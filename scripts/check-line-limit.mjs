@@ -12,7 +12,7 @@ const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), "..");
 const SCAN_DIRS = ["src", "src-tauri/src", "scripts"];
 const EXTENSIONS = new Set([
   ".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs",
-  ".rs", ".css", ".scss", ".swift", ".kt", ".html",
+  ".rs", ".css", ".scss", ".swift", ".kt", ".html", ".sh",
 ]);
 const SKIP_DIRS = new Set(["node_modules", "target", "dist", "gen", ".git"]);
 

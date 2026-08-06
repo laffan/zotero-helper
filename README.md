@@ -66,11 +66,32 @@ off.
 
 ### iOS / iPadOS
 
+One-time setup (requires macOS + Xcode):
+
 ```sh
-npm run tauri ios init   # requires macOS + Xcode; set your dev team in the generated project
-npm run tauri ios dev    # run on simulator or device
+npm run tauri ios init   # generates src-tauri/gen/apple
+# open the generated Xcode project once and set your signing team
+brew install ios-deploy  # for direct-to-device deploys
+```
+
+Day-to-day:
+
+```sh
+npm run tauri ios dev    # run on simulator or device with hot reload
+npm run ios:deploy       # build a signed .ipa AND install+launch it on a
+                         # connected iPad/iPhone via ios-deploy
+npm run ios:build        # build only (development signing), no deploy
 npm run tauri ios build  # archive for TestFlight/App Store
 ```
+
+`npm run ios:deploy` (see `scripts/ios-deploy.sh`) builds with
+`--export-method debugging` — the right signing for direct installs — then
+finds the freshest `.ipa` under `src-tauri/gen/apple/build/` and hands it to
+`ios-deploy`. Useful flags (pass after `--`):
+`--no-build` (reuse the last .ipa), `--device <udid>` (pick one of several
+devices; list them with `ios-deploy --detect`), `--debug` (launch with lldb
+attached), `--install-only`, and `--export-method <m>` / the
+`IOS_EXPORT_METHOD` env var to override signing.
 
 Notes for the iPad build:
 

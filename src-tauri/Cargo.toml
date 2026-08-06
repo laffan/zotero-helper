@@ -1,0 +1,32 @@
+[package]
+name = "zotero-helper"
+version = "0.1.0"
+description = "Companion app for Zotero on iPadOS/iOS/macOS: fetch PDFs for DOIs and push them to your library"
+authors = ["Nate Laffan"]
+edition = "2021"
+
+[lib]
+name = "zotero_helper_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+tauri-plugin-dialog = "2"
+tauri-plugin-opener = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tokio = { version = "1", features = ["time", "sync", "macros"] }
+reqwest = { version = "0.12", default-features = false, features = [
+  "json",
+  "gzip",
+  "rustls-tls-native-roots",
+] }
+thiserror = "2"
+md5 = "0.7"
+regex = "1"
+percent-encoding = "2"
+html-escape = "0.2"
+rand = "0.8"

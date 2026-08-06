@@ -20,9 +20,17 @@ impl Error {
     }
 }
 
-// Tauri commands surface errors to JS as strings.
+// Tauri commands surface errors to JS as strings. Include the source
+// chain — reqwest's Display alone says "error sending request" while the
+// actual cause (DNS, TLS certificate, timeout…) hides in the sources.
 impl serde::Serialize for Error {
     fn serialize<S: serde::Serializer>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error> {
-        serializer.serialize_str(&self.to_string())
+        let mut msg = self.to_string();
+        let mut source = std::error::Error::source(self);
+        while let Some(s) = source {
+            msg.push_str(&format!(" — {s}"));
+            source = s.source();
+        }
+        serializer.serialize_str(&msg)
     }
 }

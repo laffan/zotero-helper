@@ -138,6 +138,93 @@ fn map_crossref(msg: &Value, doi: &str) -> (Value, Vec<String>) {
     (item, candidates)
 }
 
+fn norm_tokens(s: &str) -> std::collections::HashSet<String> {
+    s.to_lowercase()
+        .chars()
+        .map(|c| if c.is_alphanumeric() { c } else { ' ' })
+        .collect::<String>()
+        .split_whitespace()
+        .map(String::from)
+        .collect()
+}
+
+/// Token-containment similarity (0..1) — tolerant of subtitles: the
+/// shorter title fully contained in the longer one scores 1.0.
+fn title_similarity(a: &str, b: &str) -> f64 {
+    let ta = norm_tokens(a);
+    let tb = norm_tokens(b);
+    if ta.is_empty() || tb.is_empty() {
+        return 0.0;
+    }
+    let inter = ta.intersection(&tb).count() as f64;
+    inter / ta.len().min(tb.len()) as f64
+}
+
+fn issued_year(v: &Value) -> Option<i64> {
+    v["issued"]["date-parts"][0][0].as_i64()
+}
+
+/// Find a DOI for an existing entry via CrossRef bibliographic search.
+/// Deliberately strict — a wrong DOI silently fetches the wrong PDF, so
+/// no match is better than a loose one. Returns None when nothing
+/// clears the bar.
+pub(super) async fn discover_doi(
+    app: &AppHandle,
+    state: &AppState,
+    title: &str,
+    author: Option<&str>,
+    year: Option<i64>,
+) -> Result<Option<String>> {
+    log(app, "info", format!("Searching CrossRef for a DOI: “{title}”"));
+    state.throttle("api.crossref.org").await;
+    let email = state.settings.read().await.contact_email.clone();
+    let mut req = state
+        .http
+        .get("https://api.crossref.org/works")
+        .query(&[
+            ("query.bibliographic", title),
+            ("rows", "5"),
+            ("select", "DOI,title,issued"),
+        ]);
+    if let Some(a) = author.filter(|a| !a.is_empty()) {
+        req = req.query(&[("query.author", a)]);
+    }
+    if !email.is_empty() {
+        req = req.query(&[("mailto", email.as_str())]);
+    }
+    let resp = req.send().await?;
+    if !resp.status().is_success() {
+        return Err(Error::msg(format!("CrossRef search failed: HTTP {}", resp.status())));
+    }
+    let body: Value = resp.json().await?;
+    let Some(items) = body["message"]["items"].as_array() else {
+        return Ok(None);
+    };
+    for cand in items {
+        let Some(cand_title) = cand["title"][0].as_str() else { continue };
+        let sim = title_similarity(title, cand_title);
+        if sim < 0.8 {
+            continue;
+        }
+        // When both sides know the year, they must roughly agree.
+        if let (Some(want), Some(got)) = (year, issued_year(cand)) {
+            if (want - got).abs() > 1 {
+                continue;
+            }
+        }
+        if let Some(doi) = cand["DOI"].as_str() {
+            log(
+                app,
+                "info",
+                format!("CrossRef match ({:.0}% title overlap): {doi}", sim * 100.0),
+            );
+            return Ok(Some(doi.to_string()));
+        }
+    }
+    log(app, "info", "No confident CrossRef match — leaving DOI empty");
+    Ok(None)
+}
+
 pub(super) async fn resolve_doi(
     app: &AppHandle,
     state: &AppState,

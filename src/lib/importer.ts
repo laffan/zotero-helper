@@ -2,6 +2,7 @@
 // through: resolve → create parent item → find PDF → download → upload.
 // Jobs that cannot fetch a PDF automatically park in "needs-manual" and the
 // user finishes them via the rescue modal / capture browser.
+import { pdfMap } from "./collections";
 import { appLog, useStore } from "./store";
 import { invoke } from "./tauri";
 import type { DownloadedPdf, Resolved, ZItemData } from "./types";
@@ -33,6 +34,54 @@ export function startImport(rawText: string, collectionKey?: string): number {
     void pump();
   }
   return identifiers.length;
+}
+
+/** Queue existing library entries into the PDF pipeline — same stages
+ *  as an import, minus item creation and metadata resolution. Entries
+ *  that already carry a PDF (or are already in flight) are skipped.
+ *  Returns how many jobs were queued. */
+export function startPdfFetch(itemKeys: string[]): number {
+  const s = useStore.getState();
+  const items = s.library.items;
+  const havePdf = pdfMap(items);
+  const inFlight = new Set(
+    s.jobOrder.map((id) => s.jobs[id]?.itemKey).filter(Boolean),
+  );
+  let queued = 0;
+  for (const key of itemKeys) {
+    const item = items.find((i) => i.key === key && !i.data?.parentItem);
+    if (!item) continue;
+    const title = String(item.data?.title ?? key);
+    if (havePdf.has(key)) {
+      appLog("info", `“${title}” already has a PDF — skipped`);
+      continue;
+    }
+    if (inFlight.has(key)) continue;
+    const doi =
+      typeof item.data?.DOI === "string" && item.data.DOI
+        ? item.data.DOI
+        : undefined;
+    const url =
+      typeof item.data?.url === "string" && item.data.url
+        ? item.data.url
+        : undefined;
+    s.addJob({
+      id: `job-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      identifier: doi ?? title,
+      stage: "pending",
+      itemKey: key,
+      item: item.data,
+      doi,
+      landingUrl: url ?? (doi ? `https://doi.org/${doi}` : undefined),
+      candidates: [],
+    });
+    queued++;
+  }
+  if (queued) {
+    appLog("info", `Queued ${queued} existing item(s) for PDF retrieval`);
+    void pump();
+  }
+  return queued;
 }
 
 async function pump(): Promise<void> {
@@ -96,6 +145,54 @@ async function runJob(id: string): Promise<void> {
         data: { ...(created?.data ?? data), key } as ZItemData,
         meta: created?.meta,
       });
+    }
+
+    // 2b. Existing entries may lack a DOI — try to discover one before
+    // the PDF hunt, and write a confident match back to Zotero so the
+    // entry is permanently improved.
+    if (!job(id).doi && job(id).item?.title) {
+      upd(id, { stage: "resolving" });
+      const data = job(id).item!;
+      try {
+        const creators = data.creators ?? [];
+        const first =
+          creators.find((c) => c.creatorType === "author") ?? creators[0];
+        const yearMatch = /\d{4}/.exec(String(data.date ?? ""));
+        const doi = await invoke<string | null>("discover_doi", {
+          title: String(data.title),
+          author: first ? first.lastName || first.name || null : null,
+          year: yearMatch ? Number(yearMatch[0]) : null,
+        });
+        if (doi) {
+          appLog("info", `Discovered DOI ${doi} for “${data.title}”`);
+          upd(id, {
+            doi,
+            landingUrl: job(id).landingUrl ?? `https://doi.org/${doi}`,
+          });
+          const local = useStore
+            .getState()
+            .library.items.find((i) => i.key === job(id).itemKey);
+          if (local) {
+            try {
+              await invoke("update_zotero_item", {
+                key: local.key,
+                version: local.version,
+                patch: { DOI: doi },
+              });
+              useStore.getState().patchItemData(local.key, { DOI: doi });
+            } catch (e) {
+              appLog("warn", `Couldn't save the discovered DOI to Zotero: ${e}`);
+            }
+          }
+        } else if (!job(id).landingUrl) {
+          appLog(
+            "warn",
+            `No DOI found for “${data.title}” — the PDF hunt has little to go on`,
+          );
+        }
+      } catch (e) {
+        appLog("warn", `DOI discovery failed: ${e}`);
+      }
     }
 
     // 3. Find PDF candidates

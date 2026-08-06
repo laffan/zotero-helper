@@ -134,6 +134,17 @@ async fn resolve_identifier(
 }
 
 #[tauri::command]
+async fn discover_doi(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    title: String,
+    author: Option<String>,
+    year: Option<i64>,
+) -> Result<Option<String>> {
+    resolve::discover_doi(&app, &state, &title, author.as_deref(), year).await
+}
+
+#[tauri::command]
 async fn find_pdf_candidates(
     app: AppHandle,
     state: State<'_, AppState>,
@@ -286,6 +297,7 @@ pub fn run() {
             update_zotero_item,
             delete_zotero_items,
             resolve_identifier,
+            discover_doi,
             find_pdf_candidates,
             download_pdf,
             attach_pdf,

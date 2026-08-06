@@ -22,6 +22,11 @@ Windows/Linux desktops too).
   fallback), Open Library / Google Books, arXiv, or Highwire meta tags. PDFs
   are discovered via Unpaywall, CrossRef full-text links, and
   `citation_pdf_url` scraping — all rate-limited.
+- **Fetch PDFs for existing entries** — select any items already in your
+  library (multi-select works) and run the same PDF pipeline without
+  re-creating metadata. Entries missing a DOI get one discovered first via
+  CrossRef bibliographic search (strict title/year matching — no match
+  beats a wrong match) and the found DOI is written back to Zotero.
 - **Manual PDF rescue** — when the automatic download is blocked (paywalls,
   Cloudflare, …) the row parks in "PDF needs your help" and offers: an
   embedded **capture browser** (desktop: any download or PDF navigation is

@@ -84,6 +84,18 @@ pub fn classify(raw: &str) -> Option<Identifier> {
     None
 }
 
+/// Find a DOI for an existing entry (CrossRef bibliographic search with
+/// strict title/year matching). See doi.rs.
+pub async fn discover_doi(
+    app: &AppHandle,
+    state: &AppState,
+    title: &str,
+    author: Option<&str>,
+    year: Option<i64>,
+) -> Result<Option<String>> {
+    doi::discover_doi(app, state, title, author, year).await
+}
+
 pub async fn resolve(app: &AppHandle, state: &AppState, raw: &str) -> Result<Resolved> {
     let id = classify(raw).ok_or_else(|| {
         Error::msg(format!(

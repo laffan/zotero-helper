@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { deleteFolder, syncNow } from "../lib/actions";
 import { tidyItems } from "../lib/ai";
+import { startPdfFetch } from "../lib/importer";
 import { useStore } from "../lib/store";
 import {
   FolderMinus,
@@ -9,6 +10,7 @@ import {
   ImportIcon,
   PanelLeft,
   PanelRight,
+  PdfIcon,
   Refresh,
   SearchIcon,
   SendIcon,
@@ -98,6 +100,15 @@ export function Toolbar() {
         >
           <ImportIcon />
           <span className="tool-label">Import IDs</span>
+        </button>
+        <button
+          className="tool-btn"
+          onClick={() => startPdfFetch(useStore.getState().selectedKeys)}
+          disabled={selectedKeys.length === 0}
+          title="Find and attach PDFs for the selected existing entries (discovers missing DOIs first)"
+        >
+          <PdfIcon />
+          <span className="tool-label">Fetch PDFs</span>
         </button>
         <button
           className="tool-btn"

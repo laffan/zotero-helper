@@ -1,0 +1,41 @@
+/* Top button bar and global search box. */
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  background: var(--panel);
+  border-bottom: 1px solid var(--border);
+  flex-wrap: nowrap;
+  overflow-x: auto;
+}
+.toolbar-group {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.toolbar-sep {
+  width: 1px;
+  height: 20px;
+  background: var(--border);
+  margin: 0 4px;
+}
+.toolbar-search {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 120px;
+  max-width: 380px;
+  margin-left: auto;
+  padding: 0 8px;
+  background: var(--panel-alt);
+  border-radius: var(--radius);
+  color: var(--text-dim);
+}
+.toolbar-search input {
+  flex: 1;
+  border: none;
+  background: transparent;
+  padding: 7px 0;
+}

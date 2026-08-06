@@ -1,0 +1,58 @@
+/* Left collections tree. */
+.sidebar {
+  width: var(--left-w, 230px);
+  min-width: 150px;
+  background: var(--panel-alt);
+  border-right: 1px solid var(--border);
+  overflow-y: auto;
+  padding-bottom: 12px;
+  flex-shrink: 0;
+}
+.sidebar-section {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-dim);
+  padding: 12px 10px 4px;
+}
+.sidebar-empty {
+  color: var(--text-dim);
+  padding: 4px 12px;
+  font-style: italic;
+}
+.tree-row {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 8px;
+  cursor: default;
+  user-select: none;
+  color: var(--text);
+}
+.tree-row:hover {
+  background: var(--select);
+}
+.tree-row.selected {
+  background: var(--select-strong);
+  font-weight: 500;
+}
+.tree-toggle {
+  display: inline-flex;
+  width: 14px;
+  color: var(--text-dim);
+}
+.tree-toggle-spacer {
+  display: inline-block;
+  width: 14px;
+}
+.tree-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+}
+.tree-count {
+  font-size: 11px;
+  color: var(--text-dim);
+}

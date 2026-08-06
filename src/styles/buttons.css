@@ -1,0 +1,82 @@
+/* Shared button primitives used across every region. */
+.tool-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: var(--radius);
+  border: 1px solid transparent;
+  white-space: nowrap;
+}
+.tool-btn:hover:not(:disabled) {
+  background: var(--panel-alt);
+}
+.tool-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.tool-btn.accent {
+  background: var(--accent);
+  color: #fff;
+}
+.tool-btn.accent:hover:not(:disabled) {
+  filter: brightness(1.08);
+  background: var(--accent);
+}
+.tool-btn.danger {
+  background: var(--bad);
+  color: #fff;
+}
+
+.icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius);
+  color: var(--text-dim);
+}
+.icon-btn:hover {
+  background: var(--panel-alt);
+  color: var(--text);
+}
+.icon-btn.active {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.mini-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  padding: 3px 8px;
+  border-radius: 5px;
+  border: 1px solid var(--border);
+  background: var(--panel);
+  white-space: nowrap;
+}
+.mini-btn:hover:not(:disabled) {
+  background: var(--panel-alt);
+}
+.mini-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.mini-btn.accent {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.link-btn {
+  color: var(--accent);
+  text-align: left;
+  font-size: 12px;
+  word-break: break-all;
+  padding: 2px 0;
+}
+.link-btn:hover {
+  text-decoration: underline;
+}

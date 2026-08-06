@@ -97,10 +97,12 @@ src/            React + TypeScript UI (Vite, zustand, MiniSearch)
   lib/          store, import pipeline driver, search index, actions
   components/   toolbar, sidebar, virtualized item list, metadata panel,
                 terminal, import/rescue modals, settings
+  styles/       one stylesheet per UI region (tokens, base, toolbar, …)
 src-tauri/      Rust core (all networking + state)
   src/zotero.rs    Zotero Web API v3: paginated sync, versioned writes,
                    3-step attachment upload (create → authorize → register)
-  src/resolve.rs   DOI/ISBN/arXiv/URL → Zotero item data
+  src/resolve/     identifier → Zotero item data; one file per source
+                   (mod = classify/dispatch, doi, isbn, arxiv, url)
   src/pdf.rs       Unpaywall + link scraping + validated downloads,
                    per-host rate limiter
   src/ai.rs        Anthropic Messages API (structured outputs) for AI Tidy
@@ -111,6 +113,33 @@ The library cache and settings live in the platform app-data directory as
 plain JSON. The import pipeline is orchestrated from the frontend (one job at
 a time; the Rust side enforces per-host politeness delays) so every step is
 visible in the UI and the log.
+
+## Code organization rules
+
+Hard rules for this repository — they apply equally to human contributors
+and **AI agents** working on the codebase:
+
+1. **700-line limit on every code file, no exceptions.** This covers *all*
+   file types — Rust, TypeScript/TSX, CSS, build scripts, everything. The
+   limit is enforced by `scripts/check-line-limit.mjs`, which runs as part of
+   `npm run build` and fails the build on violation. Check at any time with
+   `npm run check:lines`. Never raise the limit or exempt a file; if a file
+   is getting close, that is the signal to restructure *before* it overflows.
+2. **Split by feature, not by line count.** When a file needs dividing, cut
+   along feature boundaries so each module stays independently
+   understandable. Existing precedents to follow: metadata resolution is
+   `src-tauri/src/resolve/` with one file per source (CrossRef/DOI, ISBN,
+   arXiv, URL scraping) and shared helpers in `mod.rs`; styles are
+   `src/styles/` with one sheet per UI region, imported in cascade order from
+   `index.css`. New features should arrive as new sibling modules, not as
+   growth inside an existing file.
+3. **No junk-drawer modules.** Shared helpers belong in the owning feature's
+   `mod.rs` / `index.css` / a narrowly-named module — don't create a generic
+   `utils` file that everything imports and that slowly absorbs the app.
+4. Note for Rust: `cargo` does not run the line check, but `npm run build`
+   (which `tauri build` invokes) scans `src-tauri/src` too — so the rule is
+   enforced on every packaged build. Run `npm run check:lines` after backend
+   work regardless.
 
 ## Roadmap ideas
 

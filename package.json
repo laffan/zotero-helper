@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc && vite build",
+    "build": "npm run check:lines && tsc && vite build",
+    "check:lines": "node scripts/check-line-limit.mjs",
     "preview": "vite preview",
     "tauri": "tauri"
   },

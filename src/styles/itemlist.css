@@ -1,0 +1,165 @@
+/* Center item list (virtualized rows) and import-job progress rows. */
+.item-list {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  background: var(--panel);
+}
+.list-header {
+  display: flex;
+  border-bottom: 1px solid var(--border);
+  background: var(--panel);
+  padding-right: 10px;
+}
+.list-header .col {
+  text-align: left;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-dim);
+  padding: 6px 8px;
+  border-radius: 0;
+}
+.list-header .col:hover {
+  color: var(--text);
+}
+.col-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.col-creator {
+  width: 24%;
+  min-width: 90px;
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.col-year {
+  width: 52px;
+  flex-shrink: 0;
+}
+.col-pdf {
+  width: 32px;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--accent);
+}
+.list-body {
+  flex: 1;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.item-row {
+  display: flex;
+  align-items: center;
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 45%, transparent);
+  cursor: default;
+  user-select: none;
+}
+.item-row .col {
+  padding: 0 8px;
+}
+.item-row:hover {
+  background: var(--select);
+}
+.item-row.selected {
+  background: var(--select-strong);
+}
+.list-empty {
+  padding: 40px;
+  text-align: center;
+  color: var(--text-dim);
+}
+.list-footer {
+  border-top: 1px solid var(--border);
+  padding: 5px 10px;
+  font-size: 11px;
+  color: var(--text-dim);
+  background: var(--panel);
+}
+
+/* --- import pipeline rows --- */
+.job-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--border);
+  background: var(--accent-soft);
+}
+.job-row.job-done {
+  background: color-mix(in srgb, var(--good) 12%, var(--panel));
+}
+.job-row.job-error {
+  background: color-mix(in srgb, var(--bad) 12%, var(--panel));
+}
+.job-main {
+  flex: 1;
+  min-width: 0;
+}
+.job-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 500;
+  overflow: hidden;
+}
+.job-title span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.job-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  color: var(--text-dim);
+  margin-top: 3px;
+  overflow: hidden;
+}
+.job-steps {
+  display: inline-flex;
+  gap: 3px;
+  flex-shrink: 0;
+}
+.job-steps i {
+  width: 14px;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--border);
+}
+.job-steps i.on {
+  background: var(--accent);
+}
+.job-steps i.bad {
+  background: var(--bad);
+}
+.job-stage-label {
+  flex-shrink: 0;
+  font-weight: 500;
+}
+.stage-done {
+  color: var(--good);
+}
+.stage-error,
+.stage-needs-manual {
+  color: var(--bad);
+}
+.job-message {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.job-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}

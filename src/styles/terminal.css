@@ -1,0 +1,73 @@
+/* Bottom activity-log row (collapsible, resizable, copyable). */
+.terminal {
+  border-top: 1px solid var(--border);
+  background: var(--panel);
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  flex-shrink: 0;
+}
+.terminal-grip {
+  position: absolute;
+  top: -3px;
+  left: 0;
+  right: 0;
+  height: 7px;
+  cursor: row-resize;
+  touch-action: none;
+  z-index: 5;
+}
+.terminal-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 10px;
+  border-bottom: 1px solid var(--border);
+  background: var(--panel-alt);
+}
+.terminal-title {
+  font-weight: 600;
+  font-size: 12px;
+  margin-right: auto;
+}
+.terminal-pin {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  font-size: 11px;
+  color: var(--text-dim);
+}
+.terminal-body {
+  flex: 1;
+  overflow-y: auto;
+  font-family: var(--mono);
+  font-size: 11px;
+  line-height: 1.55;
+  padding: 6px 10px;
+  user-select: text;
+  -webkit-user-select: text;
+}
+.terminal-line {
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.terminal-ts {
+  color: var(--text-dim);
+  margin-right: 6px;
+}
+.terminal-lvl {
+  font-weight: 600;
+}
+.lvl-info .terminal-lvl {
+  color: var(--good);
+}
+.lvl-warn .terminal-lvl {
+  color: var(--warn);
+}
+.lvl-error .terminal-lvl {
+  color: var(--bad);
+}
+.lvl-debug .terminal-lvl,
+.terminal-line.dim {
+  color: var(--text-dim);
+}

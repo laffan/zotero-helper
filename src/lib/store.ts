@@ -14,7 +14,8 @@ export type ModalState =
   | { kind: "import" }
   | { kind: "newFolder" }
   | { kind: "sendToHush" }
-  | { kind: "rescue"; jobId: string };
+  | { kind: "rescue"; jobId: string }
+  | { kind: "capture"; jobId: string };
 
 export type SortBy = "title" | "creator" | "date" | "dateAdded";
 

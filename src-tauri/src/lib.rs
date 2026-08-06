@@ -226,34 +226,75 @@ async fn open_in_hush(app: AppHandle, url: String) -> Result<()> {
 }
 
 // ---------------------------------------------------------------------------
-// PDF rescue browser (desktop only)
+// PDF rescue browser (embedded child webview; desktop only)
 // ---------------------------------------------------------------------------
 
 #[tauri::command]
+#[allow(clippy::too_many_arguments)]
 async fn open_capture_window(
     app: AppHandle,
     state: State<'_, AppState>,
     url: String,
     job_id: String,
+    x: f64,
+    y: f64,
+    w: f64,
+    h: f64,
 ) -> Result<()> {
     #[cfg(desktop)]
     {
         let tmp = state.tmp_dir();
-        capture::open_capture_window(&app, url, job_id, tmp)
+        capture::open_capture(&app, url, job_id, tmp, x, y, w, h)
     }
     #[cfg(not(desktop))]
     {
-        let _ = (app, state, url, job_id);
+        let _ = (app, state, url, job_id, x, y, w, h);
         Err(Error::msg(
-            "The embedded capture browser is desktop-only. Use “Open in browser” and then “Attach PDF file…” instead.",
+            "The embedded capture browser is desktop-only. Use “Open in system browser” and then “Attach PDF file…” instead.",
         ))
+    }
+}
+
+#[tauri::command]
+async fn capture_set_bounds(
+    app: AppHandle,
+    job_id: String,
+    x: f64,
+    y: f64,
+    w: f64,
+    h: f64,
+) -> Result<()> {
+    #[cfg(desktop)]
+    capture::set_capture_bounds(&app, &job_id, x, y, w, h);
+    #[cfg(not(desktop))]
+    let _ = (app, job_id, x, y, w, h);
+    Ok(())
+}
+
+#[tauri::command]
+async fn capture_back(app: AppHandle, job_id: String) -> Result<()> {
+    #[cfg(desktop)]
+    capture::capture_back(&app, &job_id);
+    #[cfg(not(desktop))]
+    let _ = (app, job_id);
+    Ok(())
+}
+
+#[tauri::command]
+async fn capture_grab(app: AppHandle, job_id: String) -> Result<()> {
+    #[cfg(desktop)]
+    return capture::capture_grab(&app, &job_id);
+    #[cfg(not(desktop))]
+    {
+        let _ = (app, job_id);
+        Ok(())
     }
 }
 
 #[tauri::command]
 async fn close_capture_window(app: AppHandle, job_id: String) -> Result<()> {
     #[cfg(desktop)]
-    capture::close_capture_window(&app, &job_id);
+    capture::close_capture(&app, &job_id);
     #[cfg(not(desktop))]
     let _ = (app, job_id);
     Ok(())
@@ -306,6 +347,9 @@ pub fn run() {
             list_hush_desks,
             open_in_hush,
             open_capture_window,
+            capture_set_bounds,
+            capture_back,
+            capture_grab,
             close_capture_window,
         ])
         .run(tauri::generate_context!())

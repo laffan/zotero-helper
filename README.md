@@ -29,9 +29,12 @@ Windows/Linux desktops too).
   beats a wrong match) and the found DOI is written back to Zotero.
 - **Manual PDF rescue** — when the automatic download is blocked (paywalls,
   Cloudflare, …) the row parks in "PDF needs your help" and offers: an
-  embedded **capture browser** (desktop: any download or PDF navigation is
-  intercepted and attached automatically), the system browser + a file
-  picker (the iPad flow), candidate links, or a direct-URL box.
+  embedded **capture browser modal** (desktop: a child webview inside the
+  main window — any download or PDF-looking navigation is intercepted and
+  attached automatically, publisher popup-style "Download PDF" buttons are
+  rewritten to work, and a "Grab this page" button handles viewers we don't
+  recognize), the system browser + a file picker (the iPad flow), candidate
+  links, or a direct-URL box.
 - **AI Tidy Metadata** — with an Anthropic API key configured, selected items
   are cleaned up by Claude (grounded in a fresh CrossRef record when a DOI
   exists): casing, missing abstracts/pages/ISSNs, normalized author names.
@@ -104,10 +107,10 @@ attached), `--install-only`, and `--export-method <m>` / the
 
 Notes for the iPad build:
 
-- The embedded capture browser is desktop-only (wry download interception
-  isn't available on iOS). The rescue modal automatically falls back to
-  *open in system browser → save to Files → "Attach PDF file…"*, which uses
-  the native document picker.
+- The embedded capture browser is desktop-only (child webviews and wry
+  download interception aren't available on iOS). The capture modal detects
+  this and falls back to *open in system browser → save to Files → "Attach
+  PDF file…"*, which uses the native document picker.
 - All networking happens in the Rust core, so there are no CORS issues on
   any platform.
 

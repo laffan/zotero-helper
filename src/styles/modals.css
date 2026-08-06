@@ -78,6 +78,52 @@
   gap: 10px;
 }
 
+/* --- embedded capture-browser modal --- */
+.modal-capture {
+  width: min(1100px, 96vw);
+  height: min(820px, 92dvh);
+  max-height: none;
+}
+.capture-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+}
+.capture-title {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.capture-body {
+  flex: 1;
+  position: relative;
+  background: var(--panel-alt);
+}
+.capture-placeholder {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  color: var(--text-dim);
+  padding: 24px;
+  text-align: center;
+}
+.capture-footer {
+  padding: 8px 12px;
+  border-top: 1px solid var(--border);
+}
+
 /* --- PDF rescue modal --- */
 .rescue-actions {
   display: flex;

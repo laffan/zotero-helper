@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { bootstrap } from "./lib/actions";
 import { useStore } from "./lib/store";
+import { CaptureModal } from "./components/CaptureModal";
 import { ImportModal, NewFolderModal } from "./components/ImportModal";
 import { ItemList } from "./components/ItemList";
 import { MetadataPanel } from "./components/MetadataPanel";
@@ -80,6 +81,9 @@ export default function App() {
       )}
       {modal?.kind === "rescue" && (
         <PdfRescueModal jobId={modal.jobId} onClose={() => setModal(null)} />
+      )}
+      {modal?.kind === "capture" && (
+        <CaptureModal jobId={modal.jobId} onClose={() => setModal(null)} />
       )}
     </div>
   );

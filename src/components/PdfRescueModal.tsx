@@ -6,7 +6,6 @@ import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { downloadForJob, uploadAndFinish } from "../lib/importer";
 import { appLog, useStore } from "../lib/store";
-import { invoke } from "../lib/tauri";
 import { GlobeIcon, PdfIcon } from "./Icons";
 import { Modal } from "./Modal";
 
@@ -24,14 +23,11 @@ export function PdfRescueModal({
   if (!job) return null;
   const landing = job.landingUrl ?? job.candidates[0];
 
-  const openCapture = async () => {
+  const openCapture = () => {
     if (!landing) return;
-    try {
-      await invoke("open_capture_window", { url: landing, jobId });
-      onClose(); // capture events finish the job in the background
-    } catch (e) {
-      appLog("warn", `${e}`);
-    }
+    // Swap to the embedded capture-browser modal (desktop); it falls
+    // back with instructions when child webviews aren't supported.
+    useStore.getState().setModal({ kind: "capture", jobId });
   };
 
   const openSystem = async () => {

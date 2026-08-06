@@ -36,6 +36,10 @@ Windows/Linux desktops too).
 - **Search** — a MiniSearch index over every field (title, authors, abstract,
   tags, DOI, publication, year…), fast enough for thousands of entries on an
   M1 iPad Pro.
+- **Send to Hush** — pushes selected items' PDFs into the
+  [Hush](https://github.com/laffan/hush) writing app: pick a desk (and
+  optionally a project) and Hush downloads the PDFs itself through its own
+  Zotero credentials. See "Hush integration" below.
 - **Summary select** — selecting multiple items collapses the right panel
   into per-item summary cards (title/authors/abstract by default — the field
   set is configurable from the "Fields" popup).
@@ -134,6 +138,29 @@ The library cache and settings live in the platform app-data directory as
 plain JSON. The import pipeline is orchestrated from the frontend (one job at
 a time; the Rust side enforces per-host politeness delays) so every step is
 visible in the UI and the log.
+
+## Hush integration
+
+"Send to Hush" (toolbar, enabled on selection) is a loose coupling over a
+deep link — no shared state, no IPC channel:
+
+1. The picker modal lists Hush's desks/projects by reading the local Hush
+   data dir read-only (`{platform data dir}/com.hush.app` —
+   `src-tauri/src/hush.rs`). When that's unreadable (iPadOS sandboxing,
+   Hush on another machine) the user types names instead.
+2. Sending fires `hushwriter://zotero-import?desk=…&project=…&items=…`
+   via the `open_in_hush` command (`src/lib/hush.ts` builds the payload:
+   a JSON array of `{ itemKey, attKey, title, authors, firstAuthor, year,
+   citekey }`, chunked 8 per URL). Only items with a PDF attachment
+   already synced to Zotero are sendable — the link carries keys and
+   display metadata, never credentials.
+3. Hush's deep-link handler (`src/links/zotero-helper-import.js` in the
+   Hush repo, documented in its README-TECHNICAL "Companion-App Deep
+   Links" section) resolves the desk/project by id then case-insensitive
+   name, registers placeholder PDF nodes, and downloads the binaries
+   through its existing background pipeline with its own Zotero API key.
+
+Keep the two ends of the contract in sync when changing either side.
 
 ## Code organization rules
 

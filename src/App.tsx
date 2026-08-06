@@ -5,6 +5,7 @@ import { ImportModal, NewFolderModal } from "./components/ImportModal";
 import { ItemList } from "./components/ItemList";
 import { MetadataPanel } from "./components/MetadataPanel";
 import { PdfRescueModal } from "./components/PdfRescueModal";
+import { SendToHushModal } from "./components/SendToHushModal";
 import { SettingsView } from "./components/SettingsView";
 import { Sidebar } from "./components/Sidebar";
 import { Terminal } from "./components/Terminal";
@@ -73,6 +74,9 @@ export default function App() {
       {modal?.kind === "import" && <ImportModal onClose={() => setModal(null)} />}
       {modal?.kind === "newFolder" && (
         <NewFolderModal onClose={() => setModal(null)} />
+      )}
+      {modal?.kind === "sendToHush" && (
+        <SendToHushModal onClose={() => setModal(null)} />
       )}
       {modal?.kind === "rescue" && (
         <PdfRescueModal jobId={modal.jobId} onClose={() => setModal(null)} />

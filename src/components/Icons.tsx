@@ -154,6 +154,15 @@ export const CopyIcon = (p: IconProps = {}) =>
     p,
   );
 
+export const SendIcon = (p: IconProps = {}) =>
+  svg(
+    <>
+      <path d="M14 2L7.5 8.5" />
+      <path d="M14 2L9.8 14l-2.3-5.5L2 6.2z" />
+    </>,
+    p,
+  );
+
 export const Spinner = ({ size = 16 }: IconProps = {}) => (
   <svg
     width={size}

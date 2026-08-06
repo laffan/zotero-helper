@@ -11,6 +11,7 @@ import {
   PanelRight,
   Refresh,
   SearchIcon,
+  SendIcon,
   Sparkles,
   Spinner,
   TerminalIcon,
@@ -106,6 +107,15 @@ export function Toolbar() {
         >
           {tidying ? <Spinner /> : <Sparkles />}
           <span className="tool-label">AI Tidy</span>
+        </button>
+        <button
+          className="tool-btn"
+          onClick={() => setModal({ kind: "sendToHush" })}
+          disabled={selectedKeys.length === 0}
+          title="Send the selected items' PDFs to the Hush writing app"
+        >
+          <SendIcon />
+          <span className="tool-label">Send to Hush</span>
         </button>
         <button
           className="tool-btn"

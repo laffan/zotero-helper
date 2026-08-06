@@ -1,6 +1,7 @@
 mod ai;
 mod capture;
 mod error;
+mod hush;
 mod pdf;
 mod resolve;
 mod settings;
@@ -191,6 +192,29 @@ async fn ai_tidy_item(app: AppHandle, state: State<'_, AppState>, item: Value) -
 }
 
 // ---------------------------------------------------------------------------
+// Hush integration
+// ---------------------------------------------------------------------------
+
+/// Desk/project roster of a local Hush install (empty when unavailable).
+#[tauri::command]
+async fn list_hush_desks() -> Result<Vec<hush::HushDesk>> {
+    Ok(hush::list_desks())
+}
+
+/// Fire a hushwriter:// deep link at the Hush app. Restricted to that
+/// scheme so this command can't be used as a generic URL opener.
+#[tauri::command]
+async fn open_in_hush(app: AppHandle, url: String) -> Result<()> {
+    if !url.starts_with("hushwriter://") {
+        return Err(Error::msg("open_in_hush only accepts hushwriter:// URLs"));
+    }
+    use tauri_plugin_opener::OpenerExt;
+    app.opener()
+        .open_url(url, None::<String>)
+        .map_err(|e| Error::msg(format!("Could not open Hush — is it installed? ({e})")))
+}
+
+// ---------------------------------------------------------------------------
 // PDF rescue browser (desktop only)
 // ---------------------------------------------------------------------------
 
@@ -267,6 +291,8 @@ pub fn run() {
             attach_pdf,
             discard_temp_file,
             ai_tidy_item,
+            list_hush_desks,
+            open_in_hush,
             open_capture_window,
             close_capture_window,
         ])

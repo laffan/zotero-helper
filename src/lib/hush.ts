@@ -101,6 +101,9 @@ export async function sendToHush(
     if (desk) params.set("desk", desk);
     if (project) params.set("project", project);
     params.set("items", JSON.stringify(chunk));
+    // Deep links reach Hush more than once (every open window gets the
+    // event; iPad webview reloads replay it) — Hush dedupes on this.
+    params.set("nonce", crypto.randomUUID());
     await invoke("open_in_hush", {
       url: `hushwriter://zotero-import?${params.toString()}`,
     });

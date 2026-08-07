@@ -228,6 +228,17 @@ async fn download_attachment_file(
     Ok(tauri::ipc::Response::new(bytes))
 }
 
+/// "Get Abstract": extract the abstract from LiteParse-parsed page text.
+#[tauri::command]
+async fn ai_get_abstract(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    item: Value,
+    page_text: String,
+) -> Result<String> {
+    ai::get_abstract(&app, &state, item, page_text).await
+}
+
 /// Models available to an Anthropic API key (for the Settings dropdown).
 /// Takes the key as an argument so the not-yet-saved key in the form works.
 #[tauri::command]
@@ -405,6 +416,7 @@ pub fn run() {
             attach_pdf,
             discard_temp_file,
             ai_tidy_item,
+            ai_get_abstract,
             list_anthropic_models,
             download_attachment_file,
             list_hush_desks,

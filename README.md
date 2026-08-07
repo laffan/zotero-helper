@@ -168,12 +168,16 @@ deep link — no shared state, no IPC channel:
    data dir read-only (`{platform data dir}/com.hush.app` —
    `src-tauri/src/hush.rs`). When that's unreadable (iPadOS sandboxing,
    Hush on another machine) the user types names instead.
-2. Sending fires `hushwriter://zotero-import?desk=…&project=…&items=…`
+2. Sending fires `hushwriter://zotero-import?desk=…&project=…&items=…&nonce=…`
    via the `open_in_hush` command (`src/lib/hush.ts` builds the payload:
    a JSON array of `{ itemKey, attKey, title, authors, firstAuthor, year,
-   citekey }`, chunked 8 per URL). Only items with a PDF attachment
-   already synced to Zotero are sendable — the link carries keys and
-   display metadata, never credentials.
+   citekey }`, chunked 8 per URL, each chunk carrying a unique `nonce`
+   that Hush dedupes on — deep links get delivered to it more than once).
+   `project=__active__` targets whatever project is open in Hush's main
+   window (the iPad-friendly option, since the desk roster can't be read
+   there). Only items with a PDF attachment already synced to Zotero are
+   sendable — the link carries keys and display metadata, never
+   credentials.
 3. Hush's deep-link handler (`src/links/zotero-helper-import.js` in the
    Hush repo, documented in its README-TECHNICAL "Companion-App Deep
    Links" section) resolves the desk/project by id then case-insensitive

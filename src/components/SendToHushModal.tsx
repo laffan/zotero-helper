@@ -14,6 +14,8 @@ import { Modal } from "./Modal";
 
 const CUSTOM = "__custom__";
 const ACTIVE = "";
+/** Hush resolves this to whatever project is open in its main window. */
+const ACTIVE_PROJECT = "__active__";
 
 export function SendToHushModal({ onClose }: { onClose: () => void }) {
   const items = useStore((s) => s.library.items);
@@ -44,8 +46,10 @@ export function SendToHushModal({ onClose }: { onClose: () => void }) {
   const projectParam =
     projectChoice === CUSTOM
       ? customProject.trim()
-      : (chosenDesk?.projects ?? []).find((p) => p.id === projectChoice)
-          ?.name ?? "";
+      : projectChoice === ACTIVE_PROJECT
+        ? ACTIVE_PROJECT
+        : (chosenDesk?.projects ?? []).find((p) => p.id === projectChoice)
+            ?.name ?? "";
 
   const send = async () => {
     setBusy(true);
@@ -109,6 +113,7 @@ export function SendToHushModal({ onClose }: { onClose: () => void }) {
           onChange={(e) => setProjectChoice(e.target.value)}
         >
           <option value={ACTIVE}>None — desk’s PDFs folder only</option>
+          <option value={ACTIVE_PROJECT}>Hush’s active project</option>
           {(chosenDesk?.projects ?? []).map((p) => (
             <option key={p.id} value={p.id}>
               {p.name}

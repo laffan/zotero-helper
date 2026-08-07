@@ -23,6 +23,15 @@ impl AppState {
             .user_agent(BROWSER_UA)
             .connect_timeout(Duration::from_secs(20))
             .timeout(Duration::from_secs(120))
+            // Reliability over multiplexing: HTTP/2 uploads have stalled
+            // against api.anthropic.com on iPad (h2 flow-control + POST
+            // bodies), and h1.1 is fine for everything this app does.
+            .http1_only()
+            // iPads hop networks and suspend the app; a pooled connection
+            // that died meanwhile hangs a non-idempotent request until the
+            // full timeout. Keep pooled connections short-lived instead.
+            .pool_idle_timeout(Duration::from_secs(30))
+            .tcp_keepalive(Duration::from_secs(30))
             .build()
             .expect("failed to build HTTP client");
         AppState {

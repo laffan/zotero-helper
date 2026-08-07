@@ -128,6 +128,91 @@ const CROSSREF_NOISE: &[&str] = &[
     "content-domain", "is-referenced-by-count", "references-count", "score",
 ];
 
+const ABSTRACT_SYSTEM: &str = "You extract the abstract of a scholarly work from parsed text of \
+its first pages (extracted with a PDF parser, so reading order is generally correct but headers, \
+footers, and artifacts may be interleaved). Return JSON {\"abstract\": \"...\"}. Rules: return the \
+publication's own abstract (or summary) verbatim — fix only obvious extraction artifacts like \
+hyphenation across line breaks, stray header/footer fragments, and hard line wraps; do not \
+paraphrase, translate, or shorten. The provided item metadata tells you which work this is — if \
+the text clearly belongs to a different work, or contains no abstract, return an empty string.";
+
+/// Extract the item's abstract from LiteParse-extracted first-page text.
+/// Returns "" when no abstract is present.
+pub async fn get_abstract(
+    app: &AppHandle,
+    state: &AppState,
+    item: Value,
+    page_text: String,
+) -> Result<String> {
+    let (api_key, model) = {
+        let s = state.settings.read().await;
+        (s.anthropic_api_key.clone(), s.anthropic_model.clone())
+    };
+    if api_key.is_empty() {
+        return Err(Error::msg(
+            "No Anthropic API key configured — add one in Settings first",
+        ));
+    }
+    if page_text.trim().is_empty() {
+        return Err(Error::msg("No text could be extracted from the PDF"));
+    }
+
+    let data = if item["data"].is_object() { item["data"].clone() } else { item.clone() };
+    let brief = json!({
+        "title": data["title"],
+        "creators": data["creators"],
+        "date": data["date"],
+        "DOI": data["DOI"],
+    });
+    let prompt = format!(
+        "Item this text should belong to:\n{brief}\n\nParsed text of the first pages:\n\n{page_text}",
+    );
+
+    log(app, "info", format!("Asking {model} for the abstract…"));
+    let body = json!({
+        "model": model,
+        "max_tokens": 4096,
+        "system": ABSTRACT_SYSTEM,
+        "output_config": { "format": { "type": "json_schema", "schema": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": { "abstract": { "type": "string" } },
+            "required": ["abstract"],
+        } } },
+        "messages": [{ "role": "user", "content": prompt }],
+    });
+    let resp = state
+        .http
+        .post(ANTHROPIC_API)
+        .header("x-api-key", &api_key)
+        .header("anthropic-version", ANTHROPIC_VERSION)
+        .header("content-type", "application/json")
+        .json(&body)
+        .send()
+        .await?;
+    let status = resp.status();
+    let out: Value = resp.json().await?;
+    if !status.is_success() {
+        let msg = out["error"]["message"].as_str().unwrap_or("unknown error");
+        return Err(Error::msg(format!("Anthropic API error (HTTP {status}): {msg}")));
+    }
+    if out["stop_reason"].as_str() == Some("refusal") {
+        return Err(Error::msg("The model declined this request"));
+    }
+    let text = out["content"]
+        .as_array()
+        .and_then(|blocks| {
+            blocks
+                .iter()
+                .find(|b| b["type"].as_str() == Some("text"))
+                .and_then(|b| b["text"].as_str())
+        })
+        .ok_or_else(|| Error::msg("Empty response from the model"))?;
+    let parsed: Value = serde_json::from_str(text.trim())
+        .map_err(|e| Error::msg(format!("Model returned invalid JSON: {e}")))?;
+    Ok(parsed["abstract"].as_str().unwrap_or("").trim().to_string())
+}
+
 pub async fn tidy_item(
     app: &AppHandle,
     state: &AppState,

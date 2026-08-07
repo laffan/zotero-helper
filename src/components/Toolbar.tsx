@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { deleteFolder, syncFolder, syncNow } from "../lib/actions";
-import { tidyItems } from "../lib/ai";
+import { getAbstracts, tidyItems } from "../lib/ai";
 import { startPdfFetch } from "../lib/importer";
 import { useStore } from "../lib/store";
 import {
@@ -39,7 +39,9 @@ export function Toolbar() {
   } = useStore();
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [syncMenuOpen, setSyncMenuOpen] = useState(false);
+  const [aiMenuOpen, setAiMenuOpen] = useState(false);
   const syncMenuRef = useRef<HTMLDivElement>(null);
+  const aiMenuRef = useRef<HTMLDivElement>(null);
   const collections = useStore((s) => s.library.collections);
 
   const isRealCollection =
@@ -49,15 +51,23 @@ export function Toolbar() {
     : undefined;
 
   useEffect(() => {
-    if (!syncMenuOpen) return;
+    if (!syncMenuOpen && !aiMenuOpen) return;
     const onDown = (e: MouseEvent) => {
       if (syncMenuRef.current && !syncMenuRef.current.contains(e.target as Node)) {
         setSyncMenuOpen(false);
       }
+      if (aiMenuRef.current && !aiMenuRef.current.contains(e.target as Node)) {
+        setAiMenuOpen(false);
+      }
     };
     window.addEventListener("mousedown", onDown);
     return () => window.removeEventListener("mousedown", onDown);
-  }, [syncMenuOpen]);
+  }, [syncMenuOpen, aiMenuOpen]);
+
+  const runAi = (action: () => Promise<void>) => {
+    setAiMenuOpen(false);
+    void action();
+  };
 
   const runSync = (action: () => Promise<void>) => {
     setSyncMenuOpen(false);
@@ -132,15 +142,41 @@ export function Toolbar() {
           <PdfIcon />
           <span className="tool-label">Fetch PDFs</span>
         </button>
-        <button
-          className="tool-btn"
-          onClick={() => tidyItems(useStore.getState().selectedKeys)}
-          disabled={selectedKeys.length === 0 || tidying}
-          title="Use AI to clean up metadata for the selected items"
-        >
-          {tidying ? <Spinner /> : <Sparkles />}
-          <span className="tool-label">AI Tidy</span>
-        </button>
+        <div className="filter-anchor" ref={aiMenuRef}>
+          <button
+            className="tool-btn"
+            onClick={() => setAiMenuOpen(!aiMenuOpen)}
+            disabled={selectedKeys.length === 0 || tidying}
+            title="AI actions for the selected items"
+          >
+            {tidying ? <Spinner /> : <Sparkles />}
+            <span className="tool-label">AI ▾</span>
+          </button>
+          {aiMenuOpen && (
+            <div className="filter-pop sync-menu">
+              <button
+                className="menu-item"
+                onClick={() =>
+                  runAi(() => getAbstracts(useStore.getState().selectedKeys))
+                }
+              >
+                <strong>Get abstract</strong>
+                <span>
+                  Read it out of the PDF's first pages (items without one)
+                </span>
+              </button>
+              <button
+                className="menu-item"
+                onClick={() =>
+                  runAi(() => tidyItems(useStore.getState().selectedKeys))
+                }
+              >
+                <strong>Tidy metadata</strong>
+                <span>Clean up all fields against CrossRef</span>
+              </button>
+            </div>
+          )}
+        </div>
         <button
           className="tool-btn"
           onClick={() => setModal({ kind: "sendToHush" })}

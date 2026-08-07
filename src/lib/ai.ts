@@ -1,11 +1,65 @@
-// "AI Tidy" driver: for each selected item, render the first page of its
-// PDF (when it has one) to a downsampled JPEG, then have the backend ask
-// Claude to extract/correct metadata from that image plus a trimmed
-// CrossRef record. Fixes are written to Zotero and mirrored locally.
+// AI actions (the toolbar "AI ▾" menu). Each runs sequentially over the
+// selected items and narrates progress in the activity log.
+//
+//  - getAbstracts: LiteParse extracts text from the PDF's first pages,
+//    the model pulls the abstract out verbatim, and it's written to
+//    abstractNote. The model never has to "read" the PDF itself.
+//  - tidyItems: metadata + trimmed-CrossRef cleanup of all fields.
 import { pdfAttachmentOf } from "./collections";
 import { appLog, useStore } from "./store";
 import { invoke } from "./tauri";
 import type { ZItem } from "./types";
+
+export async function getAbstracts(keys: string[]): Promise<void> {
+  const store = useStore.getState();
+  if (store.tidying) return;
+  const items = store.library.items.filter((i) => keys.includes(i.key));
+  if (items.length === 0) return;
+
+  store.setTidying(true);
+  appLog("info", `Get Abstract: processing ${items.length} item(s)…`);
+  let changed = 0;
+  try {
+    for (const item of items) {
+      try {
+        const existing = String(item.data?.abstractNote ?? "").trim();
+        if (existing) {
+          appLog("info", `Get Abstract: “${label(item)}” already has one`);
+          continue;
+        }
+        const pageText = await firstPagesText(item);
+        if (!pageText) {
+          appLog(
+            "warn",
+            `Get Abstract: no PDF text for “${label(item)}” — skipped`,
+          );
+          continue;
+        }
+        const abstract = await invoke<string>("ai_get_abstract", {
+          item,
+          pageText,
+        });
+        if (!abstract) {
+          appLog("info", `Get Abstract: none found in “${label(item)}”`);
+          continue;
+        }
+        await invoke("update_zotero_item", {
+          key: item.key,
+          version: item.version,
+          patch: { abstractNote: abstract },
+        });
+        useStore.getState().patchItemData(item.key, { abstractNote: abstract });
+        changed++;
+        appLog("info", `Get Abstract: saved for “${label(item)}”`);
+      } catch (e) {
+        appLog("error", `Get Abstract failed on “${label(item)}”: ${e}`);
+      }
+    }
+  } finally {
+    useStore.getState().setTidying(false);
+    appLog("info", `Get Abstract finished — ${changed} item(s) updated`);
+  }
+}
 
 export async function tidyItems(keys: string[]): Promise<void> {
   const store = useStore.getState();
@@ -19,11 +73,9 @@ export async function tidyItems(keys: string[]): Promise<void> {
   try {
     for (const item of items) {
       try {
-        const pageImage = await firstPageImage(item);
         appLog("info", `AI Tidy: asking the model about “${label(item)}”…`);
         const fixes = await invoke<Record<string, unknown>>("ai_tidy_item", {
           item,
-          pageImage,
         });
         const fields = Object.keys(fixes ?? {});
         if (fields.length === 0) {
@@ -51,24 +103,22 @@ export async function tidyItems(keys: string[]): Promise<void> {
   }
 }
 
-/** First page of the item's PDF as base64 JPEG, or null when there is no
- *  PDF or any step fails (the tidy then runs on metadata alone). */
-async function firstPageImage(item: ZItem): Promise<string | null> {
+/** LiteParse text of the first pages of the item's PDF, or null when it
+ *  has no PDF / download / parsing fails. */
+async function firstPagesText(item: ZItem): Promise<string | null> {
   const att = pdfAttachmentOf(useStore.getState().library.items, item.key);
   if (!att) return null;
   try {
-    appLog("info", `AI Tidy: fetching PDF first page of “${label(item)}”…`);
-    // Lazy import: pdf.js is ~0.5 MB and only needed here.
-    const [{ renderFirstPageJpeg }, bytes] = await Promise.all([
-      import("./pdfPage"),
+    appLog("info", `Get Abstract: reading PDF of “${label(item)}”…`);
+    // Lazy import: the LiteParse WASM is ~5 MB and only needed here.
+    const [{ extractFirstPagesText }, bytes] = await Promise.all([
+      import("./pdfText"),
       invoke<ArrayBuffer>("download_attachment_file", { attKey: att.key }),
     ]);
-    return await renderFirstPageJpeg(bytes);
+    const text = await extractFirstPagesText(bytes);
+    return text || null;
   } catch (e) {
-    appLog(
-      "warn",
-      `AI Tidy: couldn't render the PDF page (${e}) — using metadata only`,
-    );
+    appLog("warn", `Get Abstract: PDF parsing failed (${e})`);
     return null;
   }
 }

@@ -39,8 +39,12 @@ Windows/Linux desktops too).
   are cleaned up by Claude (grounded in a fresh CrossRef record when a DOI
   exists): casing, missing abstracts/pages/ISSNs, normalized author names.
   Only changed fields are written back.
-- **Re-sync** — incremental sync using Zotero's `?since=` versioning; local
-  not-yet-uploaded rows are never clobbered, and remote deletions are honored.
+- **Re-sync** — the Sync menu offers three scopes: *Sync this folder*
+  (fetches only the current collection's changes — the day-to-day option
+  for five-digit libraries), *Sync all changes* (incremental via Zotero's
+  `?since=` versioning), and *Full refresh*. Local not-yet-uploaded rows
+  are never clobbered, and remote deletions are honored. Folder syncs never
+  advance the library version, so nothing elsewhere is ever skipped.
 - **Search** — a MiniSearch index over every field (title, authors, abstract,
   tags, DOI, publication, year…), fast enough for thousands of entries on an
   M1 iPad Pro.

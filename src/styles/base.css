@@ -76,6 +76,16 @@ select:focus {
   background: var(--accent-soft);
 }
 
+/* --- iPadOS 26 windowed mode --- */
+/* Apple's window-control pill overlays the top-left of the content when
+   the app is NOT full screen, and safe-area insets only report it when
+   full screen. Keep a 30px floor under the top inset on iPadOS —
+   harmless when full screen, saves the toolbar when windowed. */
+.ipados .app,
+.ipados .settings-view {
+  padding-top: max(env(safe-area-inset-top), 30px);
+}
+
 /* --- narrow-screen drawers (sidebar / metadata become slide-overs) --- */
 .drawer-scrim {
   display: none;
@@ -115,6 +125,10 @@ select:focus {
   }
   .meta-panel.open {
     transform: translateX(0);
+  }
+  .ipados .sidebar,
+  .ipados .meta-panel {
+    padding-top: max(env(safe-area-inset-top), 30px);
   }
   .drawer-scrim {
     display: block;

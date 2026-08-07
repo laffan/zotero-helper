@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { deleteFolder, syncNow } from "../lib/actions";
+import { useEffect, useRef, useState } from "react";
+import { deleteFolder, syncFolder, syncNow } from "../lib/actions";
 import { tidyItems } from "../lib/ai";
 import { startPdfFetch } from "../lib/importer";
 import { useStore } from "../lib/store";
@@ -38,9 +38,31 @@ export function Toolbar() {
     syncProgress,
   } = useStore();
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [syncMenuOpen, setSyncMenuOpen] = useState(false);
+  const syncMenuRef = useRef<HTMLDivElement>(null);
+  const collections = useStore((s) => s.library.collections);
 
   const isRealCollection =
     selectedCollection !== "all" && selectedCollection !== "unfiled";
+  const currentFolderName = isRealCollection
+    ? collections.find((c) => c.key === selectedCollection)?.data?.name
+    : undefined;
+
+  useEffect(() => {
+    if (!syncMenuOpen) return;
+    const onDown = (e: MouseEvent) => {
+      if (syncMenuRef.current && !syncMenuRef.current.contains(e.target as Node)) {
+        setSyncMenuOpen(false);
+      }
+    };
+    window.addEventListener("mousedown", onDown);
+    return () => window.removeEventListener("mousedown", onDown);
+  }, [syncMenuOpen]);
+
+  const runSync = (action: () => Promise<void>) => {
+    setSyncMenuOpen(false);
+    void action();
+  };
 
   const onDeleteFolder = async () => {
     if (!isRealCollection) return;
@@ -128,19 +150,51 @@ export function Toolbar() {
           <SendIcon />
           <span className="tool-label">Send to Hush</span>
         </button>
-        <button
-          className="tool-btn"
-          onClick={() => syncNow(false)}
-          disabled={syncing}
-          title="Re-sync with your Zotero library"
-        >
-          {syncing ? <Spinner /> : <Refresh />}
-          <span className="tool-label">
-            {syncing && syncProgress
-              ? `${syncProgress.phase} ${syncProgress.done}/${syncProgress.total}`
-              : "Sync"}
-          </span>
-        </button>
+        <div className="filter-anchor" ref={syncMenuRef}>
+          <button
+            className="tool-btn"
+            onClick={() => setSyncMenuOpen(!syncMenuOpen)}
+            disabled={syncing}
+            title="Sync options"
+          >
+            {syncing ? <Spinner /> : <Refresh />}
+            <span className="tool-label">
+              {syncing && syncProgress
+                ? `${syncProgress.phase} ${syncProgress.done}/${syncProgress.total}`
+                : "Sync ▾"}
+            </span>
+          </button>
+          {syncMenuOpen && (
+            <div className="filter-pop sync-menu">
+              <button
+                className="menu-item"
+                disabled={!isRealCollection}
+                onClick={() => runSync(() => syncFolder(selectedCollection))}
+              >
+                <strong>Sync this folder</strong>
+                <span>
+                  {isRealCollection
+                    ? `Fetch changes for “${currentFolderName}” only`
+                    : "Select a folder first"}
+                </span>
+              </button>
+              <button
+                className="menu-item"
+                onClick={() => runSync(() => syncNow(false))}
+              >
+                <strong>Sync all changes</strong>
+                <span>Incremental — everything changed since last sync</span>
+              </button>
+              <button
+                className="menu-item"
+                onClick={() => runSync(() => syncNow(true))}
+              >
+                <strong>Full refresh</strong>
+                <span>Re-download the entire library (slow)</span>
+              </button>
+            </div>
+          )}
+        </div>
       </div>
 
       <div className="toolbar-search">

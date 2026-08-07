@@ -71,6 +71,15 @@ async fn sync_library(
 }
 
 #[tauri::command]
+async fn sync_collection(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    collection_key: String,
+) -> Result<zotero::LibraryCache> {
+    zotero::sync_collection(&app, &state, &collection_key).await
+}
+
+#[tauri::command]
 async fn create_collection(
     app: AppHandle,
     state: State<'_, AppState>,
@@ -332,6 +341,7 @@ pub fn run() {
             verify_zotero_key,
             load_library,
             sync_library,
+            sync_collection,
             create_collection,
             delete_collection,
             create_zotero_items,

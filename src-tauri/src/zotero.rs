@@ -257,6 +257,39 @@ pub async fn sync_library(app: &AppHandle, state: &AppState, full: bool) -> Resu
     Ok(cache)
 }
 
+/// Folder-scoped sync: fetch this collection's items changed since the
+/// cached library version and merge them in. Deliberately does NOT
+/// advance the cached version — only whole-library syncs may do that,
+/// otherwise changes elsewhere in the library would be skipped by the
+/// next incremental sync.
+pub async fn sync_collection(
+    app: &AppHandle,
+    state: &AppState,
+    collection_key: &str,
+) -> Result<LibraryCache> {
+    let mut cache = load_cache(&state.data_dir);
+    if cache.version == 0 {
+        return Err(Error::msg("Run a full sync first — there is no local library yet"));
+    }
+    log(
+        app,
+        "info",
+        format!("Syncing folder {collection_key} (changes since v{})", cache.version),
+    );
+    let path = format!("collections/{collection_key}/items");
+    let (items, _) = fetch_all(app, state, &path, Some(cache.version), "folder").await?;
+    let changed = items.len();
+    merge_by_key(&mut cache.items, items);
+    cache.last_sync_ms = now_ms();
+    save_cache(&state.data_dir, &cache)?;
+    log(
+        app,
+        "info",
+        format!("Folder sync complete — {changed} changed item(s)"),
+    );
+    Ok(cache)
+}
+
 pub fn now_ms() -> u64 {
     std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)

@@ -84,6 +84,26 @@ export async function syncNow(full: boolean): Promise<void> {
   }
 }
 
+/** Folder-scoped sync — fetches only the given collection's changes.
+ *  The cheap option for very large libraries. */
+export async function syncFolder(key: string): Promise<void> {
+  if (key === "all" || key === "unfiled") return syncNow(false);
+  const store = useStore.getState();
+  if (store.syncing) return;
+  store.setSyncing(true);
+  try {
+    const lib = await invoke<LibraryCache>("sync_collection", {
+      collectionKey: key,
+    });
+    useStore.getState().setLibrary(lib);
+  } catch (e) {
+    appLog("error", `Folder sync failed: ${e}`);
+  } finally {
+    useStore.getState().setSyncing(false);
+    useStore.getState().setSyncProgress(null);
+  }
+}
+
 export async function saveSettings(settings: Settings): Promise<void> {
   await invoke("save_settings", { settings });
   useStore.getState().setSettings(settings);

@@ -1,5 +1,11 @@
-//! Zotero Web API v3 client: library sync, item/collection writes, and the
-//! three-step file upload flow for attachments.
+//! Zotero Web API v3 client: credentials, item/collection writes, and
+//! the three-step file upload flow for attachments. The sync engine
+//! (paginated fetches, retries, resumable initial download) lives in
+//! the `sync` submodule.
+
+mod sync;
+
+pub use sync::{sync_collection, sync_library};
 
 use crate::state::AppState;
 use crate::{log, Error, Result};
@@ -36,7 +42,7 @@ pub fn save_cache(data_dir: &Path, cache: &LibraryCache) -> Result<()> {
     Ok(())
 }
 
-async fn library_base(state: &AppState) -> Result<String> {
+pub(super) async fn library_base(state: &AppState) -> Result<String> {
     let s = state.settings.read().await;
     if s.zotero_api_key.is_empty() || s.zotero_user_id.is_empty() {
         return Err(Error::msg(
@@ -47,7 +53,7 @@ async fn library_base(state: &AppState) -> Result<String> {
     Ok(format!("{API}/{kind}/{}", s.zotero_user_id))
 }
 
-async fn api_key(state: &AppState) -> String {
+pub(super) async fn api_key(state: &AppState) -> String {
     state.settings.read().await.zotero_api_key.clone()
 }
 
@@ -61,7 +67,7 @@ fn write_token() -> String {
         .collect()
 }
 
-fn header_u64(resp: &reqwest::Response, name: &str) -> u64 {
+pub(super) fn header_u64(resp: &reqwest::Response, name: &str) -> u64 {
     resp.headers()
         .get(name)
         .and_then(|v| v.to_str().ok())
@@ -85,209 +91,6 @@ pub async fn verify_key(state: &AppState, key: &str) -> Result<Value> {
         )));
     }
     Ok(resp.json().await?)
-}
-
-/// Paginated GET over a library endpoint. Returns (objects, library_version).
-async fn fetch_all(
-    app: &AppHandle,
-    state: &AppState,
-    path: &str,
-    since: Option<u64>,
-    label: &str,
-) -> Result<(Vec<Value>, u64)> {
-    let base = library_base(state).await?;
-    let key = api_key(state).await;
-    let mut out: Vec<Value> = Vec::new();
-    let mut start = 0usize;
-    let mut version = 0u64;
-    loop {
-        let mut req = state
-            .http
-            .get(format!("{base}/{path}"))
-            .header("Zotero-API-Key", &key)
-            .header("Zotero-API-Version", "3")
-            .query(&[("format", "json"), ("include", "data")])
-            .query(&[("limit", "100"), ("start", &start.to_string())]);
-        if let Some(v) = since {
-            req = req.query(&[("since", &v.to_string())]);
-        }
-        let resp = req.send().await?;
-        if resp.status().as_u16() == 429 {
-            let wait = header_u64(&resp, "retry-after").max(2);
-            log(app, "warn", format!("Zotero rate limit hit, backing off {wait}s"));
-            tokio::time::sleep(std::time::Duration::from_secs(wait)).await;
-            continue;
-        }
-        if !resp.status().is_success() {
-            return Err(Error::msg(format!(
-                "Zotero API error fetching {path}: HTTP {}",
-                resp.status()
-            )));
-        }
-        if version == 0 {
-            version = header_u64(&resp, "last-modified-version");
-        }
-        let total = header_u64(&resp, "total-results") as usize;
-        let batch: Vec<Value> = resp.json().await?;
-        let n = batch.len();
-        out.extend(batch);
-        start += n;
-        let _ = app.emit_progress(label, out.len(), total.max(out.len()));
-        if n < 100 || start >= total {
-            break;
-        }
-    }
-    Ok((out, version))
-}
-
-trait ProgressExt {
-    fn emit_progress(&self, phase: &str, done: usize, total: usize) -> tauri::Result<()>;
-}
-impl ProgressExt for AppHandle {
-    fn emit_progress(&self, phase: &str, done: usize, total: usize) -> tauri::Result<()> {
-        use tauri::Emitter;
-        self.emit(
-            "sync-progress",
-            json!({ "phase": phase, "done": done, "total": total }),
-        )
-    }
-}
-
-fn merge_by_key(existing: &mut Vec<Value>, incoming: Vec<Value>) {
-    for obj in incoming {
-        let key = obj["key"].as_str().map(|s| s.to_string());
-        match key {
-            Some(k) => {
-                if let Some(slot) = existing
-                    .iter_mut()
-                    .find(|e| e["key"].as_str() == Some(k.as_str()))
-                {
-                    *slot = obj;
-                } else {
-                    existing.push(obj);
-                }
-            }
-            None => existing.push(obj),
-        }
-    }
-}
-
-fn remove_keys(list: &mut Vec<Value>, keys: &[String]) {
-    list.retain(|o| match o["key"].as_str() {
-        Some(k) => !keys.iter().any(|d| d == k),
-        None => true,
-    });
-}
-
-/// Full or incremental sync. Incremental sync merges changed objects and
-/// removes remotely-deleted ones without touching anything else, so local
-/// items that have not reached the server yet are preserved.
-pub async fn sync_library(app: &AppHandle, state: &AppState, full: bool) -> Result<LibraryCache> {
-    let mut cache = load_cache(&state.data_dir);
-    let full = full || cache.version == 0;
-    let since = if full { None } else { Some(cache.version) };
-
-    match since {
-        None => log(app, "info", "Starting full library sync"),
-        Some(v) => log(app, "info", format!("Starting incremental sync since version {v}")),
-    }
-
-    let (collections, v1) = fetch_all(app, state, "collections", since, "collections").await?;
-    log(app, "info", format!("Fetched {} collection(s)", collections.len()));
-    let (items, v2) = fetch_all(app, state, "items", since, "items").await?;
-    log(app, "info", format!("Fetched {} item(s)", items.len()));
-
-    if full {
-        cache.collections = collections;
-        cache.items = items;
-    } else {
-        merge_by_key(&mut cache.collections, collections);
-        merge_by_key(&mut cache.items, items);
-        // Remove objects deleted on the server since our version.
-        if let Some(v) = since {
-            let base = library_base(state).await?;
-            let key = api_key(state).await;
-            let resp = state
-                .http
-                .get(format!("{base}/deleted"))
-                .header("Zotero-API-Key", &key)
-                .header("Zotero-API-Version", "3")
-                .query(&[("since", &v.to_string())])
-                .send()
-                .await?;
-            if resp.status().is_success() {
-                let deleted: Value = resp.json().await?;
-                let to_vec = |v: &Value| -> Vec<String> {
-                    v.as_array()
-                        .map(|a| {
-                            a.iter()
-                                .filter_map(|x| x.as_str().map(|s| s.to_string()))
-                                .collect()
-                        })
-                        .unwrap_or_default()
-                };
-                let dc = to_vec(&deleted["collections"]);
-                let di = to_vec(&deleted["items"]);
-                if !dc.is_empty() || !di.is_empty() {
-                    log(
-                        app,
-                        "info",
-                        format!("Removing {} deleted item(s), {} collection(s)", di.len(), dc.len()),
-                    );
-                }
-                remove_keys(&mut cache.collections, &dc);
-                remove_keys(&mut cache.items, &di);
-            }
-        }
-    }
-
-    cache.version = cache.version.max(v1).max(v2);
-    cache.last_sync_ms = now_ms();
-    save_cache(&state.data_dir, &cache)?;
-    log(
-        app,
-        "info",
-        format!(
-            "Sync complete — {} items, {} collections (library version {})",
-            cache.items.len(),
-            cache.collections.len(),
-            cache.version
-        ),
-    );
-    Ok(cache)
-}
-
-/// Folder-scoped sync: fetch this collection's items changed since the
-/// cached library version and merge them in. Deliberately does NOT
-/// advance the cached version — only whole-library syncs may do that,
-/// otherwise changes elsewhere in the library would be skipped by the
-/// next incremental sync.
-pub async fn sync_collection(
-    app: &AppHandle,
-    state: &AppState,
-    collection_key: &str,
-) -> Result<LibraryCache> {
-    let mut cache = load_cache(&state.data_dir);
-    if cache.version == 0 {
-        return Err(Error::msg("Run a full sync first — there is no local library yet"));
-    }
-    log(
-        app,
-        "info",
-        format!("Syncing folder {collection_key} (changes since v{})", cache.version),
-    );
-    let path = format!("collections/{collection_key}/items");
-    let (items, _) = fetch_all(app, state, &path, Some(cache.version), "folder").await?;
-    let changed = items.len();
-    merge_by_key(&mut cache.items, items);
-    cache.last_sync_ms = now_ms();
-    save_cache(&state.data_dir, &cache)?;
-    log(
-        app,
-        "info",
-        format!("Folder sync complete — {changed} changed item(s)"),
-    );
-    Ok(cache)
 }
 
 pub fn now_ms() -> u64 {

@@ -45,6 +45,10 @@ Windows/Linux desktops too).
   `?since=` versioning), and *Full refresh*. Local not-yet-uploaded rows
   are never clobbered, and remote deletions are honored. Folder syncs never
   advance the library version, so nothing elsewhere is ever skipped.
+  Initial downloads are **resumable**: every page is retried with backoff
+  and journaled to disk, so flaky Wi-Fi or iPad app suspension resumes
+  where it stopped instead of restarting, and a catch-up pass afterwards
+  merges anything that changed during the long download.
 - **Search** — a MiniSearch index over every field (title, authors, abstract,
   tags, DOI, publication, year…), fast enough for thousands of entries on an
   M1 iPad Pro.

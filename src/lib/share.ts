@@ -3,6 +3,7 @@
 // plugin, anchored at the Share button) — or, on desktop, exported
 // through save/folder dialogs.
 import { creatorSummary, pdfAttachmentOf, yearOf } from "./collections";
+import { scheduleTrayClear } from "../components/TaskTray";
 import { appLog, useStore } from "./store";
 import { invoke } from "./tauri";
 import type { ZItem } from "./types";
@@ -30,18 +31,33 @@ export async function sharePdfs(
     );
   }
 
+  const store = useStore.getState();
+  store.startUiTasks(
+    "Share PDFs",
+    withPdf.map(({ item }) => ({ id: item.key, title: label(item) })),
+  );
   const paths: string[] = [];
-  for (const { item, att } of withPdf) {
-    try {
-      appLog("info", `Share PDFs: fetching “${label(item)}”…`);
-      const path = await invoke<string>("stage_attachment_for_share", {
-        attKey: att.key,
-        fileName: pdfFileName(item, att),
-      });
-      paths.push(path);
-    } catch (e) {
-      appLog("error", `Share PDFs: “${label(item)}” failed: ${e}`);
+  try {
+    for (const { item, att } of withPdf) {
+      try {
+        store.updateUiTask(item.key, { status: "working" });
+        appLog("info", `Share PDFs: fetching “${label(item)}”…`);
+        const path = await invoke<string>("stage_attachment_for_share", {
+          attKey: att.key,
+          fileName: pdfFileName(item, att),
+        });
+        paths.push(path);
+        store.updateUiTask(item.key, { status: "done" });
+      } catch (e) {
+        appLog("error", `Share PDFs: “${label(item)}” failed: ${e}`);
+        store.updateUiTask(item.key, {
+          status: "error",
+          note: String(e).slice(0, 80),
+        });
+      }
     }
+  } finally {
+    scheduleTrayClear();
   }
   if (paths.length === 0) return;
   await presentShare(paths, anchor, `${paths.length} PDF(s)`);

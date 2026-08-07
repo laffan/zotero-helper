@@ -6,11 +6,84 @@ use crate::state::AppState;
 use crate::{log, Error, Result};
 use percent_encoding::{utf8_percent_encode, NON_ALPHANUMERIC};
 use serde_json::{json, Value};
+use std::time::{Duration, Instant};
 use tauri::AppHandle;
 
 const ANTHROPIC_API: &str = "https://api.anthropic.com/v1/messages";
 const ANTHROPIC_MODELS_API: &str = "https://api.anthropic.com/v1/models";
 const ANTHROPIC_VERSION: &str = "2023-06-01";
+const MODEL_TIMEOUT: Duration = Duration::from_secs(90);
+
+/// POST to the Messages API with a per-request timeout, one retry on
+/// transport failures (fresh connection), and timing logs — so a stall
+/// is visible in the terminal instead of looking like a silent hang.
+/// Returns the response's text content.
+async fn call_model(
+    app: &AppHandle,
+    state: &AppState,
+    api_key: &str,
+    body: &Value,
+) -> Result<String> {
+    let model = body["model"].as_str().unwrap_or("?").to_string();
+    let started = Instant::now();
+    let mut attempt = 0;
+    let resp = loop {
+        attempt += 1;
+        let sent = Instant::now();
+        let r = state
+            .http
+            .post(ANTHROPIC_API)
+            .header("x-api-key", api_key)
+            .header("anthropic-version", ANTHROPIC_VERSION)
+            .header("content-type", "application/json")
+            .timeout(MODEL_TIMEOUT)
+            .json(body)
+            .send()
+            .await;
+        match r {
+            Ok(resp) => break resp,
+            Err(e) if attempt == 1 => log(
+                app,
+                "warn",
+                format!(
+                    "Model request failed after {:.0}s ({e}) — retrying once…",
+                    sent.elapsed().as_secs_f32()
+                ),
+            ),
+            Err(e) => return Err(e.into()),
+        }
+    };
+    let status = resp.status();
+    let out: Value = resp.json().await?;
+    if !status.is_success() {
+        let msg = out["error"]["message"].as_str().unwrap_or("unknown error");
+        return Err(Error::msg(format!("Anthropic API error (HTTP {status}): {msg}")));
+    }
+    if out["stop_reason"].as_str() == Some("refusal") {
+        return Err(Error::msg("The model declined this request"));
+    }
+    log(
+        app,
+        "info",
+        format!(
+            "← {model} replied in {:.1}s ({} tokens in, {} out, stop: {})",
+            started.elapsed().as_secs_f32(),
+            out["usage"]["input_tokens"].as_u64().unwrap_or(0),
+            out["usage"]["output_tokens"].as_u64().unwrap_or(0),
+            out["stop_reason"].as_str().unwrap_or("?"),
+        ),
+    );
+    out["content"]
+        .as_array()
+        .and_then(|blocks| {
+            blocks
+                .iter()
+                .find(|b| b["type"].as_str() == Some("text"))
+                .and_then(|b| b["text"].as_str())
+        })
+        .map(String::from)
+        .ok_or_else(|| Error::msg("Empty response from the model"))
+}
 
 #[derive(serde::Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -168,7 +241,14 @@ pub async fn get_abstract(
         "Item this text should belong to:\n{brief}\n\nParsed text of the first pages:\n\n{page_text}",
     );
 
-    log(app, "info", format!("Asking {model} for the abstract…"));
+    log(
+        app,
+        "info",
+        format!(
+            "→ {model}: find the abstract in {} chars of parsed text (waiting, up to 90s/try)…",
+            page_text.len()
+        ),
+    );
     let body = json!({
         "model": model,
         "max_tokens": 4096,
@@ -181,33 +261,7 @@ pub async fn get_abstract(
         } } },
         "messages": [{ "role": "user", "content": prompt }],
     });
-    let resp = state
-        .http
-        .post(ANTHROPIC_API)
-        .header("x-api-key", &api_key)
-        .header("anthropic-version", ANTHROPIC_VERSION)
-        .header("content-type", "application/json")
-        .json(&body)
-        .send()
-        .await?;
-    let status = resp.status();
-    let out: Value = resp.json().await?;
-    if !status.is_success() {
-        let msg = out["error"]["message"].as_str().unwrap_or("unknown error");
-        return Err(Error::msg(format!("Anthropic API error (HTTP {status}): {msg}")));
-    }
-    if out["stop_reason"].as_str() == Some("refusal") {
-        return Err(Error::msg("The model declined this request"));
-    }
-    let text = out["content"]
-        .as_array()
-        .and_then(|blocks| {
-            blocks
-                .iter()
-                .find(|b| b["type"].as_str() == Some("text"))
-                .and_then(|b| b["text"].as_str())
-        })
-        .ok_or_else(|| Error::msg("Empty response from the model"))?;
+    let text = call_model(app, state, &api_key, &body).await?;
     let parsed: Value = serde_json::from_str(text.trim())
         .map_err(|e| Error::msg(format!("Model returned invalid JSON: {e}")))?;
     Ok(parsed["abstract"].as_str().unwrap_or("").trim().to_string())
@@ -238,18 +292,20 @@ pub async fn tidy_item(
     // Ground the model with a fresh authoritative record when possible.
     let mut context = String::new();
     if let Some(doi) = data["DOI"].as_str().filter(|d| !d.is_empty()) {
+        log(app, "info", format!("Fetching CrossRef record for {doi}…"));
         state.throttle("api.crossref.org").await;
         let mut req = state
             .http
             .get(format!(
                 "https://api.crossref.org/works/{}",
                 utf8_percent_encode(doi, NON_ALPHANUMERIC)
-            ));
+            ))
+            .timeout(Duration::from_secs(30));
         if !email.is_empty() {
             req = req.query(&[("mailto", email.as_str())]);
         }
-        if let Ok(resp) = req.send().await {
-            if resp.status().is_success() {
+        match req.send().await {
+            Ok(resp) if resp.status().is_success() => {
                 if let Ok(body) = resp.json::<Value>().await {
                     let mut record = body["message"].clone();
                     if let Some(obj) = record.as_object_mut() {
@@ -261,9 +317,26 @@ pub async fn tidy_item(
                         "\n\nAuthoritative CrossRef record for DOI {doi}:\n{}",
                         serde_json::to_string_pretty(&record).unwrap_or_default()
                     );
+                    log(
+                        app,
+                        "info",
+                        format!("CrossRef grounding: {} chars after trimming", context.len()),
+                    );
                 }
             }
+            Ok(resp) => log(
+                app,
+                "warn",
+                format!("CrossRef lookup failed (HTTP {}) — continuing without it", resp.status()),
+            ),
+            Err(e) => log(
+                app,
+                "warn",
+                format!("CrossRef lookup failed ({e}) — continuing without it"),
+            ),
         }
+    } else {
+        log(app, "info", "Item has no DOI — tidying without CrossRef grounding");
     }
 
     let prompt = format!(
@@ -281,8 +354,16 @@ pub async fn tidy_item(
     }
     content.push(json!({ "type": "text", "text": prompt }));
 
-    let with = if page_image.is_some() { " (with first-page image)" } else { "" };
-    log(app, "info", format!("Asking {model} to tidy metadata{with}…"));
+    let with = if page_image.is_some() { " + first-page image" } else { "" };
+    log(
+        app,
+        "info",
+        format!(
+            "→ {model}: tidy request, {} chars prompt ({} chars CrossRef){with} (waiting, up to 90s/try)…",
+            prompt.len(),
+            context.len()
+        ),
+    );
     let body = json!({
         "model": model,
         "max_tokens": 8192,
@@ -291,33 +372,7 @@ pub async fn tidy_item(
         "messages": [{ "role": "user", "content": content }],
     });
 
-    let resp = state
-        .http
-        .post(ANTHROPIC_API)
-        .header("x-api-key", &api_key)
-        .header("anthropic-version", ANTHROPIC_VERSION)
-        .header("content-type", "application/json")
-        .json(&body)
-        .send()
-        .await?;
-    let status = resp.status();
-    let out: Value = resp.json().await?;
-    if !status.is_success() {
-        let msg = out["error"]["message"].as_str().unwrap_or("unknown error");
-        return Err(Error::msg(format!("Anthropic API error (HTTP {status}): {msg}")));
-    }
-    if out["stop_reason"].as_str() == Some("refusal") {
-        return Err(Error::msg("The model declined this request"));
-    }
-    let text = out["content"]
-        .as_array()
-        .and_then(|blocks| {
-            blocks
-                .iter()
-                .find(|b| b["type"].as_str() == Some("text"))
-                .and_then(|b| b["text"].as_str())
-        })
-        .ok_or_else(|| Error::msg("Empty response from the model"))?;
+    let text = call_model(app, state, &api_key, &body).await?;
     let fixes: Value = serde_json::from_str(text.trim())
         .map_err(|e| Error::msg(format!("Model returned invalid JSON: {e}")))?;
     Ok(fixes)

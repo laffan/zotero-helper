@@ -1,0 +1,78 @@
+/* Floating progress tray (bottom-right) for AI / share batches. */
+.task-tray {
+  position: fixed;
+  right: 14px;
+  bottom: 14px;
+  z-index: 40;
+  min-width: 240px;
+  max-width: 340px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: 0 8px 24px rgb(0 0 0 / 0.22);
+  padding: 8px 10px;
+  font-size: 12px;
+}
+.task-tray-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+.task-tray-count {
+  color: var(--text-dim);
+  font-variant-numeric: tabular-nums;
+}
+.task-line {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 0;
+  min-width: 0;
+}
+.task-line .task-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.task-line .task-note {
+  color: var(--text-dim);
+  max-width: 40%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.task-queued {
+  color: var(--text-dim);
+}
+.task-done {
+  color: var(--text-dim);
+}
+.task-done svg {
+  color: var(--accent);
+}
+.task-error .task-note,
+.task-error svg {
+  color: var(--danger, #c0392b);
+}
+.task-dot {
+  width: 11px;
+  height: 11px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.task-dot::before {
+  content: "";
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--border);
+}
+.task-more {
+  color: var(--text-dim);
+  font-size: 11px;
+}

@@ -19,9 +19,29 @@
   color: var(--text-dim);
   padding: 6px 8px;
   border-radius: 0;
+  position: relative;
 }
 .list-header .col:hover {
   color: var(--text);
+}
+.col-grip {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  right: -4px;
+  width: 9px;
+  cursor: col-resize;
+  touch-action: none;
+  z-index: 1;
+}
+.col-grip:hover {
+  background: linear-gradient(
+    to right,
+    transparent 3px,
+    var(--border) 4px,
+    var(--border) 5px,
+    transparent 6px
+  );
 }
 .col-title {
   flex: 1;
@@ -31,20 +51,23 @@
   white-space: nowrap;
 }
 .col-creator {
-  width: 24%;
-  min-width: 90px;
-  max-width: 220px;
+  width: var(--w-creator, 180px);
+  flex-shrink: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 .col-year {
-  width: 52px;
+  width: var(--w-year, 52px);
   flex-shrink: 0;
+  overflow: hidden;
+  white-space: nowrap;
 }
 .col-added {
-  width: 88px;
+  width: var(--w-added, 92px);
   flex-shrink: 0;
+  overflow: hidden;
+  white-space: nowrap;
   font-variant-numeric: tabular-nums;
 }
 @media (max-width: 640px) {

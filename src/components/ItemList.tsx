@@ -14,7 +14,7 @@ import {
   yearOf,
 } from "../lib/collections";
 import { retryJob } from "../lib/importer";
-import { useStore } from "../lib/store";
+import { useStore, type ResizableCol } from "../lib/store";
 import { useSearchResults } from "../lib/search";
 import type { ImportJob, ImportStage, ZItem } from "../lib/types";
 import { CheckIcon, CloseIcon, PdfIcon, Spinner } from "./Icons";
@@ -22,6 +22,45 @@ import { CheckIcon, CloseIcon, PdfIcon, Spinner } from "./Icons";
 const ROW_HEIGHT = 36;
 const JOB_ROW_HEIGHT = 52;
 const OVERSCAN = 8;
+
+const MONTHS = [
+  "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+  "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+];
+
+function fmtAdded(iso: string): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso.slice(0, 10);
+  return `${MONTHS[d.getMonth()]} ${d.getDate()} ${d.getFullYear()}`;
+}
+
+/** Drag handle on a header column's right edge. */
+function ColGrip({ col }: { col: ResizableCol }) {
+  const start = (e: React.PointerEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const startX = e.clientX;
+    const startW = useStore.getState().colWidths[col];
+    const onMove = (ev: PointerEvent) => {
+      const w = Math.min(420, Math.max(40, startW + ev.clientX - startX));
+      useStore.getState().setColWidth(col, w);
+    };
+    const onUp = () => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+    };
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+  };
+  return (
+    <span
+      className="col-grip"
+      onPointerDown={start}
+      onClick={(e) => e.stopPropagation()}
+    />
+  );
+}
 
 const STAGE_LABELS: Record<ImportStage, string> = {
   pending: "Queued",
@@ -216,20 +255,34 @@ export function ItemList() {
   const sortIndicator = (col: string) =>
     sortBy === col ? (sortDir === "asc" ? " ↑" : " ↓") : "";
 
+  const colWidths = useStore((s) => s.colWidths);
+
   return (
-    <section className="item-list">
+    <section
+      className="item-list"
+      style={
+        {
+          "--w-creator": `${colWidths.creator}px`,
+          "--w-year": `${colWidths.year}px`,
+          "--w-added": `${colWidths.added}px`,
+        } as React.CSSProperties
+      }
+    >
       <div className="list-header">
         <button className="col col-title" onClick={() => setSort("title")}>
           Title{sortIndicator("title")}
         </button>
         <button className="col col-creator" onClick={() => setSort("creator")}>
           Creator{sortIndicator("creator")}
+          <ColGrip col="creator" />
         </button>
         <button className="col col-year" onClick={() => setSort("date")}>
           Year{sortIndicator("date")}
+          <ColGrip col="year" />
         </button>
         <button className="col col-added" onClick={() => setSort("dateAdded")}>
           Added{sortIndicator("dateAdded")}
+          <ColGrip col="added" />
         </button>
         <span className="col col-pdf" title="PDF attached">
           <PdfIcon size={13} />
@@ -280,7 +333,7 @@ export function ItemList() {
                 <span className="col col-creator">{creatorSummary(item)}</span>
                 <span className="col col-year">{yearOf(item)}</span>
                 <span className="col col-added">
-                  {String(item.data?.dateAdded ?? "").slice(0, 10)}
+                  {fmtAdded(String(item.data?.dateAdded ?? ""))}
                 </span>
                 <span className="col col-pdf">
                   {withPdf.has(item.key) && <PdfIcon size={13} />}

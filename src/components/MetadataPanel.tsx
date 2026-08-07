@@ -31,8 +31,14 @@ function SingleItemEditor({ item }: { item: ZItem }) {
   const [creators, setCreators] = useState<ZCreator[]>([]);
   const [saving, setSaving] = useState(false);
   const [dirty, setDirty] = useState(false);
+  const lastKey = useRef<string | null>(null);
 
+  // Re-seed the draft on selection change, and also whenever the item's
+  // data changes underneath us (AI actions, sync) — but never clobber
+  // edits the user is in the middle of making.
   useEffect(() => {
+    if (lastKey.current === item.key && dirty) return;
+    lastKey.current = item.key;
     const d: Record<string, string> = {
       title: String(item.data?.title ?? ""),
       abstractNote: String(item.data?.abstractNote ?? ""),
@@ -43,7 +49,8 @@ function SingleItemEditor({ item }: { item: ZItem }) {
     setDraft(d);
     setCreators((item.data?.creators ?? []).map((c) => ({ ...c })));
     setDirty(false);
-  }, [item.key, item.version]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [item, dirty]);
 
   const setField = (id: string, value: string) => {
     setDraft((d) => ({ ...d, [id]: value }));

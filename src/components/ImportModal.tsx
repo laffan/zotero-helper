@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { createFolder } from "../lib/actions";
 import { startImport } from "../lib/importer";
+import { extractIdentifiers } from "../lib/identifiers";
 import { useStore } from "../lib/store";
 import { Modal } from "./Modal";
 
@@ -18,10 +19,7 @@ export function ImportModal({ onClose }: { onClose: () => void }) {
     );
   }, [selectedCollection, collections]);
 
-  const count = text
-    .split(/[\n;,]+/)
-    .map((s) => s.trim())
-    .filter(Boolean).length;
+  const count = useMemo(() => extractIdentifiers(text).length, [text]);
 
   const go = () => {
     startImport(text, selectedCollection);
@@ -31,9 +29,10 @@ export function ImportModal({ onClose }: { onClose: () => void }) {
   return (
     <Modal title="Import identifiers" onClose={onClose}>
       <p className="hint">
-        Paste DOIs, ISBNs, arXiv IDs, or URLs — one per line (commas and
-        semicolons work too). Each entry becomes a Zotero item; the app then
-        hunts for its PDF and uploads it to your library.
+        Paste DOIs, ISBNs, arXiv IDs, or URLs — clean lists, or messy notes
+        with several identifiers per line (DOIs are picked out of prose and
+        doi.org links). Each one becomes a Zotero item; the app then hunts
+        for its PDF and uploads it to your library.
       </p>
       <textarea
         className="import-textarea"

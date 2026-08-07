@@ -11,6 +11,7 @@ import { SettingsView } from "./components/SettingsView";
 import { Sidebar } from "./components/Sidebar";
 import { Terminal } from "./components/Terminal";
 import { Toolbar } from "./components/Toolbar";
+import { TaskTray } from "./components/TaskTray";
 
 function PaneResizer({ side }: { side: "left" | "right" }) {
   const { leftWidth, rightWidth, setPaneSizes } = useStore();
@@ -71,6 +72,7 @@ export default function App() {
         <MetadataPanel />
       </div>
       <Terminal />
+      <TaskTray />
 
       {modal?.kind === "import" && <ImportModal onClose={() => setModal(null)} />}
       {modal?.kind === "newFolder" && (

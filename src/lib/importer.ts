@@ -3,6 +3,7 @@
 // Jobs that cannot fetch a PDF automatically park in "needs-manual" and the
 // user finishes them via the rescue modal / capture browser.
 import { pdfMap } from "./collections";
+import { extractIdentifiers } from "./identifiers";
 import { appLog, useStore } from "./store";
 import { invoke } from "./tauri";
 import type { DownloadedPdf, Resolved, ZItemData } from "./types";
@@ -11,10 +12,7 @@ let pumping = false;
 const inFlightCaptures = new Set<string>();
 
 export function startImport(rawText: string, collectionKey?: string): number {
-  const identifiers = rawText
-    .split(/[\n;,]+/)
-    .map((s) => s.trim())
-    .filter(Boolean);
+  const identifiers = extractIdentifiers(rawText);
   const store = useStore.getState();
   for (const identifier of identifiers) {
     const id = `job-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;

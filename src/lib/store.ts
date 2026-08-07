@@ -30,6 +30,18 @@ interface UiPrefs {
   /** Sidebar folders folded shut (unlisted folders render open, so new
    *  collections start expanded). */
   collapsedFolders: string[];
+  /** Item-list column widths (px), draggable from the list header. */
+  colWidths: { creator: number; year: number; added: number };
+}
+
+export type ResizableCol = keyof UiPrefs["colWidths"];
+
+/** A row in the task tray — lightweight progress for AI/share batches. */
+export interface UiTask {
+  id: string;
+  title: string;
+  status: "queued" | "working" | "done" | "error";
+  note?: string;
 }
 
 interface AppStore extends UiPrefs {
@@ -67,6 +79,13 @@ interface AppStore extends UiPrefs {
   setSummaryFields: (f: string[]) => void;
   setPaneSizes: (p: Partial<Pick<UiPrefs, "leftWidth" | "rightWidth" | "termHeight">>) => void;
   toggleFolder: (key: string) => void;
+  setColWidth: (col: ResizableCol, w: number) => void;
+
+  uiTasks: UiTask[];
+  uiTaskLabel: string;
+  startUiTasks: (label: string, tasks: { id: string; title: string }[]) => void;
+  updateUiTask: (id: string, patch: Partial<UiTask>) => void;
+  clearUiTasks: () => void;
 
   pushLog: (line: LogLine) => void;
   clearLogs: () => void;
@@ -98,6 +117,9 @@ export const useStore = create<AppStore>()(
       sortBy: "dateAdded" as SortBy,
       sortDir: "desc" as const,
       collapsedFolders: [],
+      colWidths: { creator: 180, year: 52, added: 92 },
+      uiTasks: [],
+      uiTaskLabel: "",
 
       settings: null,
       library: EMPTY_LIBRARY,
@@ -146,6 +168,19 @@ export const useStore = create<AppStore>()(
             ? s.collapsedFolders.filter((k) => k !== key)
             : [...s.collapsedFolders, key],
         })),
+      setColWidth: (col, w) =>
+        set((s) => ({ colWidths: { ...s.colWidths, [col]: w } })),
+
+      startUiTasks: (uiTaskLabel, tasks) =>
+        set({
+          uiTaskLabel,
+          uiTasks: tasks.map((t) => ({ ...t, status: "queued" as const })),
+        }),
+      updateUiTask: (id, patch) =>
+        set((s) => ({
+          uiTasks: s.uiTasks.map((t) => (t.id === id ? { ...t, ...patch } : t)),
+        })),
+      clearUiTasks: () => set({ uiTasks: [], uiTaskLabel: "" }),
 
       pushLog: (line) =>
         set((s) => ({ logs: [...s.logs.slice(-1999), line] })),
@@ -197,6 +232,7 @@ export const useStore = create<AppStore>()(
         sortDir: s.sortDir,
         collapsedFolders: s.collapsedFolders,
         selectedCollection: s.selectedCollection,
+        colWidths: s.colWidths,
       }),
     },
   ),

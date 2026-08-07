@@ -43,6 +43,35 @@ export async function bootstrap(): Promise<void> {
     }
   });
 
+  // iPad: the native capture view (tauri-plugin-capture-view) reports
+  // results as plugin events rather than app events.
+  if (document.documentElement.classList.contains("ipados")) {
+    try {
+      const { addPluginListener } = await import("@tauri-apps/api/core");
+      await addPluginListener(
+        "capture-view",
+        "captured",
+        (p: { jobId: string; path: string }) => {
+          appLog("info", "Capture browser intercepted a PDF");
+          void captureFinished(p.jobId, p.path);
+        },
+      );
+      await addPluginListener(
+        "capture-view",
+        "failed",
+        (p: { jobId: string; message: string }) => {
+          appLog("warn", `Capture: ${p.message}`);
+          useStore.getState().updateJob(p.jobId, {
+            stage: "needs-manual",
+            message: p.message,
+          });
+        },
+      );
+    } catch (e) {
+      appLog("debug", `Capture plugin events unavailable: ${e}`);
+    }
+  }
+
   try {
     const settings = await invoke<Settings>("get_settings");
     store.setSettings(settings);

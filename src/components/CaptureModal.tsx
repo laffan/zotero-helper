@@ -145,8 +145,9 @@ export function CaptureModal({
           )}
         </div>
         <div className="capture-footer hint">
-          Download the PDF on the publisher page (or navigate to it) and it's
-          attached automatically — use “Grab this page” if it's already showing.
+          {job.stage === "needs-manual" && job.message
+            ? `⚠ ${job.message}`
+            : "Download the PDF on the publisher page (or navigate to it) and it's attached automatically — use “Grab this page” if it's already showing."}
         </div>
       </div>
     </div>

@@ -28,13 +28,14 @@ Windows/Linux desktops too).
   CrossRef bibliographic search (strict title/year matching — no match
   beats a wrong match) and the found DOI is written back to Zotero.
 - **Manual PDF rescue** — when the automatic download is blocked (paywalls,
-  Cloudflare, …) the row parks in "PDF needs your help" and offers: an
-  embedded **capture browser modal** (desktop: a child webview inside the
-  main window — any download or PDF-looking navigation is intercepted and
-  attached automatically, publisher popup-style "Download PDF" buttons are
-  rewritten to work, and a "Grab this page" button handles viewers we don't
-  recognize), the system browser + a file picker (the iPad flow), candidate
-  links, or a direct-URL box.
+  Cloudflare, …) the row parks in "PDF needs your help" and offers an
+  embedded **capture browser modal** on every platform: a child webview
+  inside the main window on desktop, a native WKWebView overlay on iPad
+  (with MIME-type PDF detection and cookie-aware downloads via a custom
+  plugin). Downloads and PDF navigations are intercepted and attached
+  automatically, popup-style "Download PDF" buttons are rewritten to work,
+  and "Grab this page" handles viewers we don't recognize. System browser +
+  file picker, candidate links, and a direct-URL box remain as fallbacks.
 - **AI Tidy Metadata** — with an Anthropic API key configured, selected items
   are cleaned up by Claude (grounded in a fresh CrossRef record when a DOI
   exists): casing, missing abstracts/pages/ISSNs, normalized author names.
@@ -115,10 +116,13 @@ attached), `--install-only`, and `--export-method <m>` / the
 
 Notes for the iPad build:
 
-- The embedded capture browser is desktop-only (child webviews and wry
-  download interception aren't available on iOS). The capture modal detects
-  this and falls back to *open in system browser → save to Files → "Attach
-  PDF file…"*, which uses the native document picker.
+- The capture browser works in-app on iPad via a custom plugin
+  (`src-tauri/tauri-plugin-capture-view/`): a native WKWebView overlays the
+  modal body, PDFs are recognized by response MIME type and downloaded
+  through WKDownload *inside the page's own cookie session* (so paywalled
+  PDFs come through), and "Grab this page" re-fetches the current URL with
+  the webview's cookies. The system-browser + "Attach PDF file…" path
+  remains as a manual fallback.
 - All networking happens in the Rust core, so there are no CORS issues on
   any platform.
 

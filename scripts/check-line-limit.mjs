@@ -9,7 +9,7 @@ import { fileURLToPath } from "node:url";
 
 const LIMIT = 700;
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), "..");
-const SCAN_DIRS = ["src", "src-tauri/src", "scripts"];
+const SCAN_DIRS = ["src", "src-tauri", "scripts"];
 const EXTENSIONS = new Set([
   ".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs",
   ".rs", ".css", ".scss", ".swift", ".kt", ".html", ".sh",

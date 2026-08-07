@@ -18,6 +18,8 @@ tauri-build = { version = "2", features = [] }
 tauri = { version = "2", features = ["unstable"] }
 tauri-plugin-dialog = "2"
 tauri-plugin-opener = "2"
+# In-app PDF capture browser for iPad (native WKWebView overlay).
+tauri-plugin-capture-view = { path = "tauri-plugin-capture-view" }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 tokio = { version = "1", features = ["time", "sync", "macros"] }

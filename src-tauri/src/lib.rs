@@ -235,8 +235,14 @@ async fn open_in_hush(app: AppHandle, url: String) -> Result<()> {
 }
 
 // ---------------------------------------------------------------------------
-// PDF rescue browser (embedded child webview; desktop only)
+// PDF rescue browser. Desktop: Tauri child webview (src/capture.rs).
+// Mobile: native WKWebView overlay (tauri-plugin-capture-view).
 // ---------------------------------------------------------------------------
+
+#[cfg(not(desktop))]
+fn capture_plugin(app: &AppHandle) -> State<'_, tauri_plugin_capture_view::CaptureView<tauri::Wry>> {
+    app.state::<tauri_plugin_capture_view::CaptureView<tauri::Wry>>()
+}
 
 #[tauri::command]
 #[allow(clippy::too_many_arguments)]
@@ -257,10 +263,10 @@ async fn open_capture_window(
     }
     #[cfg(not(desktop))]
     {
-        let _ = (app, state, url, job_id, x, y, w, h);
-        Err(Error::msg(
-            "The embedded capture browser is desktop-only. Use “Open in system browser” and then “Attach PDF file…” instead.",
-        ))
+        let _ = state;
+        capture_plugin(&app)
+            .open(tauri_plugin_capture_view::OpenArgs { url, job_id, x, y, w, h })
+            .map_err(Error::msg)
     }
 }
 
@@ -274,19 +280,31 @@ async fn capture_set_bounds(
     h: f64,
 ) -> Result<()> {
     #[cfg(desktop)]
-    capture::set_capture_bounds(&app, &job_id, x, y, w, h);
+    {
+        capture::set_capture_bounds(&app, &job_id, x, y, w, h);
+        Ok(())
+    }
     #[cfg(not(desktop))]
-    let _ = (app, job_id, x, y, w, h);
-    Ok(())
+    {
+        let _ = job_id;
+        capture_plugin(&app)
+            .set_bounds(tauri_plugin_capture_view::BoundsArgs { x, y, w, h })
+            .map_err(Error::msg)
+    }
 }
 
 #[tauri::command]
 async fn capture_back(app: AppHandle, job_id: String) -> Result<()> {
     #[cfg(desktop)]
-    capture::capture_back(&app, &job_id);
+    {
+        capture::capture_back(&app, &job_id);
+        Ok(())
+    }
     #[cfg(not(desktop))]
-    let _ = (app, job_id);
-    Ok(())
+    {
+        let _ = job_id;
+        capture_plugin(&app).back().map_err(Error::msg)
+    }
 }
 
 #[tauri::command]
@@ -295,18 +313,23 @@ async fn capture_grab(app: AppHandle, job_id: String) -> Result<()> {
     return capture::capture_grab(&app, &job_id);
     #[cfg(not(desktop))]
     {
-        let _ = (app, job_id);
-        Ok(())
+        let _ = job_id;
+        capture_plugin(&app).grab().map_err(Error::msg)
     }
 }
 
 #[tauri::command]
 async fn close_capture_window(app: AppHandle, job_id: String) -> Result<()> {
     #[cfg(desktop)]
-    capture::close_capture(&app, &job_id);
+    {
+        capture::close_capture(&app, &job_id);
+        Ok(())
+    }
     #[cfg(not(desktop))]
-    let _ = (app, job_id);
-    Ok(())
+    {
+        let _ = job_id;
+        capture_plugin(&app).close().map_err(Error::msg)
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -316,6 +339,7 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_capture_view::init())
         .setup(|app| {
             let data_dir = app
                 .path()

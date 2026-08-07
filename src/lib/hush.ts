@@ -3,7 +3,7 @@
 // with its own credentials, so the link carries only item/attachment
 // keys and display metadata (never secrets). Contract mirrored in Hush's
 // src/links/zotero-helper-import.js.
-import { fullCreatorList, yearOf } from "./collections";
+import { fullCreatorList, pdfAttachmentOf, yearOf } from "./collections";
 import { appLog } from "./store";
 import { invoke } from "./tauri";
 import type { ZItem } from "./types";
@@ -32,23 +32,6 @@ export interface HushSendable {
 export interface HushSelectionSplit {
   ready: HushSendable[];
   skipped: { item: ZItem; reason: string }[];
-}
-
-/** Real Zotero object keys are 8 alphanumerics — this excludes the local
- *  `…-att-local` placeholder rows created mid-import. */
-const REAL_KEY = /^[A-Z0-9]{8}$/i;
-
-function pdfAttachmentOf(items: ZItem[], parentKey: string): ZItem | undefined {
-  return items.find(
-    (a) =>
-      a.data?.parentItem === parentKey &&
-      a.data?.itemType === "attachment" &&
-      REAL_KEY.test(a.key) &&
-      (a.data?.contentType === "application/pdf" ||
-        String(a.data?.filename ?? "")
-          .toLowerCase()
-          .endsWith(".pdf")),
-  );
 }
 
 /** Split the current selection into items Hush can fetch (they have a

@@ -93,6 +93,26 @@ pub async fn verify_key(state: &AppState, key: &str) -> Result<Value> {
     Ok(resp.json().await?)
 }
 
+/// Download an attachment's file content (Zotero redirects to its
+/// storage backend; reqwest follows). Returns the raw bytes.
+pub async fn download_attachment(state: &AppState, key: &str) -> Result<Vec<u8>> {
+    let base = library_base(state).await?;
+    let resp = state
+        .http
+        .get(format!("{base}/items/{key}/file"))
+        .header("Zotero-API-Key", api_key(state).await)
+        .header("Zotero-API-Version", "3")
+        .send()
+        .await?;
+    if !resp.status().is_success() {
+        return Err(Error::msg(format!(
+            "Zotero file download failed (HTTP {})",
+            resp.status()
+        )));
+    }
+    Ok(resp.bytes().await?.to_vec())
+}
+
 pub fn now_ms() -> u64 {
     std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)

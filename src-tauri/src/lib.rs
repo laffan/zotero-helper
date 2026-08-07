@@ -207,8 +207,25 @@ async fn discard_temp_file(state: State<'_, AppState>, path: String) -> Result<(
 // ---------------------------------------------------------------------------
 
 #[tauri::command]
-async fn ai_tidy_item(app: AppHandle, state: State<'_, AppState>, item: Value) -> Result<Value> {
-    ai::tidy_item(&app, &state, item).await
+async fn ai_tidy_item(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    item: Value,
+    page_image: Option<String>,
+) -> Result<Value> {
+    ai::tidy_item(&app, &state, item, page_image).await
+}
+
+/// Raw bytes of an attachment file from Zotero storage (the frontend
+/// renders page 1 for AI Tidy). Returned as a binary IPC response so the
+/// PDF doesn't get JSON-encoded on the way through.
+#[tauri::command]
+async fn download_attachment_file(
+    state: State<'_, AppState>,
+    att_key: String,
+) -> Result<tauri::ipc::Response> {
+    let bytes = zotero::download_attachment(&state, &att_key).await?;
+    Ok(tauri::ipc::Response::new(bytes))
 }
 
 /// Models available to an Anthropic API key (for the Settings dropdown).
@@ -389,6 +406,7 @@ pub fn run() {
             discard_temp_file,
             ai_tidy_item,
             list_anthropic_models,
+            download_attachment_file,
             list_hush_desks,
             open_in_hush,
             open_capture_window,

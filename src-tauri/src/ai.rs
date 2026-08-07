@@ -107,17 +107,33 @@ fn output_schema() -> Value {
 }
 
 const SYSTEM_PROMPT: &str = "You are a bibliographic metadata specialist working inside a Zotero \
-companion app used at a university. You receive a Zotero item's current metadata, plus (when \
-available) an authoritative CrossRef record for its DOI. Return corrections and additions as a \
-JSON object containing ONLY the fields that should change. Omit every field that is already \
-correct. Rules: prefer the authoritative record over the existing data when they conflict; fix \
-casing (use sentence case for titles per common citation-style practice, preserving proper nouns \
-and acronyms); normalize author names into firstName/lastName; expand missing fields (abstract, \
-volume, issue, pages, ISSN, DOI, language) when the authoritative record has them; never invent \
-data that is not supported by the provided sources; dates use ISO-like formats (YYYY, YYYY-MM, or \
-YYYY-MM-DD). If everything is already correct, return an empty object.";
+companion app used at a university. You receive a Zotero item's current metadata, sometimes a \
+rendered image of the first page of the item's PDF, and (when a DOI is known) an authoritative \
+CrossRef record. Return corrections and additions as a JSON object containing ONLY the fields \
+that should change. Omit every field that is already correct. Rules: the first-page image is the \
+primary source for the title, creators, and abstract as actually published — read it carefully, \
+including small text; the CrossRef record is authoritative for identifiers and publication \
+details (DOI, ISSN, volume, issue, pages, dates); prefer these sources over the existing data \
+when they conflict; fix casing (use sentence case for titles per common citation-style practice, \
+preserving proper nouns and acronyms); normalize author names into firstName/lastName; expand \
+missing fields (abstract, volume, issue, pages, ISSN, DOI, language) when the sources have them; \
+never invent data that is not supported by the provided sources; dates use ISO-like formats \
+(YYYY, YYYY-MM, or YYYY-MM-DD). If everything is already correct, return an empty object.";
 
-pub async fn tidy_item(app: &AppHandle, state: &AppState, item: Value) -> Result<Value> {
+/// Fields of a CrossRef record that add bulk without helping metadata
+/// extraction — the reference list alone can be tens of thousands of
+/// tokens on well-cited papers (and was why v1 took minutes per item).
+const CROSSREF_NOISE: &[&str] = &[
+    "reference", "relation", "license", "link", "indexed", "assertion",
+    "content-domain", "is-referenced-by-count", "references-count", "score",
+];
+
+pub async fn tidy_item(
+    app: &AppHandle,
+    state: &AppState,
+    item: Value,
+    page_image: Option<String>,
+) -> Result<Value> {
     let (api_key, model, email) = {
         let s = state.settings.read().await;
         (
@@ -150,9 +166,15 @@ pub async fn tidy_item(app: &AppHandle, state: &AppState, item: Value) -> Result
         if let Ok(resp) = req.send().await {
             if resp.status().is_success() {
                 if let Ok(body) = resp.json::<Value>().await {
+                    let mut record = body["message"].clone();
+                    if let Some(obj) = record.as_object_mut() {
+                        for k in CROSSREF_NOISE {
+                            obj.remove(*k);
+                        }
+                    }
                     context = format!(
                         "\n\nAuthoritative CrossRef record for DOI {doi}:\n{}",
-                        serde_json::to_string_pretty(&body["message"]).unwrap_or_default()
+                        serde_json::to_string_pretty(&record).unwrap_or_default()
                     );
                 }
             }
@@ -165,13 +187,23 @@ pub async fn tidy_item(app: &AppHandle, state: &AppState, item: Value) -> Result
         context
     );
 
-    log(app, "info", format!("Asking {model} to tidy metadata…"));
+    let mut content = Vec::new();
+    if let Some(img) = &page_image {
+        content.push(json!({
+            "type": "image",
+            "source": { "type": "base64", "media_type": "image/jpeg", "data": img },
+        }));
+    }
+    content.push(json!({ "type": "text", "text": prompt }));
+
+    let with = if page_image.is_some() { " (with first-page image)" } else { "" };
+    log(app, "info", format!("Asking {model} to tidy metadata{with}…"));
     let body = json!({
         "model": model,
         "max_tokens": 8192,
         "system": SYSTEM_PROMPT,
         "output_config": { "format": { "type": "json_schema", "schema": output_schema() } },
-        "messages": [{ "role": "user", "content": prompt }],
+        "messages": [{ "role": "user", "content": content }],
     });
 
     let resp = state

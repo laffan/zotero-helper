@@ -48,6 +48,27 @@ export function itemsForCollection(items: ZItem[], key: string): ZItem[] {
   return tops.filter((i) => i.data?.collections?.includes(key));
 }
 
+/** Real Zotero object keys are 8 alphanumerics — this excludes the local
+ *  `…-att-local` placeholder rows created mid-import. */
+export const REAL_KEY = /^[A-Z0-9]{8}$/i;
+
+/** The item's synced PDF attachment, if it has one. */
+export function pdfAttachmentOf(
+  items: ZItem[],
+  parentKey: string,
+): ZItem | undefined {
+  return items.find(
+    (a) =>
+      a.data?.parentItem === parentKey &&
+      a.data?.itemType === "attachment" &&
+      REAL_KEY.test(a.key) &&
+      (a.data?.contentType === "application/pdf" ||
+        String(a.data?.filename ?? "")
+          .toLowerCase()
+          .endsWith(".pdf")),
+  );
+}
+
 /** Map of parentItem key -> true when a PDF attachment exists. */
 export function pdfMap(items: ZItem[]): Set<string> {
   const set = new Set<string>();

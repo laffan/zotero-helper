@@ -65,6 +65,10 @@ if [[ ! -d src-tauri/gen/apple ]]; then
 fi
 
 if [[ $BUILD -eq 1 ]]; then
+  # A pull can add npm dependencies; installing first keeps node_modules
+  # in step (near-instant no-op when nothing changed).
+  echo "▸ npm install"
+  npm install --no-audit --no-fund
   echo "▸ building (tauri ios build --export-method $EXPORT_METHOD)"
   npx --no-install tauri ios build --export-method "$EXPORT_METHOD"
 fi

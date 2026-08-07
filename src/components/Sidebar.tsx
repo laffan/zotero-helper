@@ -1,11 +1,12 @@
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { buildTree, type CollectionNode } from "../lib/collections";
 import { useStore } from "../lib/store";
 import { ChevronDown, ChevronRight, Folder } from "./Icons";
 
 function Node({ node, depth }: { node: CollectionNode; depth: number }) {
-  const { selectedCollection, selectCollection } = useStore();
-  const [open, setOpen] = useState(true);
+  const { selectedCollection, selectCollection, toggleFolder } = useStore();
+  // Fold state lives in the persisted store, so it survives restarts.
+  const open = useStore((s) => !s.collapsedFolders.includes(node.key));
   const hasChildren = node.children.length > 0;
 
   return (
@@ -20,7 +21,7 @@ function Node({ node, depth }: { node: CollectionNode; depth: number }) {
             className="tree-toggle"
             onClick={(e) => {
               e.stopPropagation();
-              setOpen(!open);
+              toggleFolder(node.key);
             }}
             aria-label={open ? "Collapse" : "Expand"}
           >

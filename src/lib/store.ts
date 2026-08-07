@@ -27,6 +27,9 @@ interface UiPrefs {
   summaryFields: string[];
   sortBy: SortBy;
   sortDir: "asc" | "desc";
+  /** Sidebar folders folded shut (unlisted folders render open, so new
+   *  collections start expanded). */
+  collapsedFolders: string[];
 }
 
 interface AppStore extends UiPrefs {
@@ -63,6 +66,7 @@ interface AppStore extends UiPrefs {
   setSort: (by: SortBy) => void;
   setSummaryFields: (f: string[]) => void;
   setPaneSizes: (p: Partial<Pick<UiPrefs, "leftWidth" | "rightWidth" | "termHeight">>) => void;
+  toggleFolder: (key: string) => void;
 
   pushLog: (line: LogLine) => void;
   clearLogs: () => void;
@@ -93,6 +97,7 @@ export const useStore = create<AppStore>()(
       summaryFields: ["title", "creators", "abstractNote"],
       sortBy: "dateAdded" as SortBy,
       sortDir: "desc" as const,
+      collapsedFolders: [],
 
       settings: null,
       library: EMPTY_LIBRARY,
@@ -135,6 +140,12 @@ export const useStore = create<AppStore>()(
       },
       setSummaryFields: (summaryFields) => set({ summaryFields }),
       setPaneSizes: (p) => set(p),
+      toggleFolder: (key) =>
+        set((s) => ({
+          collapsedFolders: s.collapsedFolders.includes(key)
+            ? s.collapsedFolders.filter((k) => k !== key)
+            : [...s.collapsedFolders, key],
+        })),
 
       pushLog: (line) =>
         set((s) => ({ logs: [...s.logs.slice(-1999), line] })),
@@ -184,6 +195,8 @@ export const useStore = create<AppStore>()(
         summaryFields: s.summaryFields,
         sortBy: s.sortBy,
         sortDir: s.sortDir,
+        collapsedFolders: s.collapsedFolders,
+        selectedCollection: s.selectedCollection,
       }),
     },
   ),

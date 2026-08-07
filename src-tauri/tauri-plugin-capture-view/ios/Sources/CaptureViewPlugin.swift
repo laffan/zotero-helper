@@ -25,10 +25,10 @@ import WebKit
 //   captured { jobId, path }    — PDF saved to the app temp dir
 //   failed   { jobId, message } — a download or grab attempt failed
 //
-// WKDownload needs iOS 14.5; below that, PDF navigations render inline
-// and "Grab this page" is the capture path (see the @available extension).
+// Package.swift pins the deployment target to iOS 14.5 (WKDownload's
+// floor), so the download APIs are used unguarded here.
 
-class CaptureViewPlugin: Plugin, WKNavigationDelegate, WKUIDelegate {
+class CaptureViewPlugin: Plugin, WKNavigationDelegate, WKUIDelegate, WKDownloadDelegate {
   private var hostWebView: WKWebView?
   private var captureView: WKWebView?
   private var jobId: String = ""
@@ -172,7 +172,7 @@ class CaptureViewPlugin: Plugin, WKNavigationDelegate, WKUIDelegate {
     decidePolicyFor navigationAction: WKNavigationAction,
     decisionHandler: @escaping (WKNavigationActionPolicy) -> Void
   ) {
-    if #available(iOS 14.5, *), navigationAction.shouldPerformDownload {
+    if navigationAction.shouldPerformDownload {
       decisionHandler(.download)
     } else {
       decisionHandler(.allow)
@@ -185,9 +185,7 @@ class CaptureViewPlugin: Plugin, WKNavigationDelegate, WKUIDelegate {
     decisionHandler: @escaping (WKNavigationResponsePolicy) -> Void
   ) {
     let mime = navigationResponse.response.mimeType?.lowercased() ?? ""
-    if #available(iOS 14.5, *),
-      navigationResponse.isForMainFrame && mime == "application/pdf"
-    {
+    if navigationResponse.isForMainFrame && mime == "application/pdf" {
       decisionHandler(.download)
     } else {
       decisionHandler(.allow)
@@ -236,14 +234,9 @@ class CaptureViewPlugin: Plugin, WKNavigationDelegate, WKUIDelegate {
   }
 }
 
-// MARK: - WKDownload (iOS 14.5+)
-// The whole download pipeline is availability-gated: WKDownload first
-// shipped in iOS 14.5. On the one WebKit release below that which can
-// run this app, the policy handlers above simply .allow PDF navigations
-// (the PDF renders inline) and "Grab this page" does the capturing.
+// MARK: - WKDownload
 
-@available(iOS 14.5, *)
-extension CaptureViewPlugin: WKDownloadDelegate {
+extension CaptureViewPlugin {
   public func webView(
     _ webView: WKWebView, navigationAction: WKNavigationAction, didBecome download: WKDownload
   ) {

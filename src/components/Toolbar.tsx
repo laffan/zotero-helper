@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { deleteFolder, syncFolder, syncNow } from "../lib/actions";
 import { getAbstracts, tidyItems } from "../lib/ai";
 import { startPdfFetch } from "../lib/importer";
@@ -18,6 +19,32 @@ import {
   Spinner,
   TerminalIcon,
 } from "./Icons";
+
+/** Toolbar dropdowns render into document.body: the toolbar scrolls
+ *  horizontally (`overflow-x: auto`), and any overflow value clips
+ *  absolutely-positioned children — the menu would vanish under the
+ *  item list. Fixed positioning from the anchor's rect escapes that. */
+function ToolbarMenu({
+  anchorRef,
+  children,
+}: {
+  anchorRef: React.RefObject<HTMLDivElement | null>;
+  children: React.ReactNode;
+}) {
+  const r = anchorRef.current?.getBoundingClientRect();
+  if (!r) return null;
+  const width = 250;
+  const left = Math.max(8, Math.min(r.left, window.innerWidth - width - 8));
+  return createPortal(
+    <div
+      className="filter-pop sync-menu"
+      style={{ position: "fixed", top: r.bottom + 4, left, right: "auto" }}
+    >
+      {children}
+    </div>,
+    document.body,
+  );
+}
 
 export function Toolbar() {
   const {
@@ -53,6 +80,9 @@ export function Toolbar() {
   useEffect(() => {
     if (!syncMenuOpen && !aiMenuOpen) return;
     const onDown = (e: MouseEvent) => {
+      // The menus are portaled to document.body — a mousedown inside one
+      // must not close it before the item's click handler fires.
+      if ((e.target as Element).closest?.(".filter-pop")) return;
       if (syncMenuRef.current && !syncMenuRef.current.contains(e.target as Node)) {
         setSyncMenuOpen(false);
       }
@@ -153,7 +183,7 @@ export function Toolbar() {
             <span className="tool-label">AI ▾</span>
           </button>
           {aiMenuOpen && (
-            <div className="filter-pop sync-menu">
+            <ToolbarMenu anchorRef={aiMenuRef}>
               <button
                 className="menu-item"
                 onClick={() =>
@@ -174,7 +204,7 @@ export function Toolbar() {
                 <strong>Tidy metadata</strong>
                 <span>Clean up all fields against CrossRef</span>
               </button>
-            </div>
+            </ToolbarMenu>
           )}
         </div>
         <button
@@ -201,7 +231,7 @@ export function Toolbar() {
             </span>
           </button>
           {syncMenuOpen && (
-            <div className="filter-pop sync-menu">
+            <ToolbarMenu anchorRef={syncMenuRef}>
               <button
                 className="menu-item"
                 disabled={!isRealCollection}
@@ -228,7 +258,7 @@ export function Toolbar() {
                 <strong>Full refresh</strong>
                 <span>Re-download the entire library (slow)</span>
               </button>
-            </div>
+            </ToolbarMenu>
           )}
         </div>
       </div>

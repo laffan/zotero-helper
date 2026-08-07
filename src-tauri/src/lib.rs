@@ -272,6 +272,32 @@ async fn open_in_hush(app: AppHandle, url: String) -> Result<()> {
         .map_err(|e| Error::msg(format!("Could not open Hush — is it installed? ({e})")))
 }
 
+/// Select the item in the Zotero app via its zotero://select deep link
+/// (works on macOS and the iPadOS Zotero app alike).
+#[tauri::command]
+async fn open_in_zotero(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    item_key: String,
+) -> Result<()> {
+    if item_key.is_empty() || !item_key.chars().all(|c| c.is_ascii_alphanumeric()) {
+        return Err(Error::msg("Not a real Zotero item key"));
+    }
+    let (library_type, library_id) = {
+        let s = state.settings.read().await;
+        (s.library_type.clone(), s.zotero_user_id.clone())
+    };
+    let url = if library_type == "group" {
+        format!("zotero://select/groups/{library_id}/items/{item_key}")
+    } else {
+        format!("zotero://select/library/items/{item_key}")
+    };
+    use tauri_plugin_opener::OpenerExt;
+    app.opener()
+        .open_url(url, None::<String>)
+        .map_err(|e| Error::msg(format!("Could not open Zotero — is it installed? ({e})")))
+}
+
 // ---------------------------------------------------------------------------
 // PDF rescue browser. Desktop: Tauri child webview (src/capture.rs).
 // Mobile: native WKWebView overlay (tauri-plugin-capture-view).
@@ -421,6 +447,7 @@ pub fn run() {
             download_attachment_file,
             list_hush_desks,
             open_in_hush,
+            open_in_zotero,
             open_capture_window,
             capture_set_bounds,
             capture_back,

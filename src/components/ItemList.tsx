@@ -4,10 +4,12 @@ import {
   useRef,
   useState,
 } from "react";
+import { openInZotero } from "../lib/actions";
 import {
   creatorSummary,
   itemsForCollection,
   pdfMap,
+  REAL_KEY,
   topLevelItems,
   yearOf,
 } from "../lib/collections";
@@ -226,6 +228,9 @@ export function ItemList() {
         <button className="col col-year" onClick={() => setSort("date")}>
           Year{sortIndicator("date")}
         </button>
+        <button className="col col-added" onClick={() => setSort("dateAdded")}>
+          Added{sortIndicator("dateAdded")}
+        </button>
         <span className="col col-pdf" title="PDF attached">
           <PdfIcon size={13} />
         </span>
@@ -264,12 +269,19 @@ export function ItemList() {
                   height: ROW_HEIGHT,
                 }}
                 onClick={(e) => handleRowClick(e, item)}
+                onDoubleClick={() => {
+                  if (REAL_KEY.test(item.key)) void openInZotero(item.key);
+                }}
+                title="Double-click to open in Zotero"
               >
                 <span className="col col-title" title={String(item.data?.title ?? "")}>
                   {String(item.data?.title ?? "(untitled)")}
                 </span>
                 <span className="col col-creator">{creatorSummary(item)}</span>
                 <span className="col col-year">{yearOf(item)}</span>
+                <span className="col col-added">
+                  {String(item.data?.dateAdded ?? "").slice(0, 10)}
+                </span>
                 <span className="col col-pdf">
                   {withPdf.has(item.key) && <PdfIcon size={13} />}
                 </span>

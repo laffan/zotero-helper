@@ -172,6 +172,15 @@ export async function deleteFolder(key: string): Promise<void> {
   await syncNow(false);
 }
 
+/** Select the item in the Zotero app (zotero://select deep link). */
+export async function openInZotero(itemKey: string): Promise<void> {
+  try {
+    await invoke("open_in_zotero", { itemKey });
+  } catch (e) {
+    appLog("warn", `Open in Zotero failed: ${e}`);
+  }
+}
+
 export async function saveItemEdits(
   key: string,
   patch: Record<string, unknown>,

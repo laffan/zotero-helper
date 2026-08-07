@@ -42,6 +42,16 @@
   width: 52px;
   flex-shrink: 0;
 }
+.col-added {
+  width: 88px;
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+}
+@media (max-width: 640px) {
+  .col-added {
+    display: none;
+  }
+}
 .col-pdf {
   width: 32px;
   flex-shrink: 0;

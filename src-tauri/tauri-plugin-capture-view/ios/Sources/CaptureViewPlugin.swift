@@ -24,8 +24,11 @@ import WebKit
 // Events emitted (JS subscribes via addPluginListener):
 //   captured { jobId, path }    — PDF saved to the app temp dir
 //   failed   { jobId, message } — a download or grab attempt failed
+//
+// WKDownload needs iOS 14.5; below that, PDF navigations render inline
+// and "Grab this page" is the capture path (see the @available extension).
 
-class CaptureViewPlugin: Plugin, WKNavigationDelegate, WKUIDelegate, WKDownloadDelegate {
+class CaptureViewPlugin: Plugin, WKNavigationDelegate, WKUIDelegate {
   private var hostWebView: WKWebView?
   private var captureView: WKWebView?
   private var jobId: String = ""
@@ -169,7 +172,7 @@ class CaptureViewPlugin: Plugin, WKNavigationDelegate, WKUIDelegate, WKDownloadD
     decidePolicyFor navigationAction: WKNavigationAction,
     decisionHandler: @escaping (WKNavigationActionPolicy) -> Void
   ) {
-    if navigationAction.shouldPerformDownload {
+    if #available(iOS 14.5, *), navigationAction.shouldPerformDownload {
       decisionHandler(.download)
     } else {
       decisionHandler(.allow)
@@ -182,7 +185,9 @@ class CaptureViewPlugin: Plugin, WKNavigationDelegate, WKUIDelegate, WKDownloadD
     decisionHandler: @escaping (WKNavigationResponsePolicy) -> Void
   ) {
     let mime = navigationResponse.response.mimeType?.lowercased() ?? ""
-    if navigationResponse.isForMainFrame && mime == "application/pdf" {
+    if #available(iOS 14.5, *),
+      navigationResponse.isForMainFrame && mime == "application/pdf"
+    {
       decisionHandler(.download)
     } else {
       decisionHandler(.allow)
@@ -202,8 +207,43 @@ class CaptureViewPlugin: Plugin, WKNavigationDelegate, WKUIDelegate, WKDownloadD
     return nil
   }
 
-  // MARK: - WKDownload
+  // MARK: - Helpers
 
+  private func tempDestination(for name: String) -> URL {
+    let stamp = Int(Date().timeIntervalSince1970 * 1000)
+    return FileManager.default.temporaryDirectory
+      .appendingPathComponent("\(stamp)-\(name)")
+  }
+
+  private func emitCaptured(path: String) {
+    var payload = JSObject()
+    payload["jobId"] = self.jobId
+    payload["path"] = path
+    self.trigger("captured", data: payload)
+  }
+
+  private func emitFailed(_ message: String) {
+    var payload = JSObject()
+    payload["jobId"] = self.jobId
+    payload["message"] = message
+    self.trigger("failed", data: payload)
+  }
+
+  private func teardown() {
+    captureView?.stopLoading()
+    captureView?.removeFromSuperview()
+    captureView = nil
+  }
+}
+
+// MARK: - WKDownload (iOS 14.5+)
+// The whole download pipeline is availability-gated: WKDownload first
+// shipped in iOS 14.5. On the one WebKit release below that which can
+// run this app, the policy handlers above simply .allow PDF navigations
+// (the PDF renders inline) and "Grab this page" does the capturing.
+
+@available(iOS 14.5, *)
+extension CaptureViewPlugin: WKDownloadDelegate {
   public func webView(
     _ webView: WKWebView, navigationAction: WKNavigationAction, didBecome download: WKDownload
   ) {
@@ -238,34 +278,6 @@ class CaptureViewPlugin: Plugin, WKNavigationDelegate, WKUIDelegate, WKDownloadD
   public func download(_ download: WKDownload, didFailWithError error: Error, resumeData: Data?) {
     self.downloadDest = nil
     emitFailed("Download failed: \(error.localizedDescription)")
-  }
-
-  // MARK: - Helpers
-
-  private func tempDestination(for name: String) -> URL {
-    let stamp = Int(Date().timeIntervalSince1970 * 1000)
-    return FileManager.default.temporaryDirectory
-      .appendingPathComponent("\(stamp)-\(name)")
-  }
-
-  private func emitCaptured(path: String) {
-    var payload = JSObject()
-    payload["jobId"] = self.jobId
-    payload["path"] = path
-    self.trigger("captured", data: payload)
-  }
-
-  private func emitFailed(_ message: String) {
-    var payload = JSObject()
-    payload["jobId"] = self.jobId
-    payload["message"] = message
-    self.trigger("failed", data: payload)
-  }
-
-  private func teardown() {
-    captureView?.stopLoading()
-    captureView?.removeFromSuperview()
-    captureView = nil
   }
 }
 

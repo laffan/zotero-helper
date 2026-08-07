@@ -4,9 +4,7 @@ import PackageDescription
 let package = Package(
     name: "tauri-plugin-capture-view",
     platforms: [
-        // WKDownload (the PDF interception path) needs 14.5; the app
-        // itself only ever ships to far newer iPadOS anyway.
-        .iOS("14.5"),
+        .iOS(.v14),
     ],
     products: [
         .library(

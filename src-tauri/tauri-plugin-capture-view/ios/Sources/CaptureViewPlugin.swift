@@ -25,10 +25,14 @@ import WebKit
 //   captured { jobId, path }    — PDF saved to the app temp dir
 //   failed   { jobId, message } — a download or grab attempt failed
 //
-// Package.swift pins the deployment target to iOS 14.5 (WKDownload's
-// floor), so the download APIs are used unguarded here.
+// WKDownload needs iOS 14.5, so every reference is availability-guarded
+// (see the @available extension). This is NOT optional: Tauri compiles
+// this package via swift-rs with its own hardcoded minimum-iOS target,
+// ignoring Package.swift's `platforms` — raising the floor there does
+// nothing, and unguarded WKDownload use fails the iOS build. At runtime
+// the guards always pass (the app only ships to modern iPadOS).
 
-class CaptureViewPlugin: Plugin, WKNavigationDelegate, WKUIDelegate, WKDownloadDelegate {
+class CaptureViewPlugin: Plugin, WKNavigationDelegate, WKUIDelegate {
   private var hostWebView: WKWebView?
   private var captureView: WKWebView?
   private var jobId: String = ""
@@ -172,7 +176,7 @@ class CaptureViewPlugin: Plugin, WKNavigationDelegate, WKUIDelegate, WKDownloadD
     decidePolicyFor navigationAction: WKNavigationAction,
     decisionHandler: @escaping (WKNavigationActionPolicy) -> Void
   ) {
-    if navigationAction.shouldPerformDownload {
+    if #available(iOS 14.5, *), navigationAction.shouldPerformDownload {
       decisionHandler(.download)
     } else {
       decisionHandler(.allow)
@@ -185,7 +189,9 @@ class CaptureViewPlugin: Plugin, WKNavigationDelegate, WKUIDelegate, WKDownloadD
     decisionHandler: @escaping (WKNavigationResponsePolicy) -> Void
   ) {
     let mime = navigationResponse.response.mimeType?.lowercased() ?? ""
-    if navigationResponse.isForMainFrame && mime == "application/pdf" {
+    if #available(iOS 14.5, *),
+      navigationResponse.isForMainFrame && mime == "application/pdf"
+    {
       decisionHandler(.download)
     } else {
       decisionHandler(.allow)
@@ -234,9 +240,14 @@ class CaptureViewPlugin: Plugin, WKNavigationDelegate, WKUIDelegate, WKDownloadD
   }
 }
 
-// MARK: - WKDownload
+// MARK: - WKDownload (iOS 14.5+)
+// The whole download pipeline is availability-gated: WKDownload first
+// shipped in iOS 14.5. On the one WebKit release below that which can
+// run this app, the policy handlers above simply .allow PDF navigations
+// (the PDF renders inline) and "Grab this page" does the capturing.
 
-extension CaptureViewPlugin {
+@available(iOS 14.5, *)
+extension CaptureViewPlugin: WKDownloadDelegate {
   public func webView(
     _ webView: WKWebView, navigationAction: WKNavigationAction, didBecome download: WKDownload
   ) {

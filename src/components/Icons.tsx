@@ -154,6 +154,16 @@ export const CopyIcon = (p: IconProps = {}) =>
     p,
   );
 
+export const ShareIcon = (p: IconProps = {}) =>
+  svg(
+    <>
+      <path d="M8 10V1.5" />
+      <path d="M5 4.5L8 1.5l3 3" />
+      <path d="M3 7.5v6a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1v-6" />
+    </>,
+    p,
+  );
+
 export const SendIcon = (p: IconProps = {}) =>
   svg(
     <>

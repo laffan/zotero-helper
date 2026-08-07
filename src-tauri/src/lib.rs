@@ -5,6 +5,7 @@ mod hush;
 mod pdf;
 mod resolve;
 mod settings;
+mod share;
 mod state;
 mod zotero;
 
@@ -272,6 +273,59 @@ async fn open_in_hush(app: AppHandle, url: String) -> Result<()> {
         .map_err(|e| Error::msg(format!("Could not open Hush — is it installed? ({e})")))
 }
 
+// ---------------------------------------------------------------------------
+// Share (iOS share sheet via tauri-plugin-share-sheet; desktop exports
+// staged files through save/folder dialogs instead)
+// ---------------------------------------------------------------------------
+
+/// Download an attachment into the share staging dir; returns the path.
+#[tauri::command]
+async fn stage_attachment_for_share(
+    state: State<'_, AppState>,
+    att_key: String,
+    file_name: String,
+) -> Result<String> {
+    share::stage_attachment(&state, &att_key, &file_name).await
+}
+
+/// Write text (e.g. abstracts markdown) into the staging dir.
+#[tauri::command]
+async fn stage_text_for_share(
+    state: State<'_, AppState>,
+    file_name: String,
+    content: String,
+) -> Result<String> {
+    share::stage_text(&state, &file_name, &content)
+}
+
+/// Present the iOS share sheet for staged files (x/y anchor the iPad
+/// popover at the Share button). Errors on desktop — callers fall back
+/// to the export commands below.
+#[tauri::command]
+async fn share_files(
+    app: AppHandle,
+    paths: Vec<String>,
+    x: f64,
+    y: f64,
+) -> Result<()> {
+    let plugin = app.state::<tauri_plugin_share_sheet::ShareSheet<tauri::Wry>>();
+    plugin
+        .share_files(tauri_plugin_share_sheet::ShareArgs { paths, x, y })
+        .map_err(Error::msg)
+}
+
+/// Desktop: copy staged files into a chosen folder.
+#[tauri::command]
+async fn export_files(paths: Vec<String>, dest_dir: String) -> Result<usize> {
+    share::export_to_dir(&paths, &dest_dir)
+}
+
+/// Desktop: copy one staged file to a save-dialog destination.
+#[tauri::command]
+async fn export_file(src: String, dest: String) -> Result<()> {
+    share::export_to_file(&src, &dest)
+}
+
 /// Select the item in the Zotero app via its zotero://select deep link
 /// (works on macOS and the iPadOS Zotero app alike).
 #[tauri::command]
@@ -404,6 +458,7 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_capture_view::init())
+        .plugin(tauri_plugin_share_sheet::init())
         .setup(|app| {
             let data_dir = app
                 .path()
@@ -448,6 +503,11 @@ pub fn run() {
             list_hush_desks,
             open_in_hush,
             open_in_zotero,
+            stage_attachment_for_share,
+            stage_text_for_share,
+            share_files,
+            export_files,
+            export_file,
             open_capture_window,
             capture_set_bounds,
             capture_back,

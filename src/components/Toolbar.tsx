@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import { deleteFolder, syncFolder, syncNow } from "../lib/actions";
 import { getAbstracts, tidyItems } from "../lib/ai";
 import { startPdfFetch } from "../lib/importer";
+import { sharePdfs, shareAbstracts } from "../lib/share";
 import { useStore } from "../lib/store";
 import {
   FolderMinus,
@@ -15,6 +16,7 @@ import {
   Refresh,
   SearchIcon,
   SendIcon,
+  ShareIcon,
   Sparkles,
   Spinner,
   TerminalIcon,
@@ -67,8 +69,10 @@ export function Toolbar() {
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [syncMenuOpen, setSyncMenuOpen] = useState(false);
   const [aiMenuOpen, setAiMenuOpen] = useState(false);
+  const [shareMenuOpen, setShareMenuOpen] = useState(false);
   const syncMenuRef = useRef<HTMLDivElement>(null);
   const aiMenuRef = useRef<HTMLDivElement>(null);
+  const shareMenuRef = useRef<HTMLDivElement>(null);
   const collections = useStore((s) => s.library.collections);
 
   const isRealCollection =
@@ -78,7 +82,7 @@ export function Toolbar() {
     : undefined;
 
   useEffect(() => {
-    if (!syncMenuOpen && !aiMenuOpen) return;
+    if (!syncMenuOpen && !aiMenuOpen && !shareMenuOpen) return;
     const onDown = (e: MouseEvent) => {
       // The menus are portaled to document.body — a mousedown inside one
       // must not close it before the item's click handler fires.
@@ -89,14 +93,30 @@ export function Toolbar() {
       if (aiMenuRef.current && !aiMenuRef.current.contains(e.target as Node)) {
         setAiMenuOpen(false);
       }
+      if (shareMenuRef.current && !shareMenuRef.current.contains(e.target as Node)) {
+        setShareMenuOpen(false);
+      }
     };
     window.addEventListener("mousedown", onDown);
     return () => window.removeEventListener("mousedown", onDown);
-  }, [syncMenuOpen, aiMenuOpen]);
+  }, [syncMenuOpen, aiMenuOpen, shareMenuOpen]);
 
   const runAi = (action: () => Promise<void>) => {
     setAiMenuOpen(false);
     void action();
+  };
+
+  /** Runs a share action with the Share button's viewport position —
+   *  the iPad share sheet is a popover and points its arrow there. */
+  const runShare = (
+    action: (keys: string[], anchor: { x: number; y: number }) => Promise<void>,
+  ) => {
+    setShareMenuOpen(false);
+    const r = shareMenuRef.current?.getBoundingClientRect();
+    const anchor = r
+      ? { x: r.left + r.width / 2, y: r.bottom }
+      : { x: window.innerWidth / 2, y: 60 };
+    void action(useStore.getState().selectedKeys, anchor);
   };
 
   const runSync = (action: () => Promise<void>) => {
@@ -216,6 +236,32 @@ export function Toolbar() {
           <SendIcon />
           <span className="tool-label">Send to Hush</span>
         </button>
+        <div className="filter-anchor" ref={shareMenuRef}>
+          <button
+            className="tool-btn"
+            onClick={() => setShareMenuOpen(!shareMenuOpen)}
+            disabled={selectedKeys.length === 0}
+            title="Share the selected items"
+          >
+            <ShareIcon />
+            <span className="tool-label">Share ▾</span>
+          </button>
+          {shareMenuOpen && (
+            <ToolbarMenu anchorRef={shareMenuRef}>
+              <button className="menu-item" onClick={() => runShare(sharePdfs)}>
+                <strong>Share PDFs</strong>
+                <span>Download the selected items’ PDFs and share them</span>
+              </button>
+              <button
+                className="menu-item"
+                onClick={() => runShare(shareAbstracts)}
+              >
+                <strong>Share abstracts</strong>
+                <span>Titles (linked to Zotero) + abstracts as Markdown</span>
+              </button>
+            </ToolbarMenu>
+          )}
+        </div>
         <div className="filter-anchor" ref={syncMenuRef}>
           <button
             className="tool-btn"

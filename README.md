@@ -57,6 +57,11 @@ Windows/Linux desktops too).
   [Hush](https://github.com/laffan/hush) writing app: pick a desk (and
   optionally a project) and Hush downloads the PDFs itself through its own
   Zotero credentials. See "Hush integration" below.
+- **Share** — a toolbar menu that shares the selected items' PDFs
+  (downloaded from Zotero on the spot) or a Markdown document of titles
+  (linked back to their Zotero entries) and abstracts. On iPad this is
+  the system share sheet (via `src-tauri/tauri-plugin-share-sheet/`);
+  on desktop it exports through save/folder dialogs.
 - **Summary select** — selecting multiple items collapses the right panel
   into per-item summary cards (title/authors/abstract by default — the field
   set is configurable from the "Fields" popup).

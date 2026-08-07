@@ -1,8 +1,11 @@
 import { useEffect, useState } from "react";
 import { bootstrap, saveSettings, syncNow, verifyKey } from "../lib/actions";
 import { appLog, useStore } from "../lib/store";
+import { invoke } from "../lib/tauri";
 import type { Settings } from "../lib/types";
 import { Spinner } from "./Icons";
+
+type ModelInfo = { id: string; displayName: string };
 
 const BLANK: Settings = {
   zoteroApiKey: "",
@@ -21,10 +24,43 @@ export function SettingsView() {
   const [verifying, setVerifying] = useState(false);
   const [verifyMsg, setVerifyMsg] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [models, setModels] = useState<ModelInfo[] | null>(null);
+  const [modelsLoading, setModelsLoading] = useState(false);
 
   useEffect(() => {
     if (stored) setDraft(stored);
   }, [stored]);
+
+  // Populate the model dropdown from GET /v1/models whenever a key is
+  // present (debounced so we don't fire per keystroke while pasting/typing).
+  const anthropicKey = draft.anthropicApiKey.trim();
+  useEffect(() => {
+    if (!anthropicKey) {
+      setModels(null);
+      return;
+    }
+    setModelsLoading(true);
+    let stale = false;
+    const t = setTimeout(() => {
+      invoke<ModelInfo[]>("list_anthropic_models", { key: anthropicKey })
+        .then((list) => {
+          if (!stale) setModels(list);
+        })
+        .catch((e) => {
+          if (!stale) {
+            setModels(null);
+            appLog("warn", `Could not list Anthropic models: ${e}`);
+          }
+        })
+        .finally(() => {
+          if (!stale) setModelsLoading(false);
+        });
+    }, 600);
+    return () => {
+      stale = true;
+      clearTimeout(t);
+    };
+  }, [anthropicKey]);
 
   const set = <K extends keyof Settings>(k: K, v: Settings[K]) =>
     setDraft((d) => ({ ...d, [k]: v }));
@@ -160,11 +196,32 @@ export function SettingsView() {
             />
           </label>
           <label className="settings-field">
-            <span>Model</span>
-            <input
-              value={draft.anthropicModel}
-              onChange={(e) => set("anthropicModel", e.target.value)}
-            />
+            <span>Model {modelsLoading && <Spinner size={11} />}</span>
+            {models && models.length > 0 ? (
+              <select
+                value={draft.anthropicModel}
+                onChange={(e) => set("anthropicModel", e.target.value)}
+              >
+                {!models.some((m) => m.id === draft.anthropicModel) &&
+                  draft.anthropicModel && (
+                    <option value={draft.anthropicModel}>
+                      {draft.anthropicModel} (saved)
+                    </option>
+                  )}
+                {models.map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.displayName} — {m.id}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <input
+                value={draft.anthropicModel}
+                onChange={(e) => set("anthropicModel", e.target.value)}
+                placeholder="claude-opus-5"
+                title="Enter an API key above to pick from your available models"
+              />
+            )}
           </label>
         </div>
 

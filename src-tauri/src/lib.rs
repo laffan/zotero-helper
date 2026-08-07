@@ -211,6 +211,16 @@ async fn ai_tidy_item(app: AppHandle, state: State<'_, AppState>, item: Value) -
     ai::tidy_item(&app, &state, item).await
 }
 
+/// Models available to an Anthropic API key (for the Settings dropdown).
+/// Takes the key as an argument so the not-yet-saved key in the form works.
+#[tauri::command]
+async fn list_anthropic_models(
+    state: State<'_, AppState>,
+    key: String,
+) -> Result<Vec<ai::ModelInfo>> {
+    ai::list_models(&state, &key).await
+}
+
 // ---------------------------------------------------------------------------
 // Hush integration
 // ---------------------------------------------------------------------------
@@ -378,6 +388,7 @@ pub fn run() {
             attach_pdf,
             discard_temp_file,
             ai_tidy_item,
+            list_anthropic_models,
             list_hush_desks,
             open_in_hush,
             open_capture_window,

@@ -9,7 +9,61 @@ use serde_json::{json, Value};
 use tauri::AppHandle;
 
 const ANTHROPIC_API: &str = "https://api.anthropic.com/v1/messages";
+const ANTHROPIC_MODELS_API: &str = "https://api.anthropic.com/v1/models";
 const ANTHROPIC_VERSION: &str = "2023-06-01";
+
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ModelInfo {
+    pub id: String,
+    pub display_name: String,
+}
+
+/// List the models available to the given API key via GET /v1/models,
+/// following `after_id` pagination. The endpoint returns newest-first.
+pub async fn list_models(state: &AppState, api_key: &str) -> Result<Vec<ModelInfo>> {
+    let api_key = api_key.trim();
+    if api_key.is_empty() {
+        return Err(Error::msg("No Anthropic API key provided"));
+    }
+    let mut models = Vec::new();
+    let mut after_id: Option<String> = None;
+    loop {
+        let mut req = state
+            .http
+            .get(ANTHROPIC_MODELS_API)
+            .header("x-api-key", api_key)
+            .header("anthropic-version", ANTHROPIC_VERSION)
+            .query(&[("limit", "100")]);
+        if let Some(after) = &after_id {
+            req = req.query(&[("after_id", after.as_str())]);
+        }
+        let resp = req.send().await?;
+        let status = resp.status();
+        let body: Value = resp.json().await?;
+        if !status.is_success() {
+            let msg = body["error"]["message"].as_str().unwrap_or("unknown error");
+            return Err(Error::msg(format!("Anthropic API error (HTTP {status}): {msg}")));
+        }
+        for m in body["data"].as_array().into_iter().flatten() {
+            if let Some(id) = m["id"].as_str() {
+                models.push(ModelInfo {
+                    id: id.to_string(),
+                    display_name: m["display_name"].as_str().unwrap_or(id).to_string(),
+                });
+            }
+        }
+        if body["has_more"].as_bool() == Some(true) {
+            after_id = body["last_id"].as_str().map(String::from);
+            if after_id.is_none() {
+                break;
+            }
+        } else {
+            break;
+        }
+    }
+    Ok(models)
+}
 
 fn output_schema() -> Value {
     json!({

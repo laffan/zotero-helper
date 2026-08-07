@@ -82,6 +82,71 @@ export function startPdfFetch(itemKeys: string[]): number {
   return queued;
 }
 
+function normalizeDoi(s: unknown): string {
+  return String(s ?? "")
+    .trim()
+    .replace(/^https?:\/\/(dx\.)?doi\.org\//i, "")
+    .replace(/^doi:\s*/i, "")
+    .toLowerCase();
+}
+
+/** A top-level library entry matching this identifier (by DOI or exact
+ *  URL), so imports reuse existing entries instead of duplicating them. */
+function findExisting(identifier: string) {
+  const items = useStore.getState().library.items;
+  const wantDoi = normalizeDoi(identifier);
+  const wantUrl = /^https?:\/\//i.test(identifier)
+    ? identifier.trim().toLowerCase()
+    : "";
+  if (!wantDoi.startsWith("10.") && !wantUrl) return undefined;
+  return items.find((i) => {
+    if (i.data?.parentItem) return false;
+    if (wantDoi.startsWith("10.") && normalizeDoi(i.data?.DOI) === wantDoi) {
+      return true;
+    }
+    return (
+      wantUrl !== "" &&
+      String(i.data?.url ?? "").trim().toLowerCase() === wantUrl
+    );
+  });
+}
+
+/** Point the job at an existing library entry. Returns true when the
+ *  job is thereby finished (the entry already has a PDF). */
+function reuseExisting(
+  id: string,
+  existing: { key: string; data?: ZItemData },
+): boolean {
+  const upd = useStore.getState().updateJob;
+  const title = String(existing.data?.title ?? existing.key);
+  const doi =
+    typeof existing.data?.DOI === "string" && existing.data.DOI
+      ? existing.data.DOI
+      : undefined;
+  appLog(
+    "info",
+    `“${title}” is already in your library (${existing.key}) — reusing it`,
+  );
+  upd(id, {
+    itemKey: existing.key,
+    item: existing.data,
+    doi,
+    landingUrl:
+      (typeof existing.data?.url === "string" && existing.data.url) ||
+      (doi ? `https://doi.org/${doi}` : undefined),
+  });
+  if (pdfMap(useStore.getState().library.items).has(existing.key)) {
+    upd(id, { stage: "done", hasPdf: true, message: undefined });
+    appLog("info", `“${title}” already has a PDF — nothing to do`);
+    setTimeout(() => {
+      const cur = useStore.getState().jobs[id];
+      if (cur?.stage === "done") useStore.getState().dismissJob(id);
+    }, 4000);
+    return true;
+  }
+  return false;
+}
+
 async function pump(): Promise<void> {
   if (pumping) return;
   pumping = true;
@@ -108,41 +173,62 @@ async function runJob(id: string): Promise<void> {
   try {
     // Steps 1–2 are skipped when retrying a job whose item already exists.
     if (!job(id).itemKey) {
-      // 1. Resolve identifier → metadata
-      upd(id, { stage: "resolving" });
-      const resolved = await invoke<Resolved>("resolve_identifier", {
-        identifier: job(id).identifier,
-      });
-      const data: ZItemData = { ...resolved.item } as ZItemData;
-      const collectionKey = job(id).collectionKey;
-      if (collectionKey) data.collections = [collectionKey];
-      upd(id, {
-        item: data,
-        candidates: resolved.pdfCandidates ?? [],
-        landingUrl: resolved.landingUrl ?? undefined,
-        doi: typeof data.DOI === "string" ? data.DOI : undefined,
-        stage: "creating",
-      });
+      // 0. Already in the library? Reuse the entry instead of creating a
+      // duplicate — the job becomes a PDF fetch for it (or a no-op).
+      const preExisting = findExisting(job(id).identifier);
+      if (preExisting) {
+        if (reuseExisting(id, preExisting)) return;
+      } else {
+        // 1. Resolve identifier → metadata
+        upd(id, { stage: "resolving" });
+        const resolved = await invoke<Resolved>("resolve_identifier", {
+          identifier: job(id).identifier,
+        });
+        const data: ZItemData = { ...resolved.item } as ZItemData;
+        const collectionKey = job(id).collectionKey;
+        if (collectionKey) data.collections = [collectionKey];
+        upd(id, {
+          item: data,
+          candidates: resolved.pdfCandidates ?? [],
+          landingUrl: resolved.landingUrl ?? undefined,
+          doi: typeof data.DOI === "string" ? data.DOI : undefined,
+          stage: "creating",
+        });
 
-      // 2. Create the parent item in Zotero
-      const resp = await invoke<Record<string, any>>("create_zotero_items", {
-        items: [data],
-      });
-      const created = resp?.successful?.["0"];
-      const key: string | undefined = created?.key ?? created?.data?.key;
-      if (!key) {
-        throw new Error(
-          `Zotero rejected the item: ${JSON.stringify(resp?.failed ?? resp)}`,
-        );
+        // 1b. The resolved DOI may match an entry even when the raw
+        // identifier didn't (e.g. a publisher URL for a paper we have).
+        const postExisting =
+          typeof data.DOI === "string" && data.DOI
+            ? findExisting(data.DOI)
+            : undefined;
+        if (postExisting) {
+          if (reuseExisting(id, postExisting)) return;
+        } else {
+          // 2. Create the parent item in Zotero
+          const resp = await invoke<Record<string, any>>(
+            "create_zotero_items",
+            { items: [data] },
+          );
+          const created = resp?.successful?.["0"];
+          const key: string | undefined = created?.key ?? created?.data?.key;
+          if (!key) {
+            throw new Error(
+              `Zotero rejected the item: ${JSON.stringify(resp?.failed ?? resp)}`,
+            );
+          }
+          appLog(
+            "info",
+            `Created Zotero item ${key} — “${data.title ?? job(id).identifier}”`,
+          );
+          upd(id, { itemKey: key });
+          useStore.getState().upsertItem({
+            key,
+            version: created?.version ?? 0,
+            data: { ...(created?.data ?? data), key } as ZItemData,
+            meta: created?.meta,
+          });
+        }
       }
-      appLog("info", `Created Zotero item ${key} — “${data.title ?? job(id).identifier}”`);
-      upd(id, { itemKey: key });
-      useStore.getState().upsertItem({
-        key,
-        version: created?.version ?? 0,
-        data: { ...(created?.data ?? data), key } as ZItemData,
-        meta: created?.meta,
-      });
     }
 
     // 2b. Existing entries may lack a DOI — try to discover one before
@@ -264,6 +350,15 @@ export async function uploadAndFinish(
   const j = job(id);
   if (!j?.itemKey) {
     appLog("error", "Cannot attach PDF: the parent item was never created");
+    return;
+  }
+  // A duplicate capture/download event must not attach a second copy.
+  if (
+    j.stage === "done" ||
+    pdfMap(useStore.getState().library.items).has(j.itemKey)
+  ) {
+    appLog("info", `${j.itemKey} already has a PDF — skipping duplicate attach`);
+    void invoke("discard_temp_file", { path: filePath }).catch(() => {});
     return;
   }
   try {

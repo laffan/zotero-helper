@@ -11,7 +11,9 @@
 //! we already fetched. Anything *modified* during the long fetch is
 //! caught by the incremental catch-up pass that runs right after.
 
-use super::{api_key, header_u64, library_base, load_cache, now_ms, save_cache, LibraryCache};
+use super::{
+    api_key, header_u64, library_base, load_cache, now_ms, save_cache, LibraryCache, TagColor,
+};
 use crate::state::AppState;
 use crate::{log, Error, Result};
 use serde_json::{json, Value};
@@ -158,6 +160,43 @@ async fn fetch_all(
         }
     }
     Ok((out, version))
+}
+
+// ---------------------------------------------------------------- tag colors
+
+/// Colored (a.k.a. numbered) tags are a *library setting*, not item
+/// data: `settings/tagColors` holds an ordered list of {name, color},
+/// which is the 1..9 position Zotero shows them in. An unset preference
+/// answers 404, which simply means "no colored tags".
+async fn fetch_tag_colors(state: &AppState) -> Result<Vec<TagColor>> {
+    let base = library_base(state).await?;
+    let resp = state
+        .http
+        .get(format!("{base}/settings/tagColors"))
+        .header("Zotero-API-Key", api_key(state).await)
+        .header("Zotero-API-Version", "3")
+        .send()
+        .await?;
+    if resp.status().as_u16() == 404 {
+        return Ok(Vec::new());
+    }
+    if !resp.status().is_success() {
+        return Err(Error::msg(format!(
+            "Zotero settings fetch failed (HTTP {})",
+            resp.status()
+        )));
+    }
+    let body: Value = resp.json().await?;
+    Ok(serde_json::from_value(body["value"].clone()).unwrap_or_default())
+}
+
+/// Refresh the cached colors in place. Never fails a sync — on error the
+/// previously known colors stay as they were.
+async fn refresh_tag_colors(app: &AppHandle, state: &AppState, cache: &mut LibraryCache) {
+    match fetch_tag_colors(state).await {
+        Ok(colors) => cache.tag_colors = colors,
+        Err(e) => log(app, "debug", format!("Tag colors unavailable: {e}")),
+    }
 }
 
 // ---------------------------------------------------------------- checkpoint
@@ -331,6 +370,7 @@ async fn incremental_pass(
 pub async fn sync_library(app: &AppHandle, state: &AppState, full: bool) -> Result<LibraryCache> {
     let mut cache = load_cache(&state.data_dir);
     let full = full || cache.version == 0;
+    refresh_tag_colors(app, state, &mut cache).await;
 
     if full {
         log(app, "info", "Starting full library sync");
@@ -391,6 +431,7 @@ pub async fn sync_collection(
         "info",
         format!("Syncing folder {collection_key} (changes since v{})", cache.version),
     );
+    refresh_tag_colors(app, state, &mut cache).await;
     let path = format!("collections/{collection_key}/items");
     let (items, _) = fetch_all(app, state, &path, Some(cache.version), "folder").await?;
     let changed = items.len();

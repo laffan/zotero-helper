@@ -33,6 +33,8 @@ interface UiPrefs {
   /** Collections flagged for quick access. App-side only — Zotero has no
    *  notion of this and nothing is ever written back. */
   flaggedFolders: string[];
+  /** Show colored-tag swatches on item rows and thumbnails. */
+  showTagColors: boolean;
   /** Item-list column widths (px), draggable from the list header. */
   colWidths: { creator: number; year: number; added: number };
   /** Per-folder view state. Local-only: pins and view mode are never
@@ -102,6 +104,7 @@ interface AppStore extends UiPrefs {
   setPaneSizes: (p: Partial<Pick<UiPrefs, "leftWidth" | "rightWidth" | "termHeight">>) => void;
   toggleFolder: (key: string) => void;
   toggleFlag: (key: string) => void;
+  toggleTagColors: () => void;
   setColWidth: (col: ResizableCol, w: number) => void;
   togglePin: (collection: string, itemKey: string) => void;
   setFolderMode: (collection: string, mode: FolderView["mode"]) => void;
@@ -129,6 +132,7 @@ const EMPTY_LIBRARY: LibraryCache = {
   collections: [],
   items: [],
   lastSyncMs: 0,
+  tagColors: [],
 };
 
 export const useStore = create<AppStore>()(
@@ -144,6 +148,7 @@ export const useStore = create<AppStore>()(
       sortDir: "desc" as const,
       collapsedFolders: [],
       flaggedFolders: [],
+      showTagColors: true,
       colWidths: { creator: 180, year: 52, added: 92 },
       folderViews: {},
       uiTasks: [],
@@ -202,6 +207,8 @@ export const useStore = create<AppStore>()(
             ? s.flaggedFolders.filter((k) => k !== key)
             : [...s.flaggedFolders, key],
         })),
+      toggleTagColors: () =>
+        set((s) => ({ showTagColors: !s.showTagColors })),
       setColWidth: (col, w) =>
         set((s) => ({ colWidths: { ...s.colWidths, [col]: w } })),
       togglePin: (collection, itemKey) =>
@@ -296,6 +303,7 @@ export const useStore = create<AppStore>()(
         sortDir: s.sortDir,
         collapsedFolders: s.collapsedFolders,
         flaggedFolders: s.flaggedFolders,
+        showTagColors: s.showTagColors,
         selectedCollection: s.selectedCollection,
         colWidths: s.colWidths,
         folderViews: s.folderViews,

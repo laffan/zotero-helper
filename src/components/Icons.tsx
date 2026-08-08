@@ -178,6 +178,15 @@ export const FlagIcon = ({ filled = false, ...p }: IconProps & { filled?: boolea
     p,
   );
 
+export const TagIcon = (p: IconProps = {}) =>
+  svg(
+    <>
+      <path d="M2 2.5h5.5L14 9l-5.5 5.5L2 8z" />
+      <circle cx="5" cy="5.5" r="1" fill="currentColor" />
+    </>,
+    p,
+  );
+
 export const ListViewIcon = (p: IconProps = {}) =>
   svg(
     <>

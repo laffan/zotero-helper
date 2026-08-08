@@ -67,6 +67,11 @@ Windows/Linux desktops too).
   items **pinned** to the top, and an **icon view** that shows each PDF's
   first page (annotations included) as a thumbnail, rendered once and
   cached on disk. Both are app-side only — nothing is written to Zotero.
+- **Colored tags** — Zotero's colored ("numbered") tags show as swatches
+  before the title in list view and on the caption's second line in icon
+  view, up to four per item, in Zotero's own 1–9 order. The tag button in
+  the view bar toggles them; the colors themselves come from the
+  library's `tagColors` setting, refreshed on every sync.
 - **Flagged folders** — the flag at the left of the view bar lifts the
   current collection into a "Flagged" list pinned above Library in the
   sidebar (the list hides itself when nothing is flagged; unflag from

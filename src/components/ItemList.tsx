@@ -33,7 +33,9 @@ import {
   PdfIcon,
   PinIcon,
   Spinner,
+  TagIcon,
 } from "./Icons";
+import { TagDots } from "./TagDots";
 
 const ROW_HEIGHT = 36;
 const JOB_ROW_HEIGHT = 52;
@@ -212,6 +214,9 @@ export function ItemList() {
   // "All Items" and "Unfiled" already sit at the top of the sidebar.
   const canFlag =
     selectedCollection !== "all" && selectedCollection !== "unfiled";
+  const showTagColors = useStore((s) => s.showTagColors);
+  const toggleTagColors = useStore((s) => s.toggleTagColors);
+  const hasTagColors = useStore((s) => (s.library.tagColors?.length ?? 0) > 0);
 
   const activeJobs = useMemo(
     () => jobOrder.map((id) => jobs[id]).filter(Boolean),
@@ -358,6 +363,23 @@ export function ItemList() {
         >
           <GridViewIcon size={14} />
         </button>
+        <span className="view-sep" />
+        <button
+          className={`view-btn ${showTagColors && hasTagColors ? "on" : ""}`}
+          disabled={!hasTagColors}
+          onClick={toggleTagColors}
+          title={
+            !hasTagColors
+              ? "This library has no colored tags — assign one in Zotero first"
+              : showTagColors
+                ? "Hide colored tags"
+                : "Show colored tags"
+          }
+          aria-label="Toggle colored tags"
+          aria-pressed={showTagColors && hasTagColors}
+        >
+          <TagIcon size={14} />
+        </button>
         {iconMode && (
           <div className="view-sort">
             {/* List view sorts by clicking column headers; the icon view
@@ -490,6 +512,7 @@ export function ItemList() {
                   <PinIcon size={24} filled={pinned.includes(item.key)} />
                 </button>
                 <span className="col col-title" title={String(item.data?.title ?? "")}>
+                  <TagDots item={item} />
                   {String(item.data?.title ?? "(untitled)")}
                 </span>
                 <span className="col col-creator">{creatorSummary(item)}</span>

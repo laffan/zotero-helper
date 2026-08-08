@@ -84,6 +84,14 @@ export interface LibraryCache {
   collections: ZCollection[];
   items: ZItem[];
   lastSyncMs: number;
+  /** Zotero's colored ("numbered") tags, in their assigned order — a
+   *  library setting, fetched alongside the items. */
+  tagColors: TagColor[];
+}
+
+export interface TagColor {
+  name: string;
+  color: string;
 }
 
 export interface LogLine {

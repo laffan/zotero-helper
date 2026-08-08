@@ -6,6 +6,7 @@ import { creatorSummary, yearOf } from "../lib/collections";
 import { useThumbnail } from "../lib/thumbnails";
 import type { ZItem } from "../lib/types";
 import { PdfIcon, PinIcon, Spinner } from "./Icons";
+import { TagDots } from "./TagDots";
 
 const CELL_BASE_W = 150;
 /** US-Letter-ish page ratio: the thumb box is sized to it and images are
@@ -63,6 +64,7 @@ function Cell({
       </div>
       <div className="icon-title">{String(item.data?.title ?? "(untitled)")}</div>
       <div className="icon-sub">
+        <TagDots item={item} />
         {[creatorSummary(item), yearOf(item)].filter(Boolean).join(" · ")}
       </div>
     </div>

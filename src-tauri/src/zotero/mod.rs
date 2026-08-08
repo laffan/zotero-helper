@@ -24,6 +24,16 @@ pub struct LibraryCache {
     pub collections: Vec<Value>,
     pub items: Vec<Value>,
     pub last_sync_ms: u64,
+    /// Zotero's colored ("numbered") tags, in their assigned order.
+    pub tag_colors: Vec<TagColor>,
+}
+
+/// One entry of the library's `tagColors` setting. These are a library
+/// preference, not item data — the items only carry the tag *name*.
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct TagColor {
+    pub name: String,
+    pub color: String,
 }
 
 fn cache_path(data_dir: &Path) -> std::path::PathBuf {

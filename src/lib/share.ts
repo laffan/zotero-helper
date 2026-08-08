@@ -101,6 +101,73 @@ export async function shareAbstracts(
   }
 }
 
+/** Share one attachment straight from the metadata panel. */
+export async function shareAttachment(
+  attKey: string,
+  fileName: string,
+  anchor: { x: number; y: number },
+): Promise<void> {
+  try {
+    appLog("info", `Share: fetching “${fileName}”…`);
+    const path = await invoke<string>("stage_attachment_for_share", {
+      attKey,
+      fileName,
+    });
+    await presentShare([path], anchor, fileName);
+  } catch (e) {
+    appLog("error", `Share “${fileName}” failed: ${e}`);
+  }
+}
+
+/** Share the multi-select summary exactly as the panel shows it: the
+ *  chosen fields, in order, per item. */
+export async function shareSummary(
+  items: ZItem[],
+  fields: { id: string; label: string }[],
+  valueOf: (item: ZItem, fieldId: string) => string,
+  anchor: { x: number; y: number },
+): Promise<void> {
+  if (items.length === 0) return;
+  const sections = items.map((item) => {
+    const lines: string[] = [];
+    for (const f of fields) {
+      const v = valueOf(item, f.id).trim();
+      if (!v) continue;
+      if (f.id === "title") {
+        lines.push(`## [${mdEscape(v)}](${zoteroSelectUrl(item.key)})`, "");
+      } else if (f.id === "url") {
+        lines.push(`**${f.label}:** <${v}>`);
+      } else if (f.id === "abstractShort" || f.id === "abstractNote") {
+        lines.push("", v);
+      } else {
+        lines.push(`**${f.label}:** ${v}`);
+      }
+    }
+    // No title field selected? Still anchor the entry on something.
+    if (!fields.some((f) => f.id === "title")) {
+      lines.unshift(
+        `## [${mdEscape(String(item.data?.title ?? item.key))}](${zoteroSelectUrl(item.key)})`,
+        "",
+      );
+    }
+    return lines.join("\n");
+  });
+  const md = `# Selected items (${items.length})\n\n${sections.join("\n\n---\n\n")}\n`;
+  try {
+    const path = await invoke<string>("stage_text_for_share", {
+      fileName: "Selection.md",
+      content: md,
+    });
+    await presentShare([path], anchor, "selection");
+  } catch (e) {
+    appLog("error", `Share selection failed: ${e}`);
+  }
+}
+
+function mdEscape(s: string): string {
+  return s.replace(/([\[\]])/g, "\\$1");
+}
+
 /** iOS: system share sheet. Desktop: folder picker (many files) or save
  *  dialog (single file). */
 async function presentShare(

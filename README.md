@@ -62,9 +62,18 @@ Windows/Linux desktops too).
   (linked back to their Zotero entries) and abstracts. On iPad this is
   the system share sheet (via `src-tauri/tauri-plugin-share-sheet/`);
   on desktop it exports through save/folder dialogs.
+- **Folder views** — each folder remembers its own local presentation:
+  items **pinned** to the top, and an **icon view** that shows each PDF's
+  first page (annotations included) as a thumbnail, rendered once and
+  cached on disk. Both are app-side only — nothing is written to Zotero.
+- **Attachments** — the metadata panel lists every attachment on an item
+  (Zotero allows many), each with its own share button.
 - **Summary select** — selecting multiple items collapses the right panel
   into per-item summary cards (title/authors/abstract by default — the field
-  set is configurable from the "Fields" popup).
+  set is configurable from the "Fields" popup, where the abstract can be
+  abbreviated or full). Clicking a card narrows the selection to that
+  item, and "Share these N" exports the cards as Markdown, titles linked
+  back to their Zotero entries.
 - **Activity terminal** — a collapsible log row beneath the main columns
   records everything the backend does; one tap copies the whole log for
   debugging.

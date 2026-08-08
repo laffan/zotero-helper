@@ -7,6 +7,7 @@ mod resolve;
 mod settings;
 mod share;
 mod state;
+mod thumbs;
 mod zotero;
 
 pub use error::{Error, Result};
@@ -326,6 +327,22 @@ async fn export_file(src: String, dest: String) -> Result<()> {
     share::export_to_file(&src, &dest)
 }
 
+/// Cached first-page thumbnail (base64 JPEG) for an attachment.
+#[tauri::command]
+async fn read_thumbnail(state: State<'_, AppState>, att_key: String) -> Result<Option<String>> {
+    thumbs::read(&state, &att_key)
+}
+
+/// Store a first-page thumbnail rendered by the webview.
+#[tauri::command]
+async fn write_thumbnail(
+    state: State<'_, AppState>,
+    att_key: String,
+    data: String,
+) -> Result<()> {
+    thumbs::write(&state, &att_key, &data)
+}
+
 /// Select the item in the Zotero app via its zotero://select deep link
 /// (works on macOS and the iPadOS Zotero app alike).
 #[tauri::command]
@@ -503,6 +520,8 @@ pub fn run() {
             list_hush_desks,
             open_in_hush,
             open_in_zotero,
+            read_thumbnail,
+            write_thumbnail,
             stage_attachment_for_share,
             stage_text_for_share,
             share_files,

@@ -69,6 +69,48 @@ export function pdfAttachmentOf(
   );
 }
 
+/** parentItem key -> its first PDF attachment key. Built once per
+ *  library change so grid cells don't each scan every item. */
+export function pdfAttachmentMap(items: ZItem[]): Map<string, string> {
+  const map = new Map<string, string>();
+  for (const a of items) {
+    const d = a.data;
+    if (
+      !d?.parentItem ||
+      d.itemType !== "attachment" ||
+      !REAL_KEY.test(a.key) ||
+      map.has(d.parentItem)
+    ) {
+      continue;
+    }
+    if (
+      d.contentType === "application/pdf" ||
+      String(d.filename ?? "").toLowerCase().endsWith(".pdf")
+    ) {
+      map.set(d.parentItem, a.key);
+    }
+  }
+  return map;
+}
+
+/** Every synced attachment of an item, in library order. */
+export function attachmentsOf(items: ZItem[], parentKey: string): ZItem[] {
+  return items.filter(
+    (a) =>
+      a.data?.parentItem === parentKey &&
+      a.data?.itemType === "attachment" &&
+      REAL_KEY.test(a.key),
+  );
+}
+
+/** Display name for an attachment row. */
+export function attachmentName(att: ZItem): string {
+  const f = String(att.data?.filename ?? "").trim();
+  if (f) return f;
+  const t = String(att.data?.title ?? "").trim();
+  return t || att.key;
+}
+
 /** Map of parentItem key -> true when a PDF attachment exists. */
 export function pdfMap(items: ZItem[]): Set<string> {
   const set = new Set<string>();

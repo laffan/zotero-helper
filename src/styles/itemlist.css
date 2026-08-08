@@ -196,3 +196,110 @@
   gap: 4px;
   flex-shrink: 0;
 }
+
+/* --- Pin cell + per-folder view toggle --- */
+.col-pin {
+  width: 26px;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-dim);
+  opacity: 0.35;
+  background: none;
+  border: none;
+  padding: 0;
+}
+.col-pin.on,
+.col-pin:hover {
+  opacity: 1;
+  color: var(--accent);
+}
+.col-viewmode {
+  width: 30px;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-dim);
+}
+.col-viewmode:hover {
+  color: var(--text);
+}
+
+/* --- Icon (thumbnail) view --- */
+.icon-grid {
+  flex: 1;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.grid-jobs {
+  border-bottom: 1px solid var(--border);
+  max-height: 40%;
+  overflow-y: auto;
+}
+.icon-cell {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  padding: 4px;
+  cursor: default;
+}
+.icon-cell:hover {
+  background: var(--panel-alt);
+}
+.icon-cell.selected {
+  background: var(--select-strong);
+  border-color: var(--accent);
+}
+.icon-thumb {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--panel-alt);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  overflow: hidden;
+  color: var(--text-dim);
+}
+.icon-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: top center;
+}
+.icon-pin {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  padding: 3px;
+  border: none;
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--panel) 80%, transparent);
+  color: var(--text-dim);
+  opacity: 0.5;
+}
+.icon-pin.on,
+.icon-pin:hover {
+  opacity: 1;
+  color: var(--accent);
+}
+.icon-title {
+  font-size: 11px;
+  line-height: 1.25;
+  max-height: 2.5em;
+  overflow: hidden;
+}
+.icon-sub {
+  font-size: 10px;
+  color: var(--text-dim);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

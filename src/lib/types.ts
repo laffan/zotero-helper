@@ -136,12 +136,19 @@ export interface SyncProgress {
   total: number;
 }
 
+/** The two abstract options render the same field at different lengths,
+ *  so picking one clears the other. */
+export const EXCLUSIVE_SUMMARY_GROUPS: string[][] = [
+  ["abstractShort", "abstractNote"],
+];
+
 export const SUMMARY_FIELD_OPTIONS: { id: string; label: string }[] = [
   { id: "title", label: "Title" },
   { id: "creators", label: "Authors" },
   { id: "date", label: "Date" },
   { id: "publicationTitle", label: "Publication" },
-  { id: "abstractNote", label: "Abstract" },
+  { id: "abstractShort", label: "Abstract (abbreviated)" },
+  { id: "abstractNote", label: "Abstract (full)" },
   { id: "DOI", label: "DOI" },
   { id: "url", label: "URL" },
   { id: "tags", label: "Tags" },

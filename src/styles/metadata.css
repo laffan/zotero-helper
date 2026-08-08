@@ -152,3 +152,36 @@
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
+
+/* --- Attachments list (foot of the single-item editor) --- */
+.attachment-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 0;
+  min-width: 0;
+  color: var(--text-dim);
+}
+.attachment-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text);
+  font-size: 12px;
+}
+
+/* --- Summary (multi-select) footer --- */
+.summary-card {
+  cursor: default;
+}
+.summary-card:hover {
+  background: var(--panel-alt);
+}
+.summary-footer {
+  border-top: 1px solid var(--border);
+  padding: 8px 10px;
+  display: flex;
+  justify-content: flex-end;
+}

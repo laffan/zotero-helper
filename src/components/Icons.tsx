@@ -154,6 +154,37 @@ export const CopyIcon = (p: IconProps = {}) =>
     p,
   );
 
+export const PinIcon = ({ filled = false, ...p }: IconProps & { filled?: boolean } = {}) =>
+  svg(
+    <>
+      <path
+        d="M6 1.5h4l-.5 4 2 2.5H4.5l2-2.5z"
+        fill={filled ? "currentColor" : "none"}
+      />
+      <path d="M8 8v6" />
+    </>,
+    p,
+  );
+
+export const ListViewIcon = (p: IconProps = {}) =>
+  svg(
+    <>
+      <path d="M2 4h12M2 8h12M2 12h12" />
+    </>,
+    p,
+  );
+
+export const GridViewIcon = (p: IconProps = {}) =>
+  svg(
+    <>
+      <rect x="2" y="2" width="5" height="5" rx="1" />
+      <rect x="9" y="2" width="5" height="5" rx="1" />
+      <rect x="2" y="9" width="5" height="5" rx="1" />
+      <rect x="9" y="9" width="5" height="5" rx="1" />
+    </>,
+    p,
+  );
+
 export const ShareIcon = (p: IconProps = {}) =>
   svg(
     <>

@@ -32,7 +32,18 @@ interface UiPrefs {
   collapsedFolders: string[];
   /** Item-list column widths (px), draggable from the list header. */
   colWidths: { creator: number; year: number; added: number };
+  /** Per-folder view state. Local-only: pins and view mode are never
+   *  written to Zotero and don't affect the library in any way. */
+  folderViews: Record<string, FolderView>;
 }
+
+export interface FolderView {
+  /** Item keys pinned to the top of this folder's list. */
+  pinned: string[];
+  mode: "list" | "icons";
+}
+
+export const DEFAULT_FOLDER_VIEW: FolderView = { pinned: [], mode: "list" };
 
 export type ResizableCol = keyof UiPrefs["colWidths"];
 
@@ -80,6 +91,8 @@ interface AppStore extends UiPrefs {
   setPaneSizes: (p: Partial<Pick<UiPrefs, "leftWidth" | "rightWidth" | "termHeight">>) => void;
   toggleFolder: (key: string) => void;
   setColWidth: (col: ResizableCol, w: number) => void;
+  togglePin: (collection: string, itemKey: string) => void;
+  setFolderMode: (collection: string, mode: FolderView["mode"]) => void;
 
   uiTasks: UiTask[];
   uiTaskLabel: string;
@@ -118,6 +131,7 @@ export const useStore = create<AppStore>()(
       sortDir: "desc" as const,
       collapsedFolders: [],
       colWidths: { creator: 180, year: 52, added: 92 },
+      folderViews: {},
       uiTasks: [],
       uiTaskLabel: "",
 
@@ -170,6 +184,26 @@ export const useStore = create<AppStore>()(
         })),
       setColWidth: (col, w) =>
         set((s) => ({ colWidths: { ...s.colWidths, [col]: w } })),
+      togglePin: (collection, itemKey) =>
+        set((s) => {
+          const view = s.folderViews[collection] ?? DEFAULT_FOLDER_VIEW;
+          const pinned = view.pinned.includes(itemKey)
+            ? view.pinned.filter((k) => k !== itemKey)
+            : [...view.pinned, itemKey];
+          return {
+            folderViews: { ...s.folderViews, [collection]: { ...view, pinned } },
+          };
+        }),
+      setFolderMode: (collection, mode) =>
+        set((s) => ({
+          folderViews: {
+            ...s.folderViews,
+            [collection]: {
+              ...(s.folderViews[collection] ?? DEFAULT_FOLDER_VIEW),
+              mode,
+            },
+          },
+        })),
 
       startUiTasks: (uiTaskLabel, tasks) =>
         set({
@@ -233,6 +267,7 @@ export const useStore = create<AppStore>()(
         collapsedFolders: s.collapsedFolders,
         selectedCollection: s.selectedCollection,
         colWidths: s.colWidths,
+        folderViews: s.folderViews,
       }),
     },
   ),

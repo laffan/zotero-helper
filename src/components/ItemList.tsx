@@ -8,16 +8,30 @@ import { openInZotero } from "../lib/actions";
 import {
   creatorSummary,
   itemsForCollection,
+  pdfAttachmentMap,
   pdfMap,
   REAL_KEY,
   topLevelItems,
   yearOf,
 } from "../lib/collections";
 import { retryJob } from "../lib/importer";
-import { useStore, type ResizableCol } from "../lib/store";
+import {
+  DEFAULT_FOLDER_VIEW,
+  useStore,
+  type ResizableCol,
+} from "../lib/store";
 import { useSearchResults } from "../lib/search";
 import type { ImportJob, ImportStage, ZItem } from "../lib/types";
-import { CheckIcon, CloseIcon, PdfIcon, Spinner } from "./Icons";
+import { IconGrid } from "./IconGrid";
+import {
+  CheckIcon,
+  CloseIcon,
+  GridViewIcon,
+  ListViewIcon,
+  PdfIcon,
+  PinIcon,
+  Spinner,
+} from "./Icons";
 
 const ROW_HEIGHT = 36;
 const JOB_ROW_HEIGHT = 52;
@@ -180,6 +194,15 @@ export function ItemList() {
 
   const searchKeys = useSearchResults(library.items, searchQuery);
   const withPdf = useMemo(() => pdfMap(library.items), [library.items]);
+  const attByParent = useMemo(
+    () => pdfAttachmentMap(library.items),
+    [library.items],
+  );
+  const folderView =
+    useStore((s) => s.folderViews[selectedCollection]) ?? DEFAULT_FOLDER_VIEW;
+  const togglePin = useStore((s) => s.togglePin);
+  const setFolderMode = useStore((s) => s.setFolderMode);
+  const pinned = folderView.pinned;
 
   const activeJobs = useMemo(
     () => jobOrder.map((id) => jobs[id]).filter(Boolean),
@@ -213,8 +236,25 @@ export function ItemList() {
       list = list.slice().sort((a, b) => dir * cmp[sortBy](a, b));
     }
     // Rows for in-flight jobs replace their library rows.
-    return list.filter((i) => !jobItemKeys.has(i.key));
-  }, [library.items, selectedCollection, searchKeys, sortBy, sortDir, jobItemKeys]);
+    list = list.filter((i) => !jobItemKeys.has(i.key));
+    // Pinned items float to the top, keeping their relative order.
+    if (pinned.length) {
+      const isPinned = new Set(pinned);
+      list = [
+        ...list.filter((i) => isPinned.has(i.key)),
+        ...list.filter((i) => !isPinned.has(i.key)),
+      ];
+    }
+    return list;
+  }, [
+    library.items,
+    selectedCollection,
+    searchKeys,
+    sortBy,
+    sortDir,
+    jobItemKeys,
+    pinned,
+  ]);
 
   const jobsHeight = activeJobs.length * JOB_ROW_HEIGHT;
   const totalHeight = jobsHeight + items.length * ROW_HEIGHT;
@@ -252,6 +292,11 @@ export function ItemList() {
     setSelectedKeys([item.key]);
   };
 
+  const openItem = (item: ZItem) => {
+    if (REAL_KEY.test(item.key)) void openInZotero(item.key);
+  };
+  const pinItem = (item: ZItem) => togglePin(selectedCollection, item.key);
+
   const sortIndicator = (col: string) =>
     sortBy === col ? (sortDir === "asc" ? " ↑" : " ↓") : "";
 
@@ -287,10 +332,59 @@ export function ItemList() {
         <span className="col col-pdf" title="PDF attached">
           <PdfIcon size={13} />
         </span>
+        <span className="col col-pin" />
+        <button
+          className="col col-viewmode"
+          onClick={() =>
+            setFolderMode(
+              selectedCollection,
+              folderView.mode === "icons" ? "list" : "icons",
+            )
+          }
+          title={
+            folderView.mode === "icons"
+              ? "Show this folder as a list"
+              : "Show this folder as icons (PDF first pages)"
+          }
+        >
+          {folderView.mode === "icons" ? (
+            <ListViewIcon size={13} />
+          ) : (
+            <GridViewIcon size={13} />
+          )}
+        </button>
       </div>
+      {folderView.mode === "icons" && (
+        <>
+          {activeJobs.length > 0 && (
+            <div className="grid-jobs">
+              {activeJobs.map((j) => (
+                <JobRow key={j.id} jobItem={j} />
+              ))}
+            </div>
+          )}
+          <IconGrid
+            items={items}
+            selectedKeys={selectedKeys}
+            pinnedKeys={pinned}
+            attByParent={attByParent}
+            onSelect={handleRowClick}
+            onOpen={openItem}
+            onTogglePin={pinItem}
+          />
+          {items.length === 0 && activeJobs.length === 0 && (
+            <div className="list-empty">
+              {searchQuery
+                ? "No results"
+                : "No items here yet — use Import IDs to add some"}
+            </div>
+          )}
+        </>
+      )}
       <div
         className="list-body"
         ref={containerRef}
+        hidden={folderView.mode === "icons"}
         onScroll={(e) => setScrollTop((e.target as HTMLDivElement).scrollTop)}
       >
         <div style={{ height: totalHeight, position: "relative" }}>
@@ -322,9 +416,7 @@ export function ItemList() {
                   height: ROW_HEIGHT,
                 }}
                 onClick={(e) => handleRowClick(e, item)}
-                onDoubleClick={() => {
-                  if (REAL_KEY.test(item.key)) void openInZotero(item.key);
-                }}
+                onDoubleClick={() => openItem(item)}
                 title="Double-click to open in Zotero"
               >
                 <span className="col col-title" title={String(item.data?.title ?? "")}>
@@ -338,6 +430,21 @@ export function ItemList() {
                 <span className="col col-pdf">
                   {withPdf.has(item.key) && <PdfIcon size={13} />}
                 </span>
+                <button
+                  className={`col col-pin ${pinned.includes(item.key) ? "on" : ""}`}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    pinItem(item);
+                  }}
+                  aria-label={pinned.includes(item.key) ? "Unpin" : "Pin to top"}
+                  title={
+                    pinned.includes(item.key)
+                      ? "Unpin from the top of this folder"
+                      : "Pin to the top of this folder"
+                  }
+                >
+                  <PinIcon size={12} filled={pinned.includes(item.key)} />
+                </button>
               </div>
             );
           })}

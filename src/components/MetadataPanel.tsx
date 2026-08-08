@@ -1,13 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { saveItemEdits } from "../lib/actions";
-import { fullCreatorList } from "../lib/collections";
 import { appLog, useStore } from "../lib/store";
-import {
-  SUMMARY_FIELD_OPTIONS,
-  type ZCreator,
-  type ZItem,
-} from "../lib/types";
+import { type ZCreator, type ZItem } from "../lib/types";
+import { AttachmentList } from "./AttachmentList";
 import { CloseIcon, Spinner } from "./Icons";
+import { SummaryView } from "./SummaryView";
 
 const EDITABLE_FIELDS: { id: string; label: string; multiline?: boolean }[] = [
   { id: "date", label: "Date" },
@@ -185,6 +182,8 @@ function SingleItemEditor({ item }: { item: ZItem }) {
         </label>
       ))}
 
+      <AttachmentList itemKey={item.key} />
+
       <div className="meta-save-row">
         <button
           className="tool-btn accent"
@@ -194,85 +193,6 @@ function SingleItemEditor({ item }: { item: ZItem }) {
           {saving ? <Spinner size={13} /> : null}
           {saving ? "Saving…" : dirty ? "Save to Zotero" : "Saved"}
         </button>
-      </div>
-    </div>
-  );
-}
-
-function fieldValue(item: ZItem, field: string): string {
-  if (field === "creators") return fullCreatorList(item);
-  if (field === "tags")
-    return (item.data?.tags ?? []).map((t) => t.tag).join(", ");
-  return String((item.data as Record<string, unknown>)?.[field] ?? "");
-}
-
-function SummaryView({ items }: { items: ZItem[] }) {
-  const { summaryFields, setSummaryFields } = useStore();
-  const [filterOpen, setFilterOpen] = useState(false);
-  const popRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!filterOpen) return;
-    const onDown = (e: MouseEvent) => {
-      if (popRef.current && !popRef.current.contains(e.target as Node)) {
-        setFilterOpen(false);
-      }
-    };
-    window.addEventListener("mousedown", onDown);
-    return () => window.removeEventListener("mousedown", onDown);
-  }, [filterOpen]);
-
-  const toggle = (id: string) => {
-    setSummaryFields(
-      summaryFields.includes(id)
-        ? summaryFields.filter((f) => f !== id)
-        : [...summaryFields, id],
-    );
-  };
-
-  return (
-    <div className="summary-view">
-      <div className="summary-header">
-        <span>{items.length} items selected</span>
-        <div className="filter-anchor" ref={popRef}>
-          <button className="mini-btn" onClick={() => setFilterOpen(!filterOpen)}>
-            Fields ▾
-          </button>
-          {filterOpen && (
-            <div className="filter-pop">
-              {SUMMARY_FIELD_OPTIONS.map((f) => (
-                <label key={f.id}>
-                  <input
-                    type="checkbox"
-                    checked={summaryFields.includes(f.id)}
-                    onChange={() => toggle(f.id)}
-                  />
-                  {f.label}
-                </label>
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
-      <div className="summary-list">
-        {items.map((item) => (
-          <div className="summary-card" key={item.key}>
-            {SUMMARY_FIELD_OPTIONS.filter((f) =>
-              summaryFields.includes(f.id),
-            ).map((f) => {
-              const v = fieldValue(item, f.id);
-              if (!v) return null;
-              return (
-                <div className={`summary-field summary-${f.id}`} key={f.id}>
-                  {f.id !== "title" && (
-                    <span className="summary-label">{f.label}</span>
-                  )}
-                  <span className="summary-value">{v}</span>
-                </div>
-              );
-            })}
-          </div>
-        ))}
       </div>
     </div>
   );

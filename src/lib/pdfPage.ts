@@ -12,14 +12,20 @@ pdfjs.GlobalWorkerOptions.workerSrc = new URL(
 const TARGET_LONG_EDGE = 1568;
 const JPEG_QUALITY = 0.8;
 
-/** Returns bare base64 JPEG data (no data: prefix) of page 1. */
-export async function renderFirstPageJpeg(data: ArrayBuffer): Promise<string> {
+/** Returns bare base64 JPEG data (no data: prefix) of page 1. pdf.js
+ *  renders annotation appearances along with the page content, so
+ *  highlights and notes show up in the image. */
+export async function renderFirstPageJpeg(
+  data: ArrayBuffer,
+  longEdge = TARGET_LONG_EDGE,
+  quality = JPEG_QUALITY,
+): Promise<string> {
   const task = pdfjs.getDocument({ data });
   try {
     const doc = await task.promise;
     const page = await doc.getPage(1);
     const base = page.getViewport({ scale: 1 });
-    const scale = TARGET_LONG_EDGE / Math.max(base.width, base.height);
+    const scale = longEdge / Math.max(base.width, base.height);
     const viewport = page.getViewport({ scale });
 
     const canvas = document.createElement("canvas");
@@ -34,7 +40,7 @@ export async function renderFirstPageJpeg(data: ArrayBuffer): Promise<string> {
 
     await page.render({ canvas, viewport }).promise;
 
-    const dataUrl = canvas.toDataURL("image/jpeg", JPEG_QUALITY);
+    const dataUrl = canvas.toDataURL("image/jpeg", quality);
     const comma = dataUrl.indexOf(",");
     if (comma < 0 || !dataUrl.startsWith("data:image/jpeg")) {
       throw new Error("JPEG encoding failed");

@@ -41,9 +41,17 @@ export interface FolderView {
   /** Item keys pinned to the top of this folder's list. */
   pinned: string[];
   mode: "list" | "icons";
+  /** Thumbnail size multiplier for the icon view (see THUMB_SCALE). */
+  thumbScale: number;
 }
 
-export const DEFAULT_FOLDER_VIEW: FolderView = { pinned: [], mode: "list" };
+export const DEFAULT_FOLDER_VIEW: FolderView = {
+  pinned: [],
+  mode: "list",
+  thumbScale: 1,
+};
+
+export const THUMB_SCALE = { min: 0.6, max: 2.6, step: 0.1 };
 
 export type ResizableCol = keyof UiPrefs["colWidths"];
 
@@ -93,6 +101,7 @@ interface AppStore extends UiPrefs {
   setColWidth: (col: ResizableCol, w: number) => void;
   togglePin: (collection: string, itemKey: string) => void;
   setFolderMode: (collection: string, mode: FolderView["mode"]) => void;
+  setThumbScale: (collection: string, scale: number) => void;
 
   uiTasks: UiTask[];
   uiTaskLabel: string;
@@ -201,6 +210,16 @@ export const useStore = create<AppStore>()(
             [collection]: {
               ...(s.folderViews[collection] ?? DEFAULT_FOLDER_VIEW),
               mode,
+            },
+          },
+        })),
+      setThumbScale: (collection, thumbScale) =>
+        set((s) => ({
+          folderViews: {
+            ...s.folderViews,
+            [collection]: {
+              ...(s.folderViews[collection] ?? DEFAULT_FOLDER_VIEW),
+              thumbScale,
             },
           },
         })),

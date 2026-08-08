@@ -7,8 +7,12 @@ import { useThumbnail } from "../lib/thumbnails";
 import type { ZItem } from "../lib/types";
 import { PdfIcon, PinIcon, Spinner } from "./Icons";
 
-const CELL_MIN_W = 150;
-const CELL_H = 210;
+const CELL_BASE_W = 150;
+/** US-Letter-ish page ratio: the thumb box is sized to it and images are
+ *  letterboxed inside (object-fit: contain), so pages are never cropped
+ *  and landscape scans still show whole. */
+const PAGE_RATIO = 1.294;
+const CAPTION_H = 40;
 const GAP = 12;
 const OVERSCAN_ROWS = 2;
 
@@ -54,7 +58,7 @@ function Cell({
           aria-label={pinned ? "Unpin" : "Pin to top"}
           title={pinned ? "Unpin" : "Pin to top"}
         >
-          <PinIcon size={12} filled={pinned} />
+          <PinIcon size={24} filled={pinned} />
         </button>
       </div>
       <div className="icon-title">{String(item.data?.title ?? "(untitled)")}</div>
@@ -70,6 +74,7 @@ export function IconGrid({
   selectedKeys,
   pinnedKeys,
   attByParent,
+  scale,
   onSelect,
   onOpen,
   onTogglePin,
@@ -78,6 +83,7 @@ export function IconGrid({
   selectedKeys: string[];
   pinnedKeys: string[];
   attByParent: Map<string, string>;
+  scale: number;
   onSelect: (e: React.MouseEvent, item: ZItem) => void;
   onOpen: (item: ZItem) => void;
   onTogglePin: (item: ZItem) => void;
@@ -97,9 +103,13 @@ export function IconGrid({
     return () => ro.disconnect();
   }, []);
 
-  const cols = Math.max(1, Math.floor((size.w - GAP) / (CELL_MIN_W + GAP)));
+  const targetW = CELL_BASE_W * scale;
+  const cols = Math.max(1, Math.floor((size.w - GAP) / (targetW + GAP)));
   const cellW = (size.w - GAP * (cols + 1)) / cols;
-  const rowH = CELL_H + GAP;
+  // Cell height follows the page ratio, so a wider slider means taller
+  // cells and the thumbnails keep their proportions.
+  const cellH = cellW * PAGE_RATIO + CAPTION_H;
+  const rowH = cellH + GAP;
   const rows = Math.ceil(items.length / cols);
   const firstRow = Math.max(0, Math.floor(scrollTop / rowH) - OVERSCAN_ROWS);
   const lastRow = Math.min(
@@ -121,7 +131,7 @@ export function IconGrid({
             top: GAP + r * rowH,
             left: GAP + c * (cellW + GAP),
             width: cellW,
-            height: CELL_H,
+            height: cellH,
           }}
         >
           <Cell

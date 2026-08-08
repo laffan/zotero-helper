@@ -17,6 +17,7 @@ import {
 import { retryJob } from "../lib/importer";
 import {
   DEFAULT_FOLDER_VIEW,
+  THUMB_SCALE,
   useStore,
   type ResizableCol,
 } from "../lib/store";
@@ -202,6 +203,8 @@ export function ItemList() {
     useStore((s) => s.folderViews[selectedCollection]) ?? DEFAULT_FOLDER_VIEW;
   const togglePin = useStore((s) => s.togglePin);
   const setFolderMode = useStore((s) => s.setFolderMode);
+  const setThumbScale = useStore((s) => s.setThumbScale);
+  const iconMode = folderView.mode === "icons";
   const pinned = folderView.pinned;
 
   const activeJobs = useMemo(
@@ -313,7 +316,26 @@ export function ItemList() {
         } as React.CSSProperties
       }
     >
-      <div className="list-header">
+      <div className="view-bar">
+        <button
+          className={`view-btn ${!iconMode ? "on" : ""}`}
+          onClick={() => setFolderMode(selectedCollection, "list")}
+          title="Show this folder as a list"
+          aria-label="List view"
+        >
+          <ListViewIcon size={14} />
+        </button>
+        <button
+          className={`view-btn ${iconMode ? "on" : ""}`}
+          onClick={() => setFolderMode(selectedCollection, "icons")}
+          title="Show this folder as icons (PDF first pages)"
+          aria-label="Icon view"
+        >
+          <GridViewIcon size={14} />
+        </button>
+      </div>
+      <div className="list-header" hidden={iconMode}>
+        <span className="col col-pin" aria-hidden="true" />
         <button className="col col-title" onClick={() => setSort("title")}>
           Title{sortIndicator("title")}
         </button>
@@ -332,29 +354,8 @@ export function ItemList() {
         <span className="col col-pdf" title="PDF attached">
           <PdfIcon size={13} />
         </span>
-        <span className="col col-pin" />
-        <button
-          className="col col-viewmode"
-          onClick={() =>
-            setFolderMode(
-              selectedCollection,
-              folderView.mode === "icons" ? "list" : "icons",
-            )
-          }
-          title={
-            folderView.mode === "icons"
-              ? "Show this folder as a list"
-              : "Show this folder as icons (PDF first pages)"
-          }
-        >
-          {folderView.mode === "icons" ? (
-            <ListViewIcon size={13} />
-          ) : (
-            <GridViewIcon size={13} />
-          )}
-        </button>
       </div>
-      {folderView.mode === "icons" && (
+      {iconMode && (
         <>
           {activeJobs.length > 0 && (
             <div className="grid-jobs">
@@ -368,6 +369,7 @@ export function ItemList() {
             selectedKeys={selectedKeys}
             pinnedKeys={pinned}
             attByParent={attByParent}
+            scale={folderView.thumbScale ?? 1}
             onSelect={handleRowClick}
             onOpen={openItem}
             onTogglePin={pinItem}
@@ -384,7 +386,7 @@ export function ItemList() {
       <div
         className="list-body"
         ref={containerRef}
-        hidden={folderView.mode === "icons"}
+        hidden={iconMode}
         onScroll={(e) => setScrollTop((e.target as HTMLDivElement).scrollTop)}
       >
         <div style={{ height: totalHeight, position: "relative" }}>
@@ -419,17 +421,6 @@ export function ItemList() {
                 onDoubleClick={() => openItem(item)}
                 title="Double-click to open in Zotero"
               >
-                <span className="col col-title" title={String(item.data?.title ?? "")}>
-                  {String(item.data?.title ?? "(untitled)")}
-                </span>
-                <span className="col col-creator">{creatorSummary(item)}</span>
-                <span className="col col-year">{yearOf(item)}</span>
-                <span className="col col-added">
-                  {fmtAdded(String(item.data?.dateAdded ?? ""))}
-                </span>
-                <span className="col col-pdf">
-                  {withPdf.has(item.key) && <PdfIcon size={13} />}
-                </span>
                 <button
                   className={`col col-pin ${pinned.includes(item.key) ? "on" : ""}`}
                   onClick={(e) => {
@@ -443,8 +434,19 @@ export function ItemList() {
                       : "Pin to the top of this folder"
                   }
                 >
-                  <PinIcon size={12} filled={pinned.includes(item.key)} />
+                  <PinIcon size={24} filled={pinned.includes(item.key)} />
                 </button>
+                <span className="col col-title" title={String(item.data?.title ?? "")}>
+                  {String(item.data?.title ?? "(untitled)")}
+                </span>
+                <span className="col col-creator">{creatorSummary(item)}</span>
+                <span className="col col-year">{yearOf(item)}</span>
+                <span className="col col-added">
+                  {fmtAdded(String(item.data?.dateAdded ?? ""))}
+                </span>
+                <span className="col col-pdf">
+                  {withPdf.has(item.key) && <PdfIcon size={13} />}
+                </span>
               </div>
             );
           })}
@@ -458,10 +460,28 @@ export function ItemList() {
         )}
       </div>
       <footer className="list-footer">
-        {searchKeys
-          ? `${items.length} result(s)`
-          : `${items.length} item(s)`}
-        {selectedKeys.length > 1 && ` · ${selectedKeys.length} selected`}
+        <span>
+          {searchKeys
+            ? `${items.length} result(s)`
+            : `${items.length} item(s)`}
+          {selectedKeys.length > 1 && ` · ${selectedKeys.length} selected`}
+        </span>
+        {iconMode && (
+          <label className="thumb-scale" title="Thumbnail size">
+            <GridViewIcon size={11} />
+            <input
+              type="range"
+              min={THUMB_SCALE.min}
+              max={THUMB_SCALE.max}
+              step={THUMB_SCALE.step}
+              value={folderView.thumbScale ?? 1}
+              onChange={(e) =>
+                setThumbScale(selectedCollection, Number(e.target.value))
+              }
+              aria-label="Thumbnail size"
+            />
+          </label>
+        )}
       </footer>
     </section>
   );

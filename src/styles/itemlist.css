@@ -110,11 +110,25 @@
   color: var(--text-dim);
 }
 .list-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
   border-top: 1px solid var(--border);
   padding: 5px 10px;
   font-size: 11px;
   color: var(--text-dim);
   background: var(--panel);
+}
+.thumb-scale {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+.thumb-scale input[type="range"] {
+  width: 120px;
+  accent-color: var(--accent);
 }
 
 /* --- import pipeline rows --- */
@@ -199,7 +213,7 @@
 
 /* --- Pin cell + per-folder view toggle --- */
 .col-pin {
-  width: 26px;
+  width: 34px;
   flex-shrink: 0;
   display: inline-flex;
   align-items: center;
@@ -215,16 +229,31 @@
   opacity: 1;
   color: var(--accent);
 }
-.col-viewmode {
-  width: 30px;
-  flex-shrink: 0;
+.view-bar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--border);
+  background: var(--panel);
+}
+.view-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  padding: 4px 6px;
+  border: 1px solid transparent;
+  border-radius: var(--radius);
   color: var(--text-dim);
+  background: none;
 }
-.col-viewmode:hover {
+.view-btn:hover {
   color: var(--text);
+}
+.view-btn.on {
+  color: var(--accent);
+  border-color: var(--border);
+  background: var(--panel-alt);
 }
 
 /* --- Icon (thumbnail) view --- */
@@ -269,16 +298,20 @@
   color: var(--text-dim);
 }
 .icon-thumb img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  object-position: top center;
+  max-width: 100%;
+  max-height: 100%;
+  width: auto;
+  height: auto;
+  /* Show the entire page at its own proportions — a thumbnail that
+     crops the title off is useless. */
+  object-fit: contain;
 }
 .icon-pin {
   position: absolute;
-  top: 2px;
-  right: 2px;
-  padding: 3px;
+  top: 3px;
+  right: 3px;
+  padding: 2px;
+  line-height: 0;
   border: none;
   border-radius: 3px;
   background: color-mix(in srgb, var(--panel) 80%, transparent);

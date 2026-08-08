@@ -74,8 +74,8 @@ Windows/Linux desktops too).
   set is configurable from the "Fields" popup, where the abstract can be
   abbreviated or full; that choice only affects the cards, exports always
   carry the whole abstract). Clicking a card narrows the selection to that
-  item, and "Share these N" exports the cards as Markdown, titles linked
-  back to their Zotero entries.
+  item, and "Share filtered metadata" exports the cards as Markdown,
+  titles linked back to their Zotero entries.
 - **Activity terminal** — a collapsible log row beneath the main columns
   records everything the backend does; one tap copies the whole log for
   debugging.

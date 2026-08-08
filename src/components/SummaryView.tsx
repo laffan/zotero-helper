@@ -129,8 +129,13 @@ export function SummaryView({ items }: { items: ZItem[] }) {
         ))}
       </div>
       <div className="summary-footer">
-        <button className="tool-btn" ref={shareRef} onClick={share}>
-          <ShareIcon size={13} /> Share these {items.length}
+        <button
+          className="tool-btn"
+          ref={shareRef}
+          onClick={share}
+          title={`Export the fields shown above for these ${items.length} items as Markdown`}
+        >
+          <ShareIcon size={13} /> Share filtered metadata
         </button>
       </div>
     </div>

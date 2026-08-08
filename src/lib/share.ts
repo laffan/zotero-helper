@@ -138,7 +138,9 @@ export async function shareSummary(
       } else if (f.id === "url") {
         lines.push(`**${f.label}:** <${v}>`);
       } else if (f.id === "abstractShort" || f.id === "abstractNote") {
-        lines.push("", v);
+        // "Abbreviated" is a panel-side nicety only: an exported
+        // document always carries the whole abstract.
+        lines.push("", String(item.data?.abstractNote ?? "").trim() || v);
       } else {
         lines.push(`**${f.label}:** ${v}`);
       }

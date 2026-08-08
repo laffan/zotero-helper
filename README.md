@@ -72,7 +72,8 @@ Windows/Linux desktops too).
 - **Summary select** — selecting multiple items collapses the right panel
   into per-item summary cards (title/authors/abstract by default — the field
   set is configurable from the "Fields" popup, where the abstract can be
-  abbreviated or full). Clicking a card narrows the selection to that
+  abbreviated or full; that choice only affects the cards, exports always
+  carry the whole abstract). Clicking a card narrows the selection to that
   item, and "Share these N" exports the cards as Markdown, titles linked
   back to their Zotero entries.
 - **Activity terminal** — a collapsible log row beneath the main columns

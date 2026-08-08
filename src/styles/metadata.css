@@ -144,9 +144,17 @@
   letter-spacing: 0.05em;
   color: var(--text-dim);
 }
+.summary-abstractShort .summary-value,
 .summary-abstractNote .summary-value {
   font-size: 12px;
   color: var(--text-dim);
+}
+/* Only "Abstract (abbreviated)" is shortened, and it is shortened twice
+   over: clipped to a sentence or two in summaryValue(), then clamped
+   here so a stray long word can't stretch the card. "Abstract (full)"
+   deliberately has no clamp — showing the whole thing is the entire
+   difference between the two options. */
+.summary-abstractShort .summary-value {
   display: -webkit-box;
   -webkit-line-clamp: 5;
   -webkit-box-orient: vertical;

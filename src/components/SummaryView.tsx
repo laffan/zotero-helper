@@ -15,7 +15,9 @@ import { ShareIcon } from "./Icons";
 const ABSTRACT_PREVIEW_CHARS = 240;
 
 /** The value shown for a field — also what Share writes out, so the
- *  document always matches the panel. */
+ *  document matches the panel. The one exception is the abstract:
+ *  "abbreviated" vs "full" is a display choice, and shareSummary()
+ *  exports the whole abstract either way. */
 export function summaryValue(item: ZItem, field: string): string {
   if (field === "creators") return fullCreatorList(item);
   if (field === "tags")

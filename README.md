@@ -53,15 +53,16 @@ Windows/Linux desktops too).
 - **Search** — a MiniSearch index over every field (title, authors, abstract,
   tags, DOI, publication, year…), fast enough for thousands of entries on an
   M1 iPad Pro.
-- **Send to Hush** — pushes selected items' PDFs into the
-  [Hush](https://github.com/laffan/hush) writing app: pick a desk (and
-  optionally a project) and Hush downloads the PDFs itself through its own
-  Zotero credentials. See "Hush integration" below.
-- **Share** — a toolbar menu that shares the selected items' PDFs
-  (downloaded from Zotero on the spot) or a Markdown document of titles
-  (linked back to their Zotero entries) and abstracts. On iPad this is
-  the system share sheet (via `src-tauri/tauri-plugin-share-sheet/`);
-  on desktop it exports through save/folder dialogs.
+- **Share** — one toolbar menu for getting things out of the app: the
+  selected items' PDFs (downloaded from Zotero on the spot), a Markdown
+  document of titles (linked back to their Zotero entries) and
+  abstracts, or **Send to Hush**, which pushes the PDFs into the
+  [Hush](https://github.com/laffan/hush) writing app — pick a desk (and
+  optionally a project) and Hush downloads them itself through its own
+  Zotero credentials (see "Hush integration" below). The first two use
+  the system share sheet on iPad (via
+  `src-tauri/tauri-plugin-share-sheet/`) and save/folder dialogs on
+  desktop.
 - **Folder views** — each folder remembers its own local presentation:
   items **pinned** to the top, and an **icon view** that shows each PDF's
   first page (annotations included) as a thumbnail, rendered once and

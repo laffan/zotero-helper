@@ -15,7 +15,6 @@ import {
   PdfIcon,
   Refresh,
   SearchIcon,
-  SendIcon,
   ShareIcon,
   Sparkles,
   Spinner,
@@ -227,15 +226,6 @@ export function Toolbar() {
             </ToolbarMenu>
           )}
         </div>
-        <button
-          className="tool-btn"
-          onClick={() => setModal({ kind: "sendToHush" })}
-          disabled={selectedKeys.length === 0}
-          title="Send the selected items' PDFs to the Hush writing app"
-        >
-          <SendIcon />
-          <span className="tool-label">Send to Hush</span>
-        </button>
         <div className="filter-anchor" ref={shareMenuRef}>
           <button
             className="tool-btn"
@@ -258,6 +248,18 @@ export function Toolbar() {
               >
                 <strong>Share abstracts</strong>
                 <span>Titles (linked to Zotero) + abstracts as Markdown</span>
+              </button>
+              <button
+                className="menu-item"
+                onClick={() => {
+                  setShareMenuOpen(false);
+                  setModal({ kind: "sendToHush" });
+                }}
+              >
+                <strong>Send to Hush</strong>
+                <span>
+                  Hush downloads the PDFs itself into a desk or project
+                </span>
               </button>
             </ToolbarMenu>
           )}

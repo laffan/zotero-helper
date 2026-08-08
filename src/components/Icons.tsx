@@ -166,6 +166,18 @@ export const PinIcon = ({ filled = false, ...p }: IconProps & { filled?: boolean
     p,
   );
 
+export const FlagIcon = ({ filled = false, ...p }: IconProps & { filled?: boolean } = {}) =>
+  svg(
+    <>
+      <path
+        d="M4 2.5h8l-1.8 3 1.8 3H4z"
+        fill={filled ? "currentColor" : "none"}
+      />
+      <path d="M4 2.5v11" />
+    </>,
+    p,
+  );
+
 export const ListViewIcon = (p: IconProps = {}) =>
   svg(
     <>

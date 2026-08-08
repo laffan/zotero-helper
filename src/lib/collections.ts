@@ -35,6 +35,28 @@ export function buildTree(collections: ZCollection[]): CollectionNode[] {
   return roots;
 }
 
+/** "Grandparent / Parent / Folder" for every collection. The flagged
+ *  list in the sidebar is flat, where a bare folder name ("Drafts",
+ *  "2024") is often ambiguous — this is what its tooltip shows. */
+export function collectionPaths(
+  collections: ZCollection[],
+): Map<string, string> {
+  const byKey = new Map(collections.map((c) => [c.key, c]));
+  const paths = new Map<string, string>();
+  for (const c of collections) {
+    const parts: string[] = [];
+    let cur: ZCollection | undefined = c;
+    // Depth cap: a malformed parent chain must not spin forever.
+    for (let i = 0; cur && i < 32; i++) {
+      parts.unshift(String(cur.data?.name ?? "(untitled)"));
+      const parent: unknown = cur.data?.parentCollection;
+      cur = typeof parent === "string" ? byKey.get(parent) : undefined;
+    }
+    paths.set(c.key, parts.join(" / "));
+  }
+  return paths;
+}
+
 /** Top-level (non-child) items only. */
 export function topLevelItems(items: ZItem[]): ZItem[] {
   return items.filter((i) => !i.data?.parentItem);

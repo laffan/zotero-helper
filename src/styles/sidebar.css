@@ -56,3 +56,19 @@
   font-size: 11px;
   color: var(--text-dim);
 }
+/* Unflag, on rows in the Flagged section. Dim rather than hover-only:
+   an iPad has no hover, and losing the control there would strand the
+   folder at the top of the sidebar. */
+.tree-unflag {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px;
+  border: none;
+  background: none;
+  color: var(--text-dim);
+  opacity: 0.5;
+}
+.tree-unflag:hover {
+  opacity: 1;
+  color: var(--bad);
+}

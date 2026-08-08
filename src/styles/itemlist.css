@@ -250,6 +250,15 @@
 .view-btn:hover {
   color: var(--text);
 }
+.view-btn:disabled {
+  opacity: 0.3;
+}
+.view-sep {
+  width: 1px;
+  height: 16px;
+  background: var(--border);
+  margin: 0 4px;
+}
 .view-btn.on {
   color: var(--accent);
   border-color: var(--border);

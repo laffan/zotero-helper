@@ -27,6 +27,7 @@ import { IconGrid } from "./IconGrid";
 import {
   CheckIcon,
   CloseIcon,
+  FlagIcon,
   GridViewIcon,
   ListViewIcon,
   PdfIcon,
@@ -206,6 +207,11 @@ export function ItemList() {
   const setThumbScale = useStore((s) => s.setThumbScale);
   const iconMode = folderView.mode === "icons";
   const pinned = folderView.pinned;
+  const flagged = useStore((s) => s.flaggedFolders.includes(selectedCollection));
+  const toggleFlag = useStore((s) => s.toggleFlag);
+  // "All Items" and "Unfiled" already sit at the top of the sidebar.
+  const canFlag =
+    selectedCollection !== "all" && selectedCollection !== "unfiled";
 
   const activeJobs = useMemo(
     () => jobOrder.map((id) => jobs[id]).filter(Boolean),
@@ -319,6 +325,23 @@ export function ItemList() {
       }
     >
       <div className="view-bar">
+        <button
+          className={`view-btn ${flagged ? "on" : ""}`}
+          disabled={!canFlag}
+          onClick={() => toggleFlag(selectedCollection)}
+          title={
+            !canFlag
+              ? "Only collections can be flagged"
+              : flagged
+                ? "Remove this folder from Flagged"
+                : "Flag this folder — it rises to the top of the sidebar (app-side only, nothing is sent to Zotero)"
+          }
+          aria-label={flagged ? "Unflag this folder" : "Flag this folder"}
+          aria-pressed={flagged}
+        >
+          <FlagIcon size={14} filled={flagged} />
+        </button>
+        <span className="view-sep" />
         <button
           className={`view-btn ${!iconMode ? "on" : ""}`}
           onClick={() => setFolderMode(selectedCollection, "list")}

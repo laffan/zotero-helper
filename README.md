@@ -67,6 +67,10 @@ Windows/Linux desktops too).
   items **pinned** to the top, and an **icon view** that shows each PDF's
   first page (annotations included) as a thumbnail, rendered once and
   cached on disk. Both are app-side only — nothing is written to Zotero.
+- **Flagged folders** — the flag at the left of the view bar lifts the
+  current collection into a "Flagged" list pinned above Library in the
+  sidebar (the list hides itself when nothing is flagged; unflag from
+  either end). Local only, like pins and view modes.
 - **Attachments** — the metadata panel lists every attachment on an item
   (Zotero allows many), each with its own share button.
 - **Summary select** — selecting multiple items collapses the right panel

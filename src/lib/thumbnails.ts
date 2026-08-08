@@ -7,7 +7,9 @@
 // visible grid cells, so scrolling naturally prioritizes what's on
 // screen.
 import { useEffect, useSyncExternalStore } from "react";
+import { useStore } from "./store";
 import { invoke } from "./tauri";
+import type { ThumbAnnotation } from "./pdfPage";
 
 const THUMB_LONG_EDGE = 400;
 const THUMB_QUALITY = 0.72;
@@ -28,9 +30,54 @@ function subscribe(l: () => void): () => void {
   return () => listeners.delete(l);
 }
 
+/** Zotero's own annotations for this attachment's first page. They live
+ *  as child items in the API — never inside the PDF bytes — so they
+ *  arrive with a normal sync and must be painted on separately. */
+function firstPageAnnotations(attKey: string): ThumbAnnotation[] {
+  const out: ThumbAnnotation[] = [];
+  for (const i of useStore.getState().library.items) {
+    const d = i.data as Record<string, unknown> | undefined;
+    if (!d || d.parentItem !== attKey || d.itemType !== "annotation") continue;
+    let pos: { pageIndex?: number; rects?: number[][]; paths?: number[][] } = {};
+    const raw = d.annotationPosition;
+    try {
+      pos = typeof raw === "string" ? JSON.parse(raw) : ((raw as typeof pos) ?? {});
+    } catch {
+      continue;
+    }
+    if ((pos.pageIndex ?? 0) !== 0) continue;
+    out.push({
+      type: String(d.annotationType ?? "highlight"),
+      color: String(d.annotationColor ?? ""),
+      pageIndex: 0,
+      rects: Array.isArray(pos.rects) ? pos.rects : [],
+      paths: Array.isArray(pos.paths) ? pos.paths : [],
+    });
+  }
+  return out;
+}
+
+/** Cache variant: changes when this attachment's annotations do, so an
+ *  edited highlight re-renders instead of serving a stale image. */
+function annotationSignature(attKey: string): string {
+  let sum = 0;
+  let count = 0;
+  for (const i of useStore.getState().library.items) {
+    const d = i.data as Record<string, unknown> | undefined;
+    if (!d || d.parentItem !== attKey || d.itemType !== "annotation") continue;
+    sum += Number(i.version ?? 0);
+    count++;
+  }
+  return `${count.toString(36)}x${sum.toString(36)}`;
+}
+
 async function renderOne(attKey: string): Promise<void> {
+  const variant = annotationSignature(attKey);
   // Disk cache first — the common path after the first visit.
-  const cached = await invoke<string | null>("read_thumbnail", { attKey });
+  const cached = await invoke<string | null>("read_thumbnail", {
+    attKey,
+    variant,
+  });
   if (cached) {
     cache.set(attKey, { url: `data:image/jpeg;base64,${cached}` });
     return;
@@ -39,10 +86,15 @@ async function renderOne(attKey: string): Promise<void> {
     import("./pdfPage"),
     invoke<ArrayBuffer>("download_attachment_file", { attKey }),
   ]);
-  const b64 = await renderFirstPageJpeg(bytes, THUMB_LONG_EDGE, THUMB_QUALITY);
+  const b64 = await renderFirstPageJpeg(
+    bytes,
+    THUMB_LONG_EDGE,
+    THUMB_QUALITY,
+    firstPageAnnotations(attKey),
+  );
   cache.set(attKey, { url: `data:image/jpeg;base64,${b64}` });
   // Persist for next launch; a failure here only costs a re-render.
-  void invoke("write_thumbnail", { attKey, data: b64 }).catch(() => {});
+  void invoke("write_thumbnail", { attKey, variant, data: b64 }).catch(() => {});
 }
 
 async function pump(): Promise<void> {

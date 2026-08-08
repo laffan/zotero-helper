@@ -255,6 +255,18 @@
   border-color: var(--border);
   background: var(--panel-alt);
 }
+.view-sort {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-left: auto;
+  font-size: 11px;
+  color: var(--text-dim);
+}
+.view-sort select {
+  font-size: 11px;
+  padding: 2px 4px;
+}
 
 /* --- Icon (thumbnail) view --- */
 .icon-grid {
@@ -308,18 +320,31 @@
 }
 .icon-pin {
   position: absolute;
-  top: 3px;
-  right: 3px;
-  padding: 2px;
+  top: 2px;
+  right: 2px;
+  padding: 0;
   line-height: 0;
   border: none;
-  border-radius: 3px;
-  background: color-mix(in srgb, var(--panel) 80%, transparent);
+  background: none;
   color: var(--text-dim);
-  opacity: 0.5;
+  opacity: 0.4;
+  /* Keeps the glyph legible against a white page. */
+  filter: drop-shadow(0 0 2px var(--panel));
+}
+/* Unpinned pins stay out of the way until reached for. Gated on
+   hover-capable pointers: a touch iPad has no hover, so there the
+   control must stay visible or pinning becomes impossible. */
+@media (hover: hover) {
+  .icon-pin {
+    opacity: 0;
+  }
+  .icon-cell:hover .icon-pin {
+    opacity: 0.55;
+  }
 }
 .icon-pin.on,
-.icon-pin:hover {
+.icon-pin:hover,
+.icon-cell:hover .icon-pin:hover {
   opacity: 1;
   color: var(--accent);
 }

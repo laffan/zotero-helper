@@ -296,7 +296,9 @@ export function ItemList() {
   };
 
   const openItem = (item: ZItem) => {
-    if (REAL_KEY.test(item.key)) void openInZotero(item.key);
+    if (!REAL_KEY.test(item.key)) return;
+    // Prefer the PDF itself; fall back to selecting the entry.
+    void openInZotero(item.key, attByParent.get(item.key));
   };
   const pinItem = (item: ZItem) => togglePin(selectedCollection, item.key);
 
@@ -333,6 +335,34 @@ export function ItemList() {
         >
           <GridViewIcon size={14} />
         </button>
+        {iconMode && (
+          <div className="view-sort">
+            {/* List view sorts by clicking column headers; the icon view
+                has none, so it gets this. */}
+            <label htmlFor="icon-sort">Sort</label>
+            <select
+              id="icon-sort"
+              value={sortBy}
+              onChange={(e) => {
+                const next = e.target.value as typeof sortBy;
+                if (next !== sortBy) setSort(next);
+              }}
+            >
+              <option value="title">Title</option>
+              <option value="creator">Creator</option>
+              <option value="date">Year</option>
+              <option value="dateAdded">Added</option>
+            </select>
+            <button
+              className="view-btn"
+              onClick={() => setSort(sortBy)}
+              title={sortDir === "asc" ? "Ascending" : "Descending"}
+              aria-label="Reverse sort order"
+            >
+              {sortDir === "asc" ? "↑" : "↓"}
+            </button>
+          </div>
+        )}
       </div>
       <div className="list-header" hidden={iconMode}>
         <span className="col col-pin" aria-hidden="true" />

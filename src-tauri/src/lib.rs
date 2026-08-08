@@ -328,9 +328,14 @@ async fn export_file(src: String, dest: String) -> Result<()> {
 }
 
 /// Cached first-page thumbnail (base64 JPEG) for an attachment.
+/// `variant` encodes the annotation state it was rendered with.
 #[tauri::command]
-async fn read_thumbnail(state: State<'_, AppState>, att_key: String) -> Result<Option<String>> {
-    thumbs::read(&state, &att_key)
+async fn read_thumbnail(
+    state: State<'_, AppState>,
+    att_key: String,
+    variant: String,
+) -> Result<Option<String>> {
+    thumbs::read(&state, &att_key, &variant)
 }
 
 /// Store a first-page thumbnail rendered by the webview.
@@ -338,30 +343,39 @@ async fn read_thumbnail(state: State<'_, AppState>, att_key: String) -> Result<O
 async fn write_thumbnail(
     state: State<'_, AppState>,
     att_key: String,
+    variant: String,
     data: String,
 ) -> Result<()> {
-    thumbs::write(&state, &att_key, &data)
+    thumbs::write(&state, &att_key, &variant, &data)
 }
 
-/// Select the item in the Zotero app via its zotero://select deep link
-/// (works on macOS and the iPadOS Zotero app alike).
+/// Open the item in the Zotero app. With `att_key` this opens that PDF
+/// directly (zotero://open-pdf); without one it selects the parent entry
+/// (zotero://select). Works on macOS and the iPadOS Zotero app alike.
 #[tauri::command]
 async fn open_in_zotero(
     app: AppHandle,
     state: State<'_, AppState>,
     item_key: String,
+    att_key: Option<String>,
 ) -> Result<()> {
-    if item_key.is_empty() || !item_key.chars().all(|c| c.is_ascii_alphanumeric()) {
+    let valid = |k: &str| !k.is_empty() && k.chars().all(|c| c.is_ascii_alphanumeric());
+    if !valid(&item_key) {
         return Err(Error::msg("Not a real Zotero item key"));
     }
+    let att_key = att_key.filter(|k| valid(k));
     let (library_type, library_id) = {
         let s = state.settings.read().await;
         (s.library_type.clone(), s.zotero_user_id.clone())
     };
-    let url = if library_type == "group" {
-        format!("zotero://select/groups/{library_id}/items/{item_key}")
+    let scope = if library_type == "group" {
+        format!("groups/{library_id}")
     } else {
-        format!("zotero://select/library/items/{item_key}")
+        "library".to_string()
+    };
+    let url = match &att_key {
+        Some(k) => format!("zotero://open-pdf/{scope}/items/{k}"),
+        None => format!("zotero://select/{scope}/items/{item_key}"),
     };
     use tauri_plugin_opener::OpenerExt;
     app.opener()

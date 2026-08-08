@@ -172,10 +172,14 @@ export async function deleteFolder(key: string): Promise<void> {
   await syncNow(false);
 }
 
-/** Select the item in the Zotero app (zotero://select deep link). */
-export async function openInZotero(itemKey: string): Promise<void> {
+/** Open in the Zotero app: the PDF itself when the item has one
+ *  (zotero://open-pdf), otherwise the entry (zotero://select). */
+export async function openInZotero(
+  itemKey: string,
+  attKey?: string,
+): Promise<void> {
   try {
-    await invoke("open_in_zotero", { itemKey });
+    await invoke("open_in_zotero", { itemKey, attKey: attKey ?? null });
   } catch (e) {
     appLog("warn", `Open in Zotero failed: ${e}`);
   }

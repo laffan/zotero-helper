@@ -2,8 +2,8 @@
 // stays fast for libraries with thousands of entries on an iPad.
 import MiniSearch from "minisearch";
 import { useMemo } from "react";
-import { fullCreatorList, topLevelItems, yearOf } from "./collections";
-import type { ZItem } from "./types";
+import { fullCreatorList, itemTitle, topLevelItems, yearOf } from "./collections";
+import type { SearchDates, SearchMode, ZItem } from "./types";
 
 interface SearchDoc {
   key: string;
@@ -23,7 +23,9 @@ function toDoc(item: ZItem): SearchDoc {
   const d = item.data ?? ({} as ZItem["data"]);
   return {
     key: item.key,
-    title: String(d.title ?? ""),
+    // itemTitle, not data.title: a standalone attachment is often only
+    // findable by its filename.
+    title: itemTitle(item),
     creators: fullCreatorList(item),
     abstract: String(d.abstractNote ?? ""),
     publication: String(d.publicationTitle ?? d.bookTitle ?? d.proceedingsTitle ?? ""),
@@ -61,15 +63,58 @@ export function buildIndex(items: ZItem[]): MiniSearch<SearchDoc> {
   return ms;
 }
 
+/** Fields each narrowed mode searches. "all" passes no restriction, so
+ *  MiniSearch uses every indexed field. */
+const MODE_FIELDS: Partial<Record<SearchMode, string[]>> = {
+  title: ["title"],
+  creators: ["creators"],
+  publication: ["publication"],
+};
+
+function parseYear(v: string): number | null {
+  const m = /\d{4}/.exec(v.trim());
+  return m ? Number(m[0]) : null;
+}
+
+/** A date range isn't a text query, so it skips the index and filters on
+ *  the parsed year. Either bound may be blank (open-ended); newest
+ *  first, since relevance means nothing here. */
+function dateRangeKeys(items: ZItem[], dates: SearchDates): string[] | null {
+  const lo = parseYear(dates.from);
+  const hi = parseYear(dates.to);
+  if (lo === null && hi === null) return null;
+  return items
+    .map((i) => ({ item: i, year: Number(yearOf(i)) }))
+    .filter(
+      ({ year }) =>
+        Boolean(year) &&
+        (lo === null || year >= lo) &&
+        (hi === null || year <= hi),
+    )
+    .sort(
+      (a, b) =>
+        b.year - a.year || itemTitle(a.item).localeCompare(itemTitle(b.item)),
+    )
+    .map(({ item }) => item.key);
+}
+
 /** Returns matching item keys ordered by relevance, or null when not searching. */
 export function useSearchResults(
   items: ZItem[],
   query: string,
+  mode: SearchMode,
+  dates: SearchDates,
 ): string[] | null {
   const index = useMemo(() => buildIndex(items), [items]);
+  const tops = useMemo(() => topLevelItems(items), [items]);
+  const { from, to } = dates;
   return useMemo(() => {
+    if (mode === "date") return dateRangeKeys(tops, { from, to });
     const q = query.trim();
     if (!q) return null;
-    return index.search(q).map((r) => String(r.id));
-  }, [index, query]);
+    const fields = MODE_FIELDS[mode];
+    return index
+      .search(q, fields ? { fields } : {})
+      .map((r) => String(r.id));
+  }, [index, tops, query, mode, from, to]);
 }

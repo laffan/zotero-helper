@@ -22,11 +22,13 @@ function svg(path: React.ReactNode, { size = 16 }: IconProps = {}) {
   );
 }
 
+// The two folder buttons carry no text label, so their +/− is drawn
+// large inside the folder body rather than as a small mark on it.
 export const FolderPlus = (p: IconProps = {}) =>
   svg(
     <>
       <path d="M1.5 3.5h4l1.5 2h7.5v7a1 1 0 0 1-1 1h-11a1 1 0 0 1-1-1v-9z" />
-      <path d="M8 8v4M6 10h4" />
+      <path d="M8 7.5v5M5.5 10h5" />
     </>,
     p,
   );
@@ -35,7 +37,7 @@ export const FolderMinus = (p: IconProps = {}) =>
   svg(
     <>
       <path d="M1.5 3.5h4l1.5 2h7.5v7a1 1 0 0 1-1 1h-11a1 1 0 0 1-1-1v-9z" />
-      <path d="M6 10h4" />
+      <path d="M5.5 10h5" />
     </>,
     p,
   );

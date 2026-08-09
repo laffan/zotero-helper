@@ -4,6 +4,8 @@ import type {
   ImportJob,
   LibraryCache,
   LogLine,
+  SearchDates,
+  SearchMode,
   Settings,
   SyncProgress,
   ZItem,
@@ -35,6 +37,8 @@ interface UiPrefs {
   flaggedFolders: string[];
   /** Show colored-tag swatches on item rows and thumbnails. */
   showTagColors: boolean;
+  /** Which fields the search box queries (the magnifier's menu). */
+  searchMode: SearchMode;
   /** Item-list column widths (px), draggable from the list header. */
   colWidths: { creator: number; year: number; added: number };
   /** Per-folder view state. Local-only: pins and view mode are never
@@ -79,6 +83,9 @@ interface AppStore extends UiPrefs {
   selectedCollection: string; // collection key, "all", or "unfiled"
   selectedKeys: string[];
   searchQuery: string;
+  /** Year bounds for the date-range mode — kept apart from the text
+   *  query so switching modes back and forth loses neither. */
+  searchDates: SearchDates;
   sidebarOpen: boolean; // narrow-screen drawer
   metaOpen: boolean; // narrow-screen drawer
   logs: LogLine[];
@@ -95,6 +102,8 @@ interface AppStore extends UiPrefs {
   selectCollection: (key: string) => void;
   setSelectedKeys: (keys: string[]) => void;
   setSearchQuery: (q: string) => void;
+  setSearchMode: (m: SearchMode) => void;
+  setSearchDates: (p: Partial<SearchDates>) => void;
   setSidebarOpen: (b: boolean) => void;
   setMetaOpen: (b: boolean) => void;
   setLogOpen: (b: boolean) => void;
@@ -149,6 +158,7 @@ export const useStore = create<AppStore>()(
       collapsedFolders: [],
       flaggedFolders: [],
       showTagColors: true,
+      searchMode: "all" as SearchMode,
       colWidths: { creator: 180, year: 52, added: 92 },
       folderViews: {},
       uiTasks: [],
@@ -164,6 +174,7 @@ export const useStore = create<AppStore>()(
       selectedCollection: "all",
       selectedKeys: [],
       searchQuery: "",
+      searchDates: { from: "", to: "" },
       sidebarOpen: false,
       metaOpen: false,
       logs: [],
@@ -181,6 +192,9 @@ export const useStore = create<AppStore>()(
         set({ selectedCollection: key, selectedKeys: [], sidebarOpen: false }),
       setSelectedKeys: (selectedKeys) => set({ selectedKeys }),
       setSearchQuery: (searchQuery) => set({ searchQuery }),
+      setSearchMode: (searchMode) => set({ searchMode }),
+      setSearchDates: (p) =>
+        set((s) => ({ searchDates: { ...s.searchDates, ...p } })),
       setSidebarOpen: (sidebarOpen) => set({ sidebarOpen }),
       setMetaOpen: (metaOpen) => set({ metaOpen }),
       setLogOpen: (logOpen) => set({ logOpen }),
@@ -304,6 +318,7 @@ export const useStore = create<AppStore>()(
         collapsedFolders: s.collapsedFolders,
         flaggedFolders: s.flaggedFolders,
         showTagColors: s.showTagColors,
+        searchMode: s.searchMode,
         selectedCollection: s.selectedCollection,
         colWidths: s.colWidths,
         folderViews: s.folderViews,

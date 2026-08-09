@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { saveItemEdits } from "../lib/actions";
+import { isStandaloneAttachment } from "../lib/collections";
 import { appLog, useStore } from "../lib/store";
 import { type ZCreator, type ZItem } from "../lib/types";
 import { AttachmentList } from "./AttachmentList";
+import { AttachmentPanel } from "./AttachmentPanel";
 import { CloseIcon, Spinner } from "./Icons";
 import { SummaryView } from "./SummaryView";
 
@@ -212,7 +214,13 @@ export function MetadataPanel() {
   if (selected.length === 0) {
     content = <div className="meta-empty">Select an item to see its details</div>;
   } else if (selected.length === 1) {
-    content = <SingleItemEditor item={selected[0]} />;
+    // A file with no parent entry has almost no metadata to edit — it
+    // gets its own trimmed panel rather than a page of empty fields.
+    content = isStandaloneAttachment(selected[0]) ? (
+      <AttachmentPanel item={selected[0]} />
+    ) : (
+      <SingleItemEditor item={selected[0]} />
+    );
   } else {
     content = <SummaryView items={selected} />;
   }

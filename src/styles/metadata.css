@@ -161,6 +161,34 @@
   overflow: hidden;
 }
 
+/* --- Standalone attachment panel (read-only facts) --- */
+.meta-facts {
+  gap: 0;
+  border-top: 1px solid var(--border);
+  padding-top: 8px;
+}
+.meta-fact {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 2px 0;
+  min-width: 0;
+}
+.meta-fact-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-dim);
+  width: 62px;
+  flex-shrink: 0;
+}
+.meta-fact-value {
+  font-size: 12px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 /* --- Attachments list (foot of the single-item editor) --- */
 .attachment-row {
   display: flex;

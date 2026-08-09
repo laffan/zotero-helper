@@ -2,7 +2,7 @@
 // Rust core, then handed to the iOS share sheet (via the share-sheet
 // plugin, anchored at the Share button) — or, on desktop, exported
 // through save/folder dialogs.
-import { creatorSummary, pdfAttachmentOf, yearOf } from "./collections";
+import { creatorSummary, itemTitle, pdfAttachmentOf, yearOf } from "./collections";
 import { scheduleTrayClear } from "../components/TaskTray";
 import { appLog, useStore } from "./store";
 import { invoke } from "./tauri";
@@ -230,6 +230,6 @@ function selectedItems(keys: string[]): ZItem[] {
 }
 
 function label(item: ZItem): string {
-  const t = item.data?.title ?? item.key;
-  return String(t).length > 60 ? `${String(t).slice(0, 57)}…` : String(t);
+  const t = itemTitle(item);
+  return t.length > 60 ? `${t.slice(0, 57)}…` : t;
 }

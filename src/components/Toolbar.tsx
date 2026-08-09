@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from "react";
-import { createPortal } from "react-dom";
 import { deleteFolder, syncFolder, syncNow } from "../lib/actions";
 import { getAbstracts, tidyItems } from "../lib/ai";
 import { startPdfFetch } from "../lib/importer";
@@ -14,45 +13,22 @@ import {
   PanelRight,
   PdfIcon,
   Refresh,
-  SearchIcon,
   ShareIcon,
   Sparkles,
   Spinner,
   TerminalIcon,
 } from "./Icons";
+import { SearchBox } from "./SearchBox";
+import { ToolbarMenu } from "./ToolbarMenu";
 
-/** Toolbar dropdowns render into document.body: the toolbar scrolls
- *  horizontally (`overflow-x: auto`), and any overflow value clips
- *  absolutely-positioned children — the menu would vanish under the
- *  item list. Fixed positioning from the anchor's rect escapes that. */
-function ToolbarMenu({
-  anchorRef,
-  children,
-}: {
-  anchorRef: React.RefObject<HTMLDivElement | null>;
-  children: React.ReactNode;
-}) {
-  const r = anchorRef.current?.getBoundingClientRect();
-  if (!r) return null;
-  const width = 250;
-  const left = Math.max(8, Math.min(r.left, window.innerWidth - width - 8));
-  return createPortal(
-    <div
-      className="filter-pop sync-menu"
-      style={{ position: "fixed", top: r.bottom + 4, left, right: "auto" }}
-    >
-      {children}
-    </div>,
-    document.body,
-  );
-}
+/** Folder controls are icon-only, so their glyphs carry the whole
+ *  meaning and are drawn a touch larger than the labelled buttons'. */
+const FOLDER_ICON = 20;
 
 export function Toolbar() {
   const {
     selectedCollection,
     selectedKeys,
-    searchQuery,
-    setSearchQuery,
     syncing,
     tidying,
     logOpen,
@@ -155,23 +131,27 @@ export function Toolbar() {
 
       <div className="toolbar-group">
         <button
-          className="tool-btn"
+          className="tool-btn icon-only"
           onClick={() => setModal({ kind: "newFolder" })}
           title="New folder"
+          aria-label="New folder"
         >
-          <FolderPlus />
-          <span className="tool-label">New Folder</span>
+          <FolderPlus size={FOLDER_ICON} />
         </button>
         <button
-          className={`tool-btn ${confirmDelete ? "danger" : ""}`}
+          className={`tool-btn icon-only ${confirmDelete ? "danger" : ""}`}
           onClick={onDeleteFolder}
           disabled={!isRealCollection}
-          title={confirmDelete ? "Click again to confirm" : "Delete selected folder"}
+          title={
+            confirmDelete
+              ? "Click again to confirm"
+              : currentFolderName
+                ? `Delete the folder “${currentFolderName}”`
+                : "Delete selected folder"
+          }
+          aria-label="Delete folder"
         >
-          <FolderMinus />
-          <span className="tool-label">
-            {confirmDelete ? "Confirm?" : "Delete Folder"}
-          </span>
+          <FolderMinus size={FOLDER_ICON} />
         </button>
         <span className="toolbar-sep" />
         <button
@@ -311,16 +291,7 @@ export function Toolbar() {
         </div>
       </div>
 
-      <div className="toolbar-search">
-        <SearchIcon />
-        <input
-          type="search"
-          placeholder="Search everything…"
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          aria-label="Search library"
-        />
-      </div>
+      <SearchBox />
 
       <div className="toolbar-group">
         <button

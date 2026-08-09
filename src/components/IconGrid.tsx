@@ -2,7 +2,7 @@
 // thumbnails. Thumbnails render on demand as cells scroll into view and
 // are cached on disk, so a folder is slow only the first time.
 import { useEffect, useRef, useState } from "react";
-import { creatorSummary, yearOf } from "../lib/collections";
+import { creatorSummary, itemTitle, yearOf } from "../lib/collections";
 import { useThumbnail } from "../lib/thumbnails";
 import type { ZItem } from "../lib/types";
 import { PdfIcon, PinIcon, Spinner } from "./Icons";
@@ -40,7 +40,7 @@ function Cell({
       className={`icon-cell ${selected ? "selected" : ""}`}
       onClick={(e) => onSelect(e, item)}
       onDoubleClick={() => onOpen(item)}
-      title={String(item.data?.title ?? "")}
+      title={itemTitle(item)}
     >
       <div className="icon-thumb">
         {thumb ? (
@@ -62,7 +62,7 @@ function Cell({
           <PinIcon size={24} filled={pinned} />
         </button>
       </div>
-      <div className="icon-title">{String(item.data?.title ?? "(untitled)")}</div>
+      <div className="icon-title">{itemTitle(item)}</div>
       <div className="icon-sub">
         <TagDots item={item} />
         {[creatorSummary(item), yearOf(item)].filter(Boolean).join(" · ")}

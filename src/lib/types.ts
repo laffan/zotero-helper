@@ -144,6 +144,26 @@ export interface SyncProgress {
   total: number;
 }
 
+/** Which slice of the metadata a query runs against. Picked from the
+ *  menu behind the toolbar's magnifier. */
+export type SearchMode = "all" | "title" | "creators" | "date" | "publication";
+
+/** Labels double as the search field's placeholder, so they read as an
+ *  instruction ("Search Titles"), not as a noun. */
+export const SEARCH_MODES: { id: SearchMode; label: string }[] = [
+  { id: "all", label: "Search all metadata" },
+  { id: "title", label: "Search Titles" },
+  { id: "creators", label: "Search Authors" },
+  { id: "date", label: "Search Date Range" },
+  { id: "publication", label: "Search Publication" },
+];
+
+/** Year bounds for the date-range mode; either end may be left blank. */
+export interface SearchDates {
+  from: string;
+  to: string;
+}
+
 /** The two abstract options render the same field at different lengths,
  *  so picking one clears the other. */
 export const EXCLUSIVE_SUMMARY_GROUPS: string[][] = [

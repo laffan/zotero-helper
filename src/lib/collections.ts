@@ -1,4 +1,4 @@
-import type { ZCollection, ZItem } from "./types";
+import type { ZCollection, ZItem, ZItemData } from "./types";
 
 export interface CollectionNode {
   key: string;
@@ -74,43 +74,53 @@ export function itemsForCollection(items: ZItem[], key: string): ZItem[] {
  *  `…-att-local` placeholder rows created mid-import. */
 export const REAL_KEY = /^[A-Z0-9]{8}$/i;
 
+function isPdfAttachment(d: ZItemData | undefined): boolean {
+  return (
+    d?.itemType === "attachment" &&
+    (d.contentType === "application/pdf" ||
+      String(d.filename ?? "")
+        .toLowerCase()
+        .endsWith(".pdf"))
+  );
+}
+
+/** Zotero allows a file to live at the top level with no parent entry.
+ *  Such a row *is* its own attachment, so anything keyed on "the item's
+ *  PDF" has to answer with the item itself. */
+export function isStandaloneAttachment(item: ZItem): boolean {
+  return item.data?.itemType === "attachment" && !item.data?.parentItem;
+}
+
 /** The item's synced PDF attachment, if it has one. */
 export function pdfAttachmentOf(
   items: ZItem[],
   parentKey: string,
 ): ZItem | undefined {
+  const self = items.find((i) => i.key === parentKey);
+  if (self && isStandaloneAttachment(self)) {
+    return isPdfAttachment(self.data) && REAL_KEY.test(self.key)
+      ? self
+      : undefined;
+  }
   return items.find(
     (a) =>
       a.data?.parentItem === parentKey &&
-      a.data?.itemType === "attachment" &&
       REAL_KEY.test(a.key) &&
-      (a.data?.contentType === "application/pdf" ||
-        String(a.data?.filename ?? "")
-          .toLowerCase()
-          .endsWith(".pdf")),
+      isPdfAttachment(a.data),
   );
 }
 
-/** parentItem key -> its first PDF attachment key. Built once per
- *  library change so grid cells don't each scan every item. */
+/** Item key -> the PDF attachment key to render for it: a child
+ *  attachment for normal entries, the row's own key for a standalone
+ *  file. Built once per library change so grid cells don't each scan
+ *  every item. */
 export function pdfAttachmentMap(items: ZItem[]): Map<string, string> {
   const map = new Map<string, string>();
   for (const a of items) {
     const d = a.data;
-    if (
-      !d?.parentItem ||
-      d.itemType !== "attachment" ||
-      !REAL_KEY.test(a.key) ||
-      map.has(d.parentItem)
-    ) {
-      continue;
-    }
-    if (
-      d.contentType === "application/pdf" ||
-      String(d.filename ?? "").toLowerCase().endsWith(".pdf")
-    ) {
-      map.set(d.parentItem, a.key);
-    }
+    if (!REAL_KEY.test(a.key) || !isPdfAttachment(d)) continue;
+    const owner = d?.parentItem ?? a.key;
+    if (!map.has(owner)) map.set(owner, a.key);
   }
   return map;
 }
@@ -125,6 +135,15 @@ export function attachmentsOf(items: ZItem[], parentKey: string): ZItem[] {
   );
 }
 
+/** What the item list and grid caption show. Standalone attachments
+ *  often carry no title at all, only the filename. */
+export function itemTitle(item: ZItem): string {
+  const t = String(item.data?.title ?? "").trim();
+  if (t) return t;
+  const f = String(item.data?.filename ?? "").trim();
+  return f || "(untitled)";
+}
+
 /** Display name for an attachment row. */
 export function attachmentName(att: ZItem): string {
   const f = String(att.data?.filename ?? "").trim();
@@ -133,19 +152,12 @@ export function attachmentName(att: ZItem): string {
   return t || att.key;
 }
 
-/** Map of parentItem key -> true when a PDF attachment exists. */
+/** Keys of every item that has a PDF — a parent with a PDF child, or a
+ *  standalone PDF attachment, which counts as its own. */
 export function pdfMap(items: ZItem[]): Set<string> {
   const set = new Set<string>();
   for (const i of items) {
-    const d = i.data;
-    if (
-      d?.parentItem &&
-      d.itemType === "attachment" &&
-      (d.contentType === "application/pdf" ||
-        (d.filename ?? "").toLowerCase().endsWith(".pdf"))
-    ) {
-      set.add(d.parentItem);
-    }
+    if (isPdfAttachment(i.data)) set.add(i.data?.parentItem ?? i.key);
   }
   return set;
 }

@@ -12,6 +12,12 @@
   background: var(--panel);
   padding-right: 10px;
 }
+/* The `hidden` attribute has to beat the display above — an author rule
+   outranks the UA's `[hidden]`, so without this the column header shows
+   through the icon view. */
+.list-header[hidden] {
+  display: none;
+}
 .list-header .col {
   text-align: left;
   font-size: 11px;
@@ -294,12 +300,24 @@
      stay visible on the panel background. */
   box-shadow: inset 0 0 0 1px rgb(0 0 0 / 0.2);
 }
+/* An emoji-named tag shows its glyph instead of the swatch. Sized to sit
+   on the text baseline without pushing the row taller. */
+.tag-emoji {
+  font-size: 12px;
+  line-height: 1;
+  flex-shrink: 0;
+  font-family: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji",
+    var(--sans);
+}
 .icon-sub .tag-dots {
   margin-right: 4px;
 }
 .icon-sub .tag-dot {
   width: 7px;
   height: 7px;
+}
+.icon-sub .tag-emoji {
+  font-size: 10px;
 }
 
 /* --- Icon (thumbnail) view --- */

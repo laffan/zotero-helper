@@ -3,7 +3,7 @@
 // with its own credentials, so the link carries only item/attachment
 // keys and display metadata (never secrets). Contract mirrored in Hush's
 // src/links/zotero-helper-import.js.
-import { fullCreatorList, pdfAttachmentOf, yearOf } from "./collections";
+import { fullCreatorList, itemTitle, pdfAttachmentOf, yearOf } from "./collections";
 import { appLog } from "./store";
 import { invoke } from "./tauri";
 import type { ZItem } from "./types";
@@ -65,7 +65,7 @@ export function analyzeSelection(
     ready.push({
       itemKey: item.key,
       attKey: att.key,
-      title: String(item.data?.title ?? "Untitled"),
+      title: itemTitle(item),
       authors: fullCreatorList(item),
       firstAuthor: first ? first.lastName || first.name || "" : "",
       year: yearOf(item),

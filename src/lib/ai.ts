@@ -5,7 +5,7 @@
 //    the model pulls the abstract out verbatim, and it's written to
 //    abstractNote. The model never has to "read" the PDF itself.
 //  - tidyItems: metadata + trimmed-CrossRef cleanup of all fields.
-import { pdfAttachmentOf } from "./collections";
+import { isStandaloneAttachment, itemTitle, pdfAttachmentOf } from "./collections";
 import { scheduleTrayClear } from "../components/TaskTray";
 import { appLog, useStore } from "./store";
 import { invoke } from "./tauri";
@@ -30,6 +30,15 @@ export async function getAbstracts(keys: string[]): Promise<void> {
     for (const item of items) {
       try {
         task(item.key, "working");
+        // A file with no parent entry has no abstractNote to write to.
+        if (isStandaloneAttachment(item)) {
+          appLog(
+            "info",
+            `Get Abstract: “${label(item)}” is a file with no parent entry — skipped`,
+          );
+          task(item.key, "done", "no parent entry");
+          continue;
+        }
         const existing = String(item.data?.abstractNote ?? "").trim();
         if (existing) {
           appLog("info", `Get Abstract: “${label(item)}” already has one`);
@@ -94,6 +103,15 @@ export async function tidyItems(keys: string[]): Promise<void> {
     for (const item of items) {
       try {
         task(item.key, "working");
+        // Attachments carry no bibliographic fields to clean up.
+        if (isStandaloneAttachment(item)) {
+          appLog(
+            "info",
+            `AI Tidy: “${label(item)}” is a file with no parent entry — skipped`,
+          );
+          task(item.key, "done", "no metadata");
+          continue;
+        }
         appLog("info", `AI Tidy: asking the model about “${label(item)}”…`);
         const fixes = await invoke<Record<string, unknown>>("ai_tidy_item", {
           item,
@@ -149,6 +167,6 @@ async function firstPagesText(item: ZItem): Promise<string | null> {
 }
 
 function label(item: ZItem): string {
-  const t = item.data?.title ?? item.key;
-  return String(t).length > 60 ? `${String(t).slice(0, 57)}…` : String(t);
+  const t = itemTitle(item);
+  return t.length > 60 ? `${t.slice(0, 57)}…` : t;
 }

@@ -52,7 +52,13 @@ Windows/Linux desktops too).
   merges anything that changed during the long download.
 - **Search** — a MiniSearch index over every field (title, authors, abstract,
   tags, DOI, publication, year…), fast enough for thousands of entries on an
-  M1 iPad Pro.
+  M1 iPad Pro. The magnifier opens a mode menu that narrows what a query
+  runs against: *all metadata* (the default), *titles*, *authors*,
+  *publication*, or a *date range* — two year boxes, either end open-ended,
+  which filters on the parsed year instead of running a text query. The
+  active mode is the field's placeholder, so the box always says what it
+  will search, and results always render as a list whatever view the
+  folder is set to (relevance order is invisible in a grid of thumbnails).
 - **Share** — one toolbar menu for getting things out of the app: the
   selected items' PDFs (downloaded from Zotero on the spot), a Markdown
   document of titles (linked back to their Zotero entries) and
@@ -66,18 +72,25 @@ Windows/Linux desktops too).
 - **Folder views** — each folder remembers its own local presentation:
   items **pinned** to the top, and an **icon view** that shows each PDF's
   first page (annotations included) as a thumbnail, rendered once and
-  cached on disk. Both are app-side only — nothing is written to Zotero.
+  cached on disk. A file Zotero holds with no parent entry is its own
+  attachment, so it gets a thumbnail like anything else. Both are
+  app-side only — nothing is written to Zotero.
 - **Colored tags** — Zotero's colored ("numbered") tags show as swatches
   before the title in list view and on the caption's second line in icon
-  view, up to four per item, in Zotero's own 1–9 order. The tag button in
-  the view bar toggles them; the colors themselves come from the
-  library's `tagColors` setting, refreshed on every sync.
+  view, up to four per item, in Zotero's own 1–9 order. A tag named with an
+  emoji ("📌 to read") shows its glyph instead of the swatch — the emoji
+  already says what the color only hints at. The tag button in the view bar
+  toggles them; the colors themselves come from the library's `tagColors`
+  setting, refreshed on every sync.
 - **Flagged folders** — the flag at the left of the view bar lifts the
   current collection into a "Flagged" list pinned above Library in the
   sidebar (the list hides itself when nothing is flagged; unflag from
   either end). Local only, like pins and view modes.
 - **Attachments** — the metadata panel lists every attachment on an item
-  (Zotero allows many), each with its own share button.
+  (Zotero allows many), each with its own share button. Selecting a file
+  that has *no* parent entry swaps the full editor for a short panel —
+  name, URL, type, filename, added/modified — because that is all Zotero
+  keeps for one; it lists under its filename when it has no title.
 - **Summary select** — selecting multiple items collapses the right panel
   into per-item summary cards (title/authors/abstract by default — the field
   set is configurable from the "Fields" popup, where the abstract can be

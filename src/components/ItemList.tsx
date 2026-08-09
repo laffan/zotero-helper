@@ -8,6 +8,7 @@ import { openInZotero } from "../lib/actions";
 import {
   creatorSummary,
   itemsForCollection,
+  itemTitle,
   pdfAttachmentMap,
   pdfMap,
   REAL_KEY,
@@ -176,6 +177,8 @@ export function ItemList() {
   const library = useStore((s) => s.library);
   const selectedCollection = useStore((s) => s.selectedCollection);
   const searchQuery = useStore((s) => s.searchQuery);
+  const searchMode = useStore((s) => s.searchMode);
+  const searchDates = useStore((s) => s.searchDates);
   const selectedKeys = useStore((s) => s.selectedKeys);
   const setSelectedKeys = useStore((s) => s.setSelectedKeys);
   const { sortBy, sortDir, setSort } = useStore();
@@ -196,7 +199,13 @@ export function ItemList() {
     return () => ro.disconnect();
   }, []);
 
-  const searchKeys = useSearchResults(library.items, searchQuery);
+  const searchKeys = useSearchResults(
+    library.items,
+    searchQuery,
+    searchMode,
+    searchDates,
+  );
+  const searching = searchKeys !== null;
   const withPdf = useMemo(() => pdfMap(library.items), [library.items]);
   const attByParent = useMemo(
     () => pdfAttachmentMap(library.items),
@@ -207,7 +216,10 @@ export function ItemList() {
   const togglePin = useStore((s) => s.togglePin);
   const setFolderMode = useStore((s) => s.setFolderMode);
   const setThumbScale = useStore((s) => s.setThumbScale);
-  const iconMode = folderView.mode === "icons";
+  // Results come back ranked by relevance (or by date), which a grid of
+  // thumbnails hides — so a search always renders as a list. The
+  // folder's own mode is untouched and returns when the search clears.
+  const iconMode = folderView.mode === "icons" && !searching;
   const pinned = folderView.pinned;
   const flagged = useStore((s) => s.flaggedFolders.includes(selectedCollection));
   const toggleFlag = useStore((s) => s.toggleFlag);
@@ -349,16 +361,26 @@ export function ItemList() {
         <span className="view-sep" />
         <button
           className={`view-btn ${!iconMode ? "on" : ""}`}
+          disabled={searching}
           onClick={() => setFolderMode(selectedCollection, "list")}
-          title="Show this folder as a list"
+          title={
+            searching
+              ? "Search results always show as a list"
+              : "Show this folder as a list"
+          }
           aria-label="List view"
         >
           <ListViewIcon size={14} />
         </button>
         <button
           className={`view-btn ${iconMode ? "on" : ""}`}
+          disabled={searching}
           onClick={() => setFolderMode(selectedCollection, "icons")}
-          title="Show this folder as icons (PDF first pages)"
+          title={
+            searching
+              ? "Search results always show as a list — clear the search to switch back"
+              : "Show this folder as icons (PDF first pages)"
+          }
           aria-label="Icon view"
         >
           <GridViewIcon size={14} />
@@ -451,7 +473,7 @@ export function ItemList() {
           />
           {items.length === 0 && activeJobs.length === 0 && (
             <div className="list-empty">
-              {searchQuery
+              {searching
                 ? "No results"
                 : "No items here yet — use Import IDs to add some"}
             </div>
@@ -511,9 +533,9 @@ export function ItemList() {
                 >
                   <PinIcon size={24} filled={pinned.includes(item.key)} />
                 </button>
-                <span className="col col-title" title={String(item.data?.title ?? "")}>
+                <span className="col col-title" title={itemTitle(item)}>
                   <TagDots item={item} />
-                  {String(item.data?.title ?? "(untitled)")}
+                  {itemTitle(item)}
                 </span>
                 <span className="col col-creator">{creatorSummary(item)}</span>
                 <span className="col col-year">{yearOf(item)}</span>
@@ -529,7 +551,7 @@ export function ItemList() {
         </div>
         {items.length === 0 && activeJobs.length === 0 && (
           <div className="list-empty">
-            {searchQuery
+            {searching
               ? "No results"
               : "No items here yet — use Import IDs to add some"}
           </div>

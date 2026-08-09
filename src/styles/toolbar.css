@@ -35,16 +35,37 @@
 }
 .toolbar-search input {
   flex: 1;
+  min-width: 0;
   border: none;
   background: transparent;
   padding: 7px 0;
 }
+/* The magnifier is a button here (it opens the mode menu), so it must
+   not inherit the icon-btn box that would pad the field open. */
+.search-mode .icon-btn {
+  width: 22px;
+  height: 22px;
+  margin-left: -2px;
+}
+.search-dates {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  font-size: 12px;
+}
+.search-dates input {
+  width: 4.5em;
+  flex: 0 1 auto;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
 
-/* --- sync dropdown --- */
+/* --- toolbar dropdowns --- */
 .sync-menu {
   left: 0;
   right: auto;
-  min-width: 250px;
 }
 .menu-item {
   display: flex;
@@ -66,4 +87,23 @@
 .menu-item span {
   font-size: 11px;
   color: var(--text-dim);
+}
+
+/* Search modes are a radio set, not commands: one line each, with room
+   for the checkmark on the active one. */
+.mode-item {
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+}
+.mode-item.on {
+  color: var(--accent);
+}
+.menu-item .mode-check {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  flex-shrink: 0;
+  color: inherit;
 }

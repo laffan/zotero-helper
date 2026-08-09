@@ -15,6 +15,12 @@
   opacity: 0.4;
   cursor: default;
 }
+/* Label-less variant: the glyph is drawn a size up and the button gets
+   square padding so it still reads as a target. */
+.tool-btn.icon-only {
+  padding: 5px 8px;
+  justify-content: center;
+}
 .tool-btn.accent {
   background: var(--accent);
   color: #fff;

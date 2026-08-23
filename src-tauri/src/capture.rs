@@ -2,8 +2,9 @@
 //! on the main window, framed by the React CaptureModal (which owns the
 //! chrome — header, Back / Grab / Close — and reports the body rect the
 //! webview should cover). Downloads are intercepted into the app's temp
-//! dir and reported via `pdf-captured`; navigation to a PDF-looking URL
-//! is reported via `pdf-url-detected` so the frontend can fetch it.
+//! dir and reported via `pdf-captured` (with the URL it came from, which
+//! is what the pattern book learns from); navigation to a PDF-looking
+//! URL is reported via `pdf-url-detected` so the frontend can fetch it.
 //!
 //! Publisher "Download PDF" buttons routinely use window.open /
 //! target=_blank, which a Tauri webview swallows (popups route to the
@@ -18,6 +19,7 @@ pub use imp::*;
 mod imp {
     use crate::log;
     use serde_json::json;
+    use std::sync::{Arc, Mutex};
     use tauri::webview::DownloadEvent;
     use tauri::{AppHandle, Emitter, LogicalPosition, LogicalSize, Manager};
 
@@ -89,6 +91,9 @@ mod imp {
 
         let app_dl = app.clone();
         let job_dl = job_id.clone();
+        // Where the download came from — remembered between the two
+        // halves of the download event so it can travel with the file.
+        let source_dl: Arc<Mutex<Option<String>>> = Arc::new(Mutex::new(None));
         let app_nav = app.clone();
         let job_nav = job_id.clone();
 
@@ -101,14 +106,25 @@ mod imp {
                             let name = crate::pdf::suggest_filename(url.as_str());
                             *destination =
                                 tmp_dir.join(format!("{}-{}", crate::zotero::now_ms(), name));
+                            if let Ok(mut slot) = source_dl.lock() {
+                                *slot = Some(url.to_string());
+                            }
                             log(&app_dl, "info", format!("Capturing download from {url}"));
                         }
                         DownloadEvent::Finished { path, success, .. } => {
                             if success {
                                 if let Some(p) = path {
+                                    let from = source_dl
+                                        .lock()
+                                        .ok()
+                                        .and_then(|mut slot| slot.take());
                                     let _ = app_dl.emit(
                                         "pdf-captured",
-                                        json!({ "jobId": job_dl, "path": p.to_string_lossy() }),
+                                        json!({
+                                            "jobId": job_dl,
+                                            "path": p.to_string_lossy(),
+                                            "url": from,
+                                        }),
                                     );
                                     log(&app_dl, "info", "Download captured — attaching to item");
                                 }

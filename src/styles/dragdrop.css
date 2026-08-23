@@ -1,0 +1,69 @@
+/* Dragging items from the list onto a sidebar folder (lib/dragdrop.ts).
+   The ghost follows the pointer; folders light up as it passes over. */
+.drag-ghost {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  max-width: 320px;
+  padding: 5px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--panel);
+  box-shadow: 0 6px 20px rgb(0 0 0 / 0.22);
+  font-size: 12px;
+  /* Never the hit-test result of elementFromPoint under the pointer. */
+  pointer-events: none;
+  will-change: transform;
+}
+.drag-ghost.over {
+  border-color: var(--accent);
+}
+.drag-count {
+  flex-shrink: 0;
+  min-width: 20px;
+  padding: 1px 5px;
+  border-radius: 10px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 600;
+  text-align: center;
+}
+.drag-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.drag-dest {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+  padding-left: 7px;
+  border-left: 1px solid var(--border);
+  color: var(--accent);
+  font-weight: 500;
+}
+
+/* A drag in progress: every folder is a target, the one under the
+   pointer is *the* target. */
+.sidebar.drop-mode [data-drop-collection] {
+  border-radius: var(--radius);
+}
+.tree-row.drop-over {
+  background: var(--accent-soft);
+  box-shadow: inset 0 0 0 1.5px var(--accent);
+}
+
+/* A press-and-hold on a row is a drag, not a text selection or an iPad
+   callout menu. */
+.item-row,
+.icon-cell {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}

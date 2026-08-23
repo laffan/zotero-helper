@@ -166,6 +166,34 @@ async fn find_pdf_candidates(
     pdf::find_candidates(&app, &state, doi, landing_url, seed).await
 }
 
+/// Remember where a PDF that worked actually lived, so the rest of this
+/// publisher's items can be tried there directly. Returns the learned
+/// pattern (or null when the URL taught us nothing reusable).
+#[tauri::command]
+async fn learn_pdf_pattern(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    doi: Option<String>,
+    landing_url: Option<String>,
+    pdf_url: String,
+) -> Result<Option<pdf::PdfPattern>> {
+    let learned = pdf::learn_pattern(
+        &state,
+        landing_url.as_deref(),
+        doi.as_deref(),
+        &pdf_url,
+    )
+    .await;
+    if let Some(p) = &learned {
+        log(
+            &app,
+            "info",
+            format!("Noted where {} keeps its PDFs: {}", p.host, p.describe()),
+        );
+    }
+    Ok(learned)
+}
+
 #[tauri::command]
 async fn download_pdf(
     app: AppHandle,
@@ -524,6 +552,7 @@ pub fn run() {
             resolve_identifier,
             discover_doi,
             find_pdf_candidates,
+            learn_pdf_pattern,
             download_pdf,
             attach_pdf,
             discard_temp_file,

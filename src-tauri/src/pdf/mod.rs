@@ -1,5 +1,10 @@
 //! Automatic PDF discovery (Unpaywall, CrossRef links, landing-page meta
-//! tags) and rate-limited downloading with validation.
+//! tags, and patterns learned from what worked before) and rate-limited
+//! downloading with validation.
+
+mod patterns;
+
+pub use patterns::{PatternBook, PdfPattern};
 
 use crate::resolve::meta_values;
 use crate::state::{host_of, AppState};
@@ -108,12 +113,85 @@ pub async fn find_candidates(
         }
     }
 
+    // Last: where this publisher kept its PDF the last time one of its
+    // items came through — including the times a robot check meant the
+    // user had to find it by hand. These go after the open-access copies,
+    // so the speculative request is only made if nothing else worked, and
+    // `download_pdf` paces it.
+    let plan = state
+        .patterns
+        .write()
+        .await
+        .suggest(doi.as_deref(), landing_url.as_deref());
+    if let Some(held) = plan.held {
+        log(app, "info", format!("Learned PDF pattern held back: {held}"));
+    }
+    if !plan.urls.is_empty() {
+        log(
+            app,
+            "info",
+            format!(
+                "Added {} candidate(s) from what this source taught us earlier",
+                plan.urls.len()
+            ),
+        );
+        for u in plan.urls {
+            push_unique(&mut out, u);
+        }
+    }
+
     Ok(out)
 }
 
+/// Record where a PDF that worked actually lived, so the rest of this
+/// source's items can go straight there. Returns the learned pattern
+/// when it taught us something reusable.
+pub async fn learn_pattern(
+    state: &AppState,
+    landing: Option<&str>,
+    doi: Option<&str>,
+    pdf_url: &str,
+) -> Option<PdfPattern> {
+    state.patterns.write().await.learn(landing, doi, pdf_url)
+}
+
 /// Download a URL, verify it is actually a PDF, and store it in the app's
-/// temp directory. Rate-limited per host.
+/// temp directory. Rate-limited per host. Every attempt is reported to
+/// the pattern book, which only cares about the URLs it suggested — that
+/// is how a pattern earns its keep, or gets dropped.
 pub async fn download_pdf(
+    app: &AppHandle,
+    state: &AppState,
+    url: &str,
+    referer: Option<String>,
+) -> Result<DownloadedPdf> {
+    // A URL the pattern book suggested is a guess aimed at a site that
+    // watches for robots, so it waits its turn (and is dropped outright
+    // while that host is in back-off). Everything else passes straight
+    // through.
+    let wait = state
+        .patterns
+        .write()
+        .await
+        .claim(url)
+        .map_err(Error::msg)?;
+    if wait > 0 {
+        log(
+            app,
+            "info",
+            format!(
+                "Pausing {}s before trying this source's learned PDF URL",
+                wait.div_ceil(1000)
+            ),
+        );
+        tokio::time::sleep(std::time::Duration::from_millis(wait)).await;
+    }
+    let result = fetch_pdf(app, state, url, referer).await;
+    state.patterns.write().await.note(url, result.is_ok());
+    result
+}
+
+async fn fetch_pdf(
     app: &AppHandle,
     state: &AppState,
     url: &str,

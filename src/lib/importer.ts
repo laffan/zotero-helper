@@ -4,6 +4,7 @@
 // user finishes them via the rescue modal / capture browser.
 import { pdfMap } from "./collections";
 import { extractIdentifiers } from "./identifiers";
+import { learnPdfPattern } from "./pdfPatterns";
 import { appLog, useStore } from "./store";
 import { invoke } from "./tauri";
 import type { DownloadedPdf, Resolved, ZItemData } from "./types";
@@ -304,12 +305,14 @@ async function runJob(id: string): Promise<void> {
     // 4. Try downloading each candidate (backend enforces rate limits)
     upd(id, { stage: "downloading" });
     let downloaded: DownloadedPdf | null = null;
+    let downloadedFrom = "";
     for (const url of candidates) {
       try {
         downloaded = await invoke<DownloadedPdf>("download_pdf", {
           url,
           referer: job(id).landingUrl ?? null,
         });
+        downloadedFrom = url;
         break;
       } catch (e) {
         appLog("warn", `Candidate failed (${url}): ${e}`);
@@ -326,9 +329,23 @@ async function runJob(id: string): Promise<void> {
 
     // 5. Upload to Zotero
     await uploadAndFinish(id, downloaded.path, downloaded.filename);
+    await notePdfSource(id, downloadedFrom);
   } catch (e) {
     appLog("error", `Import failed for “${job(id)?.identifier}”: ${e}`);
     upd(id, { stage: "error", message: String(e) });
+  }
+}
+
+/** A PDF that worked is a fact about its whole source, not just this
+ *  item: hand the URL to the pattern book, then wake whatever parked on
+ *  the same publisher. The backend paces the retries. */
+async function notePdfSource(id: string, url: string): Promise<void> {
+  const j = job(id);
+  if (!url || !j || j.stage !== "done") return;
+  try {
+    for (const other of await learnPdfPattern(j, url)) retryJob(other);
+  } catch (e) {
+    appLog("debug", `PDF pattern bookkeeping failed: ${e}`);
   }
 }
 
@@ -407,6 +424,7 @@ export async function downloadForJob(id: string, url: string): Promise<void> {
     });
     await invoke("close_capture_window", { jobId: id }).catch(() => {});
     await uploadAndFinish(id, pdf.path, pdf.filename);
+    await notePdfSource(id, url);
   } catch (e) {
     appLog("warn", `Download failed: ${e}`);
     upd(id, {
@@ -418,12 +436,19 @@ export async function downloadForJob(id: string, url: string): Promise<void> {
   }
 }
 
-/** Called when the capture window intercepted a completed download. */
-export async function captureFinished(id: string, path: string): Promise<void> {
+/** Called when the capture window intercepted a completed download.
+ *  `url` is where the browser got it — the one thing this item can teach
+ *  the rest of its publisher's backlog. */
+export async function captureFinished(
+  id: string,
+  path: string,
+  url?: string,
+): Promise<void> {
   if (inFlightCaptures.has(id)) return;
   inFlightCaptures.add(id);
   try {
     await uploadAndFinish(id, path);
+    if (url) await notePdfSource(id, url);
   } finally {
     inFlightCaptures.delete(id);
   }

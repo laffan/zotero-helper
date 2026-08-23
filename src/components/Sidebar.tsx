@@ -4,6 +4,7 @@ import {
   collectionPaths,
   type CollectionNode,
 } from "../lib/collections";
+import { useDragging, useIsDropTarget } from "../lib/dragdrop";
 import { useStore } from "../lib/store";
 import {
   ChevronDown,
@@ -19,13 +20,19 @@ function Node({ node, depth }: { node: CollectionNode; depth: number }) {
   const open = useStore((s) => !s.collapsedFolders.includes(node.key));
   const flagged = useStore((s) => s.flaggedFolders.includes(node.key));
   const hasChildren = node.children.length > 0;
+  // Items dragged from the list land here (see lib/dragdrop).
+  const dropOver = useIsDropTarget(node.key);
 
   return (
     <>
       <div
-        className={`tree-row ${selectedCollection === node.key ? "selected" : ""}`}
+        className={`tree-row ${selectedCollection === node.key ? "selected" : ""} ${
+          dropOver ? "drop-over" : ""
+        }`}
         style={{ paddingLeft: 10 + depth * 14 }}
         onClick={() => selectCollection(node.key)}
+        data-drop-collection={node.key}
+        data-drop-name={node.name}
       >
         {hasChildren ? (
           <button
@@ -52,6 +59,53 @@ function Node({ node, depth }: { node: CollectionNode; depth: number }) {
   );
 }
 
+interface FlaggedFolder {
+  key: string;
+  name: string;
+  path: string;
+}
+
+/** A row in the Flagged section: same drop behavior as a tree row, but
+ *  flat and with its own unflag control. */
+function FlaggedRow({
+  folder,
+  selected,
+  onSelect,
+  onUnflag,
+}: {
+  folder: FlaggedFolder;
+  selected: boolean;
+  onSelect: () => void;
+  onUnflag: () => void;
+}) {
+  const dropOver = useIsDropTarget(folder.key);
+  return (
+    <div
+      className={`tree-row ${selected ? "selected" : ""} ${dropOver ? "drop-over" : ""}`}
+      style={{ paddingLeft: 10 }}
+      onClick={onSelect}
+      title={folder.path}
+      data-drop-collection={folder.key}
+      data-drop-name={folder.name}
+    >
+      <span className="tree-toggle-spacer" />
+      <FlagIcon size={14} filled />
+      <span className="tree-name">{folder.name}</span>
+      <button
+        className="tree-unflag"
+        onClick={(e) => {
+          e.stopPropagation();
+          onUnflag();
+        }}
+        aria-label={`Unflag ${folder.name}`}
+        title="Remove from Flagged"
+      >
+        <CloseIcon size={11} />
+      </button>
+    </div>
+  );
+}
+
 export function Sidebar() {
   const collections = useStore((s) => s.library.collections);
   const itemCount = useStore(
@@ -59,6 +113,7 @@ export function Sidebar() {
   );
   const { selectedCollection, selectCollection, sidebarOpen, setSidebarOpen } =
     useStore();
+  const dragging = useDragging();
   const flaggedKeys = useStore((s) => s.flaggedFolders);
   const toggleFlag = useStore((s) => s.toggleFlag);
   const tree = useMemo(() => buildTree(collections), [collections]);
@@ -83,33 +138,22 @@ export function Sidebar() {
       {sidebarOpen && (
         <div className="drawer-scrim" onClick={() => setSidebarOpen(false)} />
       )}
-      <nav className={`sidebar ${sidebarOpen ? "open" : ""}`}>
+      <nav
+        className={`sidebar ${sidebarOpen ? "open" : ""} ${
+          dragging ? "drop-mode" : ""
+        }`}
+      >
         {flagged.length > 0 && (
           <>
             <div className="sidebar-section">Flagged</div>
             {flagged.map((f) => (
-              <div
+              <FlaggedRow
                 key={f.key}
-                className={`tree-row ${selectedCollection === f.key ? "selected" : ""}`}
-                style={{ paddingLeft: 10 }}
-                onClick={() => selectCollection(f.key)}
-                title={f.path}
-              >
-                <span className="tree-toggle-spacer" />
-                <FlagIcon size={14} filled />
-                <span className="tree-name">{f.name}</span>
-                <button
-                  className="tree-unflag"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    toggleFlag(f.key);
-                  }}
-                  aria-label={`Unflag ${f.name}`}
-                  title="Remove from Flagged"
-                >
-                  <CloseIcon size={11} />
-                </button>
-              </div>
+                folder={f}
+                selected={selectedCollection === f.key}
+                onSelect={() => selectCollection(f.key)}
+                onUnflag={() => toggleFlag(f.key)}
+              />
             ))}
           </>
         )}

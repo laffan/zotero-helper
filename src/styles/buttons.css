@@ -86,3 +86,32 @@
 .link-btn:hover {
   text-decoration: underline;
 }
+
+/* Two buttons welded into one control: no gap, one outline, a hairline
+   between the halves. Used for the job row's Find PDF / capture-browser
+   pair. */
+.btn-split {
+  display: inline-flex;
+  align-items: stretch;
+}
+.btn-split > .mini-btn {
+  border-radius: 0;
+}
+.btn-split > .mini-btn:first-child {
+  border-top-left-radius: 5px;
+  border-bottom-left-radius: 5px;
+}
+.btn-split > .mini-btn:last-child {
+  border-top-right-radius: 5px;
+  border-bottom-right-radius: 5px;
+  /* An icon-only half: square it up so the glyph sits centered. */
+  padding: 3px 7px;
+}
+.btn-split > .mini-btn + .mini-btn {
+  margin-left: -1px;
+}
+/* The seam. On the accent pair a border in --border would read as a
+   gap, so lighten the fill instead. */
+.btn-split > .mini-btn.accent + .mini-btn.accent {
+  border-left-color: color-mix(in srgb, #fff 45%, transparent);
+}

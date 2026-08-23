@@ -15,6 +15,7 @@ import {
   topLevelItems,
   yearOf,
 } from "../lib/collections";
+import { startItemDrag } from "../lib/dragdrop";
 import { retryJob } from "../lib/importer";
 import {
   DEFAULT_FOLDER_VIEW,
@@ -29,6 +30,7 @@ import {
   CheckIcon,
   CloseIcon,
   FlagIcon,
+  GlobeIcon,
   GridViewIcon,
   ListViewIcon,
   PdfIcon,
@@ -112,6 +114,9 @@ function JobRow({ jobItem }: { jobItem: ImportJob }) {
   );
   const title = jobItem.item?.title ?? jobItem.identifier;
   const step = STAGE_STEP[jobItem.stage];
+  // What the capture browser would open — the same page the rescue
+  // modal's own button uses.
+  const landing = jobItem.landingUrl ?? jobItem.candidates[0];
 
   return (
     <div className={`job-row job-${jobItem.stage}`} style={{ height: JOB_ROW_HEIGHT }}>
@@ -144,12 +149,30 @@ function JobRow({ jobItem }: { jobItem: ImportJob }) {
       </div>
       <div className="job-actions">
         {jobItem.stage === "needs-manual" && (
-          <button
-            className="mini-btn accent"
-            onClick={() => setModal({ kind: "rescue", jobId: jobItem.id })}
-          >
-            Find PDF
-          </button>
+          // One button, two halves: the options screen on the left, a
+          // shortcut straight into the capture browser on the right —
+          // that's the option almost every rescue ends up using.
+          <span className="btn-split">
+            <button
+              className="mini-btn accent"
+              onClick={() => setModal({ kind: "rescue", jobId: jobItem.id })}
+            >
+              Find PDF
+            </button>
+            <button
+              className="mini-btn accent"
+              disabled={!landing}
+              onClick={() => setModal({ kind: "capture", jobId: jobItem.id })}
+              aria-label="Open capture browser"
+              title={
+                landing
+                  ? `Open the capture browser at ${landing}`
+                  : "No page to open for this item"
+              }
+            >
+              <GlobeIcon size={12} />
+            </button>
+          </span>
         )}
         {jobItem.stage === "error" && (
           <button className="mini-btn" onClick={() => retryJob(jobItem.id)}>
@@ -470,6 +493,7 @@ export function ItemList() {
             onSelect={handleRowClick}
             onOpen={openItem}
             onTogglePin={pinItem}
+            onDragStart={startItemDrag}
           />
           {items.length === 0 && activeJobs.length === 0 && (
             <div className="list-empty">
@@ -516,7 +540,8 @@ export function ItemList() {
                 }}
                 onClick={(e) => handleRowClick(e, item)}
                 onDoubleClick={() => openItem(item)}
-                title="Double-click to open in Zotero"
+                onPointerDown={(e) => startItemDrag(e, item.key)}
+                title="Double-click to open in Zotero · drag onto a folder to file it there"
               >
                 <button
                   className={`col col-pin ${pinned.includes(item.key) ? "on" : ""}`}

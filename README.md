@@ -36,6 +36,25 @@ Windows/Linux desktops too).
   automatically, popup-style "Download PDF" buttons are rewritten to work,
   and "Grab this page" handles viewers we don't recognize. System browser +
   file picker, candidate links, and a direct-URL box remain as fallbacks.
+  The parked row's button is split in two: **Find PDF** opens that list of
+  options, the globe beside it goes straight to the capture browser, which
+  is where most rescues end up anyway.
+- **Learned PDF locations** — publishers are consistent with themselves, so
+  every PDF that *works* teaches the app where that source keeps its files:
+  the URL is stored as a template with the DOI blanked out
+  (`https://…/doi/pdf/{doi}`) and, where the PDF sat one substitution away
+  from the landing page, as that rewrite (`/doi/full/` → `/doi/pdf/`). Later
+  items from the same publisher (matched on the DOI prefix or the landing
+  host) get those URLs as extra candidates, tried *after* the open-access
+  ones. The payoff is a batch: walk one paper past a robot check by hand in
+  the capture browser and everything else parked on that source is
+  re-queued with the pattern that just worked. Speculating at a site that
+  watches for robots is done slowly and gives up early — at least 20s
+  between two such requests to one host, a 15-minute back-off once three in
+  a row are refused, and a pattern that keeps missing is forgotten. The
+  pause is charged when a learned URL is actually tried, so an item whose
+  open-access copy downloads first never waits for one. The book lives in
+  `pdf-patterns.json` beside the library cache.
 - **AI Tidy Metadata** — with an Anthropic API key configured, selected items
   are cleaned up by Claude (grounded in a fresh CrossRef record when a DOI
   exists): casing, missing abstracts/pages/ISSNs, normalized author names.
@@ -101,6 +120,14 @@ Windows/Linux desktops too).
 - **Activity terminal** — a collapsible log row beneath the main columns
   records everything the backend does; one tap copies the whole log for
   debugging.
+- **Drag items into folders** — drag from the item list (or the icon view)
+  onto any collection in the sidebar and the items are filed there; a
+  drag that starts on a selected row carries the whole selection. Works
+  with a mouse (a few pixels of movement starts the drag) and with a
+  finger on iPad (press and hold, so ordinary scrolling still scrolls) —
+  pointer events throughout, since HTML5 drag-and-drop is unreliable in a
+  WKWebView. Zotero keeps an item in every collection it was added to, so
+  this only ever adds: nothing leaves the folder it was dragged from.
 - Multi-select with the usual ctrl/cmd-click and shift-click patterns.
 - PDFs are only held in a temp folder during upload and deleted right after —
   the copy of record lives in Zotero (where your iPad Zotero app syncs it).
@@ -177,7 +204,8 @@ Regenerate the icon set any time with `node scripts/gen-icons.mjs`
 
 ```
 src/            React + TypeScript UI (Vite, zustand, MiniSearch)
-  lib/          store, import pipeline driver, search index, actions
+  lib/          store, import pipeline driver, search index, actions,
+                drag-and-drop, PDF-pattern bookkeeping
   components/   toolbar, sidebar, virtualized item list, metadata panel,
                 terminal, import/rescue modals, settings
   styles/       one stylesheet per UI region (tokens, base, toolbar, …)
@@ -186,8 +214,9 @@ src-tauri/      Rust core (all networking + state)
                    3-step attachment upload (create → authorize → register)
   src/resolve/     identifier → Zotero item data; one file per source
                    (mod = classify/dispatch, doi, isbn, arxiv, url)
-  src/pdf.rs       Unpaywall + link scraping + validated downloads,
-                   per-host rate limiter
+  src/pdf/         PDF discovery and download (mod = Unpaywall + link
+                   scraping + validated downloads, per-host rate limiter;
+                   patterns = learned per-publisher PDF URL shapes)
   src/ai.rs        Anthropic Messages API (structured outputs) for AI Tidy
   src/capture.rs   desktop capture-browser window (download interception)
 ```
@@ -253,7 +282,6 @@ and **AI agents** working on the codebase:
 
 ## Roadmap ideas
 
-- Drag-and-drop items between collections
 - PMID / PubMed resolver
 - Bulk retraction / duplicate detection
 - Per-item attachment browser

@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { bootstrap } from "./lib/actions";
 import { useStore } from "./lib/store";
 import { CaptureModal } from "./components/CaptureModal";
+import { DragLayer } from "./components/DragLayer";
 import { ImportModal, NewFolderModal } from "./components/ImportModal";
 import { ItemList } from "./components/ItemList";
 import { MetadataPanel } from "./components/MetadataPanel";
@@ -73,6 +74,7 @@ export default function App() {
       </div>
       <Terminal />
       <TaskTray />
+      <DragLayer />
 
       {modal?.kind === "import" && <ImportModal onClose={() => setModal(null)} />}
       {modal?.kind === "newFolder" && (

@@ -22,7 +22,9 @@ import WebKit
 //    the same webview via the WKUIDelegate createWebViewWith hook.
 //
 // Events emitted (JS subscribes via addPluginListener):
-//   captured { jobId, path }    — PDF saved to the app temp dir
+//   captured { jobId, path, url } — PDF saved to the app temp dir, and
+//                                   where it came from (the app learns
+//                                   the publisher's PDF URL shape from it)
 //   failed   { jobId, message } — a download or grab attempt failed
 //
 // WKDownload needs iOS 14.5, so every reference is availability-guarded
@@ -37,6 +39,8 @@ class CaptureViewPlugin: Plugin, WKNavigationDelegate, WKUIDelegate {
   private var captureView: WKWebView?
   private var jobId: String = ""
   private var downloadDest: URL?
+  /// URL the pending download is coming from, reported with the file.
+  private var downloadSource: String?
 
   @objc public override func load(webview: WKWebView) {
     self.hostWebView = webview
@@ -159,7 +163,7 @@ class CaptureViewPlugin: Plugin, WKNavigationDelegate, WKUIDelegate {
           let dest = self.tempDestination(for: name)
           do {
             try data.write(to: dest)
-            self.emitCaptured(path: dest.path)
+            self.emitCaptured(path: dest.path, url: url.absoluteString)
           } catch {
             self.emitFailed("Could not save the PDF: \(error.localizedDescription)")
           }
@@ -219,10 +223,11 @@ class CaptureViewPlugin: Plugin, WKNavigationDelegate, WKUIDelegate {
       .appendingPathComponent("\(stamp)-\(name)")
   }
 
-  private func emitCaptured(path: String) {
+  private func emitCaptured(path: String, url: String?) {
     var payload = JSObject()
     payload["jobId"] = self.jobId
     payload["path"] = path
+    if let url = url { payload["url"] = url }
     self.trigger("captured", data: payload)
   }
 
@@ -270,17 +275,21 @@ extension CaptureViewPlugin: WKDownloadDelegate {
     if !name.lowercased().hasSuffix(".pdf") { name += ".pdf" }
     let dest = tempDestination(for: name)
     self.downloadDest = dest
+    self.downloadSource = response.url?.absoluteString
     completionHandler(dest)
   }
 
   public func downloadDidFinish(_ download: WKDownload) {
     guard let dest = self.downloadDest else { return }
+    let source = self.downloadSource
     self.downloadDest = nil
-    emitCaptured(path: dest.path)
+    self.downloadSource = nil
+    emitCaptured(path: dest.path, url: source)
   }
 
   public func download(_ download: WKDownload, didFailWithError error: Error, resumeData: Data?) {
     self.downloadDest = nil
+    self.downloadSource = nil
     emitFailed("Download failed: \(error.localizedDescription)")
   }
 }

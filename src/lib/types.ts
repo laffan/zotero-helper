@@ -125,6 +125,22 @@ export interface ImportJob {
   hasPdf?: boolean;
 }
 
+/** A learned "where does this source keep its PDFs" rule
+ *  (src-tauri/src/pdf/patterns.rs). */
+export interface PdfPattern {
+  host: string;
+  doiPrefix: string;
+  /** PDF URL with the DOI blanked out, or "" when it carried none. */
+  template: string;
+  /** Landing → PDF substring substitution, or "" when there wasn't one. */
+  rewriteFrom: string;
+  rewriteTo: string;
+  hits: number;
+  misses: number;
+  learnedMs: number;
+  lastUsedMs: number;
+}
+
 export interface Resolved {
   item: ZItemData;
   pdfCandidates: string[];

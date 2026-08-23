@@ -1,3 +1,4 @@
+use crate::pdf::PatternBook;
 use crate::settings::Settings;
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -8,6 +9,8 @@ pub struct AppState {
     pub http: reqwest::Client,
     pub settings: RwLock<Settings>,
     pub data_dir: PathBuf,
+    /// Learned "where does this source keep its PDFs" patterns.
+    pub patterns: RwLock<PatternBook>,
     /// Per-host timestamp of the last automated request, for rate limiting.
     last_request: Mutex<HashMap<String, Instant>>,
 }
@@ -37,6 +40,7 @@ impl AppState {
         AppState {
             http,
             settings: RwLock::new(settings),
+            patterns: RwLock::new(PatternBook::load(&data_dir)),
             data_dir,
             last_request: Mutex::new(HashMap::new()),
         }

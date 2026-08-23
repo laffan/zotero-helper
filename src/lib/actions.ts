@@ -1,5 +1,7 @@
 // App-level actions: bootstrap, event listeners, sync, collection CRUD,
 // item editing.
+import { scheduleTrayClear } from "../components/TaskTray";
+import { itemTitle } from "./collections";
 import { captureFinished, downloadForJob } from "./importer";
 import { appLog, useStore } from "./store";
 import { invoke, isTauri, on } from "./tauri";
@@ -31,10 +33,13 @@ export async function bootstrap(): Promise<void> {
   await on<SyncProgress>("sync-progress", (p) =>
     useStore.getState().setSyncProgress(p),
   );
-  await on<{ jobId: string; path: string }>("pdf-captured", (p) => {
-    appLog("info", "Capture browser intercepted a download");
-    void captureFinished(p.jobId, p.path);
-  });
+  await on<{ jobId: string; path: string; url?: string }>(
+    "pdf-captured",
+    (p) => {
+      appLog("info", "Capture browser intercepted a download");
+      void captureFinished(p.jobId, p.path, p.url);
+    },
+  );
   await on<{ jobId: string; url: string }>("pdf-url-detected", (p) => {
     const j = useStore.getState().jobs[p.jobId];
     if (j && (j.stage === "needs-manual" || j.stage === "downloading")) {
@@ -51,9 +56,9 @@ export async function bootstrap(): Promise<void> {
       await addPluginListener(
         "capture-view",
         "captured",
-        (p: { jobId: string; path: string }) => {
+        (p: { jobId: string; path: string; url?: string }) => {
           appLog("info", "Capture browser intercepted a PDF");
-          void captureFinished(p.jobId, p.path);
+          void captureFinished(p.jobId, p.path, p.url);
         },
       );
       await addPluginListener(
@@ -131,6 +136,78 @@ export async function syncFolder(key: string): Promise<void> {
     useStore.getState().setSyncing(false);
     useStore.getState().setSyncProgress(null);
   }
+}
+
+/** File items into a collection — what a drag from the item list onto a
+ *  sidebar folder does. Zotero keeps an item in every collection it was
+ *  added to, so this only ever adds: nothing is taken out of the folder
+ *  the items were dragged from. Returns how many were filed. */
+export async function addItemsToCollection(
+  itemKeys: string[],
+  collectionKey: string,
+  collectionName?: string,
+): Promise<number> {
+  const store = useStore.getState();
+  const name =
+    collectionName ??
+    String(
+      store.library.collections.find((c) => c.key === collectionKey)?.data
+        ?.name ?? collectionKey,
+    );
+  const items = store.library.items.filter(
+    (i) => itemKeys.includes(i.key) && !i.data?.parentItem,
+  );
+  const todo = items.filter(
+    (i) => !(i.data?.collections ?? []).includes(collectionKey),
+  );
+  if (todo.length === 0) {
+    if (items.length > 0) {
+      appLog("info", `Already in “${name}” — nothing to file`);
+    }
+    return 0;
+  }
+  // One item is a single quick write; a batch gets the progress tray.
+  const tray = todo.length > 1;
+  if (tray) {
+    store.startUiTasks(
+      `Add to ${name}`,
+      todo.map((i) => ({ id: i.key, title: itemTitle(i) })),
+    );
+  }
+  let filed = 0;
+  try {
+    for (const item of todo) {
+      const task = (status: "working" | "done" | "error", note?: string) => {
+        if (tray) useStore.getState().updateUiTask(item.key, { status, note });
+      };
+      try {
+        task("working");
+        const collections = [
+          ...(item.data?.collections ?? []),
+          collectionKey,
+        ];
+        await invoke("update_zotero_item", {
+          key: item.key,
+          version: item.version,
+          patch: { collections },
+        });
+        useStore.getState().patchItemData(item.key, { collections });
+        filed++;
+        task("done");
+      } catch (e) {
+        appLog("error", `Could not file “${itemTitle(item)}” into “${name}”: ${e}`);
+        task("error", String(e).slice(0, 80));
+      }
+    }
+  } finally {
+    if (tray) scheduleTrayClear();
+  }
+  if (filed) {
+    appLog("info", `Filed ${filed} item(s) into “${name}”`);
+    // Picks up the new item versions, so the next drag isn't a conflict.
+    void syncNow(false);
+  }
+  return filed;
 }
 
 export async function saveSettings(settings: Settings): Promise<void> {

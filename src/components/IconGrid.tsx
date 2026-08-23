@@ -25,6 +25,7 @@ function Cell({
   onSelect,
   onOpen,
   onTogglePin,
+  onDragStart,
 }: {
   item: ZItem;
   attKey: string | undefined;
@@ -33,6 +34,7 @@ function Cell({
   onSelect: (e: React.MouseEvent, item: ZItem) => void;
   onOpen: (item: ZItem) => void;
   onTogglePin: (item: ZItem) => void;
+  onDragStart: (e: React.PointerEvent, itemKey: string) => void;
 }) {
   const thumb = useThumbnail(attKey);
   return (
@@ -40,6 +42,7 @@ function Cell({
       className={`icon-cell ${selected ? "selected" : ""}`}
       onClick={(e) => onSelect(e, item)}
       onDoubleClick={() => onOpen(item)}
+      onPointerDown={(e) => onDragStart(e, item.key)}
       title={itemTitle(item)}
     >
       <div className="icon-thumb">
@@ -80,6 +83,7 @@ export function IconGrid({
   onSelect,
   onOpen,
   onTogglePin,
+  onDragStart,
 }: {
   items: ZItem[];
   selectedKeys: string[];
@@ -89,6 +93,7 @@ export function IconGrid({
   onSelect: (e: React.MouseEvent, item: ZItem) => void;
   onOpen: (item: ZItem) => void;
   onTogglePin: (item: ZItem) => void;
+  onDragStart: (e: React.PointerEvent, itemKey: string) => void;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const [scrollTop, setScrollTop] = useState(0);
@@ -144,6 +149,7 @@ export function IconGrid({
             onSelect={onSelect}
             onOpen={onOpen}
             onTogglePin={onTogglePin}
+            onDragStart={onDragStart}
           />
         </div>,
       );

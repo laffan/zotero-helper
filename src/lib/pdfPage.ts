@@ -6,7 +6,13 @@
 // ~2.5k input tokens), and the citation page viewer wants an arbitrary
 // page big enough for a person to read.
 import * as pdfjs from "pdfjs-dist";
-import { locateQuote, type HighlightRect, type TextRun } from "./pdfHighlight";
+import {
+  locateQuote,
+  toWords,
+  type HighlightRect,
+  type QuoteHit,
+  type TextRun,
+} from "./pdfHighlight";
 
 pdfjs.GlobalWorkerOptions.workerSrc = new URL(
   "pdfjs-dist/build/pdf.worker.min.mjs",
@@ -85,31 +91,56 @@ export async function renderFirstPageJpeg(
   return renderPageJpeg(data, 1, longEdge, quality, annotations);
 }
 
-/** Pages to try around the cited one before widening to the whole
- *  document. Off-by-a-couple is the common case — a cover page the
- *  extractor counted differently, a citation drifting to the facing
- *  page — so it is worth checking cheaply first. */
-const NEARBY = [0, -1, 1, -2, 2, -3, 3];
+/** How many pages to sweep before giving up. Each page's text layer is
+ *  a few milliseconds, but a thousand-page scan should not lock the
+ *  dialog up looking for a sentence that may not be there. The report
+ *  says when a sweep was cut short, so a miss on a very long document
+ *  is not mistaken for a passage that isn't there. */
+const MAX_SCAN = 400;
 
-/** Cap on how much of a long document to sweep for a passage. Each
- *  page's text layer is quick, but a 400-page book should not lock the
- *  dialog up looking for a sentence that may not be there. */
-const MAX_SCAN = 80;
-
-/** Order to look for a quoted passage in: the cited page, its
- *  neighbours, then the rest of the document from the front. */
+/** Pages to look in, nearest the cited one first, spiralling out to
+ *  cover the whole document.
+ *
+ *  It used to check a few neighbours and then sweep from page 1, capped
+ *  at 80 pages — which quietly meant that on anything book-length, a
+ *  passage past page 80 was never looked at unless the cited number
+ *  happened to be within three of it. A model reading a printed folio
+ *  off a book page is never within three. */
 function searchOrder(cited: number, pages: number): number[] {
-  const seen = new Set<number>();
   const order: number[] = [];
+  const seen = new Set<number>();
   const add = (n: number) => {
     if (n >= 1 && n <= pages && !seen.has(n)) {
       seen.add(n);
       order.push(n);
     }
   };
-  for (const d of NEARBY) add(cited + d);
-  for (let n = 1; n <= pages && order.length < MAX_SCAN; n++) add(n);
+  add(cited);
+  for (let d = 1; d <= pages && order.length < MAX_SCAN; d++) {
+    add(cited - d);
+    add(cited + d);
+  }
   return order.slice(0, MAX_SCAN);
+}
+
+/** What a search did, for the activity log. A miss is only useful if
+ *  you can tell *why* — the passage is not in this PDF, or the pages
+ *  have no text layer, or the sweep ran out before reaching it. */
+export interface QuoteReport {
+  quoteWords: number;
+  citedPage: number;
+  pages: number;
+  scanned: number;
+  foundPage: number | null;
+  matchedWords: number;
+  exact: boolean;
+  /** Longest run found anywhere, accepted or not, and where. */
+  bestRun: number;
+  bestRunPage: number | null;
+  /** Words the text layer yielded across the sweep. Zero means scans. */
+  textWords: number;
+  /** True when MAX_SCAN cut the sweep short of the whole document. */
+  truncated: boolean;
 }
 
 /** One page as a `data:` URL, ready to drop into an <img>.
@@ -139,6 +170,8 @@ export async function renderPageDataUrl(
    *  scroll to it. A passage two thirds down a page is otherwise
    *  "highlighted" somewhere the reader cannot see. */
   focusY: number;
+  /** Present whenever a passage was searched for. */
+  report?: QuoteReport;
 }> {
   const task = pdfjs.getDocument({ data: data.slice(0) });
   try {
@@ -149,34 +182,52 @@ export async function renderPageDataUrl(
     let rendered = cited;
     let marks: HighlightRect[] = [];
     let page = await doc.getPage(cited);
+    let report: QuoteReport | undefined;
 
     if (quote.trim()) {
       const order = searchOrder(cited, pages);
-      // Two sweeps. The first will only accept the passage entire, so a
-      // page holding all of it wins over an earlier page holding a
-      // piece. Only if no page has the whole thing does the second
-      // sweep take the largest piece it can find, which is what a quote
-      // the extractor spliced out of two parts of a page leaves behind.
-      let found: { n: number; rects: HighlightRect[]; words: number } | null =
-        null;
-      for (const strict of [true, false]) {
-        for (const n of order) {
-          const hit = await quoteRects(await doc.getPage(n), quote, strict);
-          if (hit.rects.length === 0) continue;
-          if (strict) {
-            found = { n, ...hit };
-            break;
-          }
-          // Partial: keep looking, and keep the best.
-          if (!found || hit.words > found.words) found = { n, ...hit };
+      let best: { n: number; hit: QuoteHit } | null = null;
+      let bestRun = 0;
+      let bestRunPage: number | null = null;
+      let textWords = 0;
+      let scanned = 0;
+
+      for (const n of order) {
+        const hit = await quoteRects(await doc.getPage(n), quote);
+        scanned++;
+        textWords += hit.pageWords;
+        if (hit.bestRun > bestRun) {
+          bestRun = hit.bestRun;
+          bestRunPage = n;
         }
-        if (found) break;
+        if (hit.rects.length === 0) continue;
+        // The whole passage settles it; a piece of it is worth keeping
+        // while a better page might still turn up.
+        if (hit.exact) {
+          best = { n, hit };
+          break;
+        }
+        if (!best || hit.words > best.hit.words) best = { n, hit };
       }
-      if (found) {
-        rendered = found.n;
-        page = await doc.getPage(found.n);
-        marks = found.rects;
+
+      if (best) {
+        rendered = best.n;
+        page = await doc.getPage(best.n);
+        marks = best.hit.rects;
       }
+      report = {
+        quoteWords: toWords(quote).length,
+        citedPage: pageNumber,
+        pages,
+        scanned,
+        foundPage: best ? best.n : null,
+        matchedWords: best ? best.hit.words : 0,
+        exact: best ? best.hit.exact : false,
+        bestRun,
+        bestRunPage,
+        textWords,
+        truncated: scanned < pages,
+      };
     }
 
     const jpeg = await renderPage(page, longEdge, JPEG_QUALITY, [], marks);
@@ -186,6 +237,7 @@ export async function renderPageDataUrl(
       rendered,
       found: marks.length > 0,
       focusY: topOfHighlight(page, marks),
+      report,
     };
   } finally {
     void task.destroy();
@@ -195,11 +247,7 @@ export async function renderPageDataUrl(
 /* eslint-disable @typescript-eslint/no-explicit-any */
 /** Where a quotation sits on the page, in PDF user space, and how much
  *  of it was found there. */
-async function quoteRects(
-  page: any,
-  quote: string,
-  strict: boolean,
-): Promise<{ rects: HighlightRect[]; words: number }> {
+async function quoteRects(page: any, quote: string): Promise<QuoteHit> {
   try {
     const content = await page.getTextContent();
     const runs: TextRun[] = (content.items ?? [])
@@ -212,10 +260,10 @@ async function quoteRects(
         height: it.height as number,
         eol: Boolean(it.hasEOL),
       }));
-    return locateQuote(runs, quote, strict);
+    return locateQuote(runs, quote);
   } catch {
     // A page with no text layer (a scan) simply cannot be highlighted.
-    return { rects: [], words: 0 };
+    return { rects: [], words: 0, exact: false, bestRun: 0, pageWords: 0 };
   }
 }
 

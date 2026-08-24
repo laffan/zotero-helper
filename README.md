@@ -109,9 +109,13 @@ Windows/Linux desktops too).
   around and then across the document, because the number is the part
   of a citation a model most easily gets wrong (a paper whose running
   head reads "CONSUMING WITH OTHERS 507" invites citing the folio
-  however plainly you ask for the marker). The page then says where the
-  passage actually was. When it genuinely isn't in the PDF, the page
-  says that too, rather than looking verified. Each conversation lists the works it
+  however plainly you ask for the marker). The search spirals out from the cited
+  page across the whole document, so a book cited by its printed folio
+  still lands on the right page. The page then says where the passage
+  actually was. When it genuinely isn't in the PDF, the page says that
+  too, rather than looking verified — and the activity log says *why*:
+  the words are nowhere in the document, or the pages are images with
+  no text layer, or the sweep hit its cap on a very long PDF. Each conversation lists the works it
   covers behind a **View Titles** twirl-down, and every title there opens
   that entry in Zotero *inside the folder the question was asked from* —
   which is the one that matters for an entry filed in several.

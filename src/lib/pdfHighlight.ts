@@ -153,7 +153,10 @@ function interiorScore(
  *  Classic longest-common-substring, over words rather than characters,
  *  with a rolling row — a 40-word quote against an 800-word page is
  *  32,000 comparisons, which is nothing per page. */
-function longestRun(page: Word[], quote: string[]): [number, number] | null {
+function longestRun(
+  page: Word[],
+  quote: string[],
+): { span: [number, number] | null; best: number } {
   let prev = new Uint16Array(quote.length + 1);
   let best = 0;
   let bestEnd = -1;
@@ -174,19 +177,29 @@ function longestRun(page: Word[], quote: string[]): [number, number] | null {
   // was quoted — a short stretch of a long quote is as likely to be a
   // stock phrase ("in this article we examine") as the sentence meant.
   const floor = Math.max(6, Math.ceil(quote.length * 0.45));
-  if (best < floor) return null;
-  return [bestEnd - best + 1, bestEnd];
+  return {
+    span: best < floor ? null : [bestEnd - best + 1, bestEnd],
+    // Reported either way: "the best run anywhere was three words" is
+    // what tells you a quote is not in this document at all, as against
+    // being there in a form the matcher missed.
+    best,
+  };
 }
 
 /** Word indices of the span the quote refers to, or null. `strict`
  *  refuses the partial fallback, which lets a caller sweep a document
  *  for a whole-quote match before settling for part of one. */
-function matchWords(
-  page: Word[],
-  quote: string[],
-  strict: boolean,
-): [number, number] | null {
-  if (quote.length === 0 || page.length === 0) return null;
+interface Match {
+  span: [number, number] | null;
+  /** True when the whole quote was placed, false for a partial run. */
+  exact: boolean;
+  /** Longest contiguous run found, whether or not it was accepted. */
+  bestRun: number;
+}
+
+function matchWords(page: Word[], quote: string[], strict: boolean): Match {
+  const none: Match = { span: null, exact: false, bestRun: 0 };
+  if (quote.length === 0 || page.length === 0) return none;
 
   // A pair of words is specific enough to anchor on and short enough to
   // survive an extraction that mangled one of them; one word is the
@@ -199,7 +212,12 @@ function matchWords(
 
   const starts = quote.length >= 2 && heads(2).length ? heads(2) : heads(1);
   const ends = quote.length >= 2 && tails(2).length ? tails(2) : tails(1);
-  if (starts.length === 0 || ends.length === 0) return null;
+  const fallback = (): Match => {
+    if (strict) return none;
+    const run = longestRun(page, quote);
+    return { span: run.span, exact: false, bestRun: run.best };
+  };
+  if (starts.length === 0 || ends.length === 0) return fallback();
 
   const want = quote.length;
   const interior = quote.slice(
@@ -232,8 +250,10 @@ function matchWords(
   }
   // Both ends matching is suggestive; the middle is what makes it
   // certain. Below half, assume a different passage.
-  if (best && best.score >= 0.5) return [best.from, best.to];
-  return strict ? null : longestRun(page, quote);
+  if (best && best.score >= 0.5) {
+    return { span: [best.from, best.to], exact: true, bestRun: quote.length };
+  }
+  return fallback();
 }
 
 /** Rectangles covering a quotation, in PDF user space, and how many
@@ -242,19 +262,38 @@ function matchWords(
  *  run the match touches; the first and last are trimmed to the
  *  characters actually inside the match, which assumes even character
  *  widths — an approximation a highlight can carry. */
+export interface QuoteHit {
+  rects: HighlightRect[];
+  /** Words the highlight covers. */
+  words: number;
+  /** True when the whole quote was placed rather than part of it. */
+  exact: boolean;
+  /** Longest run found on this page, accepted or not. */
+  bestRun: number;
+  /** Words the page's text layer yielded — zero means a scan. */
+  pageWords: number;
+}
+
 export function locateQuote(
   runs: TextRun[],
   quote: string,
   strict = false,
-): { rects: HighlightRect[]; words: number } {
-  const none = { rects: [], words: 0 };
-  if (!quote.trim()) return none;
+): QuoteHit {
   const raw = runs.map((r) => r.str + (r.eol ? "\n" : "")).join("");
   const pageWords = toWords(raw);
+  const empty: QuoteHit = {
+    rects: [],
+    words: 0,
+    exact: false,
+    bestRun: 0,
+    pageWords: pageWords.length,
+  };
+  if (!quote.trim()) return empty;
   const quoteWords = toWords(quote).map((w) => w.text);
-  const span = matchWords(pageWords, quoteWords, strict);
-  if (!span) return none;
+  const match = matchWords(pageWords, quoteWords, strict);
+  if (!match.span) return { ...empty, bestRun: match.bestRun };
 
+  const span = match.span;
   const rangeStart = pageWords[span[0]].start;
   const rangeEnd = pageWords[span[1]].end;
 
@@ -277,5 +316,11 @@ export function locateQuote(
     const h = run.height > 0 ? run.height : 10;
     rects.push({ x, y: run.y - h * 0.2, w, h: h * 1.2 });
   }
-  return { rects, words: span[1] - span[0] + 1 };
+  return {
+    rects,
+    words: span[1] - span[0] + 1,
+    exact: match.exact,
+    bestRun: match.bestRun,
+    pageWords: pageWords.length,
+  };
 }

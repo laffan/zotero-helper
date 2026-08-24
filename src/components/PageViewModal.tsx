@@ -9,11 +9,37 @@ import { openInZotero } from "../lib/actions";
 import { itemTitle, pdfAttachmentOf } from "../lib/collections";
 import { appLog, useStore } from "../lib/store";
 import { invoke } from "../lib/tauri";
+import type { QuoteReport } from "../lib/pdfPage";
 import { ExternalIcon, Spinner } from "./Icons";
 import { Modal } from "./Modal";
 
 /** Big enough to read a dense two-column page at full size. */
 const PAGE_LONG_EDGE = 2200;
+
+/** Narrate a passage search into the activity log. A highlight that
+ *  doesn't appear is otherwise a dead end for the person looking at it:
+ *  this says whether the words were nowhere in the document, whether
+ *  the pages have any text to search, and whether the sweep even
+ *  reached the far end of a long PDF. */
+function logSearch(report: QuoteReport, file: string): void {
+  const where = `${report.quoteWords}-word passage in ${file} (${report.pages} pages, cited p.${report.citedPage})`;
+  if (report.foundPage !== null) {
+    appLog(
+      "info",
+      `Highlight: found ${report.exact ? "the whole" : `${report.matchedWords} words of the`} ${where} on page ${report.foundPage}, after ${report.scanned} page(s)`,
+    );
+    return;
+  }
+  const why =
+    report.textWords === 0
+      ? "no text layer on any page searched — these pages are images"
+      : report.truncated
+        ? `swept ${report.scanned} of ${report.pages} pages before the cap`
+        : `best run anywhere was ${report.bestRun} word(s)${
+            report.bestRunPage ? ` on page ${report.bestRunPage}` : ""
+          }`;
+  appLog("warn", `Highlight: no match for the ${where} — ${why}`);
+}
 
 interface PageViewProps {
   itemKey: string;
@@ -74,6 +100,7 @@ export function PageViewModal({
         setFound(out.found);
         setFocusY(out.found ? out.focusY : 0);
         setSearching(false);
+        if (out.report) logSearch(out.report, att.data?.filename || att.key);
       } catch (e) {
         if (stale) return;
         appLog("warn", `Could not render page ${page}: ${e}`);
@@ -112,7 +139,7 @@ export function PageViewModal({
                   ? `Highlighted: “${quote}”`
                   : // Never pretend: an unfound passage says so rather
                     // than leaving a plain page looking checked.
-                    `Could not find “${quote}” anywhere in this PDF — it may be worded differently there, or the pages may be scans with no text layer.`}
+                    `Could not find “${quote}” anywhere in this PDF — see the activity log for why.`}
             </span>
           )}
         </div>

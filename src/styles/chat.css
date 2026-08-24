@@ -49,29 +49,52 @@
   white-space: nowrap;
   margin-top: 2px;
 }
-.chat-row-titles {
+/* --- "View Titles": the works, in the Questions list and in a
+   conversation's own header --- */
+.work-titles {
   font-size: 11px;
   color: var(--text-dim);
   margin-top: 3px;
 }
-.chat-row-titles summary {
+.work-titles summary {
   cursor: default;
   width: fit-content;
   user-select: none;
 }
-.chat-row-titles summary:hover {
+.work-titles summary:hover {
   color: var(--text);
 }
-.chat-row-titles ol {
+.work-titles ol {
   margin: 4px 0 2px 18px;
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 3px;
 }
-.chat-row-titles li {
+.work-titles li {
   list-style: decimal;
   line-height: 1.45;
   color: var(--text);
+}
+/* Title and Zotero button share the line: the title selects the entry
+   here, the icon hands it to Zotero. */
+.work-titles li {
+  display: list-item;
+}
+.work-titles .link-btn {
+  font-size: 11px;
+  padding: 0;
+  word-break: normal;
+  overflow-wrap: anywhere;
+}
+.work-titles-zotero {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 5px;
+  color: var(--text-dim);
+  vertical-align: baseline;
+}
+.work-titles-zotero:hover {
+  color: var(--accent);
 }
 .chat-row-meta {
   display: flex;
@@ -273,10 +296,15 @@
    five papers is a table. The panel is a narrow column, so the table
    scrolls sideways inside its own box instead of widening it. */
 .chat-md-table {
-  overflow-x: auto;
+  overflow: auto;
   margin: 0 0 9px;
   border: 1px solid var(--border);
   border-radius: var(--radius);
+  /* Capping the height is what makes a sticky header mean anything: a
+     long table scrolls inside its own box, with the header pinned,
+     instead of running past the top of the panel. A short table never
+     reaches the cap and is unaffected. */
+  max-height: 55dvh;
 }
 .chat-md-table table {
   border-collapse: collapse;
@@ -297,6 +325,16 @@
   background: var(--panel);
   font-weight: 600;
   white-space: nowrap;
+  /* Stays put while the rows scroll under it — the column you are
+     reading is useless without its name. */
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+/* A sticky cell's own border scrolls away with the table, so the rule
+   under the header row is drawn as a shadow instead. */
+.chat-md-table thead th {
+  box-shadow: inset 0 -1px 0 var(--border);
 }
 .chat-md-table tr:last-child td {
   border-bottom: 0;

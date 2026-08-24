@@ -90,11 +90,16 @@ Windows/Linux desktops too).
 
   **Page citations.** Full-text material is fed to the model with page
   markers in it, and the model is asked to cite the page a claim rests
-  on. Those citations come back as inline **See on p. 12** pills with two
-  buttons: one renders that PDF page in the app, the other opens it in
-  Zotero's reader at the same page. Which means an answer is checkable —
-  you can be on the page it is talking about in one click, rather than
-  taking its word for it. Each conversation lists the works it
+  on — and, where a specific passage is the point, to quote it exactly.
+  Those citations come back as inline **See on p. 12** pills with two
+  buttons: one renders that PDF page in the app with the quoted passage
+  highlighted, the other opens it in Zotero's reader at the same page.
+  Which means an answer is checkable — you can be looking at the
+  sentence it is talking about in one click, rather than taking its word
+  for it. The passage is found by matching a normalized copy of the
+  page's text, so line wrapping, hyphenated line breaks and typographic
+  quotes don't defeat it; when it genuinely can't be found the page says
+  so rather than showing you a clean page that looks verified. Each conversation lists the works it
   covers behind a **View Titles** twirl-down, and every title there opens
   that entry in Zotero *inside the folder the question was asked from* —
   which is the one that matters for an entry filed in several.

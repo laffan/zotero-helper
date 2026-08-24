@@ -29,10 +29,17 @@ specific passage, cite it in exactly this form:\n\n    [[cite:W:P]]\n\nwhere W i
 number in the list below (the number in its \"## 3. Title\" heading) and P is the page number \
 from the nearest preceding [[page N]] marker. For a passage spanning pages, write [[cite:W:P-Q]]. \
 Put the citation immediately after the sentence it supports, in the running text — the reader's \
-app turns it into a button that opens that page. Rules: use the numbers you actually read, never \
-a guess, and never a printed folio or a citation from the work's own bibliography; if the \
-material carries no [[page N]] markers (an abstracts-only conversation), do not cite pages at \
-all; and never invent the [[page N]] markers yourself.";
+app turns it into a button that opens that page.\n\n\
+Where a specific passage is what you are pointing at, add it after the page: \
+[[cite:W:P:the exact words from the page]]. Copy them character for character from the material \
+— the app searches the page for them and highlights what it finds, so an approximation simply \
+fails to highlight. One sentence or clause is ideal; keep it under about forty words, and do not \
+use square brackets inside it. If you are pointing at a page as a whole rather than a passage, \
+leave the quotation off.\n\n\
+Rules: use the numbers you actually read, never a guess, and never a printed folio or a citation \
+from the work's own bibliography; if the material carries no [[page N]] markers (an \
+abstracts-only conversation), do not cite pages at all; and never invent the [[page N]] markers \
+yourself.";
 
 const TITLE_SYSTEM: &str = "You name conversations. Given the first question and answer of a \
 chat about a set of scholarly works, return JSON {\"title\": \"...\"} with a title of at most six \

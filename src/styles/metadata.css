@@ -46,19 +46,35 @@
   gap: 6px;
 }
 
+/* --- The record card. Same shape as a multi-select summary card, so
+   one item and several read as the same kind of thing. --- */
+.meta-card {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+
 /* --- A field's label, and the Edit link that appears on it --- */
 .meta-field-head {
   display: flex;
-  align-items: center;
+  align-items: baseline;
   gap: 6px;
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
   color: var(--text-dim);
 }
 .meta-edit {
   color: var(--accent);
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 500;
+  text-transform: none;
+  letter-spacing: 0;
   /* Hidden until the label is hovered, so the panel reads as a record
      rather than a row of controls — but it still occupies its space, so
      nothing shifts when it appears. */
@@ -73,13 +89,6 @@
 .meta-edit:hover {
   text-decoration: underline;
 }
-/* Nothing to hover with: an iPad would otherwise have no way to reach
-   the link at all. */
-@media (hover: none) {
-  .meta-edit {
-    opacity: 1;
-  }
-}
 
 /* --- Read view of a value --- */
 .meta-value {
@@ -93,6 +102,22 @@
 }
 .meta-value.empty {
   color: var(--text-dim);
+}
+/* The title carries the card, the way it does on a summary card. */
+.meta-field-title .meta-value {
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.35;
+}
+/* The abstract is a block of prose, not a field value — quieter, and
+   with room to breathe. */
+.meta-field-abstract .meta-value {
+  color: var(--text-dim);
+  line-height: 1.6;
+}
+.meta-field-abstract {
+  padding-bottom: 3px;
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 60%, transparent);
 }
 .meta-field textarea {
   resize: vertical;

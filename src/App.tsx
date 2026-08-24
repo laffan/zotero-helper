@@ -102,6 +102,7 @@ export default function App() {
           itemKey={modal.itemKey}
           page={modal.page}
           title={modal.title}
+          quote={modal.quote}
           onClose={() => setModal(null)}
         />
       )}

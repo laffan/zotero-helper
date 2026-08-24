@@ -1,12 +1,12 @@
 // The Questions folder's main-area list. One row per conversation:
 // what the model called it, when it started, and what it was about —
 // the three things you need to find a conversation again a week later.
-import { openInZotero } from "../lib/actions";
 import { removeChat } from "../lib/ai/chat";
 import { formatTokens, formatUsd, modelLabel } from "../lib/ai/models";
 import { useStore } from "../lib/store";
 import type { Chat } from "../lib/types";
 import { ChatIcon, TrashIcon } from "./Icons";
+import { WorkTitles } from "./WorkTitles";
 
 function started(ms: number): string {
   const d = new Date(ms);
@@ -30,43 +30,6 @@ function contextLine(chat: Chat): string {
   return `${scope} · ${depth}`;
 }
 
-/** The works themselves, folded away by default: a folder chat can
- *  cover thirty of them, and the list is for finding a conversation,
- *  not for reading its bibliography. Native <details> so it twirls,
- *  keyboards, and needs no state of its own. */
-function WorkTitles({ chat }: { chat: Chat }) {
-  const titles = chat.source.itemTitles ?? [];
-  if (titles.length === 0) return null;
-  return (
-    <details className="chat-row-titles" onClick={(e) => e.stopPropagation()}>
-      <summary>View Titles ({titles.length})</summary>
-      <ol>
-        {titles.map((t, i) => (
-          <li key={`${i}-${t}`}>
-            <button
-              className="link-btn"
-              onClick={() =>
-                void openInZotero(
-                  chat.source.itemKeys[i],
-                  undefined,
-                  chat.source.collectionKey,
-                )
-              }
-              title={
-                chat.source.collectionKey
-                  ? `Open in Zotero, in “${chat.source.label}”`
-                  : "Open in Zotero"
-              }
-            >
-              {t}
-            </button>
-          </li>
-        ))}
-      </ol>
-    </details>
-  );
-}
-
 function ChatRow({ chat, selected }: { chat: Chat; selected: boolean }) {
   const selectChat = useStore((s) => s.selectChat);
   const turns = chat.messages.filter((m) => m.role === "user").length;
@@ -85,7 +48,7 @@ function ChatRow({ chat, selected }: { chat: Chat; selected: boolean }) {
         <div className="chat-row-context" title={contextLine(chat)}>
           {contextLine(chat)}
         </div>
-        <WorkTitles chat={chat} />
+        <WorkTitles source={chat.source} />
       </div>
       <div className="chat-row-meta">
         <span>{started(chat.createdMs)}</span>

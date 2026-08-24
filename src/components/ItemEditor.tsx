@@ -6,6 +6,10 @@
 // you most often want to *read*, and a five-row textarea is the worst
 // possible way to show a paragraph you aren't editing.
 //
+// The typography is the multi-select summary card's, so one item and
+// several look like the same kind of thing: a card, a title set apart,
+// small capitalised field names, and the values in body text.
+//
 // Save is still the one commit point: editing a field only changes the
 // draft, and nothing reaches Zotero until Save.
 import { useEffect, useRef, useState } from "react";
@@ -159,7 +163,8 @@ export function ItemEditor({ item }: { item: ZItem }) {
         <span className="meta-key">{item.key}</span>
       </div>
 
-      <div className="meta-field">
+      <div className="meta-card">
+      <div className="meta-field meta-field-title">
         <FieldHead
           label="Title"
           editing={isEditing("title")}
@@ -240,7 +245,7 @@ export function ItemEditor({ item }: { item: ZItem }) {
         )}
       </div>
 
-      <div className="meta-field">
+      <div className="meta-field meta-field-abstract">
         <FieldHead
           label="Abstract"
           editing={isEditing("abstractNote")}
@@ -286,6 +291,7 @@ export function ItemEditor({ item }: { item: ZItem }) {
           )}
         </div>
       ))}
+      </div>
 
       <AttachmentList itemKey={item.key} />
 

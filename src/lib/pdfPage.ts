@@ -6,6 +6,7 @@
 // ~2.5k input tokens), and the citation page viewer wants an arbitrary
 // page big enough for a person to read.
 import * as pdfjs from "pdfjs-dist";
+import { locateQuote, type HighlightRect, type TextRun } from "./pdfHighlight";
 
 pdfjs.GlobalWorkerOptions.workerSrc = new URL(
   "pdfjs-dist/build/pdf.worker.min.mjs",
@@ -86,23 +87,74 @@ export async function renderFirstPageJpeg(
 
 /** One page as a `data:` URL, ready to drop into an <img>. `pageNumber`
  *  is 1-based and counts PDF pages — the same numbering the model
- *  cites and Zotero's `?page=` takes. Returns the page count too, so a
- *  citation past the end of the document can say so. */
+ *  cites and Zotero's `?page=` takes. A `quote` is searched for on that
+ *  page and painted over where it is found; `found` says whether it
+ *  was, so the caller can be honest about an unhighlighted page.
+ *  Returns the page count too, so a citation past the end of the
+ *  document can say so. */
 export async function renderPageDataUrl(
   data: ArrayBuffer,
   pageNumber: number,
   longEdge: number,
-): Promise<{ url: string; pages: number; rendered: number }> {
+  quote = "",
+): Promise<{ url: string; pages: number; rendered: number; found: boolean }> {
   const task = pdfjs.getDocument({ data: data.slice(0) });
   try {
     const doc = await task.promise;
     const pages = doc.numPages;
     const rendered = Math.min(Math.max(1, pageNumber), pages);
-    const jpeg = await renderWith(doc, rendered, longEdge, JPEG_QUALITY, []);
-    return { url: `data:image/jpeg;base64,${jpeg}`, pages, rendered };
+    const page = await doc.getPage(rendered);
+    const marks = quote.trim() ? await quoteRects(page, quote) : [];
+    const jpeg = await renderPage(page, longEdge, JPEG_QUALITY, [], marks);
+    return {
+      url: `data:image/jpeg;base64,${jpeg}`,
+      pages,
+      rendered,
+      found: marks.length > 0,
+    };
   } finally {
     void task.destroy();
   }
+}
+
+/* eslint-disable @typescript-eslint/no-explicit-any */
+/** Where a quotation sits on the page, in PDF user space. */
+async function quoteRects(page: any, quote: string): Promise<HighlightRect[]> {
+  try {
+    const content = await page.getTextContent();
+    const runs: TextRun[] = (content.items ?? [])
+      .filter((it: any) => typeof it.str === "string")
+      .map((it: any) => ({
+        str: it.str as string,
+        x: it.transform[4] as number,
+        y: it.transform[5] as number,
+        width: it.width as number,
+        height: it.height as number,
+        eol: Boolean(it.hasEOL),
+      }));
+    return locateQuote(runs, quote);
+  } catch {
+    // A page with no text layer (a scan) simply cannot be highlighted.
+    return [];
+  }
+}
+
+/** Paint the located passage. Multiply keeps the words readable through
+ *  the wash, the way a real highlighter does. */
+function drawHighlights(
+  ctx: CanvasRenderingContext2D,
+  viewport: { convertToViewportPoint: (x: number, y: number) => number[] },
+  scale: number,
+  rects: HighlightRect[],
+): void {
+  ctx.save();
+  ctx.globalCompositeOperation = "multiply";
+  ctx.fillStyle = "#ffe14d";
+  for (const r of rects) {
+    const [x, y] = viewport.convertToViewportPoint(r.x, r.y + r.h);
+    ctx.fillRect(x, y, r.w * scale, r.h * scale);
+  }
+  ctx.restore();
 }
 
 async function renderPageJpeg(
@@ -115,21 +167,21 @@ async function renderPageJpeg(
   const task = pdfjs.getDocument({ data });
   try {
     const doc = await task.promise;
-    return await renderWith(doc, pageNumber, longEdge, quality, annotations);
+    const page = await doc.getPage(pageNumber);
+    return await renderPage(page, longEdge, quality, annotations, []);
   } finally {
     void task.destroy();
   }
 }
 
-/** Rasterize one page of an already-opened document. */
-async function renderWith(
-  doc: pdfjs.PDFDocumentProxy,
-  pageNumber: number,
+/** Rasterize one already-loaded page. */
+async function renderPage(
+  page: any,
   longEdge: number,
   quality: number,
   annotations: ThumbAnnotation[],
+  highlights: HighlightRect[],
 ): Promise<string> {
-  const page = await doc.getPage(pageNumber);
   const base = page.getViewport({ scale: 1 });
   const scale = longEdge / Math.max(base.width, base.height);
   const viewport = page.getViewport({ scale });
@@ -145,8 +197,11 @@ async function renderWith(
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
   await page.render({ canvas, viewport }).promise;
+  if (highlights.length) {
+    drawHighlights(ctx, viewport, scale, highlights);
+  }
   if (annotations.length) {
-    drawAnnotations(ctx, viewport, scale, annotations, pageNumber - 1);
+    drawAnnotations(ctx, viewport, scale, annotations, page.pageNumber - 1);
   }
 
   const dataUrl = canvas.toDataURL("image/jpeg", quality);

@@ -32,6 +32,7 @@ import {
   Spinner,
   TrashIcon,
 } from "./Icons";
+import { WorkTitles } from "./WorkTitles";
 
 /** mm:ss left on the provider's cache window, or null once it's gone.
  *
@@ -120,10 +121,20 @@ function CitePill({
       <span className="cite-label">{label}</span>
       <button
         onClick={() =>
-          setModal({ kind: "pdfPage", itemKey, page: cite.page, title })
+          setModal({
+          kind: "pdfPage",
+          itemKey,
+          page: cite.page,
+          title,
+          quote: cite.quote,
+        })
         }
         aria-label={`View page ${cite.page}`}
-        title={`View page ${cite.page} here${title ? ` — ${title}` : ""}`}
+        title={
+          cite.quote
+            ? `View page ${cite.page} here, with the passage highlighted:\n“${cite.quote}”`
+            : `View page ${cite.page} here${title ? ` — ${title}` : ""}`
+        }
       >
         <EyeIcon size={12} />
       </button>
@@ -264,6 +275,7 @@ export function ChatPanel({ chat }: { chat: Chat }) {
             {chat.source.missing.length === 1 ? "" : "s"} contributed nothing
           </div>
         )}
+        <WorkTitles source={chat.source} />
       </div>
 
       <div className="chat-scroll" ref={scrollRef}>

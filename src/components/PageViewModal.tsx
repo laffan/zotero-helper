@@ -19,15 +19,24 @@ interface PageViewProps {
   itemKey: string;
   page: number;
   title: string;
+  /** Passage to highlight, when the citation named one. */
+  quote?: string;
   onClose: () => void;
 }
 
-export function PageViewModal({ itemKey, page, title, onClose }: PageViewProps) {
+export function PageViewModal({
+  itemKey,
+  page,
+  title,
+  quote,
+  onClose,
+}: PageViewProps) {
   const items = useStore((s) => s.library.items);
   const [url, setUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [shown, setShown] = useState(page);
   const [pages, setPages] = useState(0);
+  const [found, setFound] = useState(true);
   const [actualSize, setActualSize] = useState(false);
 
   const att = pdfAttachmentOf(items, itemKey);
@@ -48,11 +57,17 @@ export function PageViewModal({ itemKey, page, title, onClose }: PageViewProps) 
           import("../lib/pdfPage"),
           invoke<ArrayBuffer>("download_attachment_file", { attKey: att.key }),
         ]);
-        const out = await renderPageDataUrl(bytes, page, PAGE_LONG_EDGE);
+        const out = await renderPageDataUrl(
+          bytes,
+          page,
+          PAGE_LONG_EDGE,
+          quote ?? "",
+        );
         if (stale) return;
         setUrl(out.url);
         setShown(out.rendered);
         setPages(out.pages);
+        setFound(out.found);
       } catch (e) {
         if (stale) return;
         appLog("warn", `Could not render page ${page}: ${e}`);
@@ -62,7 +77,7 @@ export function PageViewModal({ itemKey, page, title, onClose }: PageViewProps) 
     return () => {
       stale = true;
     };
-  }, [att, page]);
+  }, [att, page, quote]);
 
   return (
     <Modal title={`Page ${page}`} onClose={onClose} wide>
@@ -72,11 +87,24 @@ export function PageViewModal({ itemKey, page, title, onClose }: PageViewProps) 
             {name}
           </span>
           <span className="page-view-sub">
-            {pages > 0
-              ? `Page ${shown} of ${pages}`
-              : `Page ${page}`}
+            {pages > 0 ? `Page ${shown} of ${pages}` : `Page ${page}`}
             {shown !== page && pages > 0 && " — the citation was past the end"}
           </span>
+          {quote && (
+            <span
+              className={`page-view-quote ${found || !url ? "" : "missed"}`}
+              title={quote}
+            >
+              {!url
+                ? `“${quote}”`
+                : found
+                  ? `Highlighted: “${quote}”`
+                  : // Never pretend: an unfound passage says so rather
+                    // than leaving a plain page looking checked.
+                    `Could not find “${quote}” on this page — it may be
+                     worded differently in the PDF, or on a scanned page.`}
+            </span>
+          )}
         </div>
 
         <div className={`page-view-stage ${actualSize ? "actual" : "fit"}`}>

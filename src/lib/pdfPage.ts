@@ -139,6 +139,9 @@ export interface QuoteReport {
   bestRunPage: number | null;
   /** Words the text layer yielded across the sweep. Zero means scans. */
   textWords: number;
+  /** Why the text layer came back empty, when it failed rather than
+   *  simply being absent. */
+  textError?: string;
   /** True when MAX_SCAN cut the sweep short of the whole document. */
   truncated: boolean;
 }
@@ -191,11 +194,13 @@ export async function renderPageDataUrl(
       let bestRunPage: number | null = null;
       let textWords = 0;
       let scanned = 0;
+      let textError: string | undefined;
 
       for (const n of order) {
         const hit = await quoteRects(await doc.getPage(n), quote);
         scanned++;
         textWords += hit.pageWords;
+        textError ??= hit.error;
         if (hit.bestRun > bestRun) {
           bestRun = hit.bestRun;
           bestRunPage = n;
@@ -226,6 +231,7 @@ export async function renderPageDataUrl(
         bestRun,
         bestRunPage,
         textWords,
+        textError,
         truncated: scanned < pages,
       };
     }
@@ -245,25 +251,71 @@ export async function renderPageDataUrl(
 }
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
-/** Where a quotation sits on the page, in PDF user space, and how much
- *  of it was found there. */
-async function quoteRects(page: any, quote: string): Promise<QuoteHit> {
+/** Turn pdf.js text items into runs we can measure. Marked-content
+ *  items carry no string and are skipped. */
+function toRuns(items: any[]): TextRun[] {
+  return items
+    .filter((it: any) => typeof it.str === "string")
+    .map((it: any) => ({
+      str: it.str as string,
+      x: it.transform[4] as number,
+      y: it.transform[5] as number,
+      width: it.width as number,
+      height: it.height as number,
+      eol: Boolean(it.hasEOL),
+    }));
+}
+
+/** The page's text items.
+ *
+ *  `getTextContent()` is the obvious call, and it consumes its chunk
+ *  stream with `for await` — which needs async iteration over a
+ *  ReadableStream, the one part of this that some WebKit builds don't
+ *  have. Where it's missing the call throws before a single item is
+ *  read, on every page, and the page looks exactly like a scan. So a
+ *  failure falls back to pumping the same stream through a reader,
+ *  which is plain ES2018 and works anywhere. */
+async function textItems(page: any): Promise<any[]> {
   try {
     const content = await page.getTextContent();
-    const runs: TextRun[] = (content.items ?? [])
-      .filter((it: any) => typeof it.str === "string")
-      .map((it: any) => ({
-        str: it.str as string,
-        x: it.transform[4] as number,
-        y: it.transform[5] as number,
-        width: it.width as number,
-        height: it.height as number,
-        eol: Boolean(it.hasEOL),
-      }));
-    return locateQuote(runs, quote);
-  } catch {
-    // A page with no text layer (a scan) simply cannot be highlighted.
-    return { rects: [], words: 0, exact: false, bestRun: 0, pageWords: 0 };
+    return content.items ?? [];
+  } catch (e) {
+    const stream = page.streamTextContent?.();
+    if (!stream?.getReader) throw e;
+    const reader = stream.getReader();
+    const items: any[] = [];
+    for (;;) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      if (value?.items) items.push(...value.items);
+    }
+    return items;
+  }
+}
+
+/** Where a quotation sits on the page, in PDF user space, and how much
+ *  of it was found there. `error` is set when the page's text couldn't
+ *  be read at all — the difference between a scanned page and a text
+ *  layer this build of pdf.js failed on, which the log has to be able
+ *  to tell apart. */
+async function quoteRects(
+  page: any,
+  quote: string,
+): Promise<QuoteHit & { error?: string }> {
+  try {
+    return locateQuote(toRuns(await textItems(page)), quote);
+  } catch (e) {
+    // A page with no text layer (a scan) simply cannot be highlighted;
+    // neither can one whose text layer threw. Say which.
+    console.warn(`Highlight: text layer failed on page ${page.pageNumber}`, e);
+    return {
+      rects: [],
+      words: 0,
+      exact: false,
+      bestRun: 0,
+      pageWords: 0,
+      error: String(e),
+    };
   }
 }
 

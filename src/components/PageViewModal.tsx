@@ -30,8 +30,9 @@ function logSearch(report: QuoteReport, file: string): void {
     );
     return;
   }
-  const why =
-    report.textWords === 0
+  const why = report.textError
+    ? `the text layer could not be read — ${report.textError}`
+    : report.textWords === 0
       ? "no text layer on any page searched — these pages are images"
       : report.truncated
         ? `swept ${report.scanned} of ${report.pages} pages before the cap`

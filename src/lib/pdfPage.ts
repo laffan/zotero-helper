@@ -1,7 +1,10 @@
-// Render the first page of a PDF to a downsampled JPEG for AI metadata
-// extraction. ~1568px on the long edge is the sweet spot for Claude
-// vision: titles/authors/abstract stay readable while the image costs
-// only ~2.5k input tokens.
+// Render a PDF page to a downsampled JPEG.
+//
+// Two callers with different needs: AI metadata extraction wants page 1
+// at ~1568px on the long edge (the sweet spot for Claude vision —
+// titles/authors/abstract stay readable while the image costs only
+// ~2.5k input tokens), and the citation page viewer wants an arbitrary
+// page big enough for a person to read.
 import * as pdfjs from "pdfjs-dist";
 
 pdfjs.GlobalWorkerOptions.workerSrc = new URL(
@@ -32,9 +35,10 @@ function drawAnnotations(
   viewport: { convertToViewportPoint: (x: number, y: number) => number[] },
   scale: number,
   annotations: ThumbAnnotation[],
+  pageIndex: number,
 ): void {
   for (const ann of annotations) {
-    if (ann.pageIndex !== 0) continue;
+    if (ann.pageIndex !== pageIndex) continue;
     if (ann.type === "ink" && ann.paths.length) {
       ctx.strokeStyle = ann.color || "#ff0000";
       ctx.lineWidth = Math.max(0.5, scale);
@@ -77,36 +81,78 @@ export async function renderFirstPageJpeg(
   quality = JPEG_QUALITY,
   annotations: ThumbAnnotation[] = [],
 ): Promise<string> {
-  const task = pdfjs.getDocument({ data });
+  return renderPageJpeg(data, 1, longEdge, quality, annotations);
+}
+
+/** One page as a `data:` URL, ready to drop into an <img>. `pageNumber`
+ *  is 1-based and counts PDF pages — the same numbering the model
+ *  cites and Zotero's `?page=` takes. Returns the page count too, so a
+ *  citation past the end of the document can say so. */
+export async function renderPageDataUrl(
+  data: ArrayBuffer,
+  pageNumber: number,
+  longEdge: number,
+): Promise<{ url: string; pages: number; rendered: number }> {
+  const task = pdfjs.getDocument({ data: data.slice(0) });
   try {
     const doc = await task.promise;
-    const page = await doc.getPage(1);
-    const base = page.getViewport({ scale: 1 });
-    const scale = longEdge / Math.max(base.width, base.height);
-    const viewport = page.getViewport({ scale });
-
-    const canvas = document.createElement("canvas");
-    canvas.width = Math.round(viewport.width);
-    canvas.height = Math.round(viewport.height);
-    const ctx = canvas.getContext("2d");
-    if (!ctx) throw new Error("Canvas 2D context unavailable");
-    // White background: PDFs are transparent where nothing is painted,
-    // which would otherwise turn black in JPEG.
-    ctx.fillStyle = "#fff";
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-    await page.render({ canvas, viewport }).promise;
-    if (annotations.length) {
-      drawAnnotations(ctx, viewport, scale, annotations);
-    }
-
-    const dataUrl = canvas.toDataURL("image/jpeg", quality);
-    const comma = dataUrl.indexOf(",");
-    if (comma < 0 || !dataUrl.startsWith("data:image/jpeg")) {
-      throw new Error("JPEG encoding failed");
-    }
-    return dataUrl.slice(comma + 1);
+    const pages = doc.numPages;
+    const rendered = Math.min(Math.max(1, pageNumber), pages);
+    const jpeg = await renderWith(doc, rendered, longEdge, JPEG_QUALITY, []);
+    return { url: `data:image/jpeg;base64,${jpeg}`, pages, rendered };
   } finally {
     void task.destroy();
   }
+}
+
+async function renderPageJpeg(
+  data: ArrayBuffer,
+  pageNumber: number,
+  longEdge: number,
+  quality: number,
+  annotations: ThumbAnnotation[],
+): Promise<string> {
+  const task = pdfjs.getDocument({ data });
+  try {
+    const doc = await task.promise;
+    return await renderWith(doc, pageNumber, longEdge, quality, annotations);
+  } finally {
+    void task.destroy();
+  }
+}
+
+/** Rasterize one page of an already-opened document. */
+async function renderWith(
+  doc: pdfjs.PDFDocumentProxy,
+  pageNumber: number,
+  longEdge: number,
+  quality: number,
+  annotations: ThumbAnnotation[],
+): Promise<string> {
+  const page = await doc.getPage(pageNumber);
+  const base = page.getViewport({ scale: 1 });
+  const scale = longEdge / Math.max(base.width, base.height);
+  const viewport = page.getViewport({ scale });
+
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.round(viewport.width);
+  canvas.height = Math.round(viewport.height);
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("Canvas 2D context unavailable");
+  // White background: PDFs are transparent where nothing is painted,
+  // which would otherwise turn black in JPEG.
+  ctx.fillStyle = "#fff";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  await page.render({ canvas, viewport }).promise;
+  if (annotations.length) {
+    drawAnnotations(ctx, viewport, scale, annotations, pageNumber - 1);
+  }
+
+  const dataUrl = canvas.toDataURL("image/jpeg", quality);
+  const comma = dataUrl.indexOf(",");
+  if (comma < 0 || !dataUrl.startsWith("data:image/jpeg")) {
+    throw new Error("JPEG encoding failed");
+  }
+  return dataUrl.slice(comma + 1);
 }

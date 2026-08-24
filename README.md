@@ -86,7 +86,15 @@ Windows/Linux desktops too).
   Conversation** exports the whole thing — exchange *and* source material —
   as one Markdown file, so the conversation can be picked up somewhere
   else. Answers render as Markdown (GitHub flavour, so a comparison of
-  five papers arrives as a table). Each conversation lists the works it
+  five papers arrives as a table).
+
+  **Page citations.** Full-text material is fed to the model with page
+  markers in it, and the model is asked to cite the page a claim rests
+  on. Those citations come back as inline **See on p. 12** pills with two
+  buttons: one renders that PDF page in the app, the other opens it in
+  Zotero's reader at the same page. Which means an answer is checkable —
+  you can be on the page it is talking about in one click, rather than
+  taking its word for it. Each conversation lists the works it
   covers behind a **View Titles** twirl-down, and every title there opens
   that entry in Zotero *inside the folder the question was asked from* —
   which is the one that matters for an entry filed in several.
@@ -165,6 +173,10 @@ Windows/Linux desktops too).
   item list: one for a PDF attachment, one for an abstract on record. Both
   are what the AI features work from, so it's worth being able to see at a
   glance which entries are ready.
+- **The details panel reads as a record.** Fields show their values as
+  text — the abstract in full, not squeezed into a five-row textarea —
+  and hovering a field's label reveals a small **Edit** link that swaps
+  just that field for an input. Save is still the single commit point.
 - Multi-select with the usual ctrl/cmd-click and shift-click patterns.
 - PDFs are only held in a temp folder during upload and deleted right after —
   the copy of record lives in Zotero (where your iPad Zotero app syncs it).

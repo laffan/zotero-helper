@@ -224,6 +224,51 @@
   border-top: 1px solid var(--border);
   margin: 12px 0;
 }
+/* --- Citation pills --- */
+/* Inline, so it sits in the sentence it supports rather than breaking
+   the paragraph, and small enough not to shout. */
+.cite-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  vertical-align: baseline;
+  /* No margin: the sentence already has a space before the pill, and a
+     margin after it would push the following comma off the word. */
+  margin: 0;
+  padding: 1px 4px 1px 6px;
+  border: 1px solid var(--accent);
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 11px;
+  line-height: 1.5;
+  white-space: nowrap;
+}
+.cite-label {
+  font-weight: 500;
+}
+.cite-pill button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 17px;
+  height: 17px;
+  border-radius: 999px;
+  color: var(--accent);
+}
+.cite-pill button:hover {
+  background: var(--accent);
+  color: #fff;
+}
+/* The work or its PDF is gone: the reference still reads, but there is
+   nowhere to send you. */
+.cite-pill-dead {
+  border-color: var(--border);
+  background: var(--panel-alt);
+  color: var(--text-dim);
+  padding: 1px 6px;
+}
+
 /* Tables are why Markdown is worth rendering here — a comparison of
    five papers is a table. The panel is a narrow column, so the table
    scrolls sideways inside its own box instead of widening it. */
@@ -375,4 +420,69 @@
   justify-content: flex-end;
   gap: 8px;
   padding-top: 4px;
+}
+
+/* --- Cited page, rendered in the app --- */
+.page-view {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 0;
+}
+.page-view-head {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.page-view-title {
+  font-weight: 600;
+  font-size: 13px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.page-view-sub {
+  font-size: 11px;
+  color: var(--text-dim);
+}
+.page-view-stage {
+  overflow: auto;
+  background: var(--panel-alt);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  /* Tall enough to be worth opening, short enough to leave the actions
+     visible without scrolling the dialog. */
+  max-height: 60dvh;
+  min-height: 160px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+}
+.page-view-stage img {
+  display: block;
+  cursor: zoom-in;
+}
+.page-view-stage.fit img {
+  max-width: 100%;
+  height: auto;
+}
+/* Actual size: the image keeps its own pixels and the stage scrolls,
+   which is the point — you opened this to read the small print. */
+.page-view-stage.actual img {
+  max-width: none;
+  cursor: zoom-out;
+}
+.page-view-loading {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-dim);
+  font-size: 12px;
+  padding: 40px 0;
+}
+.page-view-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
 }

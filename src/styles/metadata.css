@@ -45,6 +45,55 @@
   align-items: center;
   gap: 6px;
 }
+
+/* --- A field's label, and the Edit link that appears on it --- */
+.meta-field-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-dim);
+}
+.meta-edit {
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 500;
+  /* Hidden until the label is hovered, so the panel reads as a record
+     rather than a row of controls — but it still occupies its space, so
+     nothing shifts when it appears. */
+  opacity: 0;
+  transition: opacity 0.12s;
+}
+.meta-field-head:hover .meta-edit,
+.meta-field-head.editing .meta-edit,
+.meta-edit:focus-visible {
+  opacity: 1;
+}
+.meta-edit:hover {
+  text-decoration: underline;
+}
+/* Nothing to hover with: an iPad would otherwise have no way to reach
+   the link at all. */
+@media (hover: none) {
+  .meta-edit {
+    opacity: 1;
+  }
+}
+
+/* --- Read view of a value --- */
+.meta-value {
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text);
+  /* Values are read here as often as edited, so they wrap in full
+     rather than being clipped to a control-sized box. */
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+.meta-value.empty {
+  color: var(--text-dim);
+}
 .meta-field textarea {
   resize: vertical;
 }

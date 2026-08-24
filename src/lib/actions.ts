@@ -262,12 +262,14 @@ export async function openInZotero(
   itemKey: string,
   attKey?: string,
   collectionKey?: string,
+  page?: number,
 ): Promise<void> {
   try {
     await invoke("open_in_zotero", {
       itemKey,
       attKey: attKey ?? null,
       collectionKey: collectionKey ?? null,
+      page: page ?? null,
     });
   } catch (e) {
     appLog("warn", `Open in Zotero failed: ${e}`);

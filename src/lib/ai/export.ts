@@ -6,6 +6,7 @@
 // one had.
 import { shareMarkdown } from "../share";
 import type { Chat } from "../types";
+import { plainCitations } from "./citations";
 import { formatUsd, modelLabel } from "./models";
 
 const DEPTH_LABEL = {
@@ -35,7 +36,9 @@ export function conversationMarkdown(chat: Chat): string {
   }
   for (const m of chat.messages) {
     lines.push(m.role === "user" ? "### Question" : "### Answer", "");
-    lines.push(m.content.trim(), "");
+    // [[cite:2:7]] means nothing outside this app; write it as prose so
+    // the file reads properly wherever it ends up.
+    lines.push(plainCitations(m.content).trim(), "");
   }
 
   // Last, because it's the bulk: a reader scrolls past the exchange to

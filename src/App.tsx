@@ -8,6 +8,7 @@ import { DragLayer } from "./components/DragLayer";
 import { ImportModal, NewFolderModal } from "./components/ImportModal";
 import { ItemList } from "./components/ItemList";
 import { MetadataPanel } from "./components/MetadataPanel";
+import { PageViewModal } from "./components/PageViewModal";
 import { PdfRescueModal } from "./components/PdfRescueModal";
 import { SendToHushModal } from "./components/SendToHushModal";
 import { SettingsView } from "./components/SettingsView";
@@ -94,6 +95,14 @@ export default function App() {
             useStore.getState().setPendingAsk(null);
             setModal(null);
           }}
+        />
+      )}
+      {modal?.kind === "pdfPage" && (
+        <PageViewModal
+          itemKey={modal.itemKey}
+          page={modal.page}
+          title={modal.title}
+          onClose={() => setModal(null)}
         />
       )}
       {modal?.kind === "rescue" && (

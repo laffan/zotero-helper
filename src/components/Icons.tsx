@@ -252,6 +252,34 @@ export const TrashIcon = (p: IconProps = {}) =>
     p,
   );
 
+// The citation pill's two actions: read the page here, or hand it to
+// Zotero.
+export const EyeIcon = (p: IconProps = {}) =>
+  svg(
+    <>
+      <path d="M1.5 8s2.5-4 6.5-4 6.5 4 6.5 4-2.5 4-6.5 4-6.5-4-6.5-4z" />
+      <circle cx="8" cy="8" r="1.9" />
+    </>,
+    p,
+  );
+
+export const ExternalIcon = (p: IconProps = {}) =>
+  svg(
+    <>
+      <path d="M9.5 2.5H13.5V6.5M13.5 2.5 8 8" />
+      <path d="M12 9.5v3a1 1 0 0 1-1 1H3.5a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1h3" />
+    </>,
+    p,
+  );
+
+export const PencilIcon = (p: IconProps = {}) =>
+  svg(
+    <>
+      <path d="M11.2 2.3a1.2 1.2 0 0 1 1.7 0l.8.8a1.2 1.2 0 0 1 0 1.7L5.6 12.9l-3 .5.5-3z" />
+    </>,
+    p,
+  );
+
 export const Spinner = ({ size = 16 }: IconProps = {}) => (
   <svg
     width={size}

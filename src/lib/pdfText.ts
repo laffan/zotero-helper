@@ -17,16 +17,26 @@ export async function extractFirstPagesText(
   return parsePages(data, maxPages, maxChars);
 }
 
-/** The whole paper, for "Ask Full Papers". The caps are a guard against
- *  a book-length PDF quietly turning one question into a very expensive
- *  one — 80 pages of parsed text is roughly 30K tokens, and the caller
- *  tells the user when a work was cut short. */
+/** How a page boundary is written into the extracted text. The model
+ *  is told to cite the number from the nearest preceding marker, which
+ *  is what lets an answer point at a page the reader can go and check.
+ *  Counts PDF pages, not printed folios: that is what the app can
+ *  render and what Zotero's `?page=` takes. */
+export function pageMarker(page: number): string {
+  return `[[page ${page}]]`;
+}
+
+/** The whole paper, for "Ask Full Papers", with a page marker before
+ *  each page. The caps are a guard against a book-length PDF quietly
+ *  turning one question into a very expensive one — 80 pages of parsed
+ *  text is roughly 30K tokens, and the caller tells the user when a
+ *  work was cut short. */
 export async function extractFullText(
   data: ArrayBuffer,
   maxPages = 80,
   maxChars = 120000,
 ): Promise<{ text: string; truncated: boolean }> {
-  const text = await parsePages(data, maxPages, maxChars + 1);
+  const text = await parsePages(data, maxPages, maxChars + 1, true);
   return {
     text: text.slice(0, maxChars),
     truncated: text.length > maxChars,
@@ -37,6 +47,7 @@ async function parsePages(
   data: ArrayBuffer,
   maxPages: number,
   maxChars: number,
+  marked = false,
 ): Promise<string> {
   ready ??= __wbg_init({ module_or_path: wasmUrl });
   await ready;
@@ -50,7 +61,10 @@ async function parsePages(
   });
   const result = await parser.parse(new Uint8Array(data));
   const text = result.pages
-    .map((p) => p.markdown || p.text || "")
+    .map((p, i) => {
+      const body = p.markdown || p.text || "";
+      return marked ? `${pageMarker(i + 1)}\n${body}` : body;
+    })
     .join("\n\n")
     .trim();
   return text.slice(0, maxChars);

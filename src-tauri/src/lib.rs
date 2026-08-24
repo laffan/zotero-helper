@@ -426,6 +426,7 @@ async fn open_in_zotero(
     item_key: String,
     att_key: Option<String>,
     collection_key: Option<String>,
+    page: Option<u32>,
 ) -> Result<()> {
     let valid = |k: &str| !k.is_empty() && k.chars().all(|c| c.is_ascii_alphanumeric());
     if !valid(&item_key) {
@@ -443,7 +444,13 @@ async fn open_in_zotero(
         "library".to_string()
     };
     let url = match (&att_key, &collection_key) {
-        (Some(k), _) => format!("zotero://open-pdf/{scope}/items/{k}"),
+        // `?page=` is 1-based and counts PDF pages, which is what the
+        // model cites — it reads page-marked extracted text, not the
+        // printed folios.
+        (Some(k), _) => match page {
+            Some(n) if n > 0 => format!("zotero://open-pdf/{scope}/items/{k}?page={n}"),
+            _ => format!("zotero://open-pdf/{scope}/items/{k}"),
+        },
         // Selecting inside a collection keeps the entry in the context
         // it was found in. The `?itemKey=` form is the one Zotero
         // supports for this; the bare `/items/KEY` path form is only

@@ -255,13 +255,20 @@ export async function deleteFolder(key: string): Promise<void> {
 }
 
 /** Open in the Zotero app: the PDF itself when the item has one
- *  (zotero://open-pdf), otherwise the entry (zotero://select). */
+ *  (zotero://open-pdf), otherwise the entry (zotero://select). Passing a
+ *  collection selects the entry inside that folder, which matters for an
+ *  item filed in several — it lands where you were looking. */
 export async function openInZotero(
   itemKey: string,
   attKey?: string,
+  collectionKey?: string,
 ): Promise<void> {
   try {
-    await invoke("open_in_zotero", { itemKey, attKey: attKey ?? null });
+    await invoke("open_in_zotero", {
+      itemKey,
+      attKey: attKey ?? null,
+      collectionKey: collectionKey ?? null,
+    });
   } catch (e) {
     appLog("warn", `Open in Zotero failed: ${e}`);
   }

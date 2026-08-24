@@ -85,8 +85,13 @@ Windows/Linux desktops too).
   let it lapse and the next question pays for them in full. **Share
   Conversation** exports the whole thing — exchange *and* source material —
   as one Markdown file, so the conversation can be picked up somewhere
-  else. Conversations are named by the model after the first exchange and
-  live in the app's data dir; nothing about them is written to Zotero.
+  else. Answers render as Markdown (GitHub flavour, so a comparison of
+  five papers arrives as a table). Each conversation lists the works it
+  covers behind a **View Titles** twirl-down, and every title there opens
+  that entry in Zotero *inside the folder the question was asked from* —
+  which is the one that matters for an entry filed in several.
+  Conversations are named by the model after the first exchange and live
+  in the app's data dir; nothing about them is written to Zotero.
 - **Re-sync** — the Sync menu offers three scopes: *Sync this folder*
   (fetches only the current collection's changes — the day-to-day option
   for five-digit libraries), *Sync all changes* (incremental via Zotero's

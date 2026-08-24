@@ -10,7 +10,9 @@
   display: flex;
   border-bottom: 1px solid var(--border);
   background: var(--panel);
-  padding-right: 10px;
+  /* padding-right is set from the measured scrollbar width (ItemList) —
+     a hardcoded allowance leaves every header cell offset from its
+     column wherever the real scrollbar is a different width. */
 }
 /* The `hidden` attribute has to beat the display above — an author rule
    outranks the UA's `[hidden]`, so without this the column header shows

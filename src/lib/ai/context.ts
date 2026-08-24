@@ -14,6 +14,7 @@ import {
   itemsForCollection,
   itemTitle,
   pdfAttachmentOf,
+  REAL_KEY,
   yearOf,
 } from "../collections";
 import { scheduleTrayClear } from "../../components/TaskTray";
@@ -244,6 +245,11 @@ export async function prepareAsk(
       kind: target.kind,
       itemKeys: items.map((i) => i.key),
       itemTitles: items.map(itemTitle),
+      // "all" and "unfiled" are views, not collections Zotero can be
+      // pointed at, so they're left off.
+      collectionKey: REAL_KEY.test(target.collectionKey)
+        ? target.collectionKey
+        : undefined,
       label: target.label,
       depth,
       missing,

@@ -221,6 +221,10 @@ export interface ChatSource {
   /** Titles of the works, so the Questions list can say which ones —
    *  the items may have moved or gone by the time it's read back. */
   itemTitles: string[];
+  /** The folder the request was made from, when it was a real one.
+   *  Opening a work in Zotero lands it in this collection, which is
+   *  what you want for an entry filed in several. */
+  collectionKey?: string;
   depth: AskDepth;
   /** Works that contributed nothing (no PDF, no abstract). */
   missing: string[];

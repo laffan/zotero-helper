@@ -7,7 +7,7 @@ import {
 import { useDragging, useIsDropTarget } from "../lib/dragdrop";
 import { QUESTIONS, useStore } from "../lib/store";
 import {
-  AskIcon,
+  ChatIcon,
   ChevronDown,
   ChevronRight,
   CloseIcon,
@@ -169,7 +169,7 @@ export function Sidebar() {
           title="Conversations with the AI about your works"
         >
           <span className="tree-toggle-spacer" />
-          <AskIcon size={14} />
+          <ChatIcon size={14} />
           <span className="tree-name">Questions</span>
           {chatCount > 0 && <span className="tree-count">{chatCount}</span>}
         </div>

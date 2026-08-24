@@ -5,7 +5,9 @@
 // tenth of the price; let it lapse and the next question pays for them
 // in full again.
 import { useEffect, useRef, useState } from "react";
-import { sendChatMessage } from "../lib/ai/chat";
+import Markdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+import { removeChat, sendChatMessage } from "../lib/ai/chat";
 import { shareConversation } from "../lib/ai/export";
 import {
   CACHE_TTL_MS,
@@ -15,7 +17,7 @@ import {
 } from "../lib/ai/models";
 import { useStore } from "../lib/store";
 import type { Chat } from "../lib/types";
-import { ShareIcon, Spinner } from "./Icons";
+import { ShareIcon, Spinner, TrashIcon } from "./Icons";
 
 /** mm:ss left on the provider's cache window, or null once it's gone. */
 function useCacheCountdown(chat: Chat): string | null {
@@ -45,11 +47,36 @@ function useCacheCountdown(chat: Chat): string | null {
 }
 
 /** Who said it is carried by the styling — the question sits in a box,
- *  the answer runs plain down the panel. */
+ *  the answer runs plain down the panel.
+ *
+ *  Answers render as Markdown (GitHub flavour, so tables and strike-
+ *  through work): models write headings, lists and tables whether or not
+ *  you ask, and a comparison of five papers is a table. The question is
+ *  left as typed — nobody writes Markdown into a chat box on purpose,
+ *  and an underscore in a title shouldn't turn into emphasis. */
 function Bubble({ role, content }: { role: string; content: string }) {
   return (
     <div className={`chat-msg chat-msg-${role}`}>
-      <div className="chat-msg-body">{content}</div>
+      {role === "user" ? (
+        <div className="chat-msg-body">{content}</div>
+      ) : (
+        <div className="chat-msg-body chat-md">
+          <Markdown
+            remarkPlugins={[remarkGfm]}
+            components={{
+              // The panel is a narrow column; a wide table scrolls
+              // inside its own box rather than stretching it.
+              table: ({ children }) => (
+                <div className="chat-md-table">
+                  <table>{children}</table>
+                </div>
+              ),
+            }}
+          >
+            {content}
+          </Markdown>
+        </div>
+      )}
     </div>
   );
 }
@@ -58,6 +85,7 @@ export function ChatPanel({ chat }: { chat: Chat }) {
   const busy = useStore((s) => s.chatBusy) === chat.id;
   const [draft, setDraft] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const shareRef = useRef<HTMLButtonElement>(null);
   const countdown = useCacheCountdown(chat);
@@ -182,6 +210,29 @@ export function ChatPanel({ chat }: { chat: Chat }) {
             title="Export the whole conversation, source material included, as Markdown"
           >
             <ShareIcon size={13} /> Share Conversation
+          </button>
+          {/* Click twice: a conversation costs real money to produce
+              and there is no undo. */}
+          <button
+            className={`tool-btn ${confirmDelete ? "danger" : ""}`}
+            disabled={busy}
+            onClick={() => {
+              if (!confirmDelete) {
+                setConfirmDelete(true);
+                setTimeout(() => setConfirmDelete(false), 3000);
+                return;
+              }
+              setConfirmDelete(false);
+              void removeChat(chat.id);
+            }}
+            title={
+              confirmDelete
+                ? "Click again to delete this conversation"
+                : "Delete this conversation"
+            }
+          >
+            <TrashIcon size={13} />{" "}
+            {confirmDelete ? "Click to confirm" : "Delete Conversation"}
           </button>
         </div>
       </div>

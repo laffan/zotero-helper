@@ -425,12 +425,14 @@ async fn open_in_zotero(
     state: State<'_, AppState>,
     item_key: String,
     att_key: Option<String>,
+    collection_key: Option<String>,
 ) -> Result<()> {
     let valid = |k: &str| !k.is_empty() && k.chars().all(|c| c.is_ascii_alphanumeric());
     if !valid(&item_key) {
         return Err(Error::msg("Not a real Zotero item key"));
     }
     let att_key = att_key.filter(|k| valid(k));
+    let collection_key = collection_key.filter(|k| valid(k));
     let (library_type, library_id) = {
         let s = state.settings.read().await;
         (s.library_type.clone(), s.zotero_user_id.clone())
@@ -440,9 +442,16 @@ async fn open_in_zotero(
     } else {
         "library".to_string()
     };
-    let url = match &att_key {
-        Some(k) => format!("zotero://open-pdf/{scope}/items/{k}"),
-        None => format!("zotero://select/{scope}/items/{item_key}"),
+    let url = match (&att_key, &collection_key) {
+        (Some(k), _) => format!("zotero://open-pdf/{scope}/items/{k}"),
+        // Selecting inside a collection keeps the entry in the context
+        // it was found in. The `?itemKey=` form is the one Zotero
+        // supports for this; the bare `/items/KEY` path form is only
+        // for a library-wide select.
+        (None, Some(c)) => {
+            format!("zotero://select/{scope}/collections/{c}/items?itemKey={item_key}")
+        }
+        (None, None) => format!("zotero://select/{scope}/items/{item_key}"),
     };
     use tauri_plugin_opener::OpenerExt;
     app.opener()

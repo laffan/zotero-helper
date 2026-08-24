@@ -1,11 +1,12 @@
 // The Questions folder's main-area list. One row per conversation:
 // what the model called it, when it started, and what it was about —
 // the three things you need to find a conversation again a week later.
+import { openInZotero } from "../lib/actions";
 import { removeChat } from "../lib/ai/chat";
 import { formatTokens, formatUsd, modelLabel } from "../lib/ai/models";
 import { useStore } from "../lib/store";
 import type { Chat } from "../lib/types";
-import { AskIcon, TrashIcon } from "./Icons";
+import { ChatIcon, TrashIcon } from "./Icons";
 
 function started(ms: number): string {
   const d = new Date(ms);
@@ -41,7 +42,25 @@ function WorkTitles({ chat }: { chat: Chat }) {
       <summary>View Titles ({titles.length})</summary>
       <ol>
         {titles.map((t, i) => (
-          <li key={`${i}-${t}`}>{t}</li>
+          <li key={`${i}-${t}`}>
+            <button
+              className="link-btn"
+              onClick={() =>
+                void openInZotero(
+                  chat.source.itemKeys[i],
+                  undefined,
+                  chat.source.collectionKey,
+                )
+              }
+              title={
+                chat.source.collectionKey
+                  ? `Open in Zotero, in “${chat.source.label}”`
+                  : "Open in Zotero"
+              }
+            >
+              {t}
+            </button>
+          </li>
         ))}
       </ol>
     </details>
@@ -60,7 +79,7 @@ function ChatRow({ chat, selected }: { chat: Chat; selected: boolean }) {
     >
       <div className="chat-row-main">
         <div className="chat-row-title">
-          <AskIcon size={13} />
+          <ChatIcon size={13} />
           <span>{chat.title}</span>
         </div>
         <div className="chat-row-context" title={contextLine(chat)}>

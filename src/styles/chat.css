@@ -147,11 +147,114 @@
   text-align: center;
 }
 .chat-msg-body {
-  /* Replies arrive as plain text with real line breaks in them. */
+  /* The question is shown as typed, line breaks and all. */
   white-space: pre-wrap;
   font-size: 13px;
   line-height: 1.55;
   overflow-wrap: anywhere;
+}
+/* An answer is rendered Markdown, so its own block elements do the
+   spacing — pre-wrap would double every blank line. */
+.chat-md {
+  white-space: normal;
+}
+.chat-md > :first-child {
+  margin-top: 0;
+}
+.chat-md > :last-child {
+  margin-bottom: 0;
+}
+.chat-md p,
+.chat-md ul,
+.chat-md ol,
+.chat-md blockquote,
+.chat-md pre {
+  margin: 0 0 9px;
+}
+.chat-md h1,
+.chat-md h2,
+.chat-md h3,
+.chat-md h4 {
+  font-size: 13px;
+  font-weight: 600;
+  margin: 14px 0 5px;
+}
+.chat-md ul,
+.chat-md ol {
+  padding-left: 20px;
+}
+.chat-md li {
+  list-style: revert;
+  margin-bottom: 3px;
+}
+.chat-md li > p {
+  margin: 0;
+}
+.chat-md a {
+  color: var(--accent);
+  text-decoration: underline;
+}
+.chat-md code {
+  font-family: var(--mono);
+  font-size: 11.5px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 0 3px;
+}
+.chat-md pre {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 8px;
+  overflow-x: auto;
+}
+.chat-md pre code {
+  background: none;
+  border: 0;
+  padding: 0;
+}
+.chat-md blockquote {
+  border-left: 2px solid var(--border);
+  padding-left: 9px;
+  color: var(--text-dim);
+}
+.chat-md hr {
+  border: 0;
+  border-top: 1px solid var(--border);
+  margin: 12px 0;
+}
+/* Tables are why Markdown is worth rendering here — a comparison of
+   five papers is a table. The panel is a narrow column, so the table
+   scrolls sideways inside its own box instead of widening it. */
+.chat-md-table {
+  overflow-x: auto;
+  margin: 0 0 9px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.chat-md-table table {
+  border-collapse: collapse;
+  font-size: 12px;
+  min-width: 100%;
+}
+.chat-md-table th,
+.chat-md-table td {
+  border-bottom: 1px solid var(--border);
+  padding: 5px 8px;
+  text-align: left;
+  vertical-align: top;
+  /* A floor per column: narrow tables wrap to fit the panel, but a
+     wide one scrolls instead of collapsing to a letter per line. */
+  min-width: 72px;
+}
+.chat-md-table th {
+  background: var(--panel);
+  font-weight: 600;
+  white-space: nowrap;
+}
+.chat-md-table tr:last-child td {
+  border-bottom: 0;
 }
 /* The question is boxed, the answer isn't — that alternation is what
    tells the two apart, so neither needs a label. */
@@ -201,6 +304,12 @@
 }
 .chat-actions {
   display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.chat-actions .tool-btn {
+  border-color: var(--border);
+  font-size: 12px;
 }
 
 /* --- Cost popup --- */

@@ -213,14 +213,24 @@ export function ItemList() {
   const containerRef = useRef<HTMLDivElement>(null);
   const [scrollTop, setScrollTop] = useState(0);
   const [viewH, setViewH] = useState(600);
+  // The header sits outside the scrolling body, so it has to reserve
+  // exactly the width that body's scrollbar takes — which is 15-ish px
+  // with classic scrollbars and 0 with the overlay ones iPadOS and
+  // macOS use. Guessing a fixed value puts every column out of line
+  // with its own rows, so it's measured.
+  const [scrollbarW, setScrollbarW] = useState(0);
   const anchorRef = useRef<string | null>(null);
 
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
-    const ro = new ResizeObserver(() => setViewH(el.clientHeight));
+    const measure = () => {
+      setViewH(el.clientHeight);
+      setScrollbarW(el.offsetWidth - el.clientWidth);
+    };
+    const ro = new ResizeObserver(measure);
     ro.observe(el);
-    setViewH(el.clientHeight);
+    measure();
     return () => ro.disconnect();
   }, []);
 
@@ -457,7 +467,11 @@ export function ItemList() {
           </div>
         )}
       </div>
-      <div className="list-header" hidden={iconMode}>
+      <div
+        className="list-header"
+        hidden={iconMode}
+        style={{ paddingRight: scrollbarW }}
+      >
         <span className="col col-pin" aria-hidden="true" />
         <button className="col col-title" onClick={() => setSort("title")}>
           Title{sortIndicator("title")}

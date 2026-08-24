@@ -237,21 +237,10 @@ export const AbstractIcon = (p: IconProps = {}) =>
     p,
   );
 
+// Questions, and the conversations inside it.
 export const ChatIcon = (p: IconProps = {}) =>
   svg(
-    <>
-      <path d="M14 9.5a1.5 1.5 0 0 1-1.5 1.5H6l-3 2.5V4a1.5 1.5 0 0 1 1.5-1.5h8A1.5 1.5 0 0 1 14 4z" />
-    </>,
-    p,
-  );
-
-export const AskIcon = (p: IconProps = {}) =>
-  svg(
-    <>
-      <path d="M14 9.5a1.5 1.5 0 0 1-1.5 1.5H6l-3 2.5V4a1.5 1.5 0 0 1 1.5-1.5h8A1.5 1.5 0 0 1 14 4z" />
-      <path d="M6.4 5.6a1.6 1.6 0 0 1 3.1.5c0 1.1-1.6 1.3-1.6 2.2" />
-      <path d="M7.9 9.9v.01" />
-    </>,
+    <path d="M14 9.5a1.5 1.5 0 0 1-1.5 1.5H6l-3 2.5V4a1.5 1.5 0 0 1 1.5-1.5h8A1.5 1.5 0 0 1 14 4z" />,
     p,
   );
 

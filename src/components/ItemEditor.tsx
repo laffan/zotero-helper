@@ -6,9 +6,10 @@
 // you most often want to *read*, and a five-row textarea is the worst
 // possible way to show a paragraph you aren't editing.
 //
-// The typography is the multi-select summary card's, so one item and
-// several look like the same kind of thing: a card, a title set apart,
-// small capitalised field names, and the values in body text.
+// The hierarchy is carried by type and colour rather than by boxes: the
+// title is the only thing set in bold, field names are small, quiet and
+// capitalised, and every value sits at full contrast so the content is
+// the part that reads. Fields are separated by space, not by rules.
 //
 // Save is still the one commit point: editing a field only changes the
 // draft, and nothing reaches Zotero until Save.
@@ -163,7 +164,6 @@ export function ItemEditor({ item }: { item: ZItem }) {
         <span className="meta-key">{item.key}</span>
       </div>
 
-      <div className="meta-card">
       <div className="meta-field meta-field-title">
         <FieldHead
           label="Title"
@@ -291,7 +291,6 @@ export function ItemEditor({ item }: { item: ZItem }) {
           )}
         </div>
       ))}
-      </div>
 
       <AttachmentList itemKey={item.key} />
 

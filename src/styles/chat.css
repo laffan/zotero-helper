@@ -250,6 +250,9 @@
 /* --- Citation pills --- */
 /* Inline, so it sits in the sentence it supports rather than breaking
    the paragraph, and small enough not to shout. */
+/* Reads as part of the sentence, not as a link out of it: the same
+   colour as the prose around it, with the outline and the two buttons
+   doing the work of saying it is a control. */
 .cite-pill {
   display: inline-flex;
   align-items: center;
@@ -259,16 +262,17 @@
      margin after it would push the following comma off the word. */
   margin: 0;
   padding: 1px 4px 1px 6px;
-  border: 1px solid var(--accent);
+  border: 1px solid var(--border);
   border-radius: 999px;
-  background: var(--accent-soft);
-  color: var(--accent);
+  background: var(--panel);
+  color: var(--text);
   font-size: 11px;
   line-height: 1.5;
   white-space: nowrap;
 }
 .cite-label {
   font-weight: 500;
+  font-variant-numeric: tabular-nums;
 }
 .cite-pill button {
   display: inline-flex;
@@ -277,16 +281,15 @@
   width: 17px;
   height: 17px;
   border-radius: 999px;
-  color: var(--accent);
+  color: var(--text-dim);
 }
 .cite-pill button:hover {
-  background: var(--accent);
-  color: #fff;
+  background: var(--select-strong);
+  color: var(--text);
 }
 /* The work or its PDF is gone: the reference still reads, but there is
    nowhere to send you. */
 .cite-pill-dead {
-  border-color: var(--border);
   background: var(--panel-alt);
   color: var(--text-dim);
   padding: 1px 6px;

@@ -96,10 +96,13 @@ Windows/Linux desktops too).
   highlighted, the other opens it in Zotero's reader at the same page.
   Which means an answer is checkable — you can be looking at the
   sentence it is talking about in one click, rather than taking its word
-  for it. The passage is found by matching a normalized copy of the
-  page's text, so line wrapping, hyphenated line breaks and typographic
-  quotes don't defeat it; when it genuinely can't be found the page says
-  so rather than showing you a clean page that looks verified. Each conversation lists the works it
+  for it. The passage is found by comparing words rather than
+  characters — anchored on the quote's first and last pair of words,
+  with the interior words deciding between candidates — so line
+  wrapping, a word hyphenated across a break, ligatures and stray
+  spacing never come into it. When the passage genuinely isn't there the
+  page says so, rather than showing you a clean page that looks
+  verified. Each conversation lists the works it
   covers behind a **View Titles** twirl-down, and every title there opens
   that entry in Zotero *inside the folder the question was asked from* —
   which is the one that matters for an entry filed in several.

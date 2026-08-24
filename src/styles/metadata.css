@@ -16,6 +16,8 @@
   padding: 12px;
   display: flex;
   flex-direction: column;
+  /* Space between fields, in place of the rules that used to divide
+     them. */
   gap: 10px;
 }
 .meta-type-row {
@@ -24,7 +26,8 @@
   align-items: baseline;
 }
 .meta-itemtype {
-  font-weight: 600;
+  font-size: 11px;
+  color: var(--text-dim);
   text-transform: capitalize;
 }
 .meta-key {
@@ -44,18 +47,6 @@
   display: flex;
   align-items: center;
   gap: 6px;
-}
-
-/* --- The record card. Same shape as a multi-select summary card, so
-   one item and several read as the same kind of thing. --- */
-.meta-card {
-  background: var(--panel);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 10px;
-  display: flex;
-  flex-direction: column;
-  gap: 9px;
 }
 
 /* --- A field's label, and the Edit link that appears on it --- */
@@ -103,21 +94,18 @@
 .meta-value.empty {
   color: var(--text-dim);
 }
-/* The title carries the card, the way it does on a summary card. */
+/* The title is the only bold thing in the panel — that alone is enough
+   to put it at the top of the hierarchy. */
 .meta-field-title .meta-value {
   font-size: 14px;
   font-weight: 600;
   line-height: 1.35;
 }
-/* The abstract is a block of prose, not a field value — quieter, and
-   with room to breathe. */
+/* The abstract is a paragraph rather than a field value, so it gets a
+   little more leading. Same colour as everything else: it is content,
+   and content is what the panel is for. */
 .meta-field-abstract .meta-value {
-  color: var(--text-dim);
   line-height: 1.6;
-}
-.meta-field-abstract {
-  padding-bottom: 3px;
-  border-bottom: 1px solid color-mix(in srgb, var(--border) 60%, transparent);
 }
 .meta-field textarea {
   resize: vertical;

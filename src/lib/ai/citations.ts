@@ -53,10 +53,13 @@ function fromMatch([a, b, c, q]: Groups): Citation {
   };
 }
 
+/** What the pill reads. Just the page: the two buttons beside it say
+ *  what can be done with it, and a sentence of prose does not need
+ *  "See on" repeated through it a dozen times. */
 export function citationLabel(cite: Citation): string {
   return cite.pageEnd
-    ? `See on pp. ${cite.page}–${cite.pageEnd}`
-    : `See on p. ${cite.page}`;
+    ? `pp. ${cite.page}–${cite.pageEnd}`
+    : `p. ${cite.page}`;
 }
 
 /** Markdown link destinations end at an unescaped ")", and a quotation

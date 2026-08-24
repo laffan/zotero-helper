@@ -88,6 +88,13 @@
   font-size: 11px;
   color: var(--text-dim);
 }
+/* Divides a menu's groups — cleanup actions above, conversations below. */
+.menu-sep {
+  display: block;
+  height: 1px;
+  margin: 4px 6px;
+  background: var(--border);
+}
 
 /* Search modes are a radio set, not commands: one line each, with room
    for the checkmark on the active one. */

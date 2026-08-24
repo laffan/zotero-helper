@@ -1,9 +1,11 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { deleteFolder, syncFolder, syncNow } from "../lib/actions";
 import { getAbstracts, tidyItems } from "../lib/ai";
+import { startAsk } from "../lib/ai/chat";
+import { askTargetFor } from "../lib/ai/context";
 import { startPdfFetch } from "../lib/importer";
 import { sharePdfs, shareAbstracts } from "../lib/share";
-import { useStore } from "../lib/store";
+import { QUESTIONS, useStore } from "../lib/store";
 import {
   FolderMinus,
   FolderPlus,
@@ -41,6 +43,8 @@ export function Toolbar() {
     setMetaOpen,
     syncProgress,
   } = useStore();
+  const items = useStore((s) => s.library.items);
+  const askPreparing = useStore((s) => s.askPreparing);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [syncMenuOpen, setSyncMenuOpen] = useState(false);
   const [aiMenuOpen, setAiMenuOpen] = useState(false);
@@ -50,8 +54,26 @@ export function Toolbar() {
   const shareMenuRef = useRef<HTMLDivElement>(null);
   const collections = useStore((s) => s.library.collections);
 
+  // What the two Ask entries point at: the selection when there is one,
+  // the open folder when there isn't. Named in the menu so it's obvious
+  // what a click is about to send.
+  const askTarget = useMemo(
+    () => askTargetFor(items, collections, selectedCollection, selectedKeys),
+    [items, collections, selectedCollection, selectedKeys],
+  );
+  const ASK_CONTEXT = {
+    folder: "Folder",
+    selection: "Selection",
+    item: "Item",
+  } as const;
+  // Questions is a folder of conversations, not of works.
+  const canAsk =
+    selectedCollection !== QUESTIONS && askTarget.count > 0 && !askPreparing;
+
   const isRealCollection =
-    selectedCollection !== "all" && selectedCollection !== "unfiled";
+    selectedCollection !== "all" &&
+    selectedCollection !== "unfiled" &&
+    selectedCollection !== QUESTIONS;
   const currentFolderName = isRealCollection
     ? collections.find((c) => c.key === selectedCollection)?.data?.name
     : undefined;
@@ -175,33 +197,66 @@ export function Toolbar() {
           <button
             className="tool-btn"
             onClick={() => setAiMenuOpen(!aiMenuOpen)}
-            disabled={selectedKeys.length === 0 || tidying}
-            title="AI actions for the selected items"
+            disabled={tidying || askPreparing}
+            title="AI actions"
           >
-            {tidying ? <Spinner /> : <Sparkles />}
+            {tidying || askPreparing ? <Spinner /> : <Sparkles />}
             <span className="tool-label">AI ▾</span>
           </button>
           {aiMenuOpen && (
             <ToolbarMenu anchorRef={aiMenuRef}>
               <button
                 className="menu-item"
+                disabled={selectedKeys.length === 0}
                 onClick={() =>
                   runAi(() => getAbstracts(useStore.getState().selectedKeys))
                 }
               >
                 <strong>Get abstract</strong>
                 <span>
-                  Read it out of the PDF's first pages (items without one)
+                  {selectedKeys.length === 0
+                    ? "Select an item first"
+                    : "Read it out of the PDF's first pages (items without one)"}
                 </span>
               </button>
               <button
                 className="menu-item"
+                disabled={selectedKeys.length === 0}
                 onClick={() =>
                   runAi(() => tidyItems(useStore.getState().selectedKeys))
                 }
               >
                 <strong>Tidy metadata</strong>
-                <span>Clean up all fields against CrossRef</span>
+                <span>
+                  {selectedKeys.length === 0
+                    ? "Select an item first"
+                    : "Clean up all fields against CrossRef"}
+                </span>
+              </button>
+              <span className="menu-sep" />
+              <button
+                className="menu-item"
+                disabled={!canAsk}
+                onClick={() => runAi(() => startAsk(askTarget, "abstracts"))}
+              >
+                <strong>Ask Abstracts ({ASK_CONTEXT[askTarget.kind]})</strong>
+                <span>
+                  {canAsk
+                    ? `Chat about the abstracts of ${askTarget.label}`
+                    : "Nothing here to ask about"}
+                </span>
+              </button>
+              <button
+                className="menu-item"
+                disabled={!canAsk}
+                onClick={() => runAi(() => startAsk(askTarget, "full"))}
+              >
+                <strong>Ask Full Papers ({ASK_CONTEXT[askTarget.kind]})</strong>
+                <span>
+                  {canAsk
+                    ? `Read the PDFs of ${askTarget.label} and chat about them`
+                    : "Nothing here to ask about"}
+                </span>
               </button>
             </ToolbarMenu>
           )}

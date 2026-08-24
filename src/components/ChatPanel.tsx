@@ -44,10 +44,11 @@ function useCacheCountdown(chat: Chat): string | null {
   return `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, "0")}`;
 }
 
+/** Who said it is carried by the styling — the question sits in a box,
+ *  the answer runs plain down the panel. */
 function Bubble({ role, content }: { role: string; content: string }) {
   return (
     <div className={`chat-msg chat-msg-${role}`}>
-      <span className="chat-msg-role">{role === "user" ? "You" : "Model"}</span>
       <div className="chat-msg-body">{content}</div>
     </div>
   );
@@ -124,7 +125,6 @@ export function ChatPanel({ chat }: { chat: Chat }) {
         ))}
         {busy && (
           <div className="chat-msg chat-msg-assistant">
-            <span className="chat-msg-role">Model</span>
             <div className="chat-msg-body chat-thinking">
               <Spinner size={13} /> reading…
             </div>

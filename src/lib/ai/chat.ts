@@ -6,16 +6,19 @@
 // request and never change a byte, so after the first call they come
 // back from the provider's prompt cache at roughly a tenth of the price
 // — which is also why the panel counts the cache window down.
+import { startPdfFetch } from "../importer";
 import { appLog, QUESTIONS, useStore } from "../store";
 import { invoke } from "../tauri";
 import type {
   AskDepth,
+  AskTarget,
   Chat,
   ChatMessage,
-  ChatSource,
   ChatUsage,
+  ImportStage,
   PendingAsk,
 } from "../types";
+import { getAbstracts } from "./index";
 import { itemsForAsk, prepareAsk } from "./context";
 import { usageCost } from "./models";
 
@@ -26,30 +29,91 @@ interface ChatReply {
   service: string;
 }
 
-/** What the Ask buttons call. Reads the works, prices the request, and
- *  puts it behind the confirmation popup — nothing is sent to a
- *  provider until the user says go. */
+/** What the AI menu's two Ask entries call. Reads the works, prices the
+ *  request, and puts it behind the confirmation popup — nothing is sent
+ *  to a provider until the user says go. */
 export async function startAsk(
-  kind: ChatSource["kind"],
-  keys: string[],
-  collectionKey: string,
-  sourceLabel: string,
+  target: AskTarget,
   depth: AskDepth,
 ): Promise<void> {
   const store = useStore.getState();
   if (store.askPreparing) return;
-  const items = itemsForAsk(kind, keys, collectionKey);
+  const items = itemsForAsk(target);
   if (items.length === 0) {
     appLog("warn", "Ask: nothing to read here");
     return;
   }
   store.setAskPreparing(true);
   try {
-    const ask = await prepareAsk(kind, items, sourceLabel, depth);
+    const ask = await prepareAsk(target, items, depth);
     useStore.getState().setPendingAsk(ask);
     useStore.getState().setModal({ kind: "askCost" });
   } catch (e) {
     appLog("error", `Ask failed: ${e}`);
+  } finally {
+    useStore.getState().setAskPreparing(false);
+  }
+}
+
+/** Stages a PDF job passes through before it either lands or parks. */
+const PDF_JOB_RUNNING: ImportStage[] = [
+  "pending",
+  "resolving",
+  "creating",
+  "finding-pdf",
+  "downloading",
+  "uploading",
+];
+
+/** Run the PDF pipeline over the given entries and return once every
+ *  one of them has either finished or parked for manual rescue. The
+ *  pipeline is driven by the job queue rather than a promise, so this
+ *  watches the queue rather than awaiting it. */
+async function fetchMissingPdfs(keys: string[]): Promise<void> {
+  if (startPdfFetch(keys) === 0) return;
+  const wanted = new Set(keys);
+  // Generous: a folder of parked items can take a while. The user can
+  // close the popup and start over if a rescue needs their attention.
+  const deadline = Date.now() + 15 * 60 * 1000;
+  for (;;) {
+    const s = useStore.getState();
+    const running = s.jobOrder
+      .map((id) => s.jobs[id])
+      .some(
+        (j) =>
+          j?.itemKey &&
+          wanted.has(j.itemKey) &&
+          PDF_JOB_RUNNING.includes(j.stage),
+      );
+    if (!running || Date.now() > deadline) return;
+    await new Promise((r) => setTimeout(r, 500));
+  }
+}
+
+/** Fill the request's gaps — fetch the missing PDFs, or read the
+ *  missing abstracts out of the PDFs that are there — then re-gather
+ *  and re-price, because both change the token count. */
+export async function refillAsk(ask: PendingAsk): Promise<void> {
+  const store = useStore.getState();
+  if (store.askPreparing) return;
+  const fixable = ask.gaps.filter((g) => g.fixable).map((g) => g.key);
+  if (fixable.length === 0) return;
+  store.setAskPreparing(true);
+  try {
+    if (ask.source.depth === "full") {
+      await fetchMissingPdfs(fixable);
+    } else {
+      await getAbstracts(fixable);
+    }
+    const items = itemsForAsk(ask.target);
+    const next = await prepareAsk(ask.target, items, ask.source.depth);
+    // The user may have closed the popup while this ran; don't reopen
+    // something they dismissed.
+    if (useStore.getState().modal?.kind === "askCost") {
+      useStore.getState().setPendingAsk(next);
+    }
+  } catch (e) {
+    appLog("error", `Retrieval failed: ${e}`);
   } finally {
     useStore.getState().setAskPreparing(false);
   }

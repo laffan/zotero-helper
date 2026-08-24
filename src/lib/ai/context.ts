@@ -21,8 +21,10 @@ import { appLog, useStore } from "../store";
 import { invoke } from "../tauri";
 import type {
   AskDepth,
-  ChatSource,
+  AskGap,
+  AskTarget,
   PendingAsk,
+  ZCollection,
   ZItem,
 } from "../types";
 import { label } from "./index";
@@ -132,18 +134,82 @@ async function gatherFullText(items: ZItem[]): Promise<Gathered> {
   };
 }
 
-/** The items a request covers, given where it was started from. */
-export function itemsForAsk(
-  kind: ChatSource["kind"],
-  keys: string[],
-  collectionKey: string,
-): ZItem[] {
+/** The items a request covers, resolved fresh each time so a retrieval
+ *  between the popup opening and the request running is picked up. */
+export function itemsForAsk(target: AskTarget): ZItem[] {
   const all = useStore.getState().library.items;
-  if (kind === "folder") return itemsForCollection(all, collectionKey);
+  if (target.kind === "folder") {
+    return itemsForCollection(all, target.collectionKey);
+  }
   const byKey = new Map(all.map((i) => [i.key, i]));
-  return keys
+  return target.keys
     .map((k) => byKey.get(k))
     .filter((i): i is ZItem => i !== undefined && !i.data?.parentItem);
+}
+
+/** What the AI menu's two Ask entries point at: the selection when
+ *  there is one, the open folder when there isn't. */
+export function askTargetFor(
+  items: ZItem[],
+  collections: ZCollection[],
+  collectionKey: string,
+  selectedKeys: string[],
+): AskTarget {
+  if (selectedKeys.length === 1) {
+    const item = items.find((i) => i.key === selectedKeys[0]);
+    return {
+      kind: "item",
+      keys: selectedKeys,
+      collectionKey,
+      label: item ? itemTitle(item) : "One item",
+      count: item ? 1 : 0,
+    };
+  }
+  if (selectedKeys.length > 1) {
+    return {
+      kind: "selection",
+      keys: selectedKeys,
+      collectionKey,
+      label: `${selectedKeys.length} selected items`,
+      count: selectedKeys.length,
+    };
+  }
+  const name =
+    collectionKey === "all"
+      ? "All Items"
+      : collectionKey === "unfiled"
+        ? "Unfiled"
+        : String(
+            collections.find((c) => c.key === collectionKey)?.data?.name ??
+              "This folder",
+          );
+  return {
+    kind: "folder",
+    keys: [],
+    collectionKey,
+    label: name,
+    count: itemsForCollection(items, collectionKey).length,
+  };
+}
+
+/** Works this depth has nothing to read for, checked before anything is
+ *  gathered so the popup can offer to go and get them. An abstract can
+ *  be lifted out of a PDF, so a missing abstract is only fixable where
+ *  there is one; a missing PDF is always worth a try. */
+export function askGaps(items: ZItem[], depth: AskDepth): AskGap[] {
+  const all = useStore.getState().library.items;
+  const gaps: AskGap[] = [];
+  for (const item of items) {
+    const hasPdf = Boolean(pdfAttachmentOf(all, item.key));
+    if (depth === "full") {
+      if (!hasPdf) gaps.push({ key: item.key, title: itemTitle(item), fixable: true });
+      continue;
+    }
+    if (!String(item.data?.abstractNote ?? "").trim()) {
+      gaps.push({ key: item.key, title: itemTitle(item), fixable: hasPdf });
+    }
+  }
+  return gaps;
 }
 
 /** Read the works and price the request, ready for the confirmation
@@ -151,13 +217,13 @@ export function itemsForAsk(
  *  count on Anthropic is a free counting call, and on OpenAI (which has
  *  no counting endpoint) an approximation. */
 export async function prepareAsk(
-  kind: ChatSource["kind"],
+  target: AskTarget,
   items: ZItem[],
-  sourceLabel: string,
   depth: AskDepth,
 ): Promise<PendingAsk> {
   const settings = useStore.getState().settings;
   if (!settings) throw new Error("Settings are not loaded yet");
+  const gaps = askGaps(items, depth);
   appLog(
     "info",
     `Ask ${depth === "full" ? "Full Papers" : "Abstracts"}: gathering ${items.length} work(s)…`,
@@ -173,11 +239,12 @@ export async function prepareAsk(
   }>("ai_count_tokens", { context, messages: [] });
 
   return {
+    target,
     source: {
-      kind,
+      kind: target.kind,
       itemKeys: items.map((i) => i.key),
       itemTitles: items.map(itemTitle),
-      label: sourceLabel,
+      label: target.label,
       depth,
       missing,
     },
@@ -186,5 +253,6 @@ export async function prepareAsk(
     exact: count.exact,
     service: count.service === "openai" ? "openai" : "anthropic",
     model: count.model,
+    gaps,
   };
 }

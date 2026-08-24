@@ -263,10 +263,34 @@ export interface Chat {
   lastCallMs: number;
 }
 
+/** Where a request is being started from. Everything the AI menu needs
+ *  to label its two Ask entries, and everything the request needs to
+ *  resolve the works when it runs. */
+export interface AskTarget {
+  kind: ChatSource["kind"];
+  /** Selected item keys; empty for a folder, whose contents are
+   *  resolved at request time. */
+  keys: string[];
+  collectionKey: string;
+  /** What the conversation will call its source. */
+  label: string;
+  /** How many works this covers. */
+  count: number;
+}
+
+/** A work the request can't fully answer for: no abstract on record, or
+ *  no PDF to read. `fixable` marks the ones the app can go and get. */
+export interface AskGap {
+  key: string;
+  title: string;
+  fixable: boolean;
+}
+
 /** A gathered but not-yet-confirmed request, waiting behind the cost
  *  popup. Holding the text here means confirming costs nothing extra:
  *  the works have already been read. */
 export interface PendingAsk {
+  target: AskTarget;
   source: ChatSource;
   context: string;
   tokens: number;
@@ -274,4 +298,7 @@ export interface PendingAsk {
   exact: boolean;
   service: AiService;
   model: string;
+  /** Works with nothing to contribute, and whether retrieval could
+   *  change that. Only meaningful before the chat is created. */
+  gaps: AskGap[];
 }

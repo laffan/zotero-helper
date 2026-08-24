@@ -29,14 +29,23 @@ function contextLine(chat: Chat): string {
   return `${scope} · ${depth}`;
 }
 
-/** The works themselves, for the sources whose line above only counted
- *  them. A single item is already named by its label. */
-function worksLine(chat: Chat): string {
+/** The works themselves, folded away by default: a folder chat can
+ *  cover thirty of them, and the list is for finding a conversation,
+ *  not for reading its bibliography. Native <details> so it twirls,
+ *  keyboards, and needs no state of its own. */
+function WorkTitles({ chat }: { chat: Chat }) {
   const titles = chat.source.itemTitles ?? [];
-  if (chat.source.kind === "item" || titles.length === 0) return "";
-  return titles.length > 3
-    ? `${titles.slice(0, 3).join(" · ")} · +${titles.length - 3} more`
-    : titles.join(" · ");
+  if (titles.length === 0) return null;
+  return (
+    <details className="chat-row-titles" onClick={(e) => e.stopPropagation()}>
+      <summary>View Titles ({titles.length})</summary>
+      <ol>
+        {titles.map((t, i) => (
+          <li key={`${i}-${t}`}>{t}</li>
+        ))}
+      </ol>
+    </details>
+  );
 }
 
 function ChatRow({ chat, selected }: { chat: Chat; selected: boolean }) {
@@ -57,11 +66,7 @@ function ChatRow({ chat, selected }: { chat: Chat; selected: boolean }) {
         <div className="chat-row-context" title={contextLine(chat)}>
           {contextLine(chat)}
         </div>
-        {worksLine(chat) && (
-          <div className="chat-row-items" title={worksLine(chat)}>
-            {worksLine(chat)}
-          </div>
-        )}
+        <WorkTitles chat={chat} />
       </div>
       <div className="chat-row-meta">
         <span>{started(chat.createdMs)}</span>

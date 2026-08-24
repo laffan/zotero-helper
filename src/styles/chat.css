@@ -1,17 +1,6 @@
 /* Questions: the conversation list in the main area, the chat itself in
    the details panel, and the cost popup that gates the first request. */
 
-/* --- Ask buttons (folder panel, summary footer, item editor) --- */
-.ask-buttons {
-  display: flex;
-  gap: 6px;
-  flex-wrap: wrap;
-}
-.ask-buttons .tool-btn {
-  border-color: var(--border);
-  font-size: 12px;
-}
-
 /* --- Conversation list --- */
 .chat-list-heading {
   font-size: 11px;
@@ -52,14 +41,37 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.chat-row-context,
-.chat-row-items {
+.chat-row-context {
   font-size: 11px;
   color: var(--text-dim);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   margin-top: 2px;
+}
+.chat-row-titles {
+  font-size: 11px;
+  color: var(--text-dim);
+  margin-top: 3px;
+}
+.chat-row-titles summary {
+  cursor: default;
+  width: fit-content;
+  user-select: none;
+}
+.chat-row-titles summary:hover {
+  color: var(--text);
+}
+.chat-row-titles ol {
+  margin: 4px 0 2px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.chat-row-titles li {
+  list-style: decimal;
+  line-height: 1.45;
+  color: var(--text);
 }
 .chat-row-meta {
   display: flex;
@@ -76,7 +88,9 @@
 }
 .chat-row-delete {
   flex-shrink: 0;
-  align-self: center;
+  /* Pinned to the top so it doesn't drift down the row when the
+     titles accordion is opened. */
+  align-self: flex-start;
 }
 @media (max-width: 640px) {
   .chat-row-meta {
@@ -132,26 +146,21 @@
   padding: 20px 0;
   text-align: center;
 }
-.chat-msg-role {
-  font-size: 10px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--text-dim);
-}
 .chat-msg-body {
   /* Replies arrive as plain text with real line breaks in them. */
   white-space: pre-wrap;
   font-size: 13px;
   line-height: 1.55;
-  margin-top: 3px;
   overflow-wrap: anywhere;
 }
+/* The question is boxed, the answer isn't — that alternation is what
+   tells the two apart, so neither needs a label. */
 .chat-msg-user .chat-msg-body {
   background: var(--panel);
   border: 1px solid var(--border);
   border-radius: var(--radius);
   padding: 7px 9px;
+  color: var(--text-dim);
 }
 .chat-thinking {
   display: flex;
@@ -237,6 +246,20 @@
   font-size: 12px;
   color: var(--warn);
   line-height: 1.5;
+}
+/* "N works have no abstract — shall I fetch them?" */
+.ask-gaps {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--panel-alt);
+}
+.ask-gaps .tool-btn {
+  border-color: var(--border);
 }
 .ask-cost-actions {
   display: flex;

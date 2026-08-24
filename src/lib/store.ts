@@ -1,9 +1,11 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import type {
+  Chat,
   ImportJob,
   LibraryCache,
   LogLine,
+  PendingAsk,
   SearchDates,
   SearchMode,
   Settings,
@@ -16,6 +18,7 @@ export type ModalState =
   | { kind: "import" }
   | { kind: "newFolder" }
   | { kind: "sendToHush" }
+  | { kind: "askCost" }
   | { kind: "rescue"; jobId: string }
   | { kind: "capture"; jobId: string };
 
@@ -72,6 +75,10 @@ export interface UiTask {
   note?: string;
 }
 
+/** The sidebar row that holds the conversations. Not a Zotero
+ *  collection — chats never leave this machine. */
+export const QUESTIONS = "questions";
+
 interface AppStore extends UiPrefs {
   settings: Settings | null;
   library: LibraryCache;
@@ -92,6 +99,18 @@ interface AppStore extends UiPrefs {
   jobs: Record<string, ImportJob>;
   jobOrder: string[];
   modal: ModalState;
+
+  /** Conversations, newest first. Loaded from and written back to the
+   *  app data dir — nothing about them goes to Zotero. */
+  chats: Chat[];
+  selectedChatId: string | null;
+  /** Id of the chat waiting on a reply, so its input can lock. */
+  chatBusy: string | null;
+  /** A gathered request sitting behind the cost popup. */
+  pendingAsk: PendingAsk | null;
+  /** True while the works are being read, before the popup appears —
+   *  "Ask Full Papers" on a folder is a minute of downloading. */
+  askPreparing: boolean;
 
   setSettings: (s: Settings) => void;
   setLibrary: (l: LibraryCache) => void;
@@ -127,6 +146,14 @@ interface AppStore extends UiPrefs {
 
   pushLog: (line: LogLine) => void;
   clearLogs: () => void;
+
+  setChats: (chats: Chat[]) => void;
+  upsertChat: (chat: Chat) => void;
+  deleteChat: (id: string) => void;
+  selectChat: (id: string | null) => void;
+  setChatBusy: (id: string | null) => void;
+  setPendingAsk: (ask: PendingAsk | null) => void;
+  setAskPreparing: (b: boolean) => void;
 
   upsertItem: (item: ZItem) => void;
   patchItemData: (key: string, patch: Record<string, unknown>) => void;
@@ -181,6 +208,11 @@ export const useStore = create<AppStore>()(
       jobs: {},
       jobOrder: [],
       modal: null,
+      chats: [],
+      selectedChatId: null,
+      chatBusy: null,
+      pendingAsk: null,
+      askPreparing: false,
 
       setSettings: (settings) => set({ settings }),
       setLibrary: (library) => set({ library }),
@@ -189,7 +221,14 @@ export const useStore = create<AppStore>()(
       setTidying: (tidying) => set({ tidying }),
       setView: (view) => set({ view }),
       selectCollection: (key) =>
-        set({ selectedCollection: key, selectedKeys: [], sidebarOpen: false }),
+        set({
+          selectedCollection: key,
+          selectedKeys: [],
+          // Leaving Questions drops the open conversation, the same way
+          // leaving a folder drops its selection.
+          selectedChatId: key === QUESTIONS ? get().selectedChatId : null,
+          sidebarOpen: false,
+        }),
       setSelectedKeys: (selectedKeys) => set({ selectedKeys }),
       setSearchQuery: (searchQuery) => set({ searchQuery }),
       setSearchMode: (searchMode) => set({ searchMode }),
@@ -270,6 +309,25 @@ export const useStore = create<AppStore>()(
       pushLog: (line) =>
         set((s) => ({ logs: [...s.logs.slice(-1999), line] })),
       clearLogs: () => set({ logs: [] }),
+
+      setChats: (chats) => set({ chats }),
+      upsertChat: (chat) =>
+        set((s) => {
+          const idx = s.chats.findIndex((c) => c.id === chat.id);
+          if (idx < 0) return { chats: [chat, ...s.chats] };
+          const chats = s.chats.slice();
+          chats[idx] = chat;
+          return { chats };
+        }),
+      deleteChat: (id) =>
+        set((s) => ({
+          chats: s.chats.filter((c) => c.id !== id),
+          selectedChatId: s.selectedChatId === id ? null : s.selectedChatId,
+        })),
+      selectChat: (selectedChatId) => set({ selectedChatId, metaOpen: false }),
+      setChatBusy: (chatBusy) => set({ chatBusy }),
+      setPendingAsk: (pendingAsk) => set({ pendingAsk }),
+      setAskPreparing: (askPreparing) => set({ askPreparing }),
 
       upsertItem: (item) =>
         set((s) => {

@@ -1,7 +1,9 @@
 import { useEffect } from "react";
 import { bootstrap } from "./lib/actions";
-import { useStore } from "./lib/store";
+import { QUESTIONS, useStore } from "./lib/store";
+import { AskCostModal } from "./components/AskCostModal";
 import { CaptureModal } from "./components/CaptureModal";
+import { ChatList } from "./components/ChatList";
 import { DragLayer } from "./components/DragLayer";
 import { ImportModal, NewFolderModal } from "./components/ImportModal";
 import { ItemList } from "./components/ItemList";
@@ -44,6 +46,7 @@ export default function App() {
   const view = useStore((s) => s.view);
   const modal = useStore((s) => s.modal);
   const setModal = useStore((s) => s.setModal);
+  const selectedCollection = useStore((s) => s.selectedCollection);
   const { leftWidth, rightWidth } = useStore();
 
   useEffect(() => {
@@ -68,7 +71,9 @@ export default function App() {
       >
         <Sidebar />
         <PaneResizer side="left" />
-        <ItemList />
+        {/* Questions is a folder of conversations, so it replaces the
+            item list rather than filtering it. */}
+        {selectedCollection === QUESTIONS ? <ChatList /> : <ItemList />}
         <PaneResizer side="right" />
         <MetadataPanel />
       </div>
@@ -82,6 +87,14 @@ export default function App() {
       )}
       {modal?.kind === "sendToHush" && (
         <SendToHushModal onClose={() => setModal(null)} />
+      )}
+      {modal?.kind === "askCost" && (
+        <AskCostModal
+          onClose={() => {
+            useStore.getState().setPendingAsk(null);
+            setModal(null);
+          }}
+        />
       )}
       {modal?.kind === "rescue" && (
         <PdfRescueModal jobId={modal.jobId} onClose={() => setModal(null)} />

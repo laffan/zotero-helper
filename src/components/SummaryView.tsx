@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import { fullCreatorList } from "../lib/collections";
 import { shareSummary } from "../lib/share";
 import { useStore } from "../lib/store";
+import { AskButtons } from "./AskButtons";
 import {
   EXCLUSIVE_SUMMARY_GROUPS,
   SUMMARY_FIELD_OPTIONS,
@@ -137,6 +138,13 @@ export function SummaryView({ items }: { items: ZItem[] }) {
         >
           <ShareIcon size={13} /> Share filtered metadata
         </button>
+        <AskButtons
+          kind="selection"
+          keys={items.map((i) => i.key)}
+          collectionKey=""
+          label={`${items.length} selected items`}
+          count={items.length}
+        />
       </div>
     </div>
   );

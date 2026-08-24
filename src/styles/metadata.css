@@ -11,6 +11,13 @@
   padding: 40px 20px;
   text-align: center;
   color: var(--text-dim);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+}
+.meta-empty-note {
+  font-size: 11px;
 }
 .meta-editor {
   padding: 12px;
@@ -69,7 +76,10 @@
   padding: 8px 0;
   background: linear-gradient(transparent, var(--panel-alt) 30%);
   display: flex;
-  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  justify-content: flex-start;
 }
 
 /* --- summary (multi-select) view --- */
@@ -219,5 +229,8 @@
   border-top: 1px solid var(--border);
   padding: 8px 10px;
   display: flex;
-  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  justify-content: flex-start;
 }

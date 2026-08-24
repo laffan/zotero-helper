@@ -380,22 +380,30 @@ export async function uploadAndFinish(
   }
   try {
     upd(id, { stage: "uploading" });
-    await invoke<string>("attach_pdf", {
+    // Zotero's own key for the new attachment. Everything that looks up
+    // “the item's PDF” (Get Abstract, Ask Full Papers, Share PDFs, Send to
+    // Hush) matches on a real 8-character key, so the row we add locally
+    // has to carry that key — a placeholder would leave those features
+    // reporting “no PDF” until the next full restart.
+    const attKey = await invoke<string>("attach_pdf", {
       parentKey: j.itemKey,
       filePath,
       filename: filename ?? null,
     });
     upd(id, { stage: "done", hasPdf: true, message: undefined });
     appLog("info", `PDF attached to ${j.itemKey} ✓`);
-    // Reflect the new attachment locally so the ✓PDF chip shows immediately.
+    // Reflect the new attachment locally so the ✓PDF chip — and every
+    // PDF-backed action — works without waiting for the next sync.
     useStore.getState().upsertItem({
-      key: `${j.itemKey}-att-local`,
+      key: attKey,
       version: 0,
       data: {
-        key: `${j.itemKey}-att-local`,
+        key: attKey,
         version: 0,
         itemType: "attachment",
         parentItem: j.itemKey,
+        title: "Full Text PDF",
+        filename: filename ?? "document.pdf",
         contentType: "application/pdf",
         linkMode: "imported_file",
       },

@@ -1,5 +1,6 @@
 mod ai;
 mod capture;
+mod chats;
 mod error;
 mod hush;
 mod pdf;
@@ -269,14 +270,52 @@ async fn ai_get_abstract(
     ai::get_abstract(&app, &state, item, page_text).await
 }
 
-/// Models available to an Anthropic API key (for the Settings dropdown).
-/// Takes the key as an argument so the not-yet-saved key in the form works.
+// ---------------------------------------------------------------------------
+// Questions: chats about a folder, a selection, or one item. Nothing here
+// touches Zotero — the conversations live in the app's own data dir.
+// ---------------------------------------------------------------------------
+
+/// One turn of a conversation, sent back with every request (the
+/// providers are stateless).
 #[tauri::command]
-async fn list_anthropic_models(
+async fn ai_chat(
+    app: AppHandle,
     state: State<'_, AppState>,
-    key: String,
-) -> Result<Vec<ai::ModelInfo>> {
-    ai::list_models(&state, &key).await
+    context: String,
+    messages: Vec<ai::Turn>,
+) -> Result<ai::ChatReply> {
+    ai::chat(&app, &state, context, messages).await
+}
+
+/// Name a conversation from its first exchange.
+#[tauri::command]
+async fn ai_chat_title(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    question: String,
+    answer: String,
+) -> Result<ai::ChatReply> {
+    ai::title(&app, &state, question, answer).await
+}
+
+/// Size of a chat request before it is sent — the cost popup's numbers.
+#[tauri::command]
+async fn ai_count_tokens(
+    state: State<'_, AppState>,
+    context: String,
+    messages: Vec<ai::Turn>,
+) -> Result<ai::TokenCount> {
+    ai::count_tokens(&state, context, messages).await
+}
+
+#[tauri::command]
+async fn load_chats(state: State<'_, AppState>) -> Result<Vec<Value>> {
+    Ok(chats::load(&state.data_dir))
+}
+
+#[tauri::command]
+async fn save_chats(state: State<'_, AppState>, chats: Vec<Value>) -> Result<()> {
+    chats::save(&state.data_dir, &chats)
 }
 
 // ---------------------------------------------------------------------------
@@ -558,7 +597,11 @@ pub fn run() {
             discard_temp_file,
             ai_tidy_item,
             ai_get_abstract,
-            list_anthropic_models,
+            ai_chat,
+            ai_chat_title,
+            ai_count_tokens,
+            load_chats,
+            save_chats,
             download_attachment_file,
             list_hush_desks,
             open_in_hush,

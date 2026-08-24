@@ -81,7 +81,9 @@
     display: none;
   }
 }
-.col-pdf {
+/* "What do we have for this?" markers — an abstract, a PDF. Same
+   width so the two columns line up under their header glyphs. */
+.col-mark {
   width: 32px;
   flex-shrink: 0;
   display: inline-flex;

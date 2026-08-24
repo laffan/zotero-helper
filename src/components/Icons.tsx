@@ -227,6 +227,42 @@ export const SendIcon = (p: IconProps = {}) =>
     p,
   );
 
+// A few ragged lines of text — "this entry has an abstract", beside the
+// PDF column's page glyph.
+export const AbstractIcon = (p: IconProps = {}) =>
+  svg(
+    <>
+      <path d="M2.5 4h11M2.5 7h8M2.5 10h10M2.5 13h6" />
+    </>,
+    p,
+  );
+
+export const ChatIcon = (p: IconProps = {}) =>
+  svg(
+    <>
+      <path d="M14 9.5a1.5 1.5 0 0 1-1.5 1.5H6l-3 2.5V4a1.5 1.5 0 0 1 1.5-1.5h8A1.5 1.5 0 0 1 14 4z" />
+    </>,
+    p,
+  );
+
+export const AskIcon = (p: IconProps = {}) =>
+  svg(
+    <>
+      <path d="M14 9.5a1.5 1.5 0 0 1-1.5 1.5H6l-3 2.5V4a1.5 1.5 0 0 1 1.5-1.5h8A1.5 1.5 0 0 1 14 4z" />
+      <path d="M6.4 5.6a1.6 1.6 0 0 1 3.1.5c0 1.1-1.6 1.3-1.6 2.2" />
+      <path d="M7.9 9.9v.01" />
+    </>,
+    p,
+  );
+
+export const TrashIcon = (p: IconProps = {}) =>
+  svg(
+    <>
+      <path d="M2.5 4h11M6 4V2.5h4V4M4 4l.6 9.5a1 1 0 0 0 1 .95h4.8a1 1 0 0 0 1-.95L12 4" />
+    </>,
+    p,
+  );
+
 export const Spinner = ({ size = 16 }: IconProps = {}) => (
   <svg
     width={size}

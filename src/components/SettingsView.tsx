@@ -1,19 +1,20 @@
 import { useEffect, useState } from "react";
 import { bootstrap, saveSettings, syncNow, verifyKey } from "../lib/actions";
+import { AI_SERVICES, modelsFor } from "../lib/ai/models";
 import { appLog, useStore } from "../lib/store";
-import { invoke } from "../lib/tauri";
-import type { Settings } from "../lib/types";
+import type { AiService, Settings } from "../lib/types";
 import { Spinner } from "./Icons";
-
-type ModelInfo = { id: string; displayName: string };
 
 const BLANK: Settings = {
   zoteroApiKey: "",
   zoteroUserId: "",
   libraryType: "user",
   contactEmail: "",
+  aiService: "anthropic",
   anthropicApiKey: "",
-  anthropicModel: "claude-opus-5",
+  anthropicModel: "claude-sonnet-5",
+  openaiApiKey: "",
+  openaiModel: "gpt-5.6-terra",
   rateLimitMs: 1500,
 };
 
@@ -24,46 +25,34 @@ export function SettingsView() {
   const [verifying, setVerifying] = useState(false);
   const [verifyMsg, setVerifyMsg] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
-  const [models, setModels] = useState<ModelInfo[] | null>(null);
-  const [modelsLoading, setModelsLoading] = useState(false);
 
   useEffect(() => {
     if (stored) setDraft(stored);
   }, [stored]);
 
-  // Populate the model dropdown from GET /v1/models whenever a key is
-  // present (debounced so we don't fire per keystroke while pasting/typing).
-  const anthropicKey = draft.anthropicApiKey.trim();
-  useEffect(() => {
-    if (!anthropicKey) {
-      setModels(null);
-      return;
-    }
-    setModelsLoading(true);
-    let stale = false;
-    const t = setTimeout(() => {
-      invoke<ModelInfo[]>("list_anthropic_models", { key: anthropicKey })
-        .then((list) => {
-          if (!stale) setModels(list);
-        })
-        .catch((e) => {
-          if (!stale) {
-            setModels(null);
-            appLog("warn", `Could not list Anthropic models: ${e}`);
-          }
-        })
-        .finally(() => {
-          if (!stale) setModelsLoading(false);
-        });
-    }, 600);
-    return () => {
-      stale = true;
-      clearTimeout(t);
-    };
-  }, [anthropicKey]);
-
   const set = <K extends keyof Settings>(k: K, v: Settings[K]) =>
     setDraft((d) => ({ ...d, [k]: v }));
+
+  const service: AiService =
+    draft.aiService === "openai" ? "openai" : "anthropic";
+  const models = modelsFor(service);
+  const isOpenAi = service === "openai";
+  const keyField = isOpenAi ? "openaiApiKey" : "anthropicApiKey";
+  const modelField = isOpenAi ? "openaiModel" : "anthropicModel";
+  const chosenModel = isOpenAi ? draft.openaiModel : draft.anthropicModel;
+
+  /** Switching service keeps a model that belongs to it; a stale id
+   *  from the other provider falls back to that service's first. */
+  const pickService = (next: AiService) => {
+    setDraft((d) => {
+      const ids = modelsFor(next).map((m) => m.id);
+      const current = next === "openai" ? d.openaiModel : d.anthropicModel;
+      const model = ids.includes(current) ? current : ids[0];
+      return next === "openai"
+        ? { ...d, aiService: next, openaiModel: model }
+        : { ...d, aiService: next, anthropicModel: model };
+    });
+  };
 
   const doVerify = async () => {
     setVerifying(true);
@@ -91,6 +80,7 @@ export function SettingsView() {
         zoteroUserId: draft.zoteroUserId.trim(),
         contactEmail: draft.contactEmail.trim(),
         anthropicApiKey: draft.anthropicApiKey.trim(),
+        openaiApiKey: draft.openaiApiKey.trim(),
         rateLimitMs: Math.max(250, Number(draft.rateLimitMs) || 1500),
       };
       await saveSettings(clean);
@@ -184,46 +174,59 @@ export function SettingsView() {
           </label>
         </div>
 
-        <h2>AI Tidy (optional)</h2>
+        <h2>AI</h2>
+        <p className="hint">
+          Used by Tidy Metadata, Get Abstract, and the Questions
+          conversations. Optional — everything else works without it.
+        </p>
+        <label className="settings-field">
+          <span>Service</span>
+          <select
+            value={service}
+            onChange={(e) => pickService(e.target.value as AiService)}
+          >
+            {AI_SERVICES.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.label}
+              </option>
+            ))}
+          </select>
+        </label>
         <div className="settings-row">
           <label className="settings-field">
-            <span>Anthropic API key</span>
+            <span>{isOpenAi ? "OpenAI" : "Anthropic"} API key</span>
             <input
               type="password"
-              value={draft.anthropicApiKey}
-              onChange={(e) => set("anthropicApiKey", e.target.value)}
+              value={draft[keyField]}
+              onChange={(e) => set(keyField, e.target.value)}
               autoComplete="off"
             />
           </label>
           <label className="settings-field">
-            <span>Model {modelsLoading && <Spinner size={11} />}</span>
-            {models && models.length > 0 ? (
-              <select
-                value={draft.anthropicModel}
-                onChange={(e) => set("anthropicModel", e.target.value)}
-              >
-                {!models.some((m) => m.id === draft.anthropicModel) &&
-                  draft.anthropicModel && (
-                    <option value={draft.anthropicModel}>
-                      {draft.anthropicModel} (saved)
-                    </option>
-                  )}
-                {models.map((m) => (
-                  <option key={m.id} value={m.id}>
-                    {m.displayName} — {m.id}
-                  </option>
-                ))}
-              </select>
-            ) : (
-              <input
-                value={draft.anthropicModel}
-                onChange={(e) => set("anthropicModel", e.target.value)}
-                placeholder="claude-opus-5"
-                title="Enter an API key above to pick from your available models"
-              />
-            )}
+            <span>Model</span>
+            <select
+              value={chosenModel}
+              onChange={(e) => set(modelField, e.target.value)}
+            >
+              {models.map((m) => (
+                <option key={m.id} value={m.id}>
+                  {m.label}
+                </option>
+              ))}
+            </select>
           </label>
         </div>
+        <p className="hint">
+          {models.find((m) => m.id === chosenModel)?.blurb}
+          {" — "}
+          {(() => {
+            const m = models.find((x) => x.id === chosenModel);
+            return m
+              ? `$${m.inputPerMTok}/M in, $${m.outputPerMTok}/M out`
+              : "";
+          })()}
+          .
+        </p>
 
         <div className="settings-actions">
           <button

@@ -48,15 +48,7 @@ export function analyzeSelection(
   for (const item of selected) {
     const att = pdfAttachmentOf(items, item.key);
     if (!att) {
-      const pendingLocal = items.some(
-        (a) => a.data?.parentItem === item.key && a.key.endsWith("-att-local"),
-      );
-      skipped.push({
-        item,
-        reason: pendingLocal
-          ? "PDF just uploaded — run Sync so it gets a real key"
-          : "no PDF attachment in Zotero",
-      });
+      skipped.push({ item, reason: "no PDF attachment in Zotero" });
       continue;
     }
     const creators = item.data?.creators ?? [];

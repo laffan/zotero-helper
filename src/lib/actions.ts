@@ -2,6 +2,7 @@
 // item editing.
 import { scheduleTrayClear } from "../components/TaskTray";
 import { itemTitle } from "./collections";
+import { loadChats } from "./ai/chat";
 import { captureFinished, downloadForJob } from "./importer";
 import { appLog, useStore } from "./store";
 import { invoke, isTauri, on } from "./tauri";
@@ -76,6 +77,10 @@ export async function bootstrap(): Promise<void> {
       appLog("debug", `Capture plugin events unavailable: ${e}`);
     }
   }
+
+  // Conversations are local to this app, so they load whether or not
+  // Zotero credentials are in place yet.
+  await loadChats();
 
   try {
     const settings = await invoke<Settings>("get_settings");

@@ -70,8 +70,8 @@ export function itemsForCollection(items: ZItem[], key: string): ZItem[] {
   return tops.filter((i) => i.data?.collections?.includes(key));
 }
 
-/** Real Zotero object keys are 8 alphanumerics — this excludes the local
- *  `…-att-local` placeholder rows created mid-import. */
+/** Real Zotero object keys are 8 alphanumerics. Anything else is a row
+ *  this app made up, and Zotero has no file behind it. */
 export const REAL_KEY = /^[A-Z0-9]{8}$/i;
 
 function isPdfAttachment(d: ZItemData | undefined): boolean {
@@ -158,6 +158,16 @@ export function pdfMap(items: ZItem[]): Set<string> {
   const set = new Set<string>();
   for (const i of items) {
     if (isPdfAttachment(i.data)) set.add(i.data?.parentItem ?? i.key);
+  }
+  return set;
+}
+
+/** Keys of every item carrying a non-empty abstract. Paired with
+ *  pdfMap for the item list's two "what do we have for this?" columns. */
+export function abstractMap(items: ZItem[]): Set<string> {
+  const set = new Set<string>();
+  for (const i of items) {
+    if (String(i.data?.abstractNote ?? "").trim()) set.add(i.key);
   }
   return set;
 }

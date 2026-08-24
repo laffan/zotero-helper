@@ -1,15 +1,23 @@
-// AI actions (the toolbar "AI ▾" menu). Each runs sequentially over the
-// selected items and narrates progress in the activity log.
+// Everything the app asks a model to do, split by feature:
+//
+//   index    — the toolbar "AI ▾" actions (this file)
+//   models   — the model catalog, its prices, and the cost arithmetic
+//   context  — turning a folder / selection / item into readable text
+//   chat     — the Questions conversations
+//   export   — a conversation as a Markdown document
+//
+// Both actions here run sequentially over the selected items and
+// narrate progress in the activity log.
 //
 //  - getAbstracts: LiteParse extracts text from the PDF's first pages,
 //    the model pulls the abstract out verbatim, and it's written to
 //    abstractNote. The model never has to "read" the PDF itself.
 //  - tidyItems: metadata + trimmed-CrossRef cleanup of all fields.
-import { isStandaloneAttachment, itemTitle, pdfAttachmentOf } from "./collections";
-import { scheduleTrayClear } from "../components/TaskTray";
-import { appLog, useStore } from "./store";
-import { invoke } from "./tauri";
-import type { ZItem } from "./types";
+import { isStandaloneAttachment, itemTitle, pdfAttachmentOf } from "../collections";
+import { scheduleTrayClear } from "../../components/TaskTray";
+import { appLog, useStore } from "../store";
+import { invoke } from "../tauri";
+import type { ZItem } from "../types";
 
 export async function getAbstracts(keys: string[]): Promise<void> {
   const store = useStore.getState();
@@ -155,7 +163,7 @@ async function firstPagesText(item: ZItem): Promise<string | null> {
     appLog("info", `Get Abstract: reading PDF of “${label(item)}”…`);
     // Lazy import: the LiteParse WASM is ~5 MB and only needed here.
     const [{ extractFirstPagesText }, bytes] = await Promise.all([
-      import("./pdfText"),
+      import("../pdfText"),
       invoke<ArrayBuffer>("download_attachment_file", { attKey: att.key }),
     ]);
     const text = await extractFirstPagesText(bytes);
@@ -166,7 +174,8 @@ async function firstPagesText(item: ZItem): Promise<string | null> {
   }
 }
 
-function label(item: ZItem): string {
+/** A title short enough for a log line or a task-tray row. */
+export function label(item: ZItem): string {
   const t = itemTitle(item);
   return t.length > 60 ? `${t.slice(0, 57)}…` : t;
 }

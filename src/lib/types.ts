@@ -1,10 +1,16 @@
+/** Which provider every AI feature talks to. */
+export type AiService = "anthropic" | "openai";
+
 export interface Settings {
   zoteroApiKey: string;
   zoteroUserId: string;
   libraryType: "user" | "group";
   contactEmail: string;
+  aiService: AiService;
   anthropicApiKey: string;
   anthropicModel: string;
+  openaiApiKey: string;
+  openaiModel: string;
   rateLimitMs: number;
 }
 
@@ -197,3 +203,75 @@ export const SUMMARY_FIELD_OPTIONS: { id: string; label: string }[] = [
   { id: "url", label: "URL" },
   { id: "tags", label: "Tags" },
 ];
+
+// --- Questions: chats about a folder, a selection, or one item --------------
+
+/** How much of each work went into the conversation. */
+export type AskDepth = "abstracts" | "full";
+
+/** What a chat is about — shown under its title in the Questions list,
+ *  and the reason the chat can never silently change scope: the works
+ *  are read once, at creation, and the text is kept with the chat. */
+export interface ChatSource {
+  kind: "item" | "selection" | "folder";
+  /** Zotero keys of the works whose text is in the context. */
+  itemKeys: string[];
+  /** "Attention Is All You Need", "Reading list", "7 items". */
+  label: string;
+  /** Titles of the works, so the Questions list can say which ones —
+   *  the items may have moved or gone by the time it's read back. */
+  itemTitles: string[];
+  depth: AskDepth;
+  /** Works that contributed nothing (no PDF, no abstract). */
+  missing: string[];
+}
+
+export interface ChatUsage {
+  inputTokens: number;
+  outputTokens: number;
+  cachedInputTokens: number;
+  cacheWriteTokens: number;
+}
+
+export interface ChatMessage {
+  role: "user" | "assistant";
+  content: string;
+  ts: number;
+  /** What the call that produced this reply cost, in USD. */
+  costUsd?: number;
+  usage?: ChatUsage;
+}
+
+export interface Chat {
+  id: string;
+  /** Named by the model after the first exchange; until then, the
+   *  source's own label. */
+  title: string;
+  titled: boolean;
+  createdMs: number;
+  service: AiService;
+  model: string;
+  source: ChatSource;
+  /** The works, rendered once. Byte-stable for the life of the chat so
+   *  every later turn hits the provider's prefix cache. */
+  context: string;
+  contextTokens: number;
+  messages: ChatMessage[];
+  /** Everything spent on this conversation so far, in USD. */
+  costUsd: number;
+  /** When the last request went out — the cache countdown's zero. */
+  lastCallMs: number;
+}
+
+/** A gathered but not-yet-confirmed request, waiting behind the cost
+ *  popup. Holding the text here means confirming costs nothing extra:
+ *  the works have already been read. */
+export interface PendingAsk {
+  source: ChatSource;
+  context: string;
+  tokens: number;
+  /** False when the token count is a four-chars-per-token estimate. */
+  exact: boolean;
+  service: AiService;
+  model: string;
+}

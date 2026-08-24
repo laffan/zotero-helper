@@ -6,6 +6,7 @@ import {
 } from "react";
 import { openInZotero } from "../lib/actions";
 import {
+  abstractMap,
   creatorSummary,
   itemsForCollection,
   itemTitle,
@@ -27,6 +28,7 @@ import { useSearchResults } from "../lib/search";
 import type { ImportJob, ImportStage, ZItem } from "../lib/types";
 import { IconGrid } from "./IconGrid";
 import {
+  AbstractIcon,
   CheckIcon,
   CloseIcon,
   FlagIcon,
@@ -230,6 +232,7 @@ export function ItemList() {
   );
   const searching = searchKeys !== null;
   const withPdf = useMemo(() => pdfMap(library.items), [library.items]);
+  const withAbstract = useMemo(() => abstractMap(library.items), [library.items]);
   const attByParent = useMemo(
     () => pdfAttachmentMap(library.items),
     [library.items],
@@ -471,7 +474,10 @@ export function ItemList() {
           Added{sortIndicator("dateAdded")}
           <ColGrip col="added" />
         </button>
-        <span className="col col-pdf" title="PDF attached">
+        <span className="col col-mark" title="Abstract on record">
+          <AbstractIcon size={13} />
+        </span>
+        <span className="col col-mark" title="PDF attached">
           <PdfIcon size={13} />
         </span>
       </div>
@@ -567,7 +573,18 @@ export function ItemList() {
                 <span className="col col-added">
                   {fmtAdded(String(item.data?.dateAdded ?? ""))}
                 </span>
-                <span className="col col-pdf">
+                <span
+                  className="col col-mark"
+                  title={
+                    withAbstract.has(item.key) ? "Has an abstract" : undefined
+                  }
+                >
+                  {withAbstract.has(item.key) && <AbstractIcon size={13} />}
+                </span>
+                <span
+                  className="col col-mark"
+                  title={withPdf.has(item.key) ? "Has a PDF" : undefined}
+                >
                   {withPdf.has(item.key) && <PdfIcon size={13} />}
                 </span>
               </div>

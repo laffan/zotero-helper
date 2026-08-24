@@ -11,11 +11,20 @@ pub struct Settings {
     pub library_type: String,
     /// Email sent to Unpaywall / CrossRef polite pools. Optional but recommended.
     pub contact_email: String,
+    /// Which model provider every AI feature talks to: "anthropic" or "openai".
+    pub ai_service: String,
     pub anthropic_api_key: String,
     pub anthropic_model: String,
+    pub openai_api_key: String,
+    pub openai_model: String,
     /// Minimum delay between automated requests to the same host, in ms.
     pub rate_limit_ms: u64,
 }
+
+/// Defaults for the two dropdowns. The frontend owns the full catalog
+/// (src/lib/ai/models.ts) — these only have to be valid ids.
+pub const DEFAULT_ANTHROPIC_MODEL: &str = "claude-sonnet-5";
+pub const DEFAULT_OPENAI_MODEL: &str = "gpt-5.6-terra";
 
 impl Default for Settings {
     fn default() -> Self {
@@ -24,8 +33,11 @@ impl Default for Settings {
             zotero_user_id: String::new(),
             library_type: "user".into(),
             contact_email: String::new(),
+            ai_service: "anthropic".into(),
             anthropic_api_key: String::new(),
-            anthropic_model: "claude-opus-5".into(),
+            anthropic_model: DEFAULT_ANTHROPIC_MODEL.into(),
+            openai_api_key: String::new(),
+            openai_model: DEFAULT_OPENAI_MODEL.into(),
             rate_limit_ms: 1500,
         }
     }

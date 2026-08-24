@@ -166,6 +166,25 @@ export async function shareSummary(
   }
 }
 
+/** Save/share an already-built Markdown document. The conversation
+ *  export (lib/ai/export) writes its own text; this is the plumbing
+ *  that gets it out of the app. */
+export async function shareMarkdown(
+  fileName: string,
+  content: string,
+  anchor: { x: number; y: number },
+): Promise<void> {
+  try {
+    const path = await invoke<string>("stage_text_for_share", {
+      fileName,
+      content,
+    });
+    await presentShare([path], anchor, fileName);
+  } catch (e) {
+    appLog("error", `Share “${fileName}” failed: ${e}`);
+  }
+}
+
 function mdEscape(s: string): string {
   return s.replace(/([\[\]])/g, "\\$1");
 }

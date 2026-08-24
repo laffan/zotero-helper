@@ -55,10 +55,38 @@ Windows/Linux desktops too).
   pause is charged when a learned URL is actually tried, so an item whose
   open-access copy downloads first never waits for one. The book lives in
   `pdf-patterns.json` beside the library cache.
-- **AI Tidy Metadata** — with an Anthropic API key configured, selected items
-  are cleaned up by Claude (grounded in a fresh CrossRef record when a DOI
+- **AI Tidy Metadata** — with an API key configured, selected items are
+  cleaned up by the model (grounded in a fresh CrossRef record when a DOI
   exists): casing, missing abstracts/pages/ISSNs, normalized author names.
-  Only changed fields are written back.
+  Only changed fields are written back. Its sibling, **Get Abstract**,
+  parses the PDF's first pages locally and has the model lift the
+  abstract out verbatim.
+- **Two providers, four models** — Settings picks a service (Anthropic or
+  OpenAI), takes that service's key, and offers a short fixed model list:
+  Claude Sonnet 5 or Claude Haiku 4.5, GPT-5.6 Terra or GPT-5.6 Luna. Every
+  AI feature uses whichever is selected; the per-model prices live in
+  `src/lib/ai/models.ts`, which is also what the cost estimates are
+  computed from.
+- **Questions — chat with your abstracts (or your papers)** — a folder
+  above Library holding conversations about works in the library. Start one
+  from any of three places, with the same two buttons: an open folder with
+  nothing selected, a multi-item selection, or a single item. **Ask
+  Abstracts** uses the metadata the app already holds; **Ask Full Papers**
+  downloads each PDF and extracts its text with the same local parser Get
+  Abstract uses — the model is sent words, never a PDF, and never anything
+  else about Zotero. Before any of it is sent you get a popup with the
+  token count and what the first question and each one after it will cost.
+
+  Inside a conversation, the works sit at the head of every request and
+  never change a byte, so after the first call the provider serves them
+  from its prompt cache at roughly a tenth of the price. That's why the
+  chat shows a countdown beside the running total: ask again inside the
+  window (5 minutes on Anthropic, 30 on OpenAI) and the papers are cheap;
+  let it lapse and the next question pays for them in full. **Share
+  Conversation** exports the whole thing — exchange *and* source material —
+  as one Markdown file, so the conversation can be picked up somewhere
+  else. Conversations are named by the model after the first exchange and
+  live in the app's data dir; nothing about them is written to Zotero.
 - **Re-sync** — the Sync menu offers three scopes: *Sync this folder*
   (fetches only the current collection's changes — the day-to-day option
   for five-digit libraries), *Sync all changes* (incremental via Zotero's
@@ -128,6 +156,10 @@ Windows/Linux desktops too).
   pointer events throughout, since HTML5 drag-and-drop is unreliable in a
   WKWebView. Zotero keeps an item in every collection it was added to, so
   this only ever adds: nothing leaves the folder it was dragged from.
+- **What we have for each entry** — two marker columns at the right of the
+  item list: one for a PDF attachment, one for an abstract on record. Both
+  are what the AI features work from, so it's worth being able to see at a
+  glance which entries are ready.
 - Multi-select with the usual ctrl/cmd-click and shift-click patterns.
 - PDFs are only held in a temp folder during upload and deleted right after —
   the copy of record lives in Zotero (where your iPad Zotero app syncs it).
@@ -146,9 +178,9 @@ On first launch, open **Settings** and paste a Zotero API key
 (created at zotero.org → Settings → Security → API Keys, with library
 read/write **and file access** enabled). "Verify" fills in your user ID.
 Add a contact email (used for the Unpaywall/CrossRef polite pools — strongly
-recommended, PDF discovery is much weaker without it) and optionally an
-Anthropic API key for AI Tidy. The app then downloads your library and you're
-off.
+recommended, PDF discovery is much weaker without it) and, for the AI
+features, pick a service and paste its API key. The app then downloads your
+library and you're off.
 
 ### iOS / iPadOS
 
@@ -206,6 +238,9 @@ Regenerate the icon set any time with `node scripts/gen-icons.mjs`
 src/            React + TypeScript UI (Vite, zustand, MiniSearch)
   lib/          store, import pipeline driver, search index, actions,
                 drag-and-drop, PDF-pattern bookkeeping
+  lib/ai/       the AI features: toolbar actions (index), the model
+                catalog and its prices (models), gathering works to ask
+                about (context), conversations (chat), export
   components/   toolbar, sidebar, virtualized item list, metadata panel,
                 terminal, import/rescue modals, settings
   styles/       one stylesheet per UI region (tokens, base, toolbar, …)
@@ -217,7 +252,9 @@ src-tauri/      Rust core (all networking + state)
   src/pdf/         PDF discovery and download (mod = Unpaywall + link
                    scraping + validated downloads, per-host rate limiter;
                    patterns = learned per-publisher PDF URL shapes)
-  src/ai.rs        Anthropic Messages API (structured outputs) for AI Tidy
+  src/ai/          model access, one file per concern (mod = provider
+                   dispatch, anthropic, openai, tidy, chat)
+  src/chats.rs     the Questions conversations on disk
   src/capture.rs   desktop capture-browser window (download interception)
 ```
 

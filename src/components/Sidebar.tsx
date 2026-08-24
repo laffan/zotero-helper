@@ -5,8 +5,9 @@ import {
   type CollectionNode,
 } from "../lib/collections";
 import { useDragging, useIsDropTarget } from "../lib/dragdrop";
-import { useStore } from "../lib/store";
+import { QUESTIONS, useStore } from "../lib/store";
 import {
+  AskIcon,
   ChevronDown,
   ChevronRight,
   CloseIcon,
@@ -114,6 +115,7 @@ export function Sidebar() {
   const { selectedCollection, selectCollection, sidebarOpen, setSidebarOpen } =
     useStore();
   const dragging = useDragging();
+  const chatCount = useStore((s) => s.chats.length);
   const flaggedKeys = useStore((s) => s.flaggedFolders);
   const toggleFlag = useStore((s) => s.toggleFlag);
   const tree = useMemo(() => buildTree(collections), [collections]);
@@ -157,6 +159,20 @@ export function Sidebar() {
             ))}
           </>
         )}
+        {/* Conversations, not a Zotero collection — hence no drop
+            target and no flag. It sits above Library because it is
+            about the library rather than part of it. */}
+        <div
+          className={`tree-row ${selectedCollection === QUESTIONS ? "selected" : ""}`}
+          style={{ paddingLeft: 10, marginTop: 10 }}
+          onClick={() => selectCollection(QUESTIONS)}
+          title="Conversations with the AI about your works"
+        >
+          <span className="tree-toggle-spacer" />
+          <AskIcon size={14} />
+          <span className="tree-name">Questions</span>
+          {chatCount > 0 && <span className="tree-count">{chatCount}</span>}
+        </div>
         <div className="sidebar-section">Library</div>
         <div
           className={`tree-row ${selectedCollection === "all" ? "selected" : ""}`}

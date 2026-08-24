@@ -34,6 +34,7 @@ export function PageViewModal({
   const items = useStore((s) => s.library.items);
   const [url, setUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [searching, setSearching] = useState(false);
   const [shown, setShown] = useState(page);
   const [pages, setPages] = useState(0);
   const [found, setFound] = useState(true);
@@ -51,6 +52,7 @@ export function PageViewModal({
     let stale = false;
     setUrl(null);
     setError(null);
+    setSearching(Boolean(quote?.trim()));
     (async () => {
       try {
         const [{ renderPageDataUrl }, bytes] = await Promise.all([
@@ -68,10 +70,12 @@ export function PageViewModal({
         setShown(out.rendered);
         setPages(out.pages);
         setFound(out.found);
+        setSearching(false);
       } catch (e) {
         if (stale) return;
         appLog("warn", `Could not render page ${page}: ${e}`);
         setError(String(e));
+        setSearching(false);
       }
     })();
     return () => {
@@ -88,7 +92,11 @@ export function PageViewModal({
           </span>
           <span className="page-view-sub">
             {pages > 0 ? `Page ${shown} of ${pages}` : `Page ${page}`}
-            {shown !== page && pages > 0 && " — the citation was past the end"}
+            {shown !== page &&
+              pages > 0 &&
+              (found
+                ? ` — the passage is here, not on the cited page ${page}`
+                : " — the citation was past the end")}
           </span>
           {quote && (
             <span
@@ -101,8 +109,7 @@ export function PageViewModal({
                   ? `Highlighted: “${quote}”`
                   : // Never pretend: an unfound passage says so rather
                     // than leaving a plain page looking checked.
-                    `Could not find “${quote}” on this page — it may be
-                     worded differently in the PDF, or on a scanned page.`}
+                    `Could not find “${quote}” anywhere in this PDF — it may be worded differently there, or the pages may be scans with no text layer.`}
             </span>
           )}
         </div>
@@ -111,7 +118,8 @@ export function PageViewModal({
           {error && <div className="error-msg">{error}</div>}
           {!error && !url && (
             <div className="page-view-loading">
-              <Spinner size={14} /> rendering…
+              <Spinner size={14} />{" "}
+              {searching ? "finding the passage…" : "rendering…"}
             </div>
           )}
           {url && (

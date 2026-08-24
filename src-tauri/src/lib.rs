@@ -451,15 +451,25 @@ async fn open_in_zotero(
             Some(n) if n > 0 => format!("zotero://open-pdf/{scope}/items/{k}?page={n}"),
             _ => format!("zotero://open-pdf/{scope}/items/{k}"),
         },
-        // Selecting inside a collection keeps the entry in the context
-        // it was found in. The `?itemKey=` form is the one Zotero
-        // supports for this; the bare `/items/KEY` path form is only
-        // for a library-wide select.
+        // Landing on the entry *inside* a collection takes two opens.
+        // The combined `collections/KEY/items?itemKey=KEY` form is
+        // written up in places but does nothing here, whereas each of
+        // these halves works on its own: select the collection, then
+        // select the item, which Zotero keeps in the current view when
+        // the item is in it. Worst case — the collection open is
+        // ignored — this is exactly the plain select below, so it can
+        // only do better than doing nothing.
         (None, Some(c)) => {
-            format!("zotero://select/{scope}/collections/{c}/items?itemKey={item_key}")
+            open_url(&app, format!("zotero://select/{scope}/collections/{c}"))?;
+            tokio::time::sleep(std::time::Duration::from_millis(350)).await;
+            format!("zotero://select/{scope}/items/{item_key}")
         }
         (None, None) => format!("zotero://select/{scope}/items/{item_key}"),
     };
+    open_url(&app, url)
+}
+
+fn open_url(app: &AppHandle, url: String) -> Result<()> {
     use tauri_plugin_opener::OpenerExt;
     app.opener()
         .open_url(url, None::<String>)

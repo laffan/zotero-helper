@@ -40,7 +40,11 @@
   flex-direction: column;
   gap: 3px;
 }
-.meta-field > span {
+/* The label style for the plainer .meta-field users (the attachment
+   list, the standalone-file panel). It must not reach a .meta-value:
+   `.meta-field > span` out-specifies `.meta-value`, which is what was
+   quietly painting every value in the details panel dim. */
+.meta-field > span:not(.meta-value) {
   font-size: 11px;
   font-weight: 600;
   color: var(--text-dim);

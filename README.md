@@ -100,9 +100,14 @@ Windows/Linux desktops too).
   characters — anchored on the quote's first and last pair of words,
   with the interior words deciding between candidates — so line
   wrapping, a word hyphenated across a break, ligatures and stray
-  spacing never come into it. When the passage genuinely isn't there the
-  page says so, rather than showing you a clean page that looks
-  verified. Each conversation lists the works it
+  spacing never come into it. Where a passage is quoted, *it* decides
+  which page you are shown: the cited number is only a hint, searched
+  around and then across the document, because the number is the part
+  of a citation a model most easily gets wrong (a paper whose running
+  head reads "CONSUMING WITH OTHERS 507" invites citing the folio
+  however plainly you ask for the marker). The page then says where the
+  passage actually was. When it genuinely isn't in the PDF, the page
+  says that too, rather than looking verified. Each conversation lists the works it
   covers behind a **View Titles** twirl-down, and every title there opens
   that entry in Zotero *inside the folder the question was asked from* —
   which is the one that matters for an entry filed in several.

@@ -85,13 +85,46 @@ export async function renderFirstPageJpeg(
   return renderPageJpeg(data, 1, longEdge, quality, annotations);
 }
 
-/** One page as a `data:` URL, ready to drop into an <img>. `pageNumber`
- *  is 1-based and counts PDF pages — the same numbering the model
- *  cites and Zotero's `?page=` takes. A `quote` is searched for on that
- *  page and painted over where it is found; `found` says whether it
- *  was, so the caller can be honest about an unhighlighted page.
- *  Returns the page count too, so a citation past the end of the
- *  document can say so. */
+/** Pages to try around the cited one before widening to the whole
+ *  document. Off-by-a-couple is the common case — a cover page the
+ *  extractor counted differently, a citation drifting to the facing
+ *  page — so it is worth checking cheaply first. */
+const NEARBY = [0, -1, 1, -2, 2, -3, 3];
+
+/** Cap on how much of a long document to sweep for a passage. Each
+ *  page's text layer is quick, but a 400-page book should not lock the
+ *  dialog up looking for a sentence that may not be there. */
+const MAX_SCAN = 80;
+
+/** Order to look for a quoted passage in: the cited page, its
+ *  neighbours, then the rest of the document from the front. */
+function searchOrder(cited: number, pages: number): number[] {
+  const seen = new Set<number>();
+  const order: number[] = [];
+  const add = (n: number) => {
+    if (n >= 1 && n <= pages && !seen.has(n)) {
+      seen.add(n);
+      order.push(n);
+    }
+  };
+  for (const d of NEARBY) add(cited + d);
+  for (let n = 1; n <= pages && order.length < MAX_SCAN; n++) add(n);
+  return order.slice(0, MAX_SCAN);
+}
+
+/** One page as a `data:` URL, ready to drop into an <img>.
+ *
+ *  When a passage is given it — not the cited page number — decides
+ *  what gets rendered. The number is treated as a hint and searched
+ *  around, because it is the part of a citation a model most easily
+ *  gets wrong: a paper whose running head reads "CONSUMING WITH OTHERS
+ *  507" invites citing the printed folio however plainly the prompt
+ *  asks for the marker, and a reader sent to page 507 of a 19-page PDF
+ *  is worse off than one sent nowhere. The words are the model's own
+ *  and can be checked; the number can't be.
+ *
+ *  `rendered` is the page actually shown and `found` whether the
+ *  passage turned up, so the caller can say when the two disagree. */
 export async function renderPageDataUrl(
   data: ArrayBuffer,
   pageNumber: number,
@@ -102,9 +135,25 @@ export async function renderPageDataUrl(
   try {
     const doc = await task.promise;
     const pages = doc.numPages;
-    const rendered = Math.min(Math.max(1, pageNumber), pages);
-    const page = await doc.getPage(rendered);
-    const marks = quote.trim() ? await quoteRects(page, quote) : [];
+    const cited = Math.min(Math.max(1, pageNumber), pages);
+
+    let rendered = cited;
+    let marks: HighlightRect[] = [];
+    let page = await doc.getPage(cited);
+
+    if (quote.trim()) {
+      for (const n of searchOrder(cited, pages)) {
+        const candidate = n === cited ? page : await doc.getPage(n);
+        const rects = await quoteRects(candidate, quote);
+        if (rects.length > 0) {
+          rendered = n;
+          page = candidate;
+          marks = rects;
+          break;
+        }
+      }
+    }
+
     const jpeg = await renderPage(page, longEdge, JPEG_QUALITY, [], marks);
     return {
       url: `data:image/jpeg;base64,${jpeg}`,

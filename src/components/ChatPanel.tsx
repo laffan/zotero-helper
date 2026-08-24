@@ -22,7 +22,7 @@ import {
   formatUsd,
   modelLabel,
 } from "../lib/ai/models";
-import { pdfAttachmentOf } from "../lib/collections";
+import { firstAuthorLast, pdfAttachmentOf } from "../lib/collections";
 import { useStore } from "../lib/store";
 import type { Chat, ChatSource } from "../lib/types";
 import {
@@ -105,12 +105,20 @@ function CitePill({
   const title = source.itemTitles?.[index - 1] ?? "";
   const label = citationLabel(cite);
 
+  // Which paper this came from, when there is more than one it could
+  // have come from. A page number on its own is only ever unambiguous
+  // in a chat about a single work; across a folder, "p. 3" three times
+  // in a paragraph is three different papers.
+  const item = itemKey ? items.find((i) => i.key === itemKey) : undefined;
+  const who = source.itemKeys.length > 1 && item ? firstAuthorLast(item) : "";
+
   // No work to resolve, or the work has no PDF any more: keep the
   // reference visible, just without buttons that would go nowhere.
   const att = itemKey ? pdfAttachmentOf(items, itemKey) : undefined;
   if (!itemKey || !att) {
     return (
       <span className="cite-pill cite-pill-dead" title={title || undefined}>
+        {who && <span className="cite-who">{who}</span>}
         {label}
       </span>
     );
@@ -118,6 +126,7 @@ function CitePill({
 
   return (
     <span className="cite-pill" title={title || undefined}>
+      {who && <span className="cite-who">{who}</span>}
       <span className="cite-label">{label}</span>
       <button
         onClick={() =>

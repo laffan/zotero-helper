@@ -185,6 +185,23 @@ export function creatorSummary(item: ZItem): string {
   return `${names[0]} et al.`;
 }
 
+/** The first author's surname alone — "Jones", not "Jones et al." A
+ *  citation pill in a chat about a dozen papers has to say which one it
+ *  came from, and has about one word to do it in. Institutional authors
+ *  carry a single-field name with no surname to take, so that name is
+ *  used whole. */
+export function firstAuthorLast(item: ZItem): string {
+  const creators = item.data?.creators ?? [];
+  const first = creators.find((c) => c.creatorType === "author") ?? creators[0];
+  const name = (first?.lastName || first?.name || "").trim();
+  if (name) return name;
+  // No creator list came down with the item: Zotero's own summary is
+  // already a surname, or a surname followed by "et al.".
+  return String(item.meta?.creatorSummary ?? "")
+    .split(/\s+(?:and|et al\.?)\b/i)[0]
+    .trim();
+}
+
 export function yearOf(item: ZItem): string {
   const d = item.meta?.parsedDate ?? item.data?.date ?? "";
   const m = /\d{4}/.exec(String(d));

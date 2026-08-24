@@ -274,6 +274,13 @@
   font-weight: 500;
   font-variant-numeric: tabular-nums;
 }
+/* Whose paper it is, when the chat covers several. Quieter than the
+   page number and hard against it — one reads as "Jones p. 3", not as
+   two separate things sharing a pill. */
+.cite-who {
+  margin-right: -1px;
+  color: var(--text-dim);
+}
 .cite-pill button {
   display: inline-flex;
   align-items: center;

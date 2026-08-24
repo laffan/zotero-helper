@@ -33,8 +33,7 @@ app turns it into a button that opens that page.\n\n\
 Where a specific passage is what you are pointing at, add it after the page: \
 [[cite:W:P:the exact words from the page]]. Copy them character for character from the material \
 — the app searches the page for them and highlights what it finds, so an approximation simply \
-fails to highlight. One sentence or clause is ideal; keep it under about forty words, and do not \
-use square brackets inside it. If you are pointing at a page as a whole rather than a passage, \
+fails to highlight. One sentence or clause is ideal; keep it under about forty words. If you are pointing at a page as a whole rather than a passage, \
 leave the quotation off.\n\n\
 Rules: use the numbers you actually read, never a guess, and never a printed folio or a citation \
 from the work's own bibliography; if the material carries no [[page N]] markers (an \

@@ -32,11 +32,15 @@ export interface Citation {
 /** Deliberately permissive: any of cite/page/p, any separator, optional
  *  range, whitespace wherever. The one thing it insists on is the
  *  double brackets, which is what keeps it from firing on ordinary
- *  prose like "[2]" or "(p. 7)". The quote runs to the closing
- *  brackets and may not contain one, so a stray bracket truncates the
- *  highlight instead of swallowing the rest of the sentence. */
+ *  prose like "[2]" or "(p. 7)".
+ *
+ *  The quote runs to the closing brackets and may contain a single "]"
+ *  on the way — which it will, constantly, because half of scholarly
+ *  prose cites like "[10] found the opposite". Rejecting those threw
+ *  the whole citation away and left the raw [[cite:…]] text sitting in
+ *  the answer. */
 const CITE_RE =
-  /\[\[\s*(?:cite|pages?|pp?)\s*[:.]?\s*(\d{1,5})\s*(?:[:,.]\s*(\d{1,5}))?\s*(?:[-–—]\s*(\d{1,5}))?\s*(?::\s*([^\]]{1,400}?))?\s*\]\]/gi;
+  /\[\[\s*(?:cite|pages?|pp?)\s*[:.]?\s*(\d{1,5})\s*(?:[:,.]\s*(\d{1,5}))?\s*(?:[-–—]\s*(\d{1,5}))?\s*(?::\s*((?:[^\]]|\](?!\])){1,400}?))?\s*\]\]/gi;
 
 type Groups = [string, string?, string?, string?];
 

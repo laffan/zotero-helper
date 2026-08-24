@@ -13,9 +13,20 @@
 // and where several spans match, the interior words decide which one was
 // meant. Whitespace never enters into it.
 //
-// A miss is expected and fine: the page still renders, just without a
-// highlight. A wrong highlight would be worse than none, so a candidate
-// has to earn its interior words before it is accepted.
+// The other half of the problem is that a quote is not always *on* the
+// page as one stretch of words. LiteParse reads spatially, so a
+// two-column paper's title block comes out interleaved, a paragraph
+// crossing a column break comes out spliced, and body text runs
+// straight into the copyright footer. The model quotes what it was
+// given, faithfully, and no amount of matching will find that sequence
+// on the page, because it isn't there. So when the whole quote can't be
+// placed, the longest stretch of it that *is* contiguous gets
+// highlighted instead — which is the part the reader wants to see
+// anyway.
+//
+// A miss is still expected and fine: the page renders without a
+// highlight. A wrong highlight would be worse than none, so both the
+// whole-quote and the partial paths have to clear a bar first.
 
 /** One text run from pdf.js, with where it sits on the page. */
 export interface TextRun {
@@ -135,8 +146,46 @@ function interiorScore(
   return found / interior.length;
 }
 
-/** Word indices of the span the quote refers to, or null. */
-function matchWords(page: Word[], quote: string[]): [number, number] | null {
+/** The longest stretch of the quote that appears contiguously on the
+ *  page. This is what rescues a quote the extractor spliced together
+ *  out of two parts of the page: one of the parts is still there, whole.
+ *
+ *  Classic longest-common-substring, over words rather than characters,
+ *  with a rolling row — a 40-word quote against an 800-word page is
+ *  32,000 comparisons, which is nothing per page. */
+function longestRun(page: Word[], quote: string[]): [number, number] | null {
+  let prev = new Uint16Array(quote.length + 1);
+  let best = 0;
+  let bestEnd = -1;
+  for (let i = 0; i < page.length; i++) {
+    const row = new Uint16Array(quote.length + 1);
+    for (let j = 0; j < quote.length; j++) {
+      if (page[i].text !== quote[j]) continue;
+      const len = prev[j] + 1;
+      row[j + 1] = len;
+      if (len > best) {
+        best = len;
+        bestEnd = i;
+      }
+    }
+    prev = row;
+  }
+  // Long enough to be unmistakably the passage, and a real share of what
+  // was quoted — a short stretch of a long quote is as likely to be a
+  // stock phrase ("in this article we examine") as the sentence meant.
+  const floor = Math.max(6, Math.ceil(quote.length * 0.45));
+  if (best < floor) return null;
+  return [bestEnd - best + 1, bestEnd];
+}
+
+/** Word indices of the span the quote refers to, or null. `strict`
+ *  refuses the partial fallback, which lets a caller sweep a document
+ *  for a whole-quote match before settling for part of one. */
+function matchWords(
+  page: Word[],
+  quote: string[],
+  strict: boolean,
+): [number, number] | null {
   if (quote.length === 0 || page.length === 0) return null;
 
   // A pair of words is specific enough to anchor on and short enough to
@@ -182,22 +231,29 @@ function matchWords(page: Word[], quote: string[]): [number, number] | null {
     }
   }
   // Both ends matching is suggestive; the middle is what makes it
-  // certain. Below half, assume a different passage and highlight none.
-  if (!best || best.score < 0.5) return null;
-  return [best.from, best.to];
+  // certain. Below half, assume a different passage.
+  if (best && best.score >= 0.5) return [best.from, best.to];
+  return strict ? null : longestRun(page, quote);
 }
 
-/** Rectangles covering a quotation, in PDF user space. One per text run
- *  the match touches; the first and last are trimmed to the characters
- *  actually inside the match, which assumes even character widths — an
- *  approximation a highlight can carry. */
-export function locateQuote(runs: TextRun[], quote: string): HighlightRect[] {
-  if (!quote.trim()) return [];
+/** Rectangles covering a quotation, in PDF user space, and how many
+ *  words they cover — a caller sweeping several pages uses that to
+ *  prefer the page that matched most of the quote. One rect per text
+ *  run the match touches; the first and last are trimmed to the
+ *  characters actually inside the match, which assumes even character
+ *  widths — an approximation a highlight can carry. */
+export function locateQuote(
+  runs: TextRun[],
+  quote: string,
+  strict = false,
+): { rects: HighlightRect[]; words: number } {
+  const none = { rects: [], words: 0 };
+  if (!quote.trim()) return none;
   const raw = runs.map((r) => r.str + (r.eol ? "\n" : "")).join("");
   const pageWords = toWords(raw);
   const quoteWords = toWords(quote).map((w) => w.text);
-  const span = matchWords(pageWords, quoteWords);
-  if (!span) return [];
+  const span = matchWords(pageWords, quoteWords, strict);
+  if (!span) return none;
 
   const rangeStart = pageWords[span[0]].start;
   const rangeEnd = pageWords[span[1]].end;
@@ -221,5 +277,5 @@ export function locateQuote(runs: TextRun[], quote: string): HighlightRect[] {
     const h = run.height > 0 ? run.height : 10;
     rects.push({ x, y: run.y - h * 0.2, w, h: h * 1.2 });
   }
-  return rects;
+  return { rects, words: span[1] - span[0] + 1 };
 }

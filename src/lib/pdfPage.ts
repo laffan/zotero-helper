@@ -130,7 +130,16 @@ export async function renderPageDataUrl(
   pageNumber: number,
   longEdge: number,
   quote = "",
-): Promise<{ url: string; pages: number; rendered: number; found: boolean }> {
+): Promise<{
+  url: string;
+  pages: number;
+  rendered: number;
+  found: boolean;
+  /** Where the highlight sits down the page, 0–1, so the viewer can
+   *  scroll to it. A passage two thirds down a page is otherwise
+   *  "highlighted" somewhere the reader cannot see. */
+  focusY: number;
+}> {
   const task = pdfjs.getDocument({ data: data.slice(0) });
   try {
     const doc = await task.promise;
@@ -142,15 +151,31 @@ export async function renderPageDataUrl(
     let page = await doc.getPage(cited);
 
     if (quote.trim()) {
-      for (const n of searchOrder(cited, pages)) {
-        const candidate = n === cited ? page : await doc.getPage(n);
-        const rects = await quoteRects(candidate, quote);
-        if (rects.length > 0) {
-          rendered = n;
-          page = candidate;
-          marks = rects;
-          break;
+      const order = searchOrder(cited, pages);
+      // Two sweeps. The first will only accept the passage entire, so a
+      // page holding all of it wins over an earlier page holding a
+      // piece. Only if no page has the whole thing does the second
+      // sweep take the largest piece it can find, which is what a quote
+      // the extractor spliced out of two parts of a page leaves behind.
+      let found: { n: number; rects: HighlightRect[]; words: number } | null =
+        null;
+      for (const strict of [true, false]) {
+        for (const n of order) {
+          const hit = await quoteRects(await doc.getPage(n), quote, strict);
+          if (hit.rects.length === 0) continue;
+          if (strict) {
+            found = { n, ...hit };
+            break;
+          }
+          // Partial: keep looking, and keep the best.
+          if (!found || hit.words > found.words) found = { n, ...hit };
         }
+        if (found) break;
+      }
+      if (found) {
+        rendered = found.n;
+        page = await doc.getPage(found.n);
+        marks = found.rects;
       }
     }
 
@@ -160,6 +185,7 @@ export async function renderPageDataUrl(
       pages,
       rendered,
       found: marks.length > 0,
+      focusY: topOfHighlight(page, marks),
     };
   } finally {
     void task.destroy();
@@ -167,8 +193,13 @@ export async function renderPageDataUrl(
 }
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
-/** Where a quotation sits on the page, in PDF user space. */
-async function quoteRects(page: any, quote: string): Promise<HighlightRect[]> {
+/** Where a quotation sits on the page, in PDF user space, and how much
+ *  of it was found there. */
+async function quoteRects(
+  page: any,
+  quote: string,
+  strict: boolean,
+): Promise<{ rects: HighlightRect[]; words: number }> {
   try {
     const content = await page.getTextContent();
     const runs: TextRun[] = (content.items ?? [])
@@ -181,10 +212,10 @@ async function quoteRects(page: any, quote: string): Promise<HighlightRect[]> {
         height: it.height as number,
         eol: Boolean(it.hasEOL),
       }));
-    return locateQuote(runs, quote);
+    return locateQuote(runs, quote, strict);
   } catch {
     // A page with no text layer (a scan) simply cannot be highlighted.
-    return [];
+    return { rects: [], words: 0 };
   }
 }
 
@@ -221,6 +252,20 @@ async function renderPageJpeg(
   } finally {
     void task.destroy();
   }
+}
+
+/** How far down the page the topmost highlight sits, as a fraction.
+ *  Rects are in PDF user space, where y counts up from the bottom, so
+ *  the page's own viewport does the flip. */
+function topOfHighlight(page: any, marks: HighlightRect[]): number {
+  if (marks.length === 0) return 0;
+  const base = page.getViewport({ scale: 1 });
+  let top = Infinity;
+  for (const r of marks) {
+    const [, y] = base.convertToViewportPoint(r.x, r.y + r.h);
+    top = Math.min(top, y);
+  }
+  return Math.max(0, Math.min(1, top / base.height));
 }
 
 /** Rasterize one already-loaded page. */

@@ -100,7 +100,11 @@ Windows/Linux desktops too).
   characters — anchored on the quote's first and last pair of words,
   with the interior words deciding between candidates — so line
   wrapping, a word hyphenated across a break, ligatures and stray
-  spacing never come into it. Where a passage is quoted, *it* decides
+  spacing never come into it. Where the extractor has spliced the quote
+  out of two parts of a page — which two-column layouts, title blocks
+  and copyright footers all cause — the longest stretch of it that is
+  really contiguous gets highlighted instead, and the view scrolls to
+  it. Where a passage is quoted, *it* decides
   which page you are shown: the cited number is only a hint, searched
   around and then across the document, because the number is the part
   of a citation a model most easily gets wrong (a paper whose running

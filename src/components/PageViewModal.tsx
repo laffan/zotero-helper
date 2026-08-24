@@ -4,7 +4,7 @@
 // and this is page 7. It fetches the PDF from Zotero, rasterizes the one
 // page, and shows it — fit to the dialog by default, and at full size on
 // a click, because the reason you opened it is to read the small print.
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { openInZotero } from "../lib/actions";
 import { itemTitle, pdfAttachmentOf } from "../lib/collections";
 import { appLog, useStore } from "../lib/store";
@@ -38,6 +38,8 @@ export function PageViewModal({
   const [shown, setShown] = useState(page);
   const [pages, setPages] = useState(0);
   const [found, setFound] = useState(true);
+  const [focusY, setFocusY] = useState(0);
+  const stageRef = useRef<HTMLDivElement>(null);
   const [actualSize, setActualSize] = useState(false);
 
   const att = pdfAttachmentOf(items, itemKey);
@@ -70,6 +72,7 @@ export function PageViewModal({
         setShown(out.rendered);
         setPages(out.pages);
         setFound(out.found);
+        setFocusY(out.found ? out.focusY : 0);
         setSearching(false);
       } catch (e) {
         if (stale) return;
@@ -114,7 +117,10 @@ export function PageViewModal({
           )}
         </div>
 
-        <div className={`page-view-stage ${actualSize ? "actual" : "fit"}`}>
+        <div
+          className={`page-view-stage ${actualSize ? "actual" : "fit"}`}
+          ref={stageRef}
+        >
           {error && <div className="error-msg">{error}</div>}
           {!error && !url && (
             <div className="page-view-loading">
@@ -126,6 +132,18 @@ export function PageViewModal({
             <img
               src={url}
               alt={`Page ${shown} of ${name}`}
+              // Bring the passage into view once the image has a
+              // height to measure, leaving a little of the page above
+              // it for context.
+              onLoad={(e) => {
+                const stage = stageRef.current;
+                if (!stage || focusY <= 0) return;
+                const h = e.currentTarget.clientHeight;
+                stage.scrollTop = Math.max(
+                  0,
+                  h * focusY - stage.clientHeight * 0.3,
+                );
+              }}
               onClick={() => setActualSize(!actualSize)}
               title={actualSize ? "Click to fit" : "Click for actual size"}
             />

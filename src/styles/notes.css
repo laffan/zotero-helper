@@ -1,120 +1,39 @@
-/* Reading notes: the Notes tab, the editor in Take Notes mode, and the
-   PDF reader pane that takes over the sidebar and item list. */
+/* Reading notes: the Notes tab and its editor, and the PDF reader pane
+   that takes over the sidebar and item list while a PDF is open. */
 .notes-panel {
+  flex: 1;
+  min-height: 0;
   display: flex;
   flex-direction: column;
-}
-.notes-panel-head {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 6px;
-  padding: 12px 12px 4px;
-}
-.notes-action {
-  font-weight: 600;
 }
 .notes-loading {
   display: flex;
   align-items: center;
   gap: 6px;
+  padding: 14px;
   color: var(--text-dim);
   font-size: 12px;
 }
-
-/* Rendered NOTES.md */
-.notes-md {
-  padding: 4px 14px 16px;
-  font-size: 13px;
-  line-height: 1.6;
-  overflow-wrap: anywhere;
-}
-.notes-md h1 {
-  font-size: 17px;
-  margin: 10px 0 8px;
-}
-.notes-md h2 {
-  font-size: 15px;
-  margin: 14px 0 6px;
-}
-.notes-md h3 {
-  font-size: 13px;
-  margin: 12px 0 4px;
-}
-.notes-md p,
-.notes-md ul,
-.notes-md ol {
-  margin: 0 0 10px;
-}
-.notes-md ul,
-.notes-md ol {
-  padding-left: 20px;
-}
-.notes-md blockquote {
-  margin: 0 0 6px;
-  padding: 2px 0 2px 10px;
-  border-left: 3px solid var(--accent-soft);
-  color: var(--text);
-  font-style: italic;
-}
-.notes-md blockquote p {
-  margin: 0 0 4px;
-}
-.notes-md a {
-  color: var(--accent);
-  text-decoration: none;
-  cursor: pointer;
-}
-.notes-md a:hover {
-  text-decoration: underline;
-}
-.notes-md code {
-  font-family: var(--mono);
-  font-size: 12px;
-  background: var(--panel);
-  padding: 0 3px;
-  border-radius: 3px;
-}
-.notes-md pre {
-  background: var(--panel);
-  padding: 8px;
-  border-radius: var(--radius);
-  overflow-x: auto;
-}
-.notes-md-table {
-  overflow-x: auto;
-  margin-bottom: 10px;
-}
-.notes-md table {
-  border-collapse: collapse;
-  font-size: 12px;
-}
-.notes-md th,
-.notes-md td {
-  border: 1px solid var(--border);
-  padding: 3px 6px;
-  text-align: left;
+.notes-error {
+  margin: 8px 12px 0;
 }
 
-/* --- Take Notes: the editor fills the right panel --- */
-.meta-panel.notes-mode {
-  width: var(--notes-w, 420px);
-}
-.meta-panel.notes-mode .meta-content {
-  overflow: hidden;
-}
+/* The editor (CodeMirror, src/noteseditor/) fills the tab and scrolls
+   itself; its type and rendering are in noteseditor/theme.ts. */
 .notes-editor {
   flex: 1;
+  min-height: 0;
   display: flex;
   flex-direction: column;
-  min-height: 0;
+  background: var(--panel);
 }
 .notes-editor-head {
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 8px 10px;
+  padding: 5px 10px 5px 14px;
   border-bottom: 1px solid var(--border);
+  background: var(--panel-alt);
 }
 .notes-status {
   flex: 1;
@@ -128,31 +47,17 @@
 .notes-status.dirty {
   color: var(--warn);
 }
-.notes-done {
-  padding: 4px 12px;
-}
-.notes-textarea {
+.notes-cm {
   flex: 1;
   min-height: 0;
-  width: 100%;
-  resize: none;
-  border: none;
-  border-radius: 0;
-  padding: 14px;
-  background: var(--panel);
-  font-family: var(--mono);
-  font-size: 13px;
-  line-height: 1.6;
 }
-.notes-textarea:focus {
-  outline: none;
-  border: none;
+.notes-cm .cm-editor {
+  height: 100%;
 }
-.notes-editor-preview {
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
-  background: var(--panel);
+
+/* --- with the PDF open, the notes panel is wider --- */
+.meta-panel.notes-mode {
+  width: var(--notes-w, 420px);
 }
 
 /* --- the reader pane, in place of sidebar + item list --- */

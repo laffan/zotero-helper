@@ -1,4 +1,4 @@
-// The PDF viewer used by Take Notes — a port of Hush's
+// The PDF viewer beside the notes — a port of Hush's
 // src/pdf/pdf-viewer.js, built as plain DOM under one root element and
 // driven from React by ReaderPane.
 //
@@ -17,6 +17,7 @@ import { createAnnotationLayer } from "./annotations";
 import { createFoldLayer } from "./folds";
 import { createLinkLayerManager } from "./links";
 import { attachPageHoverButtons, attachTextLayer, createSelectionNoter } from "./pageTools";
+import { drawAnnotations, pageSignatures } from "./paint";
 import { getPdfjs } from "./pdfjs";
 import { createPageRenderer } from "./render";
 import { createThumbnailManager } from "./thumbnails";
@@ -110,8 +111,8 @@ export function createPdfViewer(container: HTMLElement, opts: PdfViewerOptions =
     getLayoutMode: () => layoutMode,
     isFolded: () => folded,
     isDestroyed: () => destroyed,
+    paintPage: (idx, ctx, viewport) => drawAnnotations(ctx, viewport, annotLayer.getAnnotations(), idx),
     onPageRendered: (idx, page) => {
-      annotLayer.paintAnnotationsOnPage(idx);
       void linkMgr.attach(idx, page);
       if (opts.onQuote) void attachTextLayer(pages[idx], page);
     },
@@ -450,10 +451,22 @@ export function createPdfViewer(container: HTMLElement, opts: PdfViewerOptions =
     destroy,
     goToPage,
     getPageCount: () => pdfDoc?.numPages ?? 0,
+    /** Replace the annotations. Only pages whose annotations changed are
+     *  repainted, so a sync that touched nothing here costs nothing. */
     setAnnotations: (list: Annotation[]) => {
+      const before = pageSignatures(annotLayer.getAnnotations());
+      const after = pageSignatures(list);
       annotLayer.setAnnotations(list);
-      foldLayer.onAnnotationsChanged();
+      const changed = new Set<number>();
+      for (const [i, sig] of after) if (before.get(i) !== sig) changed.add(i);
+      for (const i of before.keys()) if (!after.has(i)) changed.add(i);
+      if (changed.size) {
+        renderer.repaint(changed);
+        foldLayer.onAnnotationsChanged();
+      }
     },
+    /** The page in view, 1-based. */
+    currentPage: () => currentPage(),
     /** Scroll to an annotation by key; false when it isn't in this PDF. */
     showAnnotation: (key: string): boolean => {
       const a = annotLayer.getAnnotations().find((x) => x.key === key);

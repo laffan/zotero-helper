@@ -1,16 +1,22 @@
-// The notes being written, in Take Notes mode. Plain Markdown in a
-// textarea — saved to this device a moment after each keystroke, and
-// pushed to Zotero periodically (src/lib/notes.ts) and on Done.
+// An entry's NOTES.md, always editable: CodeMirror with Markdown
+// rendered in place (src/noteseditor/). Saved to this device a moment
+// after each keystroke, pushed to Zotero periodically (src/lib/notes.ts)
+// and when the PDF is closed.
 //
-// The PDF viewer adds to it through insertIntoNotes(): a cited page, a
-// selected passage, a highlight from its shelf. Those land at the caret
-// as their own paragraph.
+// With the entry's PDF open beside it, the viewer sends quotes, page
+// citations and highlights here (insertIntoNotes), Zotero links move the
+// viewer instead of opening Zotero, and the line being written gets the
+// cite-this-page icon.
+import { openUrl } from "@tauri-apps/plugin-opener";
 import { useEffect, useRef, useState } from "react";
-import { pushNote, registerNotesInserter, saveNote } from "../lib/notes";
-import { appLog } from "../lib/store";
+import { openInZotero } from "../lib/actions";
+import { annotationByKey, parsePdfLink, pdfLink } from "../lib/highlights";
+import { NOTES_FILENAME, pushNote, registerNotesInserter, saveNote } from "../lib/notes";
+import { appLog, useStore } from "../lib/store";
 import type { NoteMeta } from "../lib/types";
+import type { NotesEditorHandle } from "../noteseditor/editor";
 import { Spinner } from "./Icons";
-import { NotesMarkdown } from "./NotesMarkdown";
+import { currentReaderPage, showInReader } from "./ReaderPane";
 
 const SAVE_DELAY_MS = 600;
 
@@ -22,80 +28,97 @@ function ago(ms: number): string {
   return new Date(ms).toLocaleDateString();
 }
 
-/** Put `md` at the caret as a paragraph of its own. */
-function spliceParagraph(text: string, start: number, end: number, md: string) {
-  const before = text.slice(0, start).replace(/\s+$/, "");
-  const after = text.slice(end).replace(/^\s+/, "");
-  const head = before ? `${before}\n\n` : "";
-  const inserted = `${head}${md.trim()}\n\n`;
-  return { text: inserted + after, caret: inserted.length };
+function follow(itemKey: string, href: string): void {
+  const link = parsePdfLink(href);
+  if (link) {
+    if (!showInReader(link.attKey, link.page, link.annotation)) {
+      void openInZotero(itemKey, link.attKey, undefined, link.page, link.annotation);
+    }
+    return;
+  }
+  if (/^(https?|zotero):\/\//i.test(href)) {
+    void openUrl(href).catch((e) => appLog("warn", `Could not open ${href}: ${e}`));
+  }
 }
 
 interface Props {
   itemKey: string;
   initialText: string;
-  initialMeta: NoteMeta;
-  onDone: (text: string, meta: NoteMeta) => void;
+  /** Null for notes that don't exist yet — the first keystroke makes them. */
+  initialMeta: NoteMeta | null;
+  /** The entry's PDF, when there is one. */
+  pdfAttKey: string | null;
 }
 
-export function NotesEditor({ itemKey, initialText, initialMeta, onDone }: Props) {
-  const [text, setText] = useState(initialText);
+export function NotesEditor({ itemKey, initialText, initialMeta, pdfAttKey }: Props) {
+  const reading = useStore((s) => s.reading);
   const [meta, setMeta] = useState(initialMeta);
-  const [preview, setPreview] = useState(false);
   const [pushing, setPushing] = useState(false);
   const [, tick] = useState(0);
-  const taRef = useRef<HTMLTextAreaElement>(null);
-  const textRef = useRef(initialText);
+  const hostRef = useRef<HTMLDivElement>(null);
+  const editorRef = useRef<NotesEditorHandle | null>(null);
   const pending = useRef<string | null>(null);
   const timer = useRef(0);
-  // Where the writer last left the caret. Until they place one, things
-  // sent from the PDF go at the end — an untouched textarea reports its
-  // caret at 0, which would file every quote above the title.
-  const caret = useRef<{ start: number; end: number } | null>(null);
 
-  const flush = async (): Promise<NoteMeta | null> => {
+  const flush = async (): Promise<void> => {
     clearTimeout(timer.current);
     const t = pending.current;
-    if (t == null) return null;
+    if (t == null) return;
     pending.current = null;
     try {
-      const m = await saveNote(itemKey, t);
-      setMeta(m);
-      return m;
+      setMeta(await saveNote(itemKey, t));
     } catch (e) {
       appLog("error", `Saving notes failed: ${e}`);
-      return null;
     }
   };
 
-  const change = (t: string) => {
-    textRef.current = t;
-    setText(t);
-    pending.current = t;
-    clearTimeout(timer.current);
-    timer.current = window.setTimeout(() => void flush(), SAVE_DELAY_MS);
-  };
+  // The PDF beside the notes is this entry's: cite and jump within it.
+  const pdfOpen = Boolean(pdfAttKey && reading?.itemKey === itemKey && reading.attKey === pdfAttKey);
+  const pdfOpenRef = useRef(pdfOpen);
+  pdfOpenRef.current = pdfOpen;
 
   useEffect(() => {
-    registerNotesInserter((md) => {
-      const cur = textRef.current;
-      const at = caret.current ?? { start: cur.length, end: cur.length };
-      const next = spliceParagraph(cur, at.start, at.end, md);
-      caret.current = { start: next.caret, end: next.caret };
-      change(next.text);
-      requestAnimationFrame(() => {
-        const el = taRef.current;
-        if (!el) return;
-        el.focus();
-        el.setSelectionRange(next.caret, next.caret);
+    const host = hostRef.current;
+    if (!host) return;
+    let handle: NotesEditorHandle | null = null;
+    let cancelled = false;
+    void import("../noteseditor/editor").then(({ createNotesEditor }) => {
+      if (cancelled) return;
+      handle = createNotesEditor(host, {
+        doc: initialText,
+        placeholder: `Write notes in Markdown. They're saved on this device and kept in Zotero as ${NOTES_FILENAME}.`,
+        onChange: (text) => {
+          pending.current = text;
+          clearTimeout(timer.current);
+          timer.current = window.setTimeout(() => void flush(), SAVE_DELAY_MS);
+        },
+        follow: (href) => follow(itemKey, href),
+        annotationColor: (key) => annotationByKey(useStore.getState().library.items, key)?.color,
+        cite: () => {
+          const page = pdfAttKey ? currentReaderPage(pdfAttKey) : null;
+          if (!pdfAttKey || page == null) return null;
+          return `[p. ${page}](${pdfLink(useStore.getState().settings, pdfAttKey, page)})`;
+        },
       });
+      editorRef.current = handle;
+      handle.setCiteEnabled(pdfOpenRef.current);
+      registerNotesInserter((md) => handle?.insert(md));
     });
-    return () => registerNotesInserter(null);
+    return () => {
+      cancelled = true;
+      registerNotesInserter(null);
+      editorRef.current = null;
+      handle?.destroy();
+      // Never lose the last keystrokes to an unmount.
+      void flush();
+    };
+    // One editor per entry; the panel is keyed by it.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [itemKey]);
 
-  // Never lose the last keystrokes to an unmount.
-  useEffect(() => () => void flush(), []); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    editorRef.current?.setCiteEnabled(pdfOpen);
+  }, [pdfOpen]);
 
   // Keep "pushed 3 min ago" honest.
   useEffect(() => {
@@ -111,55 +134,29 @@ export function NotesEditor({ itemKey, initialText, initialMeta, onDone }: Props
     setPushing(false);
   };
 
-  const done = async () => {
-    const saved = (await flush()) ?? meta;
-    onDone(textRef.current, saved);
-    // Pushed in the background: Done shouldn't wait on the network.
-    void pushNote(itemKey);
-  };
-
-  const status = pushing
-    ? "Pushing to Zotero…"
-    : meta.dirty
-      ? "Saved here · not yet in Zotero"
-      : meta.pushedMs
-        ? `In Zotero · pushed ${ago(meta.pushedMs)}`
-        : "In Zotero";
+  const status = !meta
+    ? null
+    : pushing
+      ? "Pushing to Zotero…"
+      : meta.dirty
+        ? "Saved here · not yet in Zotero"
+        : meta.pushedMs
+          ? `In Zotero · pushed ${ago(meta.pushedMs)}`
+          : "In Zotero";
 
   return (
     <div className="notes-editor">
-      <div className="notes-editor-head">
-        <span className={`notes-status ${meta.dirty ? "dirty" : ""}`}>{status}</span>
-        {meta.dirty && (
-          <button className="mini-btn" onClick={() => void push()} disabled={pushing}>
-            {pushing ? <Spinner size={11} /> : "Push now"}
-          </button>
-        )}
-        <button className="mini-btn" onClick={() => setPreview(!preview)}>
-          {preview ? "Edit" : "Preview"}
-        </button>
-        <button className="tool-btn accent notes-done" onClick={() => void done()}>
-          Done
-        </button>
-      </div>
-      {preview ? (
-        <div className="notes-editor-preview">
-          <NotesMarkdown itemKey={itemKey} text={text} />
+      {status && (
+        <div className="notes-editor-head">
+          <span className={`notes-status ${meta?.dirty ? "dirty" : ""}`}>{status}</span>
+          {meta?.dirty && (
+            <button className="mini-btn" onClick={() => void push()} disabled={pushing}>
+              {pushing ? <Spinner size={11} /> : "Push now"}
+            </button>
+          )}
         </div>
-      ) : (
-        <textarea
-          ref={taRef}
-          className="notes-textarea"
-          value={text}
-          onChange={(e) => change(e.target.value)}
-          onSelect={(e) => {
-            const t = e.currentTarget;
-            caret.current = { start: t.selectionStart, end: t.selectionEnd };
-          }}
-          spellCheck
-          placeholder="Write in Markdown. Select text in the PDF, or use a page's pencil button, to quote and cite it here."
-        />
       )}
+      <div className="notes-cm" ref={hostRef} />
     </div>
   );
 }

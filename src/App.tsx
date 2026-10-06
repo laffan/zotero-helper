@@ -80,7 +80,7 @@ export default function App() {
         }
       >
         {reading ? (
-          // Take Notes: the PDF takes the sidebar's and the list's room.
+          // An open PDF takes the sidebar's and the list's room.
           <ReaderPane />
         ) : (
           <>

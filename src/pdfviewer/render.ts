@@ -16,7 +16,7 @@
 //  - Canvas resolution is capped per page (iOS has hard canvas limits).
 //  - `scheduleSettle()` is the crisp pass after a zoom or resize: in the
 //    meantime existing rasters are only CSS-stretched.
-import type { LayoutMode, PageRecord, PDFDocumentProxy, PDFPageProxy } from "./types";
+import type { LayoutMode, PageRecord, PageViewport, PDFDocumentProxy, PDFPageProxy } from "./types";
 
 const RENDER_BUFFER = 2; // pages rendered beyond the visible range
 const VISIBLE_MARGIN = 200; // px of scroll slack counted as "visible"
@@ -55,7 +55,9 @@ export interface RendererEnv {
   getLayoutMode: () => LayoutMode;
   isFolded: () => boolean;
   isDestroyed: () => boolean;
-  /** Annotation, link and text layers join the page here. */
+  /** Draw into a page's raster before it is shown (annotations). */
+  paintPage?: (idx: number, ctx: CanvasRenderingContext2D, viewport: PageViewport) => void;
+  /** Link and text layers join the page here. */
   onPageRendered: (idx: number, page: PDFPageProxy) => void;
   /** After each render-set update (the page indicator). */
   onUpdate?: () => void;
@@ -282,6 +284,8 @@ export function createPageRenderer(scrollArea: HTMLElement, env: RendererEnv) {
       await task.promise;
       p.renderTask = null;
       if (env.isDestroyed() || p.cancelled || pages !== env.getPages()) return;
+      const ctx = canvas.getContext("2d");
+      if (ctx) env.paintPage?.(idx, ctx, viewport);
 
       // The canvas lives inside a content box sized at paint-time CSS
       // px; overlay layers join it there, so a later CSS stretch scales
@@ -346,6 +350,20 @@ export function createPageRenderer(scrollArea: HTMLElement, env: RendererEnv) {
     p.renderedZoom = null;
   }
 
+  /** Re-render pages in place: the old raster stays up until the new
+   *  one replaces it, so a repaint after a sync doesn't flash. */
+  function repaint(indices: Iterable<number>): void {
+    const pages = env.getPages();
+    for (const i of indices) {
+      const p = pages[i];
+      if (!p?.rendered) continue;
+      renderedBytes -= p.canvasBytes || 0;
+      p.canvasBytes = 0;
+      p.rendered = false;
+    }
+    scheduleUpdate();
+  }
+
   function clearAll(): void {
     const pages = env.getPages();
     for (let i = 0; i < pages.length; i++) clearPage(i);
@@ -377,6 +395,7 @@ export function createPageRenderer(scrollArea: HTMLElement, env: RendererEnv) {
     scheduleSettle,
     clearPage,
     clearAll,
+    repaint,
     reset,
     destroy,
     invalidateGeometry,

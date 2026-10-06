@@ -108,7 +108,7 @@ export function StorageSettings() {
           </button>
         </div>
         <div className="storage-detail">
-          Kept for Take Notes, and used instead of the network wherever a PDF
+          Kept to read beside your notes, and used instead of the network wherever a PDF
           is read while it is here. Removing one only frees space — Zotero
           still has it.
         </div>

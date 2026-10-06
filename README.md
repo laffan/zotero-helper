@@ -184,27 +184,36 @@ Windows/Linux desktops too).
   highlight. Several selected entries, or one with several PDFs, list
   under a heading per PDF.
 - **Reading notes** — every entry has a **Notes** tab holding its
-  `NOTES.md`, rendered. The button at the top follows what is on hand:
-  *Download PDF & Create Notes* when there are none, *Download PDF* when
-  there are notes but the PDF isn't on this device, and **Take Notes**
-  once both are here (an entry with no PDF gets plain *Create Notes*).
-  Take Notes turns the sidebar and item list into a PDF viewer and the
-  right panel into a Markdown editor. The viewer is a port of Hush's:
-  horizontal or vertical scrolling, fit one / two / three pages, zoom,
-  a thumbnail grid, the PDF's own links, Zotero's highlights and ink
-  painted on the pages, an annotation shelf with its own filter and
-  colour row, and the **folded view**, which collapses the paper to the
-  regions around its annotations. It adds what note-taking needs:
-  selectable text with an *Add to notes* bubble that quotes the passage,
-  a pencil on each page that cites it, and *Add to notes* on every shelf
-  highlight — all inserted at the caret with a `zotero://` link to the
-  page. Those links, in the editor's preview or the Notes tab, move the
-  viewer to the page (or open Zotero there when the PDF isn't open).
+  `NOTES.md`, always open for writing: a CodeMirror editor with the
+  Markdown (GitHub flavour) rendered in place — headings, emphasis,
+  quotes, code and links show as formatted text, and a line's marks
+  reappear only while the caret is on it. Zotero links are drawn as
+  small page pills ("p. 22", tinted with the highlight's colour when
+  the link names one); a tap follows the link, ⌘-click shows the
+  Markdown to edit it. The right end of the tab bar holds the entry's
+  PDF: **Download PDF**, then **View PDF**, which turns the sidebar and
+  item list into a PDF viewer beside the notes (**Close PDF** brings
+  them back). The viewer is a port of Hush's: horizontal or vertical
+  scrolling, fit one / two / three pages, zoom, a thumbnail grid, the
+  PDF's own links, Zotero's highlights, underlines and ink painted into
+  the pages, an annotation shelf with its own filter and colour row, and
+  the **folded view**, which collapses the paper to the regions around
+  its annotations. It adds what note-taking needs: selectable text with
+  an *Add to notes* bubble that quotes the passage, a pencil on each
+  page that cites it, and *Add to notes* on every shelf highlight, all
+  inserted at the caret with a `zotero://` link to the page. While the
+  PDF is open, a faint link icon sits at the left edge of the line being
+  written; pressing it heads the line with the page in view —
+  `Example note text` becomes
+  `[p. 22](zotero://open-pdf/library/items/6M6B2TX9?page=22) - Example note text`
+  (after any `- ` / `> ` / `## ` marker, replacing a page link already
+  there). Page pills move the open viewer rather than leaving for
+  Zotero.
 
   Notes save to this device as you type and are pushed to Zotero as a
   `NOTES.md` attachment of the entry every couple of minutes while
   anything is unpushed, when the app goes to the background, and on
-  **Done**. Opening an entry's notes (online) first asks Zotero whether
+  **Close PDF**. Opening an entry's notes (online) first asks Zotero whether
   its copy changed, so notes written on another device arrive. Editing
   in two places isn't the expected use, so the conflict handling only
   promises not to lose words: a version changed in Zotero while this
@@ -246,7 +255,7 @@ Windows/Linux desktops too).
 - Multi-select with the usual ctrl/cmd-click and shift-click patterns.
 - Imported PDFs are only held in a temp folder during upload and deleted
   right after — the copy of record lives in Zotero (where your iPad Zotero
-  app syncs it). The one exception is a PDF you download for Take Notes:
+  app syncs it). The one exception is a PDF you download to read beside your notes:
   that copy stays in the PDF cache (`pdfs/` in the app data dir) until you
   remove it from Settings, and while it is there every other reader of
   that PDF (thumbnails, page citations, Ask Full Papers) uses it instead
@@ -335,16 +344,19 @@ src/            React + TypeScript UI (Vite, zustand, MiniSearch)
   components/   toolbar, sidebar, virtualized item list, metadata panel
                 and its tabs (Highlights, Notes), reader pane, terminal,
                 import/rescue modals, settings
-  pdfviewer/    the Take Notes PDF viewer, ported from Hush (viewer,
-                render, annotations + shelf, folds, thumbnails, links,
-                toolbar) plus pageTools (text layer, notes hooks)
+  pdfviewer/    the PDF viewer beside the notes, ported from Hush (viewer,
+                render, paint (annotations into the rasters), shelf,
+                folds, thumbnails, links, toolbar) plus pageTools (text
+                layer, notes hooks)
+  noteseditor/  the notes editor: CodeMirror setup, live preview,
+                Zotero-link pills, the cite-this-page gutter
   styles/       one stylesheet per UI region (tokens, base, toolbar, …)
 src-tauri/      Rust core (all networking + state)
   src/zotero/      Zotero Web API v3: paginated sync (sync), versioned
                    writes, and attachment files (files — create, upload
                    or replace with md5 preconditions, read one item)
   src/notes.rs     NOTES.md on the device and its push/pull with Zotero
-  src/pdfcache.rs  PDFs kept on the device for Take Notes
+  src/pdfcache.rs  PDFs kept on the device to read beside notes
   src/storage.rs   the Settings page's storage report
   src/resolve/     identifier → Zotero item data; one file per source
                    (mod = classify/dispatch, doi, isbn, arxiv, url)

@@ -90,6 +90,19 @@ export function annotationIndexFor(items: ZItem[]): Map<string, Annotation[]> {
   return indexCache.index;
 }
 
+let byKeyCache: { items: ZItem[]; map: Map<string, Annotation> } | null = null;
+
+/** One annotation by its key — how a Zotero link in the notes finds the
+ *  colour of the highlight it names. */
+export function annotationByKey(items: ZItem[], key: string): Annotation | undefined {
+  if (byKeyCache?.items !== items) {
+    const map = new Map<string, Annotation>();
+    for (const list of annotationIndexFor(items).values()) for (const a of list) map.set(a.key, a);
+    byKeyCache = { items, map };
+  }
+  return byKeyCache.map.get(key);
+}
+
 /** The attachments an entry's annotations can hang off: its synced
  *  child attachments, or the row itself for a standalone file. */
 export function annotatableAttachments(items: ZItem[], item: ZItem): ZItem[] {

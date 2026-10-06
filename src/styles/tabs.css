@@ -24,6 +24,40 @@
   font-weight: 600;
   border-bottom-color: var(--accent);
 }
+/* The entry's PDF (Download / View / Close), right-aligned. */
+.meta-tab-actions {
+  margin-left: auto;
+  display: inline-flex;
+  gap: 2px;
+}
+.meta-tab-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  align-self: center;
+  margin: 0 0 4px auto;
+  padding: 3px 8px;
+  border-radius: var(--radius);
+  font-size: 11.5px;
+  color: var(--accent);
+  white-space: nowrap;
+}
+.meta-tab-actions .meta-tab-action {
+  margin-left: 0;
+}
+.meta-tab-action:hover:not(:disabled) {
+  background: var(--accent-soft);
+}
+.meta-tab-action:disabled {
+  color: var(--text-dim);
+}
+.meta-tab-action.active {
+  background: var(--accent-soft);
+}
+.meta-tab-action.icon {
+  padding: 3px 5px;
+  color: var(--text-dim);
+}
 
 /* --- Highlights tab --- */
 .hl-panel {

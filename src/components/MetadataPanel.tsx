@@ -3,9 +3,10 @@
 // in Questions — the open conversation.
 //
 // With a selection it has tabs: Details (Summary for several items),
-// Highlights when the selection has any, and Notes, always. In Take
-// Notes mode it is the notes editor for the entry being read, and the
-// tabs step aside.
+// Highlights when the selection has any, and Notes, always — with the
+// entry's PDF button (Download / View / Close PDF) at the right end.
+// While the PDF is open, the panel stays on that entry whatever the
+// selection does.
 import { useMemo } from "react";
 import { isStandaloneAttachment } from "../lib/collections";
 import { QUESTIONS, useStore, type MetaTab } from "../lib/store";
@@ -14,6 +15,7 @@ import { ChatPanel } from "./ChatPanel";
 import { highlightGroups, HighlightsPanel } from "./HighlightsPanel";
 import { ItemEditor } from "./ItemEditor";
 import { NotesPanel } from "./NotesPanel";
+import { PdfTabButton } from "./PdfTabButton";
 import { SummaryView } from "./SummaryView";
 
 export function MetadataPanel() {
@@ -28,7 +30,7 @@ export function MetadataPanel() {
   const { metaOpen, setMetaOpen } = useStore();
 
   const selected = useMemo(() => {
-    // Take Notes holds on to its entry whatever the selection does.
+    // An open PDF holds the panel on its entry whatever the selection does.
     const keys = reading ? [reading.itemKey] : selectedKeys;
     return items.filter((i) => keys.includes(i.key));
   }, [items, selectedKeys, reading]);
@@ -42,11 +44,7 @@ export function MetadataPanel() {
     !reading && collectionKey === QUESTIONS && chats.some((c) => c.id === selectedChatId);
 
   // A remembered tab that has nothing to show falls back to Details.
-  const tab: MetaTab = reading
-    ? "notes"
-    : metaTab === "highlights" && highlightCount === 0
-      ? "details"
-      : metaTab;
+  const tab: MetaTab = metaTab === "highlights" && highlightCount === 0 ? "details" : metaTab;
 
   let tabs: React.ReactNode = null;
   let content: React.ReactNode;
@@ -63,25 +61,24 @@ export function MetadataPanel() {
     content = <div className="meta-empty">Select an item to see its details</div>;
   } else {
     const one = selected.length === 1 ? selected[0] : null;
-    if (!reading) {
-      const tab_ = (id: MetaTab, label: string) => (
-        <button
-          className={`meta-tab ${tab === id ? "active" : ""}`}
-          onClick={() => setMetaTab(id)}
-          role="tab"
-          aria-selected={tab === id}
-        >
-          {label}
-        </button>
-      );
-      tabs = (
-        <div className="meta-tabs" role="tablist">
-          {tab_("details", one ? "Details" : "Summary")}
-          {highlightCount > 0 && tab_("highlights", `Highlights ${highlightCount}`)}
-          {tab_("notes", "Notes")}
-        </div>
-      );
-    }
+    const tabButton = (id: MetaTab, label: string) => (
+      <button
+        className={`meta-tab ${tab === id ? "active" : ""}`}
+        onClick={() => setMetaTab(id)}
+        role="tab"
+        aria-selected={tab === id}
+      >
+        {label}
+      </button>
+    );
+    tabs = (
+      <div className="meta-tabs" role="tablist">
+        {tabButton("details", one ? "Details" : "Summary")}
+        {highlightCount > 0 && tabButton("highlights", `Highlights ${highlightCount}`)}
+        {tabButton("notes", "Notes")}
+        {one && <PdfTabButton item={one} />}
+      </div>
+    );
     if (tab === "highlights") {
       content = <HighlightsPanel items={selected} />;
     } else if (tab === "notes") {

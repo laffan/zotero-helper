@@ -4,8 +4,8 @@
 //
 // Saving is local and immediate (debounced keystrokes); pushing to
 // Zotero is periodic — every couple of minutes while anything is
-// unpushed, when the app goes to the background, and when Take Notes
-// mode closes. Opening a note asks Zotero first whether its copy has
+// unpushed, when the app goes to the background, and when the PDF
+// beside the notes is closed. Opening a note asks Zotero first whether its copy has
 // changed, so notes written on another device arrive.
 import { REAL_KEY } from "./collections";
 import { appLog, useStore } from "./store";
@@ -142,19 +142,26 @@ export function cachedPdfIsStale(att: ZItem | undefined, cached: CachedPdf | und
 
 type Inserter = (markdown: string) => void;
 let inserter: Inserter | null = null;
+let pending: string[] = [];
 
-/** The notes editor registers itself while it is mounted. */
+/** The notes editor registers itself while it is mounted, and takes
+ *  anything sent while it wasn't. */
 export function registerNotesInserter(fn: Inserter | null): void {
   inserter = fn;
+  if (fn && pending.length) {
+    const queued = pending;
+    pending = [];
+    for (const md of queued) fn(md);
+  }
 }
 
-/** Add Markdown at the editor's cursor. False when no editor is open. */
-export function insertIntoNotes(markdown: string): boolean {
-  if (!inserter) return false;
-  inserter(markdown);
-  return true;
-}
-
-export function canInsertIntoNotes(): boolean {
-  return inserter !== null;
+/** Add Markdown at the editor's caret. With another tab showing, the
+ *  Notes tab is brought up and the text lands once its editor mounts. */
+export function insertIntoNotes(markdown: string): void {
+  if (inserter) {
+    inserter(markdown);
+    return;
+  }
+  pending.push(markdown);
+  useStore.getState().setMetaTab("notes");
 }

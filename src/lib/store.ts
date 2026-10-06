@@ -37,7 +37,7 @@ export type ModalState =
  *  summary cards for several. */
 export type MetaTab = "details" | "highlights" | "notes";
 
-/** Take Notes mode: the PDF viewer replaces the sidebar and item list,
+/** An open PDF: the viewer replaces the sidebar and item list,
  *  and the right panel holds the notes being written. */
 export interface ReadingState {
   itemKey: string;

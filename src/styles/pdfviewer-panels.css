@@ -1,26 +1,6 @@
-/* PDF viewer, continued: annotation overlays and shelf, the thumbnail
-   grid, and the folded view. */
-
-/* --- annotations painted over the pages --- */
-.pdf-annot-layer {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-}
-.pdf-annot-highlight {
-  position: absolute;
-  opacity: 0.3;
-  mix-blend-mode: multiply;
-  border-radius: 1px;
-  pointer-events: none;
-}
-.pdf-annot-ink {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  pointer-events: none;
-}
+/* PDF viewer, continued: the annotation shelf, the thumbnail grid, and
+   the folded view. (Annotations themselves are painted into the page
+   rasters — src/pdfviewer/paint.ts.) */
 
 /* --- annotation shelf (in-flow, right edge) --- */
 .pdf-annot-shelf {

@@ -1,10 +1,8 @@
-// Zotero annotations painted over the pages, and the annotation shelf —
-// the collapsible list at the viewer's right edge with a filter box and
-// a colour row. Ported from Hush's src/pdf/pdf-viewer-annotations.js.
-//
-// Zotero keeps annotations in its database, not in the PDF bytes, so
-// nothing pdf.js draws includes them; they are laid over each rendered
-// page as positioned boxes (highlights) or SVG paths (ink).
+// The annotation shelf — the collapsible list at the viewer's right edge
+// with a filter box and a colour row. Ported from Hush's
+// src/pdf/pdf-viewer-annotations.js; the painting half of that module is
+// paint.ts here, which draws into the page rasters instead of laying
+// boxes over them.
 //
 // One addition over Hush: each shelf row can be sent to the notes
 // (`onInsert`), which is what the shelf is for while taking notes.
@@ -16,73 +14,6 @@ import type { LayoutMode, PageRecord, PageViewport } from "./types";
  *  CropBox origin that isn't (0,0) and any /Rotate. */
 export function pdfPointToViewport(viewport: PageViewport, x: number, y: number): number[] {
   return viewport.convertToViewportPoint(x, y);
-}
-
-/** Paint annotations into an overlay sized to a page. Shared with the
- *  folded view. */
-export function paintAnnotationsInto(
-  layer: HTMLElement,
-  pageAnnots: Annotation[],
-  viewport: PageViewport,
-  scaleX: number,
-  scaleY: number,
-): void {
-  for (const annot of pageAnnots) {
-    const pos = annotationPosition(annot);
-    if (!pos) continue;
-    if (annot.type === "ink" && pos.paths?.length) {
-      paintInk(layer, annot, pos.paths, scaleX, scaleY, viewport);
-    } else if (pos.rects?.length) {
-      for (const rect of pos.rects) {
-        if (!Array.isArray(rect) || rect.length < 4) continue;
-        const [ax, ay] = pdfPointToViewport(viewport, rect[0], rect[1]);
-        const [bx, by] = pdfPointToViewport(viewport, rect[2], rect[3]);
-        const div = document.createElement("div");
-        div.className = `pdf-annot-highlight${annot.type === "underline" ? " underline" : ""}`;
-        div.style.left = `${Math.min(ax, bx) * scaleX}px`;
-        div.style.top = `${Math.min(ay, by) * scaleY}px`;
-        div.style.width = `${Math.abs(bx - ax) * scaleX}px`;
-        div.style.height = `${Math.abs(by - ay) * scaleY}px`;
-        div.style.backgroundColor = annot.color || "#ffff00";
-        if (annot.comment) div.title = annot.comment;
-        layer.appendChild(div);
-      }
-    }
-  }
-}
-
-function paintInk(
-  layer: HTMLElement,
-  annot: Annotation,
-  paths: number[][],
-  scaleX: number,
-  scaleY: number,
-  viewport: PageViewport,
-): void {
-  const w = Math.round(viewport.width * scaleX);
-  const h = Math.round(viewport.height * scaleY);
-  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-  svg.classList.add("pdf-annot-ink");
-  svg.setAttribute("width", String(w));
-  svg.setAttribute("height", String(h));
-  svg.setAttribute("viewBox", `0 0 ${w} ${h}`);
-  for (const pts of paths) {
-    if (!pts || pts.length < 2) continue;
-    let d = "";
-    for (let i = 0; i < pts.length; i += 2) {
-      const [vx, vy] = pdfPointToViewport(viewport, pts[i], pts[i + 1]);
-      d += `${i === 0 ? "M" : "L"}${vx * scaleX},${vy * scaleY} `;
-    }
-    const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
-    path.setAttribute("d", d);
-    path.setAttribute("fill", "none");
-    path.setAttribute("stroke", annot.color || "#ff0000");
-    path.setAttribute("stroke-width", String(Math.max(0.5, scaleX)));
-    path.setAttribute("stroke-linecap", "round");
-    path.setAttribute("stroke-linejoin", "round");
-    svg.appendChild(path);
-  }
-  layer.appendChild(svg);
 }
 
 const SHELF_WIDTH_DEFAULT = 280;
@@ -366,35 +297,15 @@ export function createAnnotationLayer(
 
   function setAnnotations(list: Annotation[]): void {
     annotations = list;
-    const pages = viewer.getPages();
-    for (let i = 0; i < pages.length; i++) if (pages[i].rendered) paintAnnotationsOnPage(i);
     shelf.classList.toggle("has-annotations", annotations.length > 0);
     paintColorFilter();
     if (shelfOpen) rebuildShelfList();
-  }
-
-  function paintAnnotationsOnPage(pageIdx: number): void {
-    const p = viewer.getPages()[pageIdx];
-    if (!p?.rendered || !p.canvas) return;
-    // The overlay joins the content box so it stretches with the raster;
-    // geometry uses the paint-time content size, not the live wrapper.
-    const host = p.contentEl || p.wrapper;
-    host.querySelector(".pdf-annot-layer")?.remove();
-    const pageAnnots = annotations.filter((a) => annotationPosition(a)?.pageIndex === pageIdx);
-    if (!pageAnnots.length) return;
-    const layer = document.createElement("div");
-    layer.className = "pdf-annot-layer";
-    const scaleX = host.offsetWidth / p.viewport.width;
-    const scaleY = host.offsetHeight / p.viewport.height;
-    paintAnnotationsInto(layer, pageAnnots, p.viewport, scaleX, scaleY);
-    if (layer.children.length) host.appendChild(layer);
   }
 
   return {
     shelf,
     toggleShelf,
     setAnnotations,
-    paintAnnotationsOnPage,
     scrollToAnnotation,
     getAnnotations: () => annotations,
   };

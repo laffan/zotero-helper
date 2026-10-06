@@ -8,7 +8,8 @@
 // "come back to this" convention. A library without any red marks would
 // open on an empty view, so here the filter falls back to everything.
 import { annotationPosition, type Annotation } from "../lib/highlights";
-import { paintAnnotationsInto, pdfPointToViewport } from "./annotations";
+import { pdfPointToViewport } from "./annotations";
+import { drawAnnotations } from "./paint";
 import { COLLAPSE_ICON, EXPAND_ICON } from "./icons";
 import { capRenderScale } from "./render";
 import type { PageRecord, PageViewport, PDFDocumentProxy } from "./types";
@@ -296,28 +297,18 @@ export function createFoldLayer(scrollArea: HTMLElement, env: FoldEnv) {
       canvas.style.height = `${fold.pageCssH}px`;
       await page.render({ canvas, viewport, background: "#ffffff" }).promise;
       if (!enabled || env.isDestroyed() || !fold.wrapper.isConnected) return;
+      // Every annotation on the page, not only the filtered ones, so a
+      // revealed page reads exactly like the normal view.
+      const ctx = canvas.getContext("2d");
+      if (ctx) drawAnnotations(ctx, viewport, env.getAnnotations(), fold.pageIndex);
       fold.inner.innerHTML = "";
       fold.inner.appendChild(canvas);
-      paintFoldAnnotations(fold);
       fold.rendered = true;
     } catch (e) {
       console.error(`Failed to render fold on page ${fold.pageIndex + 1}:`, e);
     } finally {
       fold.rendering = false;
     }
-  }
-
-  /** Every annotation on the fold's page, not only the filtered ones, so
-   *  a revealed page reads exactly like the normal view. */
-  function paintFoldAnnotations(fold: Fold): void {
-    const p = env.getPages()[fold.pageIndex];
-    if (!p) return;
-    const onPage = env.getAnnotations().filter((a) => annotationPosition(a)?.pageIndex === fold.pageIndex);
-    if (!onPage.length) return;
-    const layer = document.createElement("div");
-    layer.className = "pdf-annot-layer";
-    paintAnnotationsInto(layer, onPage, p.viewport, fold.cssW / p.viewport.width, fold.pageCssH / p.viewport.height);
-    if (layer.children.length) fold.inner.appendChild(layer);
   }
 
   function domAlive(): boolean {

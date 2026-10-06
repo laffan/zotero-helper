@@ -1,5 +1,5 @@
-// Take Notes: the PDF viewer that takes over the sidebar and item list
-// while notes are being written in the right panel.
+// The PDF beside the notes: the viewer that takes over the sidebar and
+// item list while notes are written in the right panel.
 //
 // The viewer itself is plain DOM (src/pdfviewer/, a port of Hush's), so
 // this component only mounts it, feeds it the cached PDF and the
@@ -31,9 +31,12 @@ export function showInReader(attKey: string, page?: number, annotationKey?: stri
   return Boolean(page);
 }
 
-function addToNotes(markdown: string): void {
-  if (!insertIntoNotes(markdown)) appLog("warn", "The notes editor isn't open");
+/** The page the open viewer shows, when it shows `attKey`. */
+export function currentReaderPage(attKey: string): number | null {
+  return active?.attKey === attKey ? active.viewer.currentPage() : null;
 }
+
+const addToNotes = insertIntoNotes;
 
 export function ReaderPane() {
   const reading = useStore((s) => s.reading);

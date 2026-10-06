@@ -3,6 +3,7 @@
 //! (paginated fetches, retries, resumable initial download) lives in
 //! the `sync` submodule.
 
+pub mod files;
 mod sync;
 
 pub use sync::{sync_collection, sync_library};
@@ -244,9 +245,10 @@ pub async fn delete_items(state: &AppState, keys: Vec<String>, library_version: 
     Ok(())
 }
 
-/// Full attachment upload: create the attachment item, authorize the upload,
-/// send the bytes, register the upload. Returns the attachment item key.
-/// Removes the local file on success (the PDF lives in Zotero from then on).
+/// Full attachment upload: create the attachment item, then send its
+/// file (files::upload_file — authorize, upload, register). Returns the
+/// attachment item key. Removes the local file on success (the PDF lives
+/// in Zotero from then on).
 pub async fn upload_attachment(
     app: &AppHandle,
     state: &AppState,
@@ -254,127 +256,17 @@ pub async fn upload_attachment(
     file_path: &str,
     filename: &str,
 ) -> Result<String> {
-    let base = library_base(state).await?;
-    let key = api_key(state).await;
-
-    // 1. Create the attachment item.
-    let payload = json!([{
-        "itemType": "attachment",
-        "linkMode": "imported_file",
-        "parentItem": parent_key,
-        "title": "Full Text PDF",
-        "filename": filename,
-        "contentType": "application/pdf",
-        "tags": [],
-        "relations": {},
-    }]);
-    let resp = state
-        .http
-        .post(format!("{base}/items"))
-        .header("Zotero-API-Key", &key)
-        .header("Zotero-API-Version", "3")
-        .header("Zotero-Write-Token", write_token())
-        .json(&payload)
-        .send()
-        .await?;
-    let status = resp.status();
-    let body: Value = resp.json().await?;
-    if !status.is_success() {
-        return Err(Error::msg(format!(
-            "Creating attachment item failed (HTTP {status}): {body}"
-        )));
-    }
-    let att = &body["successful"]["0"];
-    let att_key = att["key"]
-        .as_str()
-        .or_else(|| att["data"]["key"].as_str())
-        .ok_or_else(|| Error::msg(format!("Unexpected Zotero response: {body}")))?
-        .to_string();
+    let att_key =
+        files::create_attachment_item(state, parent_key, "Full Text PDF", filename, "application/pdf")
+            .await?;
     log(app, "info", format!("Created attachment item {att_key}"));
 
-    // 2. Get upload authorization.
     let bytes = std::fs::read(file_path)?;
-    let md5hex = format!("{:x}", md5::compute(&bytes));
-    let mtime = std::fs::metadata(file_path)
-        .ok()
-        .and_then(|m| m.modified().ok())
-        .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
-        .map(|d| d.as_millis() as u64)
-        .unwrap_or_else(now_ms);
-    let form = [
-        ("md5", md5hex.clone()),
-        ("filename", filename.to_string()),
-        ("filesize", bytes.len().to_string()),
-        ("mtime", mtime.to_string()),
-    ];
-    let resp = state
-        .http
-        .post(format!("{base}/items/{att_key}/file"))
-        .header("Zotero-API-Key", &key)
-        .header("Zotero-API-Version", "3")
-        .header("If-None-Match", "*")
-        .form(&form)
-        .send()
-        .await?;
-    let status = resp.status();
-    let auth: Value = resp.json().await?;
-    if !status.is_success() {
-        return Err(Error::msg(format!(
-            "Upload authorization failed (HTTP {status}): {auth}"
-        )));
-    }
-
-    if auth["exists"].as_i64() == Some(1) {
-        log(app, "info", "File already exists in Zotero storage — skipping upload");
-    } else {
-        // 3. Upload prefix + bytes + suffix to the storage URL.
-        let url = auth["url"]
-            .as_str()
-            .ok_or_else(|| Error::msg(format!("No upload URL in authorization: {auth}")))?;
-        let content_type = auth["contentType"].as_str().unwrap_or("application/pdf");
-        let prefix = auth["prefix"].as_str().unwrap_or("");
-        let suffix = auth["suffix"].as_str().unwrap_or("");
-        let upload_key = auth["uploadKey"]
-            .as_str()
-            .ok_or_else(|| Error::msg("No uploadKey in authorization"))?;
-
-        let mut body_bytes = Vec::with_capacity(prefix.len() + bytes.len() + suffix.len());
-        body_bytes.extend_from_slice(prefix.as_bytes());
-        body_bytes.extend_from_slice(&bytes);
-        body_bytes.extend_from_slice(suffix.as_bytes());
-
-        log(
-            app,
-            "info",
-            format!("Uploading {} KB to Zotero storage…", bytes.len() / 1024),
-        );
-        let resp = state
-            .http
-            .post(url)
-            .header("Content-Type", content_type)
-            .body(body_bytes)
-            .send()
-            .await?;
-        if !resp.status().is_success() {
-            return Err(Error::msg(format!(
-                "Storage upload failed (HTTP {})",
-                resp.status()
-            )));
-        }
-
-        // 4. Register the upload.
-        let resp = state
-            .http
-            .post(format!("{base}/items/{att_key}/file"))
-            .header("Zotero-API-Key", &key)
-            .header("Zotero-API-Version", "3")
-            .header("If-None-Match", "*")
-            .form(&[("upload", upload_key)])
-            .send()
-            .await?;
-        if !resp.status().is_success() {
-            let body = resp.text().await.unwrap_or_default();
-            return Err(Error::msg(format!("Registering upload failed: {body}")));
+    match files::upload_file(app, state, &att_key, &bytes, filename, None).await? {
+        files::Upload::Stored(_) => {}
+        // A brand-new attachment has no file to conflict with.
+        files::Upload::Conflict => {
+            return Err(Error::msg("Zotero refused the upload as a conflict"));
         }
     }
 

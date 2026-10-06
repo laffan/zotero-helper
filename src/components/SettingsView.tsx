@@ -4,6 +4,7 @@ import { AI_SERVICES, modelsFor } from "../lib/ai/models";
 import { appLog, useStore } from "../lib/store";
 import type { AiService, Settings } from "../lib/types";
 import { Spinner } from "./Icons";
+import { StorageSettings } from "./StorageSettings";
 
 const BLANK: Settings = {
   zoteroApiKey: "",
@@ -227,6 +228,8 @@ export function SettingsView() {
           })()}
           .
         </p>
+
+        <StorageSettings />
 
         <div className="settings-actions">
           <button

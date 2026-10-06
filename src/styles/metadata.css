@@ -4,8 +4,18 @@
   min-width: 200px;
   border-left: 1px solid var(--border);
   background: var(--panel-alt);
-  overflow-y: auto;
+  overflow: hidden;
   flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+}
+/* Below the tab row (tabs.css); scrolls on its own so the tabs stay put. */
+.meta-content {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
 }
 .meta-empty {
   padding: 40px 20px;

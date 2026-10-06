@@ -3,11 +3,14 @@ mod capture;
 mod chats;
 mod error;
 mod hush;
+mod notes;
 mod pdf;
+mod pdfcache;
 mod resolve;
 mod settings;
 mod share;
 mod state;
+mod storage;
 mod thumbs;
 mod zotero;
 
@@ -247,14 +250,18 @@ async fn ai_tidy_item(
     ai::tidy_item(&app, &state, item, page_image).await
 }
 
-/// Raw bytes of an attachment file from Zotero storage (the frontend
-/// renders page 1 for AI Tidy). Returned as a binary IPC response so the
-/// PDF doesn't get JSON-encoded on the way through.
+/// Raw bytes of an attachment file (the frontend renders pages from it).
+/// A copy in the PDF cache is used when there is one; otherwise it comes
+/// from Zotero storage. Returned as a binary IPC response so the PDF
+/// doesn't get JSON-encoded on the way through.
 #[tauri::command]
 async fn download_attachment_file(
     state: State<'_, AppState>,
     att_key: String,
 ) -> Result<tauri::ipc::Response> {
+    if let Some(bytes) = pdfcache::read(&state, &att_key) {
+        return Ok(tauri::ipc::Response::new(bytes));
+    }
     let bytes = zotero::download_attachment(&state, &att_key).await?;
     Ok(tauri::ipc::Response::new(bytes))
 }
@@ -427,6 +434,7 @@ async fn open_in_zotero(
     att_key: Option<String>,
     collection_key: Option<String>,
     page: Option<u32>,
+    annotation_key: Option<String>,
 ) -> Result<()> {
     let valid = |k: &str| !k.is_empty() && k.chars().all(|c| c.is_ascii_alphanumeric());
     if !valid(&item_key) {
@@ -447,10 +455,18 @@ async fn open_in_zotero(
         // `?page=` is 1-based and counts PDF pages, which is what the
         // model cites — it reads page-marked extracted text, not the
         // printed folios.
-        (Some(k), _) => match page {
-            Some(n) if n > 0 => format!("zotero://open-pdf/{scope}/items/{k}?page={n}"),
-            _ => format!("zotero://open-pdf/{scope}/items/{k}"),
-        },
+        // `annotation=` makes Zotero scroll to and select that annotation.
+        (Some(k), _) => {
+            let mut query: Vec<String> = Vec::new();
+            if let Some(n) = page.filter(|n| *n > 0) {
+                query.push(format!("page={n}"));
+            }
+            if let Some(a) = annotation_key.filter(|a| valid(a)) {
+                query.push(format!("annotation={a}"));
+            }
+            let base = format!("zotero://open-pdf/{scope}/items/{k}");
+            if query.is_empty() { base } else { format!("{base}?{}", query.join("&")) }
+        }
         // Landing on the entry *inside* a collection takes two opens.
         // The combined `collections/KEY/items?itemKey=KEY` form is
         // written up in places but does nothing here, whereas each of
@@ -644,6 +660,18 @@ pub fn run() {
             capture_back,
             capture_grab,
             close_capture_window,
+            pdfcache::cache_pdf,
+            pdfcache::read_cached_pdf,
+            pdfcache::list_cached_pdfs,
+            pdfcache::remove_cached_pdf,
+            pdfcache::clear_pdf_cache,
+            notes::notes_load,
+            notes::notes_save,
+            notes::notes_list,
+            notes::notes_pull,
+            notes::notes_push,
+            storage::storage_report,
+            storage::clear_thumbnails,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

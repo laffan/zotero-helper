@@ -123,9 +123,9 @@
 
 /* The chat scrolls its own message list, so the panel around it must
    not scroll as well. */
-.meta-panel.chat-mode {
+.meta-panel.chat-mode .meta-content {
   overflow: hidden;
-  display: flex;
+  flex-direction: row;
 }
 
 /* --- The conversation, in the details panel --- */

@@ -172,6 +172,51 @@ Windows/Linux desktops too).
   that has *no* parent entry swaps the full editor for a short panel —
   name, URL, type, filename, added/modified — because that is all Zotero
   keeps for one; it lists under its filename when it has no title.
+- **Highlights** — Zotero's annotations are ordinary items, so every
+  sync (the full refresh included) already brings them down with the
+  rest of the library; nothing extra is fetched. When the selection has
+  any, the right panel gains a **Highlights** tab, a searchable browser
+  modelled on [Hush](https://github.com/laffan/hush)'s highlight pane: a
+  filter box that searches highlighted text, comments, page labels and
+  tags; a column of colour swatches; and the highlights in reading
+  order, each with its page, a copy button (a Markdown blockquote with a
+  link back to the page) and **Open in Zotero**, which lands on that
+  highlight. Several selected entries, or one with several PDFs, list
+  under a heading per PDF.
+- **Reading notes** — every entry has a **Notes** tab holding its
+  `NOTES.md`, rendered. The button at the top follows what is on hand:
+  *Download PDF & Create Notes* when there are none, *Download PDF* when
+  there are notes but the PDF isn't on this device, and **Take Notes**
+  once both are here (an entry with no PDF gets plain *Create Notes*).
+  Take Notes turns the sidebar and item list into a PDF viewer and the
+  right panel into a Markdown editor. The viewer is a port of Hush's:
+  horizontal or vertical scrolling, fit one / two / three pages, zoom,
+  a thumbnail grid, the PDF's own links, Zotero's highlights and ink
+  painted on the pages, an annotation shelf with its own filter and
+  colour row, and the **folded view**, which collapses the paper to the
+  regions around its annotations. It adds what note-taking needs:
+  selectable text with an *Add to notes* bubble that quotes the passage,
+  a pencil on each page that cites it, and *Add to notes* on every shelf
+  highlight — all inserted at the caret with a `zotero://` link to the
+  page. Those links, in the editor's preview or the Notes tab, move the
+  viewer to the page (or open Zotero there when the PDF isn't open).
+
+  Notes save to this device as you type and are pushed to Zotero as a
+  `NOTES.md` attachment of the entry every couple of minutes while
+  anything is unpushed, when the app goes to the background, and on
+  **Done**. Opening an entry's notes (online) first asks Zotero whether
+  its copy changed, so notes written on another device arrive. Editing
+  in two places isn't the expected use, so the conflict handling only
+  promises not to lose words: a version changed in Zotero while this
+  device has unpushed edits is kept beside the local one as
+  `<itemKey>.conflict-<time>.md`, and the local text wins. Replacements
+  are sent with Zotero's `If-Match` md5 precondition, so nothing in
+  Zotero is overwritten unseen. The sync is `src-tauri/src/notes.rs`.
+- **Storage** — Settings shows what the app keeps on the device: the
+  library cache (file size, how many entries, attachments, highlights
+  and notes it holds, when it was last updated), the **PDF cache**
+  (total size, each PDF with its size and date, *Clear all* or remove
+  one), thumbnails (clearable) and reading notes.
 - **Summary select** — selecting multiple items collapses the right panel
   into per-item summary cards (title/authors/abstract by default — the field
   set is configurable from the "Fields" popup, where the abstract can be
@@ -199,8 +244,13 @@ Windows/Linux desktops too).
   and hovering a field's label reveals a small **Edit** link that swaps
   just that field for an input. Save is still the single commit point.
 - Multi-select with the usual ctrl/cmd-click and shift-click patterns.
-- PDFs are only held in a temp folder during upload and deleted right after —
-  the copy of record lives in Zotero (where your iPad Zotero app syncs it).
+- Imported PDFs are only held in a temp folder during upload and deleted
+  right after — the copy of record lives in Zotero (where your iPad Zotero
+  app syncs it). The one exception is a PDF you download for Take Notes:
+  that copy stays in the PDF cache (`pdfs/` in the app data dir) until you
+  remove it from Settings, and while it is there every other reader of
+  that PDF (thumbnails, page citations, Ask Full Papers) uses it instead
+  of the network.
 
 ## Setup
 
@@ -279,12 +329,23 @@ src/            React + TypeScript UI (Vite, zustand, MiniSearch)
   lib/ai/       the AI features: toolbar actions (index), the model
                 catalog and its prices (models), gathering works to ask
                 about (context), conversations (chat), export
-  components/   toolbar, sidebar, virtualized item list, metadata panel,
-                terminal, import/rescue modals, settings
+  lib/highlights.ts, lib/notes.ts
+                annotations out of the library cache; NOTES.md load /
+                save / periodic push, the PDF cache
+  components/   toolbar, sidebar, virtualized item list, metadata panel
+                and its tabs (Highlights, Notes), reader pane, terminal,
+                import/rescue modals, settings
+  pdfviewer/    the Take Notes PDF viewer, ported from Hush (viewer,
+                render, annotations + shelf, folds, thumbnails, links,
+                toolbar) plus pageTools (text layer, notes hooks)
   styles/       one stylesheet per UI region (tokens, base, toolbar, …)
 src-tauri/      Rust core (all networking + state)
-  src/zotero.rs    Zotero Web API v3: paginated sync, versioned writes,
-                   3-step attachment upload (create → authorize → register)
+  src/zotero/      Zotero Web API v3: paginated sync (sync), versioned
+                   writes, and attachment files (files — create, upload
+                   or replace with md5 preconditions, read one item)
+  src/notes.rs     NOTES.md on the device and its push/pull with Zotero
+  src/pdfcache.rs  PDFs kept on the device for Take Notes
+  src/storage.rs   the Settings page's storage report
   src/resolve/     identifier → Zotero item data; one file per source
                    (mod = classify/dispatch, doi, isbn, arxiv, url)
   src/pdf/         PDF discovery and download (mod = Unpaywall + link

@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import type {
+  CachedPdf,
   Chat,
   ImportJob,
   LibraryCache,
@@ -32,6 +33,18 @@ export type ModalState =
   | { kind: "rescue"; jobId: string }
   | { kind: "capture"; jobId: string };
 
+/** The right panel's tabs. "details" is the record for one item and the
+ *  summary cards for several. */
+export type MetaTab = "details" | "highlights" | "notes";
+
+/** Take Notes mode: the PDF viewer replaces the sidebar and item list,
+ *  and the right panel holds the notes being written. */
+export interface ReadingState {
+  itemKey: string;
+  /** The PDF shown, or null for an entry with none. */
+  attKey: string | null;
+}
+
 export type SortBy = "title" | "creator" | "date" | "dateAdded";
 
 interface UiPrefs {
@@ -57,6 +70,10 @@ interface UiPrefs {
   /** Per-folder view state. Local-only: pins and view mode are never
    *  written to Zotero and don't affect the library in any way. */
   folderViews: Record<string, FolderView>;
+  metaTab: MetaTab;
+  /** Right panel width while taking notes — wider than the details
+   *  panel, since it is where the writing happens. */
+  notesWidth: number;
 }
 
 export interface FolderView {
@@ -122,6 +139,10 @@ interface AppStore extends UiPrefs {
    *  "Ask Full Papers" on a folder is a minute of downloading. */
   askPreparing: boolean;
 
+  reading: ReadingState | null;
+  /** PDFs kept on this device (src-tauri/src/pdfcache.rs), by attKey. */
+  cachedPdfs: Record<string, CachedPdf>;
+
   setSettings: (s: Settings) => void;
   setLibrary: (l: LibraryCache) => void;
   setSyncing: (b: boolean) => void;
@@ -165,6 +186,11 @@ interface AppStore extends UiPrefs {
   setPendingAsk: (ask: PendingAsk | null) => void;
   setAskPreparing: (b: boolean) => void;
 
+  setMetaTab: (t: MetaTab) => void;
+  setNotesWidth: (w: number) => void;
+  setReading: (r: ReadingState | null) => void;
+  setCachedPdfs: (list: CachedPdf[]) => void;
+
   upsertItem: (item: ZItem) => void;
   patchItemData: (key: string, patch: Record<string, unknown>) => void;
 
@@ -198,6 +224,8 @@ export const useStore = create<AppStore>()(
       searchMode: "all" as SearchMode,
       colWidths: { creator: 180, year: 52, added: 92 },
       folderViews: {},
+      metaTab: "details" as MetaTab,
+      notesWidth: 420,
       uiTasks: [],
       uiTaskLabel: "",
 
@@ -223,6 +251,8 @@ export const useStore = create<AppStore>()(
       chatBusy: null,
       pendingAsk: null,
       askPreparing: false,
+      reading: null,
+      cachedPdfs: {},
 
       setSettings: (settings) => set({ settings }),
       setLibrary: (library) => set({ library }),
@@ -339,6 +369,20 @@ export const useStore = create<AppStore>()(
       setPendingAsk: (pendingAsk) => set({ pendingAsk }),
       setAskPreparing: (askPreparing) => set({ askPreparing }),
 
+      setMetaTab: (metaTab) => set({ metaTab }),
+      setNotesWidth: (notesWidth) => set({ notesWidth }),
+      setReading: (reading) =>
+        // Entering closes the narrow-screen drawers: on a tablet the
+        // notes sit beside the PDF (notes.css), and a drawer's scrim
+        // would cover it.
+        set(
+          reading
+            ? { reading, metaTab: "notes", sidebarOpen: false, metaOpen: false }
+            : { reading },
+        ),
+      setCachedPdfs: (list) =>
+        set({ cachedPdfs: Object.fromEntries(list.map((p) => [p.attKey, p])) }),
+
       upsertItem: (item) =>
         set((s) => {
           const items = s.library.items.slice();
@@ -390,6 +434,8 @@ export const useStore = create<AppStore>()(
         selectedCollection: s.selectedCollection,
         colWidths: s.colWidths,
         folderViews: s.folderViews,
+        metaTab: s.metaTab,
+        notesWidth: s.notesWidth,
       }),
     },
   ),

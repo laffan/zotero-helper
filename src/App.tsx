@@ -10,6 +10,7 @@ import { ItemList } from "./components/ItemList";
 import { MetadataPanel } from "./components/MetadataPanel";
 import { PageViewModal } from "./components/PageViewModal";
 import { PdfRescueModal } from "./components/PdfRescueModal";
+import { ReaderPane } from "./components/ReaderPane";
 import { SendToHushModal } from "./components/SendToHushModal";
 import { SettingsView } from "./components/SettingsView";
 import { Sidebar } from "./components/Sidebar";
@@ -18,19 +19,25 @@ import { Toolbar } from "./components/Toolbar";
 import { TaskTray } from "./components/TaskTray";
 
 function PaneResizer({ side }: { side: "left" | "right" }) {
-  const { leftWidth, rightWidth, setPaneSizes } = useStore();
+  const { leftWidth, rightWidth, notesWidth, setPaneSizes, setNotesWidth } = useStore();
+  const reading = useStore((s) => s.reading);
 
   const start = (e: React.PointerEvent) => {
     e.preventDefault();
     const startX = e.clientX;
-    const startW = side === "left" ? leftWidth : rightWidth;
+    // While taking notes the right edge resizes the notes, which may
+    // take up to two thirds of the window.
+    const notes = side === "right" && reading !== null;
+    const startW = side === "left" ? leftWidth : notes ? notesWidth : rightWidth;
     const onMove = (ev: PointerEvent) => {
       const delta = ev.clientX - startX;
-      const w =
-        side === "left"
-          ? Math.min(420, Math.max(150, startW + delta))
-          : Math.min(520, Math.max(200, startW - delta));
-      setPaneSizes(side === "left" ? { leftWidth: w } : { rightWidth: w });
+      if (side === "left") {
+        setPaneSizes({ leftWidth: Math.min(420, Math.max(150, startW + delta)) });
+      } else if (notes) {
+        setNotesWidth(Math.min(window.innerWidth * 0.66, Math.max(260, startW - delta)));
+      } else {
+        setPaneSizes({ rightWidth: Math.min(520, Math.max(200, startW - delta)) });
+      }
     };
     const onUp = () => {
       window.removeEventListener("pointermove", onMove);
@@ -48,7 +55,8 @@ export default function App() {
   const modal = useStore((s) => s.modal);
   const setModal = useStore((s) => s.setModal);
   const selectedCollection = useStore((s) => s.selectedCollection);
-  const { leftWidth, rightWidth } = useStore();
+  const reading = useStore((s) => s.reading);
+  const { leftWidth, rightWidth, notesWidth } = useStore();
 
   useEffect(() => {
     void bootstrap();
@@ -67,14 +75,22 @@ export default function App() {
           {
             "--left-w": `${leftWidth}px`,
             "--right-w": `${rightWidth}px`,
+            "--notes-w": `${notesWidth}px`,
           } as React.CSSProperties
         }
       >
-        <Sidebar />
-        <PaneResizer side="left" />
-        {/* Questions is a folder of conversations, so it replaces the
-            item list rather than filtering it. */}
-        {selectedCollection === QUESTIONS ? <ChatList /> : <ItemList />}
+        {reading ? (
+          // Take Notes: the PDF takes the sidebar's and the list's room.
+          <ReaderPane />
+        ) : (
+          <>
+            <Sidebar />
+            <PaneResizer side="left" />
+            {/* Questions is a folder of conversations, so it replaces
+                the item list rather than filtering it. */}
+            {selectedCollection === QUESTIONS ? <ChatList /> : <ItemList />}
+          </>
+        )}
         <PaneResizer side="right" />
         <MetadataPanel />
       </div>

@@ -1,0 +1,382 @@
+/* PDF viewer, continued: annotation overlays and shelf, the thumbnail
+   grid, and the folded view. */
+
+/* --- annotations painted over the pages --- */
+.pdf-annot-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.pdf-annot-highlight {
+  position: absolute;
+  opacity: 0.3;
+  mix-blend-mode: multiply;
+  border-radius: 1px;
+  pointer-events: none;
+}
+.pdf-annot-ink {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+/* --- annotation shelf (in-flow, right edge) --- */
+.pdf-annot-shelf {
+  width: 24px;
+  min-width: 24px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  transition: width 0.2s;
+  background: var(--panel);
+  border-left: 1px solid var(--border);
+  position: relative;
+}
+.pdf-annot-shelf.open {
+  width: var(--pdf-annot-shelf-width, 280px);
+}
+.pdf-annot-shelf.resizing {
+  transition: none;
+}
+.pdf-annot-shelf-resize {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 6px;
+  z-index: 11;
+  cursor: ew-resize;
+  display: none;
+}
+.pdf-annot-shelf.open .pdf-annot-shelf-resize {
+  display: block;
+}
+.pdf-annot-shelf-resize:hover,
+.pdf-annot-shelf.resizing .pdf-annot-shelf-resize {
+  background: rgb(127 127 127 / 0.28);
+}
+.pdf-annot-shelf-grip {
+  width: 24px;
+  height: 100%;
+  position: absolute;
+  left: 0;
+  top: 0;
+  border: none;
+  background: transparent;
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+  color: var(--text);
+  opacity: 0.7;
+}
+.pdf-annot-shelf-grip:hover {
+  opacity: 1;
+}
+.pdf-annot-shelf-content {
+  margin-left: 24px;
+  flex: 1;
+  display: none;
+  flex-direction: column;
+  overflow: hidden;
+  padding: 16px 16px 16px 0;
+}
+.pdf-annot-shelf.open .pdf-annot-shelf-content {
+  display: flex;
+}
+.pdf-annot-shelf-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+.pdf-annot-shelf-colors {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 7px;
+  margin: 0 0 10px 2px;
+}
+/* Swatches — shared with the Highlights tab's colour column. */
+.pdf-annot-swatch,
+.hl-swatch {
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  border: 1px solid rgb(0 0 0 / 0.2);
+  padding: 0;
+  background-color: #ccc;
+  opacity: 0.55;
+  transition: opacity 0.15s, transform 0.1s;
+}
+.pdf-annot-swatch:hover,
+.hl-swatch:hover {
+  opacity: 0.85;
+}
+.pdf-annot-swatch.active,
+.hl-swatch.active {
+  opacity: 1;
+  transform: scale(1.1);
+  box-shadow: 0 0 0 2px var(--text);
+}
+.pdf-annot-swatch-all,
+.hl-swatch-all {
+  background-color: transparent;
+  border-color: color-mix(in srgb, var(--text) 45%, transparent);
+}
+.pdf-annot-shelf-search {
+  width: 100%;
+  margin-bottom: 8px;
+}
+.pdf-annot-shelf-body {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+/* Rows — shared with the Highlights tab. */
+.pdf-annot-shelf-row,
+.hl-row {
+  padding: 8px 10px;
+  margin-bottom: 6px;
+  border-left: 3px solid rgb(128 128 128 / 0.4);
+  border-radius: 0 6px 6px 0;
+  background: rgb(128 128 128 / 0.06);
+  cursor: pointer;
+}
+.pdf-annot-shelf-row:hover,
+.hl-row:hover {
+  background: rgb(128 128 128 / 0.12);
+}
+.pdf-annot-shelf-text,
+.hl-text {
+  font-size: 13px;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  color: var(--text);
+}
+.pdf-annot-shelf-comment,
+.hl-comment {
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--text-dim);
+  font-style: italic;
+  white-space: pre-wrap;
+}
+.pdf-annot-shelf-meta,
+.hl-meta {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  margin-top: 4px;
+  font-size: 11px;
+  color: var(--text-dim);
+}
+.pdf-annot-shelf-insert {
+  margin-left: auto;
+  color: var(--accent);
+  font-size: 11px;
+}
+.pdf-annot-shelf-insert:hover {
+  text-decoration: underline;
+}
+.pdf-annot-shelf-empty {
+  padding: 16px 0;
+  text-align: center;
+  color: var(--text-dim);
+  font-size: 13px;
+}
+.pdf-annot-shelf-match,
+.hl-match {
+  background: rgb(255 230 0 / 0.35);
+  color: inherit;
+  border-radius: 2px;
+  padding: 0 1px;
+}
+
+/* --- thumbnail grid --- */
+.pdf-thumbnail-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 12;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+}
+.pdf-thumbnail-scroll {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 20px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  align-content: flex-start;
+  justify-content: center;
+}
+.pdf-thumb-cell {
+  position: relative;
+  flex-shrink: 0;
+  cursor: pointer;
+  box-shadow: 0 1px 4px rgb(0 0 0 / 0.12);
+  background: #fff;
+  border: 2px solid transparent;
+  border-radius: 4px;
+  overflow: hidden;
+  contain: strict;
+  transition: border-color 0.15s, transform 0.1s;
+}
+.pdf-thumb-cell:hover {
+  border-color: var(--accent);
+  transform: scale(1.03);
+}
+.pdf-thumb-canvas {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+.pdf-thumb-placeholder {
+  width: 100%;
+  height: 100%;
+  background: #f5f5f5;
+}
+.pdf-thumb-label {
+  position: absolute;
+  bottom: 3px;
+  right: 5px;
+  font-size: 10px;
+  color: #333;
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+/* --- folded view --- */
+.pdf-scroll-area.pdf-layout-folded {
+  flex-wrap: nowrap;
+  flex-direction: column;
+  align-items: center;
+  align-content: center;
+  justify-content: flex-start;
+}
+.pdf-layout-folded .pdf-page-wrapper {
+  display: none;
+}
+.pdf-fold-wrapper {
+  position: relative;
+  overflow: hidden;
+  flex-shrink: 0;
+  background: #fff;
+  box-shadow: 0 1px 4px rgb(0 0 0 / 0.15);
+  transition: height 0.15s ease;
+  contain: strict;
+}
+.pdf-fold-page {
+  position: absolute;
+  left: 0;
+  background: #f5f5f5;
+}
+.pdf-fold-page .pdf-page-canvas {
+  display: block;
+}
+.pdf-fold-page-label {
+  position: absolute;
+  top: 4px;
+  left: 6px;
+  font-size: 10px;
+  color: rgb(0 0 0 / 0.6);
+  background: rgb(255 255 255 / 0.85);
+  padding: 1px 5px;
+  border-radius: 4px;
+  opacity: 0;
+  transition: opacity 0.15s;
+  pointer-events: none;
+  z-index: 4;
+}
+.pdf-fold-wrapper:hover .pdf-fold-page-label {
+  opacity: 1;
+}
+.pdf-fold-toggle {
+  position: absolute;
+  top: 4px;
+  right: 6px;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: none;
+  border-radius: 6px;
+  background: rgb(0 0 0 / 0.55);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s;
+  z-index: 5;
+}
+.pdf-fold-wrapper:hover .pdf-fold-toggle {
+  opacity: 1;
+  pointer-events: auto;
+}
+.pdf-fold-toggle:hover {
+  background: rgb(0 0 0 / 0.75);
+}
+.pdf-fold-empty {
+  padding: 32px 16px;
+  text-align: center;
+  color: var(--text-dim);
+  font-size: 13px;
+}
+.pdf-fold-filter-popup {
+  position: absolute;
+  bottom: 42px;
+  z-index: 20;
+  min-width: 190px;
+  max-width: 260px;
+  max-height: 260px;
+  overflow-y: auto;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgb(0 0 0 / 0.18);
+  padding: 8px;
+  font-size: 12px;
+}
+.pdf-fold-filter-title {
+  font-size: 11px;
+  font-weight: 600;
+  opacity: 0.7;
+  margin: 2px 4px 6px;
+}
+.pdf-fold-filter-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 6px;
+  border-radius: 5px;
+  cursor: pointer;
+}
+.pdf-fold-filter-row:hover {
+  background: rgb(128 128 128 / 0.1);
+}
+.pdf-fold-filter-swatch {
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+  border: 1px solid rgb(0 0 0 / 0.15);
+  flex-shrink: 0;
+}
+.pdf-fold-filter-count {
+  margin-left: auto;
+  opacity: 0.55;
+  font-size: 11px;
+}
+.pdf-fold-filter-empty {
+  padding: 8px;
+  opacity: 0.6;
+}

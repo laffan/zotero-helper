@@ -1,0 +1,373 @@
+/* PDF viewer (Take Notes) — pages, toolbar, links, text layer. Ported
+   from Hush's styles/pdf-viewer.css; the shelf, thumbnails and folded
+   view are in pdfviewer-panels.css. */
+.pdf-viewer {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: var(--bg);
+  position: relative;
+}
+/* Scroll area + shelf side by side; the shelf is in-flow so it
+   constrains the scroll area's width. */
+.pdf-viewer-body {
+  flex: 1;
+  display: flex;
+  flex-direction: row;
+  min-height: 0;
+  overflow: hidden;
+  /* The thumbnail grid covers this, leaving the toolbar usable. */
+  position: relative;
+}
+
+.pdf-scroll-area {
+  flex: 1;
+  overflow: auto;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  align-content: flex-start;
+  justify-content: center;
+  padding: 20px;
+  gap: 12px;
+  background: rgb(128 128 128 / 0.06);
+  min-height: 0;
+  min-width: 0;
+}
+/* Fit-width: one column. justify-content must be flex-start here — in a
+   column flex, `center` pushes half of an overflowing document above
+   the container, where no scrolling can reach it. */
+.pdf-scroll-area.pdf-layout-fit {
+  flex-wrap: nowrap;
+  flex-direction: column;
+  align-items: center;
+  align-content: center;
+  justify-content: flex-start;
+}
+.pdf-scroll-area.pdf-layout-fixed {
+  flex-wrap: wrap;
+  flex-direction: row;
+  align-items: flex-start;
+  align-content: flex-start;
+  justify-content: center;
+}
+.pdf-scroll-area.pdf-layout-horizontal {
+  flex-wrap: nowrap;
+  flex-direction: row;
+  align-items: center;
+  justify-content: flex-start;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+.pdf-page-wrapper {
+  position: relative;
+  box-shadow: 0 1px 4px rgb(0 0 0 / 0.15);
+  background: #fff;
+  flex-shrink: 0;
+  overflow: hidden;
+  /* Wrappers carry explicit sizes, so full containment is safe and keeps
+     a page's render/evict from invalidating its siblings. */
+  contain: strict;
+}
+.pdf-page-canvas {
+  display: block;
+}
+/* Canvas + overlays at paint-time size; stretched by transform during a
+   resize until the settle pass re-renders it. */
+.pdf-page-content {
+  position: absolute;
+  top: 0;
+  left: 0;
+  transform-origin: top left;
+}
+.pdf-page-content .pdf-page-canvas {
+  width: 100%;
+  height: 100%;
+}
+.pdf-page-placeholder {
+  width: 100%;
+  height: 100%;
+  background: #f5f5f5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+/* The spinner only turns while the page is actually being rendered. */
+.pdf-page-placeholder::after {
+  content: "";
+  width: 24px;
+  height: 24px;
+  border: 2px solid rgb(128 128 128 / 0.2);
+  border-radius: 50%;
+}
+.pdf-page-placeholder.loading::after {
+  border-color: rgb(128 128 128 / 0.3);
+  border-top-color: rgb(128 128 128 / 0.7);
+  animation: spin 0.8s linear infinite;
+}
+
+/* --- the PDF's own links --- */
+.pdf-link-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 2;
+}
+.pdf-link {
+  position: absolute;
+  pointer-events: auto;
+  cursor: pointer;
+  border-radius: 2px;
+}
+.pdf-link:hover {
+  background: rgb(66 133 244 / 0.14);
+  box-shadow: 0 0 0 2px rgb(66 133 244 / 0.14);
+}
+
+/* --- page hover buttons: Zotero (bottom-right), cite in notes (top-right) --- */
+.pdf-page-zotero-btn,
+.pdf-page-note-btn {
+  position: absolute;
+  right: 8px;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: none;
+  border-radius: 6px;
+  background: rgb(0 0 0 / 0.55);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s;
+  z-index: 5;
+}
+.pdf-page-zotero-btn {
+  bottom: 8px;
+}
+.pdf-page-note-btn {
+  top: 8px;
+}
+.pdf-page-zotero-btn.visible,
+.pdf-page-note-btn.visible {
+  opacity: 1;
+  pointer-events: auto;
+}
+.pdf-page-zotero-btn:hover,
+.pdf-page-note-btn:hover {
+  background: rgb(0 0 0 / 0.75);
+}
+/* Touch screens have no hover: keep the cite button reachable. */
+@media (hover: none) {
+  .pdf-page-note-btn {
+    opacity: 0.6;
+    pointer-events: auto;
+  }
+}
+
+/* --- text layer (pdf.js), so passages can be selected --- */
+.textLayer {
+  color-scheme: only light;
+  position: absolute;
+  text-align: initial;
+  inset: 0;
+  overflow: clip;
+  opacity: 1;
+  line-height: 1;
+  letter-spacing: normal;
+  word-spacing: normal;
+  -webkit-text-size-adjust: none;
+  text-size-adjust: none;
+  forced-color-adjust: none;
+  transform-origin: 0 0;
+  caret-color: CanvasText;
+  z-index: 1;
+  --min-font-size: 1;
+  --text-scale-factor: calc(var(--total-scale-factor) * var(--min-font-size));
+  --min-font-size-inv: calc(1 / var(--min-font-size));
+}
+.textLayer span,
+.textLayer br {
+  color: transparent;
+  position: absolute;
+  white-space: pre;
+  cursor: text;
+  transform-origin: 0% 0%;
+  -webkit-user-select: text;
+  user-select: text;
+}
+.textLayer > :not(.markedContent),
+.textLayer .markedContent span:not(.markedContent) {
+  z-index: 1;
+  --font-height: 0;
+  font-size: calc(var(--text-scale-factor) * var(--font-height));
+  --scale-x: 1;
+  --rotate: 0deg;
+  transform: rotate(var(--rotate)) scaleX(var(--scale-x)) scale(var(--min-font-size-inv));
+}
+.textLayer .markedContent {
+  display: contents;
+}
+.textLayer span[role="img"] {
+  -webkit-user-select: none;
+  user-select: none;
+  cursor: default;
+}
+.textLayer ::selection {
+  background: rgb(0 90 255 / 0.25);
+  color: transparent;
+}
+.textLayer br::selection {
+  background: transparent;
+}
+.textLayer .endOfContent {
+  display: block;
+  position: absolute;
+  inset: 100% 0 0;
+  z-index: 0;
+  cursor: default;
+  -webkit-user-select: none;
+  user-select: none;
+}
+.textLayer.selecting .endOfContent {
+  top: 0;
+}
+[data-main-rotation="90"] {
+  transform: rotate(90deg) translateY(-100%);
+}
+[data-main-rotation="180"] {
+  transform: rotate(180deg) translate(-100%, -100%);
+}
+[data-main-rotation="270"] {
+  transform: rotate(270deg) translateX(-100%);
+}
+
+.pdf-selection-note {
+  position: absolute;
+  z-index: 30;
+  padding: 5px 10px;
+  border-radius: 6px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  box-shadow: 0 2px 10px rgb(0 0 0 / 0.25);
+  white-space: nowrap;
+}
+
+/* --- bottom toolbar --- */
+.pdf-zoom-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-top: 1px solid var(--border);
+  background: var(--panel);
+  font-size: 12px;
+  color: var(--text);
+  flex-shrink: 0;
+}
+.pdf-zoom-btn {
+  padding: 2px 8px;
+  border-radius: 4px;
+  border: 1px solid rgb(128 128 128 / 0.2);
+  background: rgb(128 128 128 / 0.06);
+  color: var(--text);
+  font-size: 13px;
+  line-height: 1;
+  transition: background 0.15s;
+}
+.pdf-zoom-btn:hover {
+  background: rgb(128 128 128 / 0.18);
+}
+.pdf-zoom-btn svg,
+.pdf-toggle-option svg {
+  vertical-align: middle;
+  display: inline-block;
+}
+.pdf-toggle-group {
+  display: inline-flex;
+  border-radius: 4px;
+  overflow: hidden;
+  border: 1px solid rgb(128 128 128 / 0.2);
+}
+.pdf-toggle-option {
+  padding: 2px 6px;
+  border: none;
+  border-radius: 0;
+  background: rgb(128 128 128 / 0.04);
+  color: var(--text);
+  line-height: 1;
+  transition: background 0.15s;
+  opacity: 0.45;
+}
+.pdf-toggle-option:not(:last-child) {
+  border-right: 1px solid rgb(128 128 128 / 0.15);
+}
+.pdf-toggle-option:hover {
+  background: rgb(128 128 128 / 0.14);
+  opacity: 0.7;
+}
+.pdf-toggle-option.active {
+  background: rgb(128 128 128 / 0.22);
+  opacity: 1;
+}
+.pdf-zoom-label {
+  min-width: 36px;
+  text-align: center;
+  font-size: 12px;
+  color: var(--text-dim);
+}
+.pdf-toolbar-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  line-height: 1.2;
+}
+.pdf-toolbar-info-title,
+.pdf-toolbar-info-author {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+  text-align: center;
+}
+.pdf-toolbar-info-title {
+  font-size: 11px;
+  font-weight: 600;
+}
+.pdf-toolbar-info-author {
+  font-size: 10px;
+  opacity: 0.6;
+}
+.pdf-page-indicator {
+  margin-left: auto;
+  font-size: 11px;
+  color: var(--text-dim);
+}
+.pdf-zotero-link {
+  font-size: 11px;
+  color: var(--text-dim);
+  text-decoration: none;
+  margin-left: 8px;
+}
+.pdf-zotero-link:hover {
+  color: var(--text);
+  text-decoration: underline;
+}
+.pdf-zoom-toolbar > .pdf-thumbnail-btn {
+  margin-right: 8px;
+}
+.pdf-thumbnail-btn.active,
+.pdf-fold-btn.active {
+  background: rgb(128 128 128 / 0.22);
+  border-color: rgb(128 128 128 / 0.4);
+}

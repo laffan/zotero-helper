@@ -1,0 +1,208 @@
+/* Reading notes: the Notes tab, the editor in Take Notes mode, and the
+   PDF reader pane that takes over the sidebar and item list. */
+.notes-panel {
+  display: flex;
+  flex-direction: column;
+}
+.notes-panel-head {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 12px 12px 4px;
+}
+.notes-action {
+  font-weight: 600;
+}
+.notes-loading {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-dim);
+  font-size: 12px;
+}
+
+/* Rendered NOTES.md */
+.notes-md {
+  padding: 4px 14px 16px;
+  font-size: 13px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+.notes-md h1 {
+  font-size: 17px;
+  margin: 10px 0 8px;
+}
+.notes-md h2 {
+  font-size: 15px;
+  margin: 14px 0 6px;
+}
+.notes-md h3 {
+  font-size: 13px;
+  margin: 12px 0 4px;
+}
+.notes-md p,
+.notes-md ul,
+.notes-md ol {
+  margin: 0 0 10px;
+}
+.notes-md ul,
+.notes-md ol {
+  padding-left: 20px;
+}
+.notes-md blockquote {
+  margin: 0 0 6px;
+  padding: 2px 0 2px 10px;
+  border-left: 3px solid var(--accent-soft);
+  color: var(--text);
+  font-style: italic;
+}
+.notes-md blockquote p {
+  margin: 0 0 4px;
+}
+.notes-md a {
+  color: var(--accent);
+  text-decoration: none;
+  cursor: pointer;
+}
+.notes-md a:hover {
+  text-decoration: underline;
+}
+.notes-md code {
+  font-family: var(--mono);
+  font-size: 12px;
+  background: var(--panel);
+  padding: 0 3px;
+  border-radius: 3px;
+}
+.notes-md pre {
+  background: var(--panel);
+  padding: 8px;
+  border-radius: var(--radius);
+  overflow-x: auto;
+}
+.notes-md-table {
+  overflow-x: auto;
+  margin-bottom: 10px;
+}
+.notes-md table {
+  border-collapse: collapse;
+  font-size: 12px;
+}
+.notes-md th,
+.notes-md td {
+  border: 1px solid var(--border);
+  padding: 3px 6px;
+  text-align: left;
+}
+
+/* --- Take Notes: the editor fills the right panel --- */
+.meta-panel.notes-mode {
+  width: var(--notes-w, 420px);
+}
+.meta-panel.notes-mode .meta-content {
+  overflow: hidden;
+}
+.notes-editor {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.notes-editor-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border);
+}
+.notes-status {
+  flex: 1;
+  min-width: 0;
+  font-size: 11px;
+  color: var(--text-dim);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.notes-status.dirty {
+  color: var(--warn);
+}
+.notes-done {
+  padding: 4px 12px;
+}
+.notes-textarea {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  resize: none;
+  border: none;
+  border-radius: 0;
+  padding: 14px;
+  background: var(--panel);
+  font-family: var(--mono);
+  font-size: 13px;
+  line-height: 1.6;
+}
+.notes-textarea:focus {
+  outline: none;
+  border: none;
+}
+.notes-editor-preview {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  background: var(--panel);
+}
+
+/* --- the reader pane, in place of sidebar + item list --- */
+.reader-pane {
+  flex: 1;
+  min-width: 0;
+  position: relative;
+  display: flex;
+  background: var(--bg);
+}
+.reader-host {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+}
+.reader-status,
+.reader-empty {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  color: var(--text-dim);
+  pointer-events: none;
+}
+.reader-empty {
+  position: static;
+  flex: 1;
+}
+
+/* Narrow windows turn the right panel into a drawer. Not while taking
+   notes on a tablet in portrait: writing beside the PDF is the point,
+   so the notes stay in the row. Phones keep the drawer (the details
+   button in the toolbar opens it). */
+@media (max-width: 900px) and (min-width: 600px) {
+  .meta-panel.notes-mode {
+    position: relative;
+    transform: none;
+    box-shadow: none;
+    z-index: auto;
+    padding-top: 0;
+    width: min(var(--notes-w, 420px), 45vw);
+  }
+  .ipados .meta-panel.notes-mode {
+    padding-top: 0;
+  }
+}
+@media (max-width: 599px) {
+  .meta-panel.notes-mode {
+    width: min(420px, 92vw);
+  }
+}

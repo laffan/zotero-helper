@@ -4,6 +4,7 @@ import { scheduleTrayClear } from "../components/TaskTray";
 import { itemTitle } from "./collections";
 import { loadChats } from "./ai/chat";
 import { captureFinished, downloadForJob } from "./importer";
+import { refreshCachedPdfs, startNotesSync } from "./notes";
 import { appLog, useStore } from "./store";
 import { invoke, isTauri, on } from "./tauri";
 import type {
@@ -81,6 +82,8 @@ export async function bootstrap(): Promise<void> {
   // Conversations are local to this app, so they load whether or not
   // Zotero credentials are in place yet.
   await loadChats();
+  await refreshCachedPdfs();
+  startNotesSync();
 
   try {
     const settings = await invoke<Settings>("get_settings");
@@ -263,6 +266,7 @@ export async function openInZotero(
   attKey?: string,
   collectionKey?: string,
   page?: number,
+  annotationKey?: string,
 ): Promise<void> {
   try {
     await invoke("open_in_zotero", {
@@ -270,6 +274,7 @@ export async function openInZotero(
       attKey: attKey ?? null,
       collectionKey: collectionKey ?? null,
       page: page ?? null,
+      annotationKey: annotationKey ?? null,
     });
   } catch (e) {
     appLog("warn", `Open in Zotero failed: ${e}`);

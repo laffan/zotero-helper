@@ -1,0 +1,130 @@
+// Take Notes: the PDF viewer that takes over the sidebar and item list
+// while notes are being written in the right panel.
+//
+// The viewer itself is plain DOM (src/pdfviewer/, a port of Hush's), so
+// this component only mounts it, feeds it the cached PDF and the
+// entry's Zotero annotations, and routes what it hands back — a cited
+// page, a selected passage, a shelf highlight — into the notes.
+import { useEffect, useRef, useState } from "react";
+import { openInZotero } from "../lib/actions";
+import { creatorSummary, itemTitle, yearOf } from "../lib/collections";
+import {
+  annotationIndexFor,
+  annotationMarkdown,
+  pdfLink,
+  type Annotation,
+} from "../lib/highlights";
+import { insertIntoNotes } from "../lib/notes";
+import { appLog, useStore } from "../lib/store";
+import { invoke } from "../lib/tauri";
+import type { PdfViewer } from "../pdfviewer/viewer";
+import { Spinner } from "./Icons";
+
+let active: { attKey: string; viewer: PdfViewer } | null = null;
+
+/** Move the open viewer to a page or an annotation of `attKey`. False
+ *  when that PDF isn't the one open — the caller falls back to Zotero. */
+export function showInReader(attKey: string, page?: number, annotationKey?: string): boolean {
+  if (!active || active.attKey !== attKey) return false;
+  if (annotationKey && active.viewer.showAnnotation(annotationKey)) return true;
+  if (page) active.viewer.goToPage(page);
+  return Boolean(page);
+}
+
+function addToNotes(markdown: string): void {
+  if (!insertIntoNotes(markdown)) appLog("warn", "The notes editor isn't open");
+}
+
+export function ReaderPane() {
+  const reading = useStore((s) => s.reading);
+  const items = useStore((s) => s.library.items);
+  const hostRef = useRef<HTMLDivElement>(null);
+  const viewerRef = useRef<PdfViewer | null>(null);
+  const [state, setState] = useState<"loading" | "ready" | "error">("loading");
+  const [error, setError] = useState("");
+
+  const itemKey = reading?.itemKey ?? "";
+  const attKey = reading?.attKey ?? null;
+
+  useEffect(() => {
+    const host = hostRef.current;
+    if (!host || !attKey) return;
+    let cancelled = false;
+    let viewer: PdfViewer | null = null;
+    setState("loading");
+    (async () => {
+      try {
+        const { createPdfViewer } = await import("../pdfviewer/viewer");
+        if (cancelled) return;
+        const settings = () => useStore.getState().settings;
+        const cite = (page: number) => `[p. ${page}](${pdfLink(settings(), attKey, page)})`;
+        viewer = createPdfViewer(host, {
+          onOpenInZotero: (page) => void openInZotero(itemKey, attKey, undefined, page),
+          onCitePage: (page) => addToNotes(cite(page)),
+          onQuote: (text, page) => addToNotes(`> ${text}\n\n— ${cite(page)}`),
+          onInsertAnnotation: (a: Annotation) => addToNotes(annotationMarkdown(settings(), a)),
+        });
+        viewerRef.current = viewer;
+        active = { attKey, viewer };
+        // Cached copies come straight off the disk; the command falls
+        // back to Zotero for one that isn't (or was cleared meanwhile).
+        const bytes = await invoke<ArrayBuffer>("download_attachment_file", { attKey });
+        if (cancelled) return;
+        await viewer.loadPdf(bytes);
+        if (cancelled) return;
+        const lib = useStore.getState().library.items;
+        viewer.setAnnotations(annotationIndexFor(lib).get(attKey) ?? []);
+        const item = lib.find((i) => i.key === itemKey);
+        if (item) {
+          const year = yearOf(item);
+          viewer.setToolbarInfo(itemTitle(item), [creatorSummary(item), year].filter(Boolean).join(", "));
+        }
+        setState("ready");
+      } catch (e) {
+        if (cancelled) return;
+        appLog("error", `Could not open the PDF: ${e}`);
+        setError(String(e));
+        setState("error");
+      }
+    })();
+    return () => {
+      cancelled = true;
+      if (active?.viewer === viewer) active = null;
+      viewerRef.current = null;
+      void viewer?.destroy();
+    };
+  }, [itemKey, attKey]);
+
+  // A sync that brings new or edited highlights repaints them in place.
+  useEffect(() => {
+    if (state === "ready" && attKey) {
+      viewerRef.current?.setAnnotations(annotationIndexFor(items).get(attKey) ?? []);
+    }
+  }, [items, attKey, state]);
+
+  if (!reading) return null;
+  return (
+    <section className="reader-pane">
+      {!attKey ? (
+        <div className="reader-empty">
+          This entry has no PDF in Zotero — the notes are on the right.
+        </div>
+      ) : (
+        <>
+          <div className="reader-host" ref={hostRef} />
+          {state !== "ready" && (
+            <div className="reader-status">
+              {state === "loading" ? (
+                <>
+                  <Spinner size={14} /> Opening the PDF…
+                </>
+              ) : (
+                <span className="error-msg">{error}</span>
+              )}
+            </div>
+          )}
+        </>
+      )}
+    </section>
+  );
+}

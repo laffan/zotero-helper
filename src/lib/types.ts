@@ -306,3 +306,53 @@ export interface PendingAsk {
    *  change that. Only meaningful before the chat is created. */
   gaps: AskGap[];
 }
+
+// --- Device storage: the PDF cache, reading notes, usage report -----------
+
+/** A PDF kept on this device (src-tauri/src/pdfcache.rs). */
+export interface CachedPdf {
+  attKey: string;
+  itemKey: string;
+  title: string;
+  filename: string;
+  size: number;
+  md5: string;
+  savedMs: number;
+}
+
+/** Bookkeeping for one NOTES.md (src-tauri/src/notes.rs). */
+export interface NoteMeta {
+  itemKey: string;
+  /** The NOTES.md attachment in Zotero; "" until first pushed. */
+  attKey: string;
+  syncedMd5: string;
+  /** Local edits not yet pushed to Zotero. */
+  dirty: boolean;
+  editedMs: number;
+  pushedMs: number;
+  checkedMs: number;
+}
+
+export interface LocalNote {
+  text: string;
+  meta: NoteMeta;
+}
+
+export interface NoteSyncOutcome {
+  status: "unchanged" | "updated" | "conflict" | "pushed" | "missing";
+  text: string | null;
+  meta: NoteMeta;
+  item: ZItem | null;
+}
+
+export interface StorageUsage {
+  bytes: number;
+  files: number;
+}
+
+export interface StorageReport {
+  library: StorageUsage;
+  pdfs: StorageUsage;
+  thumbnails: StorageUsage;
+  notes: StorageUsage;
+}

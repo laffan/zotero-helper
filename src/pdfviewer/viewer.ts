@@ -21,6 +21,7 @@ import { attachPageHoverButtons, attachTextLayer, createSelectionNoter } from ".
 import { drawAnnotations, pageSignatures } from "./paint";
 import { getPdfjs } from "./pdfjs";
 import { createPageRenderer } from "./render";
+import { createPdfSearch } from "./search";
 import { createThumbnailManager } from "./thumbnails";
 import { buildPdfToolbar } from "./toolbar";
 import type { LayoutMode, PageRecord, PDFDocumentProxy } from "./types";
@@ -82,6 +83,8 @@ export function createPdfViewer(container: HTMLElement, opts: PdfViewerOptions =
   body.className = "pdf-viewer-body";
   const scrollArea = document.createElement("div");
   scrollArea.className = "pdf-scroll-area pdf-layout-horizontal";
+  // Focusable, so ← / → page through it once it has been clicked.
+  scrollArea.tabIndex = 0;
   body.appendChild(scrollArea);
 
   const annotLayer = createAnnotationLayer(scrollArea, body, {
@@ -144,6 +147,22 @@ export function createPdfViewer(container: HTMLElement, opts: PdfViewerOptions =
     goToPage: (n) => goToPage(n),
     onHide: () => tb.thumbnailBtn.classList.remove("active"),
   });
+  const search = createPdfSearch({
+    getPdfDoc: () => pdfDoc,
+    getPages: () => pages,
+    isDestroyed: () => destroyed,
+    reveal: (idx, x, y) => {
+      exitFolded();
+      const w = pages[idx]?.wrapper;
+      if (!w) return;
+      const wr = w.getBoundingClientRect();
+      const ar = scrollArea.getBoundingClientRect();
+      const left = scrollArea.scrollLeft + wr.left - ar.left + x * wr.width - scrollArea.clientWidth / 2;
+      const top = scrollArea.scrollTop + wr.top - ar.top + y * wr.height - scrollArea.clientHeight / 3;
+      scrollArea.scrollTo({ left: Math.max(0, left), top: Math.max(0, top), behavior: "smooth" });
+    },
+  });
+
   tb.thumbnailBtn.addEventListener("click", () => {
     tb.thumbnailBtn.classList.toggle("active", thumbs.toggle());
   });
@@ -231,6 +250,22 @@ export function createPdfViewer(container: HTMLElement, opts: PdfViewerOptions =
     }
   }
   window.addEventListener("keydown", onKeydown);
+
+  // ← / → while the pages have focus: the previous or next page. Quick
+  // presses count from the page last asked for, not the one the smooth
+  // scroll has reached so far.
+  let pageTarget: { page: number; at: number } | null = null;
+  scrollArea.addEventListener("keydown", (e) => {
+    if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+    if (e.defaultPrevented || e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return;
+    if (!pages.length) return;
+    e.preventDefault();
+    const recent = pageTarget && performance.now() - pageTarget.at < 700;
+    const from = recent ? pageTarget!.page : currentPage();
+    const page = Math.max(1, Math.min(pages.length, from + (e.key === "ArrowRight" ? 1 : -1)));
+    pageTarget = { page, at: performance.now() };
+    goToPage(page);
+  });
 
   function getEffectiveZoom(): number {
     const first = pages[0];
@@ -402,6 +437,7 @@ export function createPdfViewer(container: HTMLElement, opts: PdfViewerOptions =
     if (folded) foldLayer.enable();
     updateToolbarState();
     updatePageIndicator();
+    scrollArea.focus({ preventScroll: true });
   }
 
   function goToPage(n: number): void {
@@ -433,6 +469,7 @@ export function createPdfViewer(container: HTMLElement, opts: PdfViewerOptions =
 
   async function destroy(): Promise<void> {
     destroyed = true;
+    search.onChange(null);
     resizeObserver.disconnect();
     if (resizeTimer) clearTimeout(resizeTimer);
     window.removeEventListener("keydown", onKeydown);
@@ -476,6 +513,10 @@ export function createPdfViewer(container: HTMLElement, opts: PdfViewerOptions =
       return true;
     },
     toggleShelf: annotLayer.toggleShelf,
+    /** Find in the document (the toolbar's search box while reading). */
+    search: search.search,
+    searchStep: search.step,
+    onSearchChange: search.onChange,
   };
 }
 

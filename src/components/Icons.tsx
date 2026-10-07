@@ -146,6 +146,9 @@ export const CloseIcon = (p: IconProps = {}) =>
 export const ChevronRight = (p: IconProps = {}) =>
   svg(<path d="M6 3.5L10.5 8 6 12.5" />, p);
 
+export const ChevronUp = (p: IconProps = {}) =>
+  svg(<path d="M3.5 10L8 5.5 12.5 10" />, p);
+
 export const ChevronDown = (p: IconProps = {}) =>
   svg(<path d="M3.5 6L8 10.5 12.5 6" />, p);
 

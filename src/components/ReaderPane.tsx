@@ -16,6 +16,7 @@ import {
 import { insertIntoNotes } from "../lib/notes";
 import { appLog, useStore } from "../lib/store";
 import { invoke } from "../lib/tauri";
+import type { SearchStatus } from "../pdfviewer/search";
 import type { PdfViewer } from "../pdfviewer/viewer";
 import { Spinner } from "./Icons";
 
@@ -33,6 +34,19 @@ export function showInReader(attKey: string, page?: number, annotationKey?: stri
 /** The page the open viewer shows, when it shows `attKey`. */
 export function currentReaderPage(attKey: string): number | null {
   return active?.attKey === attKey ? active.viewer.currentPage() : null;
+}
+
+/** Find `query` in the open PDF; `onStatus` hears the count grow and
+ *  the current hit change. Ignored before the viewer has a PDF. */
+export function searchReader(query: string, onStatus: (s: SearchStatus) => void): void {
+  if (!active) return;
+  active.viewer.onSearchChange(onStatus);
+  void active.viewer.search(query);
+}
+
+/** Next (1) or previous (-1) hit of the search in the open PDF. */
+export function stepReaderSearch(dir: 1 | -1): void {
+  active?.viewer.searchStep(dir);
 }
 
 const addToNotes = insertIntoNotes;

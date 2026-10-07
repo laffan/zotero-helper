@@ -87,6 +87,26 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* Find in the open PDF (PdfSearchBox.tsx). */
+.pdf-search-glyph {
+  display: inline-flex;
+  color: var(--text-dim);
+}
+.pdf-search-count {
+  font-size: 11px;
+  color: var(--text-dim);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.pdf-search .pdf-search-step {
+  width: 22px;
+  height: 22px;
+}
+.pdf-search .pdf-search-step:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
 /* --- toolbar dropdowns --- */
 .sync-menu {
   left: 0;

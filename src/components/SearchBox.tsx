@@ -7,11 +7,18 @@ import { useEffect, useRef, useState } from "react";
 import { useStore } from "../lib/store";
 import { SEARCH_MODES } from "../lib/types";
 import { CheckIcon, SearchIcon } from "./Icons";
+import { PdfSearchBox } from "./PdfSearchBox";
 import { ToolbarMenu } from "./ToolbarMenu";
 
 const MENU_WIDTH = 210;
 
 export function SearchBox() {
+  const reading = useStore((s) => s.reading);
+  // With a PDF open the field searches that PDF (a fresh field per PDF).
+  return reading ? <PdfSearchBox key={reading.attKey ?? reading.itemKey} /> : <LibrarySearchBox />;
+}
+
+function LibrarySearchBox() {
   const searchQuery = useStore((s) => s.searchQuery);
   const setSearchQuery = useStore((s) => s.setSearchQuery);
   const searchMode = useStore((s) => s.searchMode);

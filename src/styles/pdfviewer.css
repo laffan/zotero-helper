@@ -36,6 +36,28 @@
   min-height: 0;
   min-width: 0;
 }
+.pdf-scroll-area:focus {
+  outline: none;
+}
+
+/* Find-in-PDF hits (search.ts), over the page in percentages. */
+.pdf-search-hits {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 1;
+}
+.pdf-search-hit {
+  position: absolute;
+  background: rgb(255 214 0 / 0.38);
+  mix-blend-mode: multiply;
+  border-radius: 1px;
+}
+.pdf-search-hit.current {
+  background: rgb(255 140 0 / 0.55);
+  box-shadow: 0 0 0 1px rgb(230 110 0 / 0.9);
+}
+
 /* Fit-width: one column. justify-content must be flex-start here — in a
    column flex, `center` pushes half of an overflowing document above
    the container, where no scrolling can reach it. */

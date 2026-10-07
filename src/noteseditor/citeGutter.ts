@@ -35,16 +35,36 @@ const caretPlaced = StateField.define<boolean>({
 
 const LINK_ICON = `<svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 9.5l3-3"/><path d="M7.5 4.5l1-1a2.8 2.8 0 0 1 4 4l-1 1"/><path d="M8.5 11.5l-1 1a2.8 2.8 0 0 1-4-4l1-1"/></svg>`;
 
+/** Line height of the notes (theme.ts), and the heading sizes, so the
+ *  icon can sit in the middle of the line's first row — where the
+ *  caret is — rather than of a wrapped paragraph. */
+const LINE_HEIGHT = 1.65;
+const HEADING_SCALE = [1.45, 1.25, 1.1];
+
 class CiteMarker extends GutterMarker {
+  /** `scale`: the line's font size relative to body text. */
+  constructor(readonly scale: number) {
+    super();
+  }
+  eq(other: CiteMarker): boolean {
+    return other.scale === this.scale;
+  }
   toDOM(): Node {
     const el = document.createElement("span");
     el.className = "cm-cite-marker";
     el.title = "Link this line to the page in view";
+    el.style.height = `${this.scale * LINE_HEIGHT}em`;
     el.innerHTML = LINK_ICON;
     return el;
   }
 }
-const marker = new CiteMarker();
+const marker = new CiteMarker(1);
+const headingMarkers = HEADING_SCALE.map((k) => new CiteMarker(k));
+
+function markerFor(text: string): CiteMarker {
+  const level = /^(#{1,6})\s/.exec(text)?.[1].length ?? 0;
+  return headingMarkers[level - 1] ?? marker;
+}
 
 /** Block markers a page link should follow rather than precede. */
 const PREFIX = /^\s*(?:(?:[-*+]\s+(?:\[[ xX]\]\s+)?|\d+[.)]\s+|#{1,6}\s+|>\s?))*/;
@@ -77,7 +97,9 @@ export function citeGutter(source: CiteSource) {
       lineMarker(view, line) {
         const { state } = view;
         if (!state.field(citeEnabled) || !state.field(caretPlaced)) return null;
-        return activeLineFrom(state) === line.from ? marker : null;
+        return activeLineFrom(state) === line.from
+          ? markerFor(state.doc.lineAt(line.from).text)
+          : null;
       },
       lineMarkerChange: (u) =>
         u.selectionSet ||
@@ -100,15 +122,18 @@ export function citeGutter(source: CiteSource) {
     EditorView.theme({
       ".cm-cite-gutter": { width: "22px" },
       // Level with the line's first row, not the middle of a wrapped
-      // paragraph.
+      // paragraph: the marker is one row tall and centres the icon.
+      // (No padding here — under the app's border-box sizing it would
+      // give CodeMirror's zero-height spacer a height and push every
+      // marker below its line.)
       ".cm-cite-gutter .cm-gutterElement": {
         display: "flex",
         alignItems: "flex-start",
         justifyContent: "center",
-        paddingTop: "5px",
       },
       ".cm-cite-marker": {
         display: "inline-flex",
+        alignItems: "center",
         color: "var(--text-dim)",
         opacity: "0.45",
         cursor: "pointer",

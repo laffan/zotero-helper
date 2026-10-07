@@ -128,7 +128,7 @@ export function Toolbar() {
   };
 
   return (
-    <header className={`toolbar ${reading ? "reading" : ""}`}>
+    <header className="toolbar">
       {!reading && (
         <button
           className="icon-btn"

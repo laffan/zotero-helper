@@ -154,8 +154,10 @@ Windows/Linux desktops too).
   items **pinned** to the top, and an **icon view** that shows each PDF's
   first page (annotations included) as a thumbnail, rendered once and
   cached on disk. A file Zotero holds with no parent entry is its own
-  attachment, so it gets a thumbnail like anything else. Both are
-  app-side only — nothing is written to Zotero.
+  attachment, so it gets a thumbnail like anything else. Once every
+  cover in a folder has been rendered, the list view shows them too,
+  tiny, in a column before the title (the list never sets off a render
+  itself). Both are app-side only — nothing is written to Zotero.
 - **Colored tags** — Zotero's colored ("numbered") tags show as swatches
   before the title in list view and on the caption's second line in icon
   view, up to four per item, in Zotero's own 1–9 order. A tag named with an
@@ -167,6 +169,14 @@ Windows/Linux desktops too).
   current collection into a "Flagged" list pinned above Library in the
   sidebar (the list hides itself when nothing is flagged; unflag from
   either end). Local only, like pins and view modes.
+- **Folder menu** — hovering a folder in the sidebar shows a menu
+  button at the right of its row (always shown, faintly, on a touch
+  screen): flag or unflag it, rename it (in place; the collection is
+  renamed in Zotero), download all of its PDFs to the device, or delete
+  it (a second click confirms).
+- **Panel buttons** — the two panel icons at the ends of the toolbar
+  fold the sidebar and the details panel away and back on a wide
+  window, and slide them in as drawers on a narrow one.
 - **Attachments** — the metadata panel lists every attachment on an item
   (Zotero allows many), each with its own share button. Selecting a file
   that has *no* parent entry swaps the full editor for a short panel —
@@ -193,7 +203,14 @@ Windows/Linux desktops too).
   Markdown to edit it. The right end of the tab bar holds the entry's
   PDF: **Download PDF**, then **View PDF**, which turns the sidebar and
   item list into a PDF viewer beside the notes (**Close PDF** brings
-  them back). The viewer is a port of Hush's: horizontal or vertical
+  them back). Double-clicking an entry does both at once (an entry with
+  no PDF opens in Zotero instead). While the PDF is open the toolbar
+  shrinks to what applies to it — **Share** and **Sync** for that entry
+  (Sync fetches new highlights and pushes the notes, or downloads the
+  PDF again) and the document's name — and the search field finds
+  words in the PDF: hits are boxed on the pages and stepped through
+  with Enter / ⇧Enter (⌘F returns to the field). ← / → turn the page
+  while the pages have focus. The viewer is a port of Hush's: horizontal or vertical
   scrolling, fit one / two / three pages, zoom, a thumbnail grid, the
   PDF's own links, Zotero's highlights, underlines and ink painted into
   the pages, an annotation shelf with its own filter and colour row, and
@@ -247,7 +264,11 @@ Windows/Linux desktops too).
 - **What we have for each entry** — two marker columns at the right of the
   item list: one for a PDF attachment, one for an abstract on record. Both
   are what the AI features work from, so it's worth being able to see at a
-  glance which entries are ready.
+  glance which entries are ready. The PDF mark is filled once that PDF is
+  downloaded to this device. Holding ⌘ (Ctrl on Windows/Linux) turns the
+  marks into buttons — download on the empty ones, remove on the filled
+  — that act without changing the selection; the icon view shows the
+  same mark, smaller, at the right of each caption's author line.
 - **The details panel reads as a record.** Fields show their values as
   text — the abstract in full, not squeezed into a five-row textarea —
   and hovering a field's label reveals a small **Edit** link that swaps
@@ -361,7 +382,7 @@ src/            React + TypeScript UI (Vite, zustand, MiniSearch)
   pdfviewer/    the PDF viewer beside the notes, ported from Hush (viewer,
                 render, paint (annotations into the rasters), shelf,
                 folds, thumbnails, links, toolbar) plus pageTools (text
-                layer, notes hooks)
+                layer, notes hooks) and search (find in the PDF)
   noteseditor/  the notes editor: CodeMirror setup, live preview,
                 Zotero-link pills, the cite-this-page gutter
   styles/       one stylesheet per UI region (tokens, base, toolbar, …)
@@ -382,6 +403,13 @@ src-tauri/      Rust core (all networking + state)
   src/chats.rs     the Questions conversations on disk
   src/capture.rs   desktop capture-browser window (download interception)
 ```
+
+pdf.js loads some of what it needs by URL at run time — the
+WebAssembly JBIG2 / JPEG 2000 decoders that scanned PDFs depend on,
+ICC profiles, standard fonts, CMaps. `vite.config.ts` serves those
+directories of `pdfjs-dist` under `/pdfjs/` and copies them into the
+build, and `src/lib/pdfjsAssets.ts` hands every `getDocument` call
+their URLs.
 
 The library cache and settings live in the platform app-data directory as
 plain JSON. The import pipeline is orchestrated from the frontend (one job at

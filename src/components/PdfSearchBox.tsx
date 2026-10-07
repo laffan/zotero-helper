@@ -12,13 +12,11 @@ const DEBOUNCE_MS = 250;
 export function PdfSearchBox() {
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState<SearchStatus | null>(null);
-  const searched = useRef("");
   const timer = useRef(0);
   const input = useRef<HTMLInputElement>(null);
 
   const run = (q: string) => {
     window.clearTimeout(timer.current);
-    searched.current = q;
     searchReader(q, setStatus);
   };
 
@@ -37,8 +35,10 @@ export function PdfSearchBox() {
     };
   }, []);
 
+  // A query the viewer hasn't searched yet (still being typed, or typed
+  // before the PDF finished opening) is searched rather than stepped.
   const step = (dir: 1 | -1) => {
-    if (query.trim() !== searched.current.trim()) run(query);
+    if (status?.query !== query.trim()) run(query);
     else stepReaderSearch(dir);
   };
 

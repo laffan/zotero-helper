@@ -1,6 +1,6 @@
 // The menu at the right of a sidebar folder: flag, rename, download all
 // of its PDFs to this device, delete. The button shows while the row is
-// hovered (always, faintly, where there is no hover — sidebar.css).
+// hovered or the menu is open (sidebar.css).
 import { useState } from "react";
 import { deleteFolder } from "../lib/actions";
 import { cacheFolderPdfs } from "../lib/notes";

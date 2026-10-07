@@ -34,8 +34,18 @@ interface Hit {
   rects: { x: number; y: number; w: number; h: number }[];
 }
 
+/** A hit as the results list shows it: the page, and the match with
+ *  the text either side of it. */
+export interface HitSummary {
+  page: number; // 1-based
+  before: string;
+  match: string;
+  after: string;
+}
+
 export interface SearchStatus {
   query: string;
+  hits: HitSummary[];
   total: number;
   /** 1-based index of the current hit; 0 when there is none. */
   current: number;
@@ -54,6 +64,29 @@ export interface SearchEnv {
 
 const escapeRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
+/** Characters of context before and after a match — about three lines'
+ *  in the results list, which clamps to three. The shorter lead-in
+ *  keeps the match itself within the first two. */
+const BEFORE = 60;
+const AFTER = 130;
+
+const squash = (t: string) => t.replace(/\s+/g, " ");
+
+/** The match in `text` at [from, to) with its context, cut at word
+ *  boundaries and marked with an ellipsis where the page goes on. */
+function summarize(text: string, from: number, to: number, page: number): HitSummary {
+  let a = Math.max(0, from - BEFORE);
+  let b = Math.min(text.length, to + AFTER);
+  if (a > 0) a = Math.min(from, text.indexOf(" ", a) + 1 || a);
+  if (b < text.length) b = Math.max(to, text.lastIndexOf(" ", b) === -1 ? b : text.lastIndexOf(" ", b));
+  return {
+    page: page + 1,
+    before: (a > 0 ? "…" : "") + squash(text.slice(a, from)).trimStart(),
+    match: squash(text.slice(from, to)),
+    after: squash(text.slice(to, b)).trimEnd() + (b < text.length ? "…" : ""),
+  };
+}
+
 function applyTransform(m: number[], x: number, y: number): [number, number] {
   return [m[0] * x + m[2] * y + m[4], m[1] * x + m[3] * y + m[5]];
 }
@@ -61,6 +94,7 @@ function applyTransform(m: number[], x: number, y: number): [number, number] {
 export function createPdfSearch(env: SearchEnv) {
   const texts = new Map<number, PageText>();
   let hits: Hit[] = [];
+  let summaries: HitSummary[] = [];
   let current = -1;
   let query = "";
   let token = 0;
@@ -144,7 +178,7 @@ export function createPdfSearch(env: SearchEnv) {
   }
 
   function status(): SearchStatus {
-    return { query, total: hits.length, current: current + 1, done };
+    return { query, hits: summaries.slice(), total: hits.length, current: current + 1, done };
   }
   const notify = () => listener?.(status());
 
@@ -191,11 +225,18 @@ export function createPdfSearch(env: SearchEnv) {
     const my = ++token;
     query = q.trim();
     hits = [];
+    summaries = [];
     current = -1;
     clearOverlays();
     const doc = env.getPdfDoc();
-    if (!query || !doc) {
+    if (!query) {
       done = true;
+      return notify();
+    }
+    // Typed before the PDF finished opening: left pending ("…") and run
+    // by rerun() once the document is there.
+    if (!doc) {
+      done = false;
       return notify();
     }
     done = false;
@@ -208,7 +249,10 @@ export function createPdfSearch(env: SearchEnv) {
       let found = false;
       for (const m of pt.text.matchAll(re)) {
         if (!m[0]) continue;
-        hits.push({ page: i, rects: rectsFor(pt, m.index ?? 0, (m.index ?? 0) + m[0].length) });
+        const from = m.index ?? 0;
+        const to = from + m[0].length;
+        hits.push({ page: i, rects: rectsFor(pt, from, to) });
+        summaries.push(summarize(pt.text, from, to, i));
         found = true;
       }
       if (found) {
@@ -227,6 +271,16 @@ export function createPdfSearch(env: SearchEnv) {
     select((current + dir + hits.length) % hits.length);
   }
 
+  /** Show hit `idx` (0-based) — a click in the results list. */
+  function goTo(idx: number): void {
+    if (idx >= 0 && idx < hits.length) select(idx);
+  }
+
+  /** Search again for the current query — after the document loads. */
+  function rerun(): void {
+    if (query) void search(query);
+  }
+
   function clear(): void {
     void search("");
   }
@@ -234,6 +288,8 @@ export function createPdfSearch(env: SearchEnv) {
   return {
     search,
     step,
+    goTo,
+    rerun,
     clear,
     onChange: (fn: ((s: SearchStatus) => void) | null) => {
       listener = fn;

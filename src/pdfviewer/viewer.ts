@@ -437,7 +437,11 @@ export function createPdfViewer(container: HTMLElement, opts: PdfViewerOptions =
     if (folded) foldLayer.enable();
     updateToolbarState();
     updatePageIndicator();
-    scrollArea.focus({ preventScroll: true });
+    // Ready for ← / →, unless the reader is already typing somewhere
+    // (the search field, the notes).
+    const focused = document.activeElement;
+    if (!focused || focused === document.body) scrollArea.focus({ preventScroll: true });
+    search.rerun();
   }
 
   function goToPage(n: number): void {
@@ -516,6 +520,7 @@ export function createPdfViewer(container: HTMLElement, opts: PdfViewerOptions =
     /** Find in the document (the toolbar's search box while reading). */
     search: search.search,
     searchStep: search.step,
+    searchGoTo: search.goTo,
     onSearchChange: search.onChange,
   };
 }

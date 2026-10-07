@@ -49,6 +49,11 @@ export function stepReaderSearch(dir: 1 | -1): void {
   active?.viewer.searchStep(dir);
 }
 
+/** Show hit `idx` (0-based) of the search in the open PDF. */
+export function goToReaderSearchHit(idx: number): void {
+  active?.viewer.searchGoTo(idx);
+}
+
 const addToNotes = insertIntoNotes;
 
 export function ReaderPane() {

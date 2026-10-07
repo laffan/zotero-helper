@@ -106,6 +106,68 @@
   opacity: 0.35;
   cursor: default;
 }
+/* The ✕ that stands in for the magnifier while there is a query. */
+.pdf-search .pdf-search-clear {
+  width: 22px;
+  height: 22px;
+  margin-left: -4px;
+}
+/* The list of matches under the field: page, then up to three lines of
+   the text around the match. */
+.pdf-hits {
+  display: flex;
+  flex-direction: column;
+  max-height: min(60vh, 520px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  margin: -4px;
+}
+.pdf-hit {
+  display: flex;
+  gap: 10px;
+  align-items: baseline;
+  padding: 7px 8px;
+  border-radius: 5px;
+  text-align: left;
+}
+.pdf-hit:hover {
+  background: var(--panel-alt);
+}
+.pdf-hit.current {
+  background: var(--select-strong);
+}
+.pdf-hit-page {
+  flex-shrink: 0;
+  width: 3.6em;
+  font-size: 11px;
+  color: var(--text-dim);
+  font-variant-numeric: tabular-nums;
+}
+.pdf-hit-text {
+  flex: 1;
+  min-width: 0;
+  font-size: 12px;
+  line-height: 1.4;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+  overflow: hidden;
+}
+.pdf-hit-text mark {
+  background: rgb(255 200 0 / 0.45);
+  color: inherit;
+  border-radius: 2px;
+}
+.pdf-hits-more {
+  padding: 8px;
+  font-size: 12px;
+  color: var(--accent);
+  border-radius: 5px;
+}
+.pdf-hits-more:hover {
+  background: var(--panel-alt);
+}
 
 /* --- toolbar dropdowns --- */
 .sync-menu {

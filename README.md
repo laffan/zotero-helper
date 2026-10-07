@@ -170,8 +170,7 @@ Windows/Linux desktops too).
   sidebar (the list hides itself when nothing is flagged; unflag from
   either end). Local only, like pins and view modes.
 - **Folder menu** — hovering a folder in the sidebar shows a menu
-  button at the right of its row (always shown, faintly, on a touch
-  screen): flag or unflag it, rename it (in place; the collection is
+  button at the right of its row: flag or unflag it, rename it (in place; the collection is
   renamed in Zotero), download all of its PDFs to the device, or delete
   it (a second click confirms).
 - **Panel buttons** — the two panel icons at the ends of the toolbar
@@ -208,8 +207,11 @@ Windows/Linux desktops too).
   shrinks to what applies to it — **Share** and **Sync** for that entry
   (Sync fetches new highlights and pushes the notes, or downloads the
   PDF again) and the document's name — and the search field finds
-  words in the PDF: hits are boxed on the pages and stepped through
-  with Enter / ⇧Enter (⌘F returns to the field). ← / → turn the page
+  words in the PDF: hits are boxed on the pages, listed under the field
+  with their page and a few lines of the surrounding text (a hundred at
+  a time, with *Show more matches* below), and stepped through with
+  Enter / ⇧Enter; the magnifier turns into a clear button while there
+  is a query, and ⌘F returns to the field. ← / → turn the page
   while the pages have focus. The viewer is a port of Hush's: horizontal or vertical
   scrolling, fit one / two / three pages, zoom, a thumbnail grid, the
   PDF's own links, Zotero's highlights, underlines and ink painted into

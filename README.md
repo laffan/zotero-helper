@@ -310,16 +310,11 @@ attached), `--install-only`, and `--export-method <m>` / the
 
 Notes for the iPad build:
 
-- The minimum iOS version is 15.0 (`bundle > iOS > minimumSystemVersion`
-  in `tauri.conf.json`; current Xcode refuses anything older). That value
-  is copied into the Xcode project when `tauri ios init` generates it, so
-  a project generated under an older floor has to be regenerated
-  (`npm run tauri ios init`, then set the signing team again) or have its
-  deployment target raised by hand:
-  `sed -i '' 's/IPHONEOS_DEPLOYMENT_TARGET = 14.0;/IPHONEOS_DEPLOYMENT_TARGET = 15.0;/' src-tauri/gen/apple/zotero-helper.xcodeproj/project.pbxproj`
-  plus `iOS: 14.0` → `iOS: 15.0` under `deploymentTarget` in
-  `src-tauri/gen/apple/project.yml`.
-
+- Xcode 27 (iOS 27 SDK) needs Tauri 2.12 or later: its `swift build`
+  uses the new Swift Build backend, which older swift-rs (pulled in by
+  Tauri ≤ 2.11) can't drive, and the build fails compiling Tauri's own
+  Swift package against the macOS SDK. The minimum iOS version is 15.0
+  (`bundle > iOS > minimumSystemVersion` in `tauri.conf.json`).
 - The capture browser works in-app on iPad via a custom plugin
   (`src-tauri/tauri-plugin-capture-view/`): a native WKWebView overlays the
   modal body, PDFs are recognized by response MIME type and downloaded

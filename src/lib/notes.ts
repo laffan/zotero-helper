@@ -7,7 +7,8 @@
 // unpushed, when the app goes to the background, and when the PDF
 // beside the notes is closed. Opening a note asks Zotero first whether its copy has
 // changed, so notes written on another device arrive.
-import { itemTitle, pdfAttachmentOf, REAL_KEY } from "./collections";
+import { scheduleTrayClear } from "../components/TaskTray";
+import { itemsForCollection, itemTitle, pdfAttachmentOf, REAL_KEY } from "./collections";
 import { appLog, useStore } from "./store";
 import { invoke, isTauri } from "./tauri";
 import type {
@@ -144,6 +145,41 @@ export async function cacheItemPdf(itemKey: string): Promise<void> {
   const item = library.items.find((i) => i.key === itemKey);
   if (!att || !item || cachedPdfs[att.key] || pdfsDownloading.includes(att.key)) return;
   await cachePdf(att, itemKey, itemTitle(item));
+}
+
+/** Download every PDF in a folder that isn't on this device yet — the
+ *  sidebar folder menu's "Download all PDFs". One at a time, with the
+ *  progress in the task tray. */
+export async function cacheFolderPdfs(collectionKey: string): Promise<void> {
+  const st = useStore.getState();
+  const items = st.library.items;
+  const todo = itemsForCollection(items, collectionKey).filter((i) => {
+    const att = pdfAttachmentOf(items, i.key);
+    return att && !st.cachedPdfs[att.key];
+  });
+  const name = String(
+    st.library.collections.find((c) => c.key === collectionKey)?.data?.name ?? "folder",
+  );
+  if (!todo.length) {
+    appLog("info", `Every PDF in “${name}” is already on this device`);
+    return;
+  }
+  st.startUiTasks(`Download PDFs · ${name}`, todo.map((i) => ({ id: i.key, title: itemTitle(i) })));
+  try {
+    for (const item of todo) {
+      const { updateUiTask } = useStore.getState();
+      updateUiTask(item.key, { status: "working" });
+      try {
+        await cacheItemPdf(item.key);
+        updateUiTask(item.key, { status: "done" });
+      } catch (e) {
+        appLog("error", `Downloading the PDF of “${itemTitle(item)}” failed: ${e}`);
+        updateUiTask(item.key, { status: "error", note: String(e).slice(0, 80) });
+      }
+    }
+  } finally {
+    scheduleTrayClear();
+  }
 }
 
 /** Take an attachment's PDF off this device. */

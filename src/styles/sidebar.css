@@ -56,19 +56,45 @@
   font-size: 11px;
   color: var(--text-dim);
 }
-/* Unflag, on rows in the Flagged section. Dim rather than hover-only:
-   an iPad has no hover, and losing the control there would strand the
-   folder at the top of the sidebar. */
-.tree-unflag {
+/* The folder menu (FolderMenu.tsx): shown on hover, and while open.
+   Faint but always there without hover — an iPad would otherwise have
+   no way to reach it. */
+.tree-menu {
+  display: inline-flex;
+  margin-left: auto;
+  visibility: hidden;
+}
+.tree-row:hover .tree-menu,
+.tree-menu.open {
+  visibility: visible;
+}
+@media (hover: none) {
+  .tree-menu {
+    visibility: visible;
+    opacity: 0.5;
+  }
+}
+.tree-menu-btn {
   display: inline-flex;
   align-items: center;
-  padding: 2px;
-  border: none;
-  background: none;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  margin: -2px -2px -2px 0;
+  border-radius: 4px;
   color: var(--text-dim);
-  opacity: 0.5;
 }
-.tree-unflag:hover {
-  opacity: 1;
+.tree-menu-btn:hover,
+.tree-menu.open .tree-menu-btn {
+  background: var(--select-strong);
+  color: var(--text);
+}
+.tree-rename {
+  flex: 1;
+  min-width: 0;
+  padding: 1px 4px;
+  font-size: inherit;
+}
+.menu-item.danger strong {
   color: var(--bad);
 }

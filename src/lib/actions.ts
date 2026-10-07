@@ -260,6 +260,23 @@ export async function createFolder(
   await syncNow(false);
 }
 
+export async function renameFolder(key: string, name: string): Promise<void> {
+  const col = useStore.getState().library.collections.find((c) => c.key === key);
+  const next = name.trim();
+  if (!col || !next || next === col.data?.name) return;
+  await invoke("rename_collection", { key, version: col.version, name: next });
+  appLog("info", `Collection “${col.data?.name}” renamed to “${next}”`);
+  // Shown at once; the sync brings the new version number.
+  const st = useStore.getState();
+  st.setLibrary({
+    ...st.library,
+    collections: st.library.collections.map((c) =>
+      c.key === key ? { ...c, data: { ...c.data, name: next } } : c,
+    ),
+  });
+  await syncNow(false);
+}
+
 export async function deleteFolder(key: string): Promise<void> {
   const col = useStore
     .getState()

@@ -1,19 +1,53 @@
-import { useMemo } from "react";
+import { useMemo, useRef, useState } from "react";
+import { renameFolder } from "../lib/actions";
 import {
   buildTree,
   collectionPaths,
   type CollectionNode,
 } from "../lib/collections";
 import { useDragging, useIsDropTarget } from "../lib/dragdrop";
-import { QUESTIONS, useStore } from "../lib/store";
+import { appLog, QUESTIONS, useStore } from "../lib/store";
+import { FolderMenu } from "./FolderMenu";
 import {
   ChatIcon,
   ChevronDown,
   ChevronRight,
-  CloseIcon,
   FlagIcon,
   Folder,
 } from "./Icons";
+
+/** A folder's name while it is being renamed: Enter (or leaving the
+ *  field) renames it in Zotero, Escape leaves it as it was. */
+function RenameField({ folderKey, name, onDone }: { folderKey: string; name: string; onDone: () => void }) {
+  const [value, setValue] = useState(name);
+  // Enter unmounts the field, which can also blur it — rename once.
+  const finished = useRef(false);
+  const finish = (commit: boolean) => {
+    if (finished.current) return;
+    finished.current = true;
+    onDone();
+    if (commit && value.trim() && value.trim() !== name) {
+      renameFolder(folderKey, value).catch((e) => appLog("error", `Rename failed: ${e}`));
+    }
+  };
+  return (
+    <input
+      className="tree-rename"
+      value={value}
+      autoFocus
+      onFocus={(e) => e.currentTarget.select()}
+      onChange={(e) => setValue(e.target.value)}
+      onClick={(e) => e.stopPropagation()}
+      onPointerDown={(e) => e.stopPropagation()}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") finish(true);
+        else if (e.key === "Escape") finish(false);
+      }}
+      onBlur={() => finish(true)}
+      aria-label="Folder name"
+    />
+  );
+}
 
 function Node({ node, depth }: { node: CollectionNode; depth: number }) {
   const { selectedCollection, selectCollection, toggleFolder } = useStore();
@@ -23,6 +57,7 @@ function Node({ node, depth }: { node: CollectionNode; depth: number }) {
   const hasChildren = node.children.length > 0;
   // Items dragged from the list land here (see lib/dragdrop).
   const dropOver = useIsDropTarget(node.key);
+  const [renaming, setRenaming] = useState(false);
 
   return (
     <>
@@ -50,7 +85,12 @@ function Node({ node, depth }: { node: CollectionNode; depth: number }) {
           <span className="tree-toggle-spacer" />
         )}
         {flagged ? <FlagIcon size={14} filled /> : <Folder size={14} />}
-        <span className="tree-name">{node.name}</span>
+        {renaming ? (
+          <RenameField folderKey={node.key} name={node.name} onDone={() => setRenaming(false)} />
+        ) : (
+          <span className="tree-name">{node.name}</span>
+        )}
+        <FolderMenu folderKey={node.key} name={node.name} onRename={() => setRenaming(true)} />
       </div>
       {open &&
         node.children.map((c) => (
@@ -66,20 +106,19 @@ interface FlaggedFolder {
   path: string;
 }
 
-/** A row in the Flagged section: same drop behavior as a tree row, but
- *  flat and with its own unflag control. */
+/** A row in the Flagged section: same drop behavior and menu as a tree
+ *  row (unflag is in the menu), but flat. */
 function FlaggedRow({
   folder,
   selected,
   onSelect,
-  onUnflag,
 }: {
   folder: FlaggedFolder;
   selected: boolean;
   onSelect: () => void;
-  onUnflag: () => void;
 }) {
   const dropOver = useIsDropTarget(folder.key);
+  const [renaming, setRenaming] = useState(false);
   return (
     <div
       className={`tree-row ${selected ? "selected" : ""} ${dropOver ? "drop-over" : ""}`}
@@ -91,18 +130,12 @@ function FlaggedRow({
     >
       <span className="tree-toggle-spacer" />
       <FlagIcon size={14} filled />
-      <span className="tree-name">{folder.name}</span>
-      <button
-        className="tree-unflag"
-        onClick={(e) => {
-          e.stopPropagation();
-          onUnflag();
-        }}
-        aria-label={`Unflag ${folder.name}`}
-        title="Remove from Flagged"
-      >
-        <CloseIcon size={11} />
-      </button>
+      {renaming ? (
+        <RenameField folderKey={folder.key} name={folder.name} onDone={() => setRenaming(false)} />
+      ) : (
+        <span className="tree-name">{folder.name}</span>
+      )}
+      <FolderMenu folderKey={folder.key} name={folder.name} onRename={() => setRenaming(true)} />
     </div>
   );
 }
@@ -118,7 +151,6 @@ export function Sidebar() {
   const dragging = useDragging();
   const chatCount = useStore((s) => s.chats.length);
   const flaggedKeys = useStore((s) => s.flaggedFolders);
-  const toggleFlag = useStore((s) => s.toggleFlag);
   const tree = useMemo(() => buildTree(collections), [collections]);
 
   // Flags are stored as bare keys, so a collection deleted in Zotero
@@ -155,7 +187,6 @@ export function Sidebar() {
                 folder={f}
                 selected={selectedCollection === f.key}
                 onSelect={() => selectCollection(f.key)}
-                onUnflag={() => toggleFlag(f.key)}
               />
             ))}
           </>

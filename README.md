@@ -321,9 +321,19 @@ Notes for the iPad build:
   own runtime shim, and a release build fails to link on
   `_retain_object` / `_release_object` / `_string_from_bytes`.
   `src-tauri/vendor/swift-rs` is 1.0.8 with the fix from
-  [swift-rs#82](https://github.com/Brendonovich/swift-rs/pull/82),
-  patched in from `src-tauri/Cargo.toml`; delete both once a swift-rs
-  release includes it.
+  [swift-rs#82](https://github.com/Brendonovich/swift-rs/pull/82)
+  (issue [#81](https://github.com/Brendonovich/swift-rs/issues/81)),
+  patched in from `src-tauri/Cargo.toml`.
+
+  **Once a swift-rs release includes that fix**, undo the workaround:
+  1. delete `src-tauri/vendor/swift-rs`;
+  2. delete the `[patch.crates-io]` section (and its comment) at the end
+     of `src-tauri/Cargo.toml`, then run `cargo update -p swift-rs` in
+     `src-tauri` so the lockfile picks up the release;
+  3. delete this bullet.
+
+  Keep `rust-toolchain.toml`: swift-rs still needs `llvm-tools` to build
+  for iOS with Xcode 27.
 - The capture browser works in-app on iPad via a custom plugin
   (`src-tauri/tauri-plugin-capture-view/`): a native WKWebView overlays the
   modal body, PDFs are recognized by response MIME type and downloaded

@@ -32,24 +32,42 @@
 .list-header .col:hover {
   color: var(--text);
 }
+/* Column grab handle, at the start of each resizable header (it sits
+   inside the cell: the headers clip what overflows them). */
 .col-grip {
   position: absolute;
   top: 0;
   bottom: 0;
-  right: -4px;
+  left: 0;
   width: 9px;
   cursor: col-resize;
   touch-action: none;
   z-index: 1;
 }
-.col-grip:hover {
-  background: linear-gradient(
-    to right,
-    transparent 3px,
-    var(--border) 4px,
-    var(--border) 5px,
-    transparent 6px
-  );
+.col-grip::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 2px;
+  width: 3px;
+  height: 12px;
+  transform: translateY(-50%);
+  border-left: 1px solid var(--border);
+  border-right: 1px solid var(--border);
+}
+/* Room for the handle before the label, matched in the rows so the
+   cells stay under their headers. */
+.list-header .col-creator,
+.list-header .col-year,
+.list-header .col-added,
+.item-row .col-creator,
+.item-row .col-year,
+.item-row .col-added {
+  padding-left: 13px;
+}
+.col-grip:hover::before,
+.col-grip:active::before {
+  border-color: var(--accent);
 }
 .col-title {
   flex: 1;

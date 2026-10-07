@@ -176,7 +176,7 @@ export function Toolbar() {
         </button>
         <span className="toolbar-sep" />
         <button
-          className="tool-btn accent"
+          className="tool-btn"
           onClick={() => setModal({ kind: "import" })}
           title="Import DOIs / ISBNs / arXiv IDs / URLs with PDFs"
         >

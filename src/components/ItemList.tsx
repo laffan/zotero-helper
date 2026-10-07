@@ -63,7 +63,9 @@ function ListCover({ attKey }: { attKey: string }) {
   return thumb ? <img src={thumb} alt="" /> : null;
 }
 
-/** Drag handle on a header column's right edge. */
+/** Grab handle at the start of a header column. The title column takes
+ *  whatever room is left, so a column grows leftwards: dragging its
+ *  handle left widens it and the handle stays under the pointer. */
 function ColGrip({ col }: { col: ResizableCol }) {
   const start = (e: React.PointerEvent) => {
     e.preventDefault();
@@ -71,7 +73,7 @@ function ColGrip({ col }: { col: ResizableCol }) {
     const startX = e.clientX;
     const startW = useStore.getState().colWidths[col];
     const onMove = (ev: PointerEvent) => {
-      const w = Math.min(420, Math.max(40, startW + ev.clientX - startX));
+      const w = Math.min(420, Math.max(40, startW - (ev.clientX - startX)));
       useStore.getState().setColWidth(col, w);
     };
     const onUp = () => {
@@ -86,6 +88,8 @@ function ColGrip({ col }: { col: ResizableCol }) {
       className="col-grip"
       onPointerDown={start}
       onClick={(e) => e.stopPropagation()}
+      title="Drag to resize the column"
+      aria-hidden="true"
     />
   );
 }
@@ -385,16 +389,16 @@ export function ItemList() {
           Title{sortIndicator("title")}
         </button>
         <button className="col col-creator" onClick={() => setSort("creator")}>
-          Creator{sortIndicator("creator")}
           <ColGrip col="creator" />
+          Creator{sortIndicator("creator")}
         </button>
         <button className="col col-year" onClick={() => setSort("date")}>
-          Year{sortIndicator("date")}
           <ColGrip col="year" />
+          Year{sortIndicator("date")}
         </button>
         <button className="col col-added" onClick={() => setSort("dateAdded")}>
-          Added{sortIndicator("dateAdded")}
           <ColGrip col="added" />
+          Added{sortIndicator("dateAdded")}
         </button>
         {/* Tooltips drawn in CSS (itemlist.css): these headers are bare
             glyphs, and a native title tooltip is slow to come, when the

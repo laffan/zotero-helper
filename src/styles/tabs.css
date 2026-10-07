@@ -111,6 +111,14 @@
 .hl-row {
   cursor: default;
 }
+/* The PDF is open: a row takes you to its highlight. */
+.hl-row.navigable {
+  cursor: pointer;
+}
+.hl-row.shown {
+  background: rgb(128 128 128 / 0.14);
+  box-shadow: inset 0 0 0 1px var(--border);
+}
 .hl-group {
   font-size: 12px;
   font-weight: 600;

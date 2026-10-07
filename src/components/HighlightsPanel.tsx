@@ -5,13 +5,16 @@
 //
 // Several selected entries (or one with several PDFs) list under a
 // heading per PDF. Nothing is fetched: annotations arrive with every
-// sync (src/lib/highlights.ts), and ↻ runs an incremental one.
+// sync (src/lib/highlights.ts), and ↻ runs an incremental one. While
+// the PDF is open beside the panel, clicking a highlight scrolls the
+// viewer to it.
 import { useMemo, useState } from "react";
 import { openInZotero, syncNow } from "../lib/actions";
 import { attachmentName, itemTitle } from "../lib/collections";
 import {
   annotatableAttachments,
   annotationIndexFor,
+  annotationPosition,
   annotationMarkdown,
   colorsOf,
   matchesQuery,
@@ -20,6 +23,7 @@ import {
 import { useStore } from "../lib/store";
 import type { ZItem } from "../lib/types";
 import { CopyIcon, Refresh, Spinner } from "./Icons";
+import { showInReader } from "./ReaderPane";
 
 interface Group {
   item: ZItem;
@@ -62,6 +66,9 @@ export function HighlightsPanel({ items }: { items: ZItem[] }) {
   const library = useStore((s) => s.library.items);
   const settings = useStore((s) => s.settings);
   const syncing = useStore((s) => s.syncing);
+  // With the PDF open beside the panel, a highlight is a place to go.
+  const openAttKey = useStore((s) => s.reading?.attKey ?? null);
+  const [shownKey, setShownKey] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [color, setColor] = useState<string | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
@@ -90,6 +97,15 @@ export function HighlightsPanel({ items }: { items: ZItem[] }) {
     } catch {
       setCopied(null);
     }
+  };
+
+  /** Scroll the open PDF to the highlight. */
+  const reveal = (g: Group, a: Annotation) => {
+    if (g.att.key !== openAttKey) return;
+    // A text selection in the row is someone copying, not navigating.
+    if (window.getSelection()?.toString()) return;
+    const page = annotationPosition(a)?.pageIndex;
+    if (showInReader(g.att.key, page != null ? page + 1 : undefined, a.key)) setShownKey(a.key);
   };
 
   const open = (g: Group, a: Annotation) => {
@@ -154,9 +170,13 @@ export function HighlightsPanel({ items }: { items: ZItem[] }) {
               )}
               {g.list.map((a) => (
                 <div
-                  className="hl-row"
+                  className={`hl-row ${g.att.key === openAttKey ? "navigable" : ""} ${
+                    shownKey === a.key ? "shown" : ""
+                  }`}
                   key={a.key}
                   style={a.color ? { borderLeftColor: a.color } : undefined}
+                  onClick={() => reveal(g, a)}
+                  title={g.att.key === openAttKey ? "Show in the PDF" : undefined}
                 >
                   {a.text && (
                     <div className="hl-text">
@@ -175,14 +195,20 @@ export function HighlightsPanel({ items }: { items: ZItem[] }) {
                     <span className="hl-actions">
                       <button
                         className="link-btn"
-                        onClick={() => void copy(a)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          void copy(a);
+                        }}
                         title="Copy as a Markdown quote with a link back to the page"
                       >
                         {copied === a.key ? "Copied" : <CopyIcon size={11} />}
                       </button>
                       <button
                         className="link-btn"
-                        onClick={() => open(g, a)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          open(g, a);
+                        }}
                         title="Open the PDF in Zotero at this highlight"
                       >
                         Open in Zotero ↗

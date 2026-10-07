@@ -13,6 +13,7 @@
 // their place) and Extract Annotations (pdf.js already paints a file's
 // own annotations into the page).
 import type { Annotation } from "../lib/highlights";
+import { PDFJS_ASSETS } from "../lib/pdfjsAssets";
 import { createAnnotationLayer } from "./annotations";
 import { createFoldLayer } from "./folds";
 import { createLinkLayerManager } from "./links";
@@ -353,7 +354,7 @@ export function createPdfViewer(container: HTMLElement, opts: PdfViewerOptions =
     scrollArea.innerHTML = "";
 
     const bytes = data instanceof Uint8Array ? data : new Uint8Array(data);
-    const doc = await pdfjs.getDocument({ data: bytes }).promise;
+    const doc = await pdfjs.getDocument({ data: bytes, ...PDFJS_ASSETS }).promise;
     if (destroyed) {
       await doc.loadingTask.destroy();
       return;

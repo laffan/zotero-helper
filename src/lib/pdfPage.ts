@@ -13,6 +13,7 @@ import {
   type QuoteHit,
   type TextRun,
 } from "./pdfHighlight";
+import { PDFJS_ASSETS } from "./pdfjsAssets";
 
 pdfjs.GlobalWorkerOptions.workerSrc = new URL(
   "pdfjs-dist/build/pdf.worker.min.mjs",
@@ -176,7 +177,7 @@ export async function renderPageDataUrl(
   /** Present whenever a passage was searched for. */
   report?: QuoteReport;
 }> {
-  const task = pdfjs.getDocument({ data: data.slice(0) });
+  const task = pdfjs.getDocument({ data: data.slice(0), ...PDFJS_ASSETS });
   try {
     const doc = await task.promise;
     const pages = doc.numPages;
@@ -344,7 +345,7 @@ async function renderPageJpeg(
   quality: number,
   annotations: ThumbAnnotation[],
 ): Promise<string> {
-  const task = pdfjs.getDocument({ data });
+  const task = pdfjs.getDocument({ data, ...PDFJS_ASSETS });
   try {
     const doc = await task.promise;
     const page = await doc.getPage(pageNumber);

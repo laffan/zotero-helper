@@ -1,0 +1,6 @@
+# swift-rs needs llvm-objcopy (rustup's llvm-tools component) to build for
+# iOS with Xcode 27 — see the [patch.crates-io] note in src-tauri/Cargo.toml. Listing
+# it here lets rustup install it on first use.
+[toolchain]
+channel = "stable"
+components = ["llvm-tools"]

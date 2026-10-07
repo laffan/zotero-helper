@@ -315,6 +315,15 @@ Notes for the iPad build:
   Tauri ≤ 2.11) can't drive, and the build fails compiling Tauri's own
   Swift package against the macOS SDK. The minimum iOS version is 15.0
   (`bundle > iOS > minimumSystemVersion` in `tauri.conf.json`).
+- Xcode 27 also builds Swift `@_cdecl` exports as local symbols, which
+  swift-rs repairs with `llvm-objcopy` — so `rust-toolchain.toml` asks
+  rustup for the `llvm-tools` component — but swift-rs 1.0.8 misses its
+  own runtime shim, and a release build fails to link on
+  `_retain_object` / `_release_object` / `_string_from_bytes`.
+  `src-tauri/vendor/swift-rs` is 1.0.8 with the fix from
+  [swift-rs#82](https://github.com/Brendonovich/swift-rs/pull/82),
+  patched in from `src-tauri/Cargo.toml`; delete both once a swift-rs
+  release includes it.
 - The capture browser works in-app on iPad via a custom plugin
   (`src-tauri/tauri-plugin-capture-view/`): a native WKWebView overlays the
   modal body, PDFs are recognized by response MIME type and downloaded

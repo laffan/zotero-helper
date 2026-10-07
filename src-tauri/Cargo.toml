@@ -41,3 +41,13 @@ regex = "1"
 percent-encoding = "2"
 html-escape = "0.2"
 rand = "0.8"
+
+# Xcode 27 builds static Swift products with `@_cdecl` exports made local,
+# and swift-rs 1.0.8's fix-up (llvm-objcopy, from rustup's llvm-tools —
+# see /rust-toolchain.toml) skips the SwiftRs runtime shim, so iOS release
+# links fail on `_retain_object` / `_release_object` / `_string_from_bytes`.
+# vendor/swift-rs is the published 1.0.8 with the three-line fix from
+# Brendonovich/swift-rs#82 (issue #81). Remove this once a swift-rs release
+# carries it.
+[patch.crates-io]
+swift-rs = { path = "vendor/swift-rs" }

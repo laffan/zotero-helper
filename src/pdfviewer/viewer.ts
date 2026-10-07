@@ -22,7 +22,7 @@ import { drawAnnotations, pageSignatures } from "./paint";
 import { getPdfjs } from "./pdfjs";
 import { createPageRenderer } from "./render";
 import { createThumbnailManager } from "./thumbnails";
-import { applyToolbarInfo, buildPdfToolbar } from "./toolbar";
+import { buildPdfToolbar } from "./toolbar";
 import type { LayoutMode, PageRecord, PDFDocumentProxy } from "./types";
 
 const ZOOM_LEVELS = [0.5, 0.75, 1.0, 1.25, 1.5, 2.0];
@@ -475,7 +475,6 @@ export function createPdfViewer(container: HTMLElement, opts: PdfViewerOptions =
       annotLayer.scrollToAnnotation(a);
       return true;
     },
-    setToolbarInfo: (title: string, author: string) => applyToolbarInfo(tb.toolbarInfo, title, author),
     toggleShelf: annotLayer.toggleShelf,
   };
 }

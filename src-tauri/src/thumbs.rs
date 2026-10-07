@@ -8,7 +8,9 @@
 use crate::state::AppState;
 use crate::{Error, Result};
 use base64::{engine::general_purpose::STANDARD, Engine as _};
+use std::collections::BTreeSet;
 use std::path::PathBuf;
+use tauri::State;
 
 fn thumbs_dir(state: &AppState) -> Result<PathBuf> {
     let dir = state.data_dir.join("thumbs");
@@ -54,4 +56,19 @@ pub fn write(state: &AppState, key: &str, variant: &str, base64_jpeg: &str) -> R
     }
     std::fs::write(path, bytes)?;
     Ok(())
+}
+
+/// Attachment keys with a cached thumbnail (any variant), so the item
+/// list can tell whether a folder's covers have all been rendered
+/// without reading a single image.
+#[tauri::command]
+pub async fn list_thumbnails(state: State<'_, AppState>) -> Result<Vec<String>> {
+    let mut keys = BTreeSet::new();
+    for e in std::fs::read_dir(thumbs_dir(&state)?)?.flatten() {
+        let name = e.file_name().to_string_lossy().into_owned();
+        if let Some((key, _)) = name.strip_suffix(".jpg").and_then(|n| n.split_once('_')) {
+            keys.insert(key.to_string());
+        }
+    }
+    Ok(keys.into_iter().collect())
 }

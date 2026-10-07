@@ -22,13 +22,17 @@ function svg(path: React.ReactNode, { size = 16 }: IconProps = {}) {
   );
 }
 
-// The two folder buttons carry no text label, so their +/− is drawn
-// large inside the folder body rather than as a small mark on it.
+// A folder: tab at the top left, body below it. The +/− of the two
+// toolbar buttons sits in the middle of the body, well clear of its
+// edges.
+const FOLDER_PATH =
+  "M13.5 13.5a1 1 0 0 0 1-1v-7a1 1 0 0 0-1-1H8.2a1 1 0 0 1-.8-.4L6.6 3a1 1 0 0 0-.8-.5H2.5a1 1 0 0 0-1 1v9a1 1 0 0 0 1 1z";
+
 export const FolderPlus = (p: IconProps = {}) =>
   svg(
     <>
-      <path d="M1.5 3.5h4l1.5 2h7.5v7a1 1 0 0 1-1 1h-11a1 1 0 0 1-1-1v-9z" />
-      <path d="M8 7.5v5M5.5 10h5" />
+      <path d={FOLDER_PATH} />
+      <path d="M8 7v4M6 9h4" />
     </>,
     p,
   );
@@ -36,14 +40,13 @@ export const FolderPlus = (p: IconProps = {}) =>
 export const FolderMinus = (p: IconProps = {}) =>
   svg(
     <>
-      <path d="M1.5 3.5h4l1.5 2h7.5v7a1 1 0 0 1-1 1h-11a1 1 0 0 1-1-1v-9z" />
-      <path d="M5.5 10h5" />
+      <path d={FOLDER_PATH} />
+      <path d="M6 9h4" />
     </>,
     p,
   );
 
-export const Folder = (p: IconProps = {}) =>
-  svg(<path d="M1.5 3.5h4l1.5 2h7.5v7a1 1 0 0 1-1 1h-11a1 1 0 0 1-1-1v-9z" />, p);
+export const Folder = (p: IconProps = {}) => svg(<path d={FOLDER_PATH} />, p);
 
 export const ImportIcon = (p: IconProps = {}) =>
   svg(
@@ -81,11 +84,12 @@ export const SearchIcon = (p: IconProps = {}) =>
     p,
   );
 
+// Eight teeth round a hub.
 export const GearIcon = (p: IconProps = {}) =>
   svg(
     <>
-      <circle cx="8" cy="8" r="2.2" />
-      <path d="M8 1.8v2M8 12.2v2M1.8 8h2M12.2 8h2M3.6 3.6l1.4 1.4M11 11l1.4 1.4M12.4 3.6L11 5M5 11l-1.4 1.4" />
+      <polygon points="6.24 3.75 6.97 3.52 7.04 1.57 8.96 1.57 9.03 3.52 9.76 3.75 10.44 4.10 11.87 2.77 13.23 4.13 11.90 5.56 12.25 6.24 12.48 6.97 14.43 7.04 14.43 8.96 12.48 9.03 12.25 9.76 11.90 10.44 13.23 11.87 11.87 13.23 10.44 11.90 9.76 12.25 9.03 12.48 8.96 14.43 7.04 14.43 6.97 12.48 6.24 12.25 5.56 11.90 4.13 13.23 2.77 11.87 4.10 10.44 3.75 9.76 3.52 9.03 1.57 8.96 1.57 7.04 3.52 6.97 3.75 6.24 4.10 5.56 2.77 4.13 4.13 2.77 5.56 4.10" />
+      <circle cx="8" cy="8" r="2" />
     </>,
     p,
   );
@@ -117,14 +121,24 @@ export const PanelRight = (p: IconProps = {}) =>
     p,
   );
 
-export const PdfIcon = (p: IconProps = {}) =>
+// `filled`: the PDF is on this device.
+export const PdfIcon = ({ filled = false, ...p }: IconProps & { filled?: boolean } = {}) =>
   svg(
     <>
-      <path d="M4 1.5h5.5L13 5v8.5a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1v-11a1 1 0 0 1 1-1z" />
+      <path
+        d="M4 1.5h5.5L13 5v8.5a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1v-11a1 1 0 0 1 1-1z"
+        fill={filled ? "currentColor" : "none"}
+      />
       <path d="M9.5 1.5V5H13" />
     </>,
     p,
   );
+
+export const DownloadIcon = (p: IconProps = {}) =>
+  svg(<path d="M8 2v8.5M4.5 7l3.5 3.5L11.5 7M3 14h10" />, p);
+
+export const MenuIcon = (p: IconProps = {}) =>
+  svg(<path d="M3 4.5h10M3 8h10M3 11.5h10" />, p);
 
 export const CloseIcon = (p: IconProps = {}) =>
   svg(<path d="M4 4l8 8M12 4l-8 8" />, p);

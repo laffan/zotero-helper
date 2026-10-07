@@ -74,6 +74,10 @@ interface UiPrefs {
   /** Right panel width while taking notes — wider than the details
    *  panel, since it is where the writing happens. */
   notesWidth: number;
+  /** Wide windows: the sidebar / right panel folded away by the
+   *  toolbar's panel buttons. (Narrow ones use the drawers instead.) */
+  sidebarHidden: boolean;
+  metaHidden: boolean;
 }
 
 export interface FolderView {
@@ -142,6 +146,8 @@ interface AppStore extends UiPrefs {
   reading: ReadingState | null;
   /** PDFs kept on this device (src-tauri/src/pdfcache.rs), by attKey. */
   cachedPdfs: Record<string, CachedPdf>;
+  /** Attachments being downloaded into that cache right now. */
+  pdfsDownloading: string[];
 
   setSettings: (s: Settings) => void;
   setLibrary: (l: LibraryCache) => void;
@@ -188,8 +194,11 @@ interface AppStore extends UiPrefs {
 
   setMetaTab: (t: MetaTab) => void;
   setNotesWidth: (w: number) => void;
+  setSidebarHidden: (b: boolean) => void;
+  setMetaHidden: (b: boolean) => void;
   setReading: (r: ReadingState | null) => void;
   setCachedPdfs: (list: CachedPdf[]) => void;
+  setPdfDownloading: (attKey: string, on: boolean) => void;
 
   upsertItem: (item: ZItem) => void;
   patchItemData: (key: string, patch: Record<string, unknown>) => void;
@@ -226,6 +235,8 @@ export const useStore = create<AppStore>()(
       folderViews: {},
       metaTab: "details" as MetaTab,
       notesWidth: 420,
+      sidebarHidden: false,
+      metaHidden: false,
       uiTasks: [],
       uiTaskLabel: "",
 
@@ -253,6 +264,7 @@ export const useStore = create<AppStore>()(
       askPreparing: false,
       reading: null,
       cachedPdfs: {},
+      pdfsDownloading: [],
 
       setSettings: (settings) => set({ settings }),
       setLibrary: (library) => set({ library }),
@@ -371,6 +383,8 @@ export const useStore = create<AppStore>()(
 
       setMetaTab: (metaTab) => set({ metaTab }),
       setNotesWidth: (notesWidth) => set({ notesWidth }),
+      setSidebarHidden: (sidebarHidden) => set({ sidebarHidden }),
+      setMetaHidden: (metaHidden) => set({ metaHidden }),
       setReading: (reading) =>
         // Entering closes the narrow-screen drawers: on a tablet the
         // notes sit beside the PDF (notes.css), and a drawer's scrim
@@ -382,6 +396,12 @@ export const useStore = create<AppStore>()(
         ),
       setCachedPdfs: (list) =>
         set({ cachedPdfs: Object.fromEntries(list.map((p) => [p.attKey, p])) }),
+      setPdfDownloading: (attKey, on) =>
+        set((s) => ({
+          pdfsDownloading: on
+            ? [...s.pdfsDownloading.filter((k) => k !== attKey), attKey]
+            : s.pdfsDownloading.filter((k) => k !== attKey),
+        })),
 
       upsertItem: (item) =>
         set((s) => {
@@ -436,6 +456,8 @@ export const useStore = create<AppStore>()(
         folderViews: s.folderViews,
         metaTab: s.metaTab,
         notesWidth: s.notesWidth,
+        sidebarHidden: s.sidebarHidden,
+        metaHidden: s.metaHidden,
       }),
     },
   ),

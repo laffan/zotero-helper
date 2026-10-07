@@ -6,7 +6,7 @@
 // keeps us from hammering Zotero's file endpoint. Requests come from
 // visible grid cells, so scrolling naturally prioritizes what's on
 // screen.
-import { useEffect, useSyncExternalStore } from "react";
+import { useEffect, useMemo, useSyncExternalStore } from "react";
 import { useStore } from "./store";
 import { invoke } from "./tauri";
 import type { ThumbAnnotation } from "./pdfPage";
@@ -20,9 +20,45 @@ const cache = new Map<string, State>();
 const queue: string[] = [];
 const listeners = new Set<() => void>();
 let working = false;
+/** Bumped on every change, as the snapshot hooks re-render on. */
+let version = 0;
+/** Attachments with a thumbnail on disk (any variant), read once from
+ *  the Rust side so the item list knows which covers exist without
+ *  loading them. */
+let onDisk: Set<string> | null = null;
+let diskLoading = false;
 
 function emit(): void {
+  version++;
   for (const l of listeners) l();
+}
+
+async function loadDiskList(): Promise<void> {
+  if (onDisk || diskLoading) return;
+  diskLoading = true;
+  try {
+    onDisk = new Set(await invoke<string[]>("list_thumbnails"));
+  } catch {
+    onDisk = new Set();
+  } finally {
+    diskLoading = false;
+    emit();
+  }
+}
+
+/** Is there nothing left to render for this attachment? A thumbnail
+ *  that could not be rendered counts: there will never be one. */
+function settled(attKey: string): boolean {
+  const st = cache.get(attKey);
+  if (st) return !("pending" in st);
+  return onDisk?.has(attKey) ?? false;
+}
+
+/** Forget every thumbnail — after Settings clears them from disk. */
+export function forgetThumbnails(): void {
+  cache.clear();
+  onDisk = new Set();
+  emit();
 }
 
 function subscribe(l: () => void): () => void {
@@ -136,4 +172,16 @@ export function useThumbnail(attKey: string | undefined): string | null {
     if (attKey) request(attKey);
   }, [attKey]);
   return state && "url" in state ? state.url : null;
+}
+
+/** True once every one of these attachments has its thumbnail —
+ *  i.e. the folder's covers have all been rendered (by visiting its
+ *  icon view), so the list can show them too without causing any. */
+export function useThumbnailsReady(attKeys: string[]): boolean {
+  const v = useSyncExternalStore(subscribe, () => version, () => 0);
+  useEffect(() => {
+    void loadDiskList();
+  }, []);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  return useMemo(() => attKeys.length > 0 && attKeys.every(settled), [attKeys, v]);
 }

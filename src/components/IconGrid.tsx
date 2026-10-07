@@ -6,6 +6,7 @@ import { creatorSummary, itemTitle, yearOf } from "../lib/collections";
 import { useThumbnail } from "../lib/thumbnails";
 import type { ZItem } from "../lib/types";
 import { PdfIcon, PinIcon, Spinner } from "./Icons";
+import { PdfMark } from "./PdfMark";
 import { TagDots } from "./TagDots";
 
 const CELL_BASE_W = 150;
@@ -22,6 +23,7 @@ function Cell({
   attKey,
   selected,
   pinned,
+  commandHeld,
   onSelect,
   onOpen,
   onTogglePin,
@@ -31,6 +33,7 @@ function Cell({
   attKey: string | undefined;
   selected: boolean;
   pinned: boolean;
+  commandHeld: boolean;
   onSelect: (e: React.MouseEvent, item: ZItem) => void;
   onOpen: (item: ZItem) => void;
   onTogglePin: (item: ZItem) => void;
@@ -68,7 +71,16 @@ function Cell({
       <div className="icon-title">{itemTitle(item)}</div>
       <div className="icon-sub">
         <TagDots item={item} />
-        {[creatorSummary(item), yearOf(item)].filter(Boolean).join(" · ")}
+        <span className="icon-sub-text">
+          {[creatorSummary(item), yearOf(item)].filter(Boolean).join(" · ")}
+        </span>
+        <PdfMark
+          itemKey={item.key}
+          attKey={attKey}
+          hasPdf={Boolean(attKey)}
+          commandHeld={commandHeld}
+          size={11}
+        />
       </div>
     </div>
   );
@@ -80,6 +92,7 @@ export function IconGrid({
   pinnedKeys,
   attByParent,
   scale,
+  commandHeld,
   onSelect,
   onOpen,
   onTogglePin,
@@ -90,6 +103,7 @@ export function IconGrid({
   pinnedKeys: string[];
   attByParent: Map<string, string>;
   scale: number;
+  commandHeld: boolean;
   onSelect: (e: React.MouseEvent, item: ZItem) => void;
   onOpen: (item: ZItem) => void;
   onTogglePin: (item: ZItem) => void;
@@ -146,6 +160,7 @@ export function IconGrid({
             attKey={attByParent.get(item.key)}
             selected={selectedKeys.includes(item.key)}
             pinned={pinnedKeys.includes(item.key)}
+            commandHeld={commandHeld}
             onSelect={onSelect}
             onOpen={onOpen}
             onTogglePin={onTogglePin}

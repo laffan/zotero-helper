@@ -97,6 +97,18 @@ async fn create_collection(
 }
 
 #[tauri::command]
+async fn rename_collection(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    key: String,
+    version: u64,
+    name: String,
+) -> Result<()> {
+    log(&app, "info", format!("Renaming collection {key} to “{name}”"));
+    zotero::rename_collection(&state, &key, version, &name).await
+}
+
+#[tauri::command]
 async fn delete_collection(
     app: AppHandle,
     state: State<'_, AppState>,
@@ -626,6 +638,7 @@ pub fn run() {
             sync_library,
             sync_collection,
             create_collection,
+            rename_collection,
             delete_collection,
             create_zotero_items,
             update_zotero_item,
@@ -650,6 +663,7 @@ pub fn run() {
             open_in_zotero,
             read_thumbnail,
             write_thumbnail,
+            thumbs::list_thumbnails,
             stage_attachment_for_share,
             stage_text_for_share,
             share_files,

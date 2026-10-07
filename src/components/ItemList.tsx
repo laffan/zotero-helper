@@ -17,7 +17,7 @@ import {
   yearOf,
 } from "../lib/collections";
 import { startItemDrag } from "../lib/dragdrop";
-import { retryJob } from "../lib/importer";
+import { readItem } from "../lib/notes";
 import {
   DEFAULT_FOLDER_VIEW,
   THUMB_SCALE,
@@ -25,25 +25,23 @@ import {
   type ResizableCol,
 } from "../lib/store";
 import { useSearchResults } from "../lib/search";
-import type { ImportJob, ImportStage, ZItem } from "../lib/types";
+import { useThumbnail, useThumbnailsReady } from "../lib/thumbnails";
+import type { ZItem } from "../lib/types";
 import { IconGrid } from "./IconGrid";
 import {
   AbstractIcon,
-  CheckIcon,
-  CloseIcon,
   FlagIcon,
-  GlobeIcon,
   GridViewIcon,
   ListViewIcon,
   PdfIcon,
   PinIcon,
-  Spinner,
   TagIcon,
 } from "./Icons";
+import { JOB_ROW_HEIGHT, JobRow } from "./JobRow";
+import { COMMAND_LABEL, PdfMark, useCommandHeld } from "./PdfMark";
 import { TagDots } from "./TagDots";
 
 const ROW_HEIGHT = 36;
-const JOB_ROW_HEIGHT = 52;
 const OVERSCAN = 8;
 
 const MONTHS = [
@@ -56,6 +54,13 @@ function fmtAdded(iso: string): string {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return iso.slice(0, 10);
   return `${MONTHS[d.getMonth()]} ${d.getDate()} ${d.getFullYear()}`;
+}
+
+/** A row's tiny first-page cover, once the folder's icon view has
+ *  rendered them all. */
+function ListCover({ attKey }: { attKey: string }) {
+  const thumb = useThumbnail(attKey);
+  return thumb ? <img src={thumb} alt="" /> : null;
 }
 
 /** Drag handle on a header column's right edge. */
@@ -82,119 +87,6 @@ function ColGrip({ col }: { col: ResizableCol }) {
       onPointerDown={start}
       onClick={(e) => e.stopPropagation()}
     />
-  );
-}
-
-const STAGE_LABELS: Record<ImportStage, string> = {
-  pending: "Queued",
-  resolving: "Looking up metadata",
-  creating: "Creating Zotero item",
-  "finding-pdf": "Searching for PDF",
-  downloading: "Downloading PDF",
-  uploading: "Uploading to Zotero",
-  done: "Done",
-  "needs-manual": "PDF needs your help",
-  error: "Failed",
-};
-
-const STAGE_STEP: Record<ImportStage, number> = {
-  pending: 0,
-  resolving: 1,
-  creating: 2,
-  "finding-pdf": 3,
-  downloading: 3,
-  uploading: 4,
-  done: 5,
-  "needs-manual": 3,
-  error: 0,
-};
-
-function JobRow({ jobItem }: { jobItem: ImportJob }) {
-  const { setModal, dismissJob } = useStore();
-  const busy = ["resolving", "creating", "finding-pdf", "downloading", "uploading"].includes(
-    jobItem.stage,
-  );
-  const title = jobItem.item?.title ?? jobItem.identifier;
-  const step = STAGE_STEP[jobItem.stage];
-  // What the capture browser would open — the same page the rescue
-  // modal's own button uses.
-  const landing = jobItem.landingUrl ?? jobItem.candidates[0];
-
-  return (
-    <div className={`job-row job-${jobItem.stage}`} style={{ height: JOB_ROW_HEIGHT }}>
-      <div className="job-main">
-        <div className="job-title" title={String(title)}>
-          {busy && <Spinner size={13} />}
-          {jobItem.stage === "done" && <CheckIcon size={13} />}
-          <span>{String(title)}</span>
-        </div>
-        <div className="job-status">
-          <span className="job-steps" aria-hidden="true">
-            {[1, 2, 3, 4, 5].map((n) => (
-              <i
-                key={n}
-                className={
-                  step >= n ? (jobItem.stage === "error" ? "bad" : "on") : ""
-                }
-              />
-            ))}
-          </span>
-          <span className={`job-stage-label stage-${jobItem.stage}`}>
-            {STAGE_LABELS[jobItem.stage]}
-          </span>
-          {jobItem.message && (
-            <span className="job-message" title={jobItem.message}>
-              — {jobItem.message}
-            </span>
-          )}
-        </div>
-      </div>
-      <div className="job-actions">
-        {jobItem.stage === "needs-manual" && (
-          // One button, two halves: the options screen on the left, a
-          // shortcut straight into the capture browser on the right —
-          // that's the option almost every rescue ends up using.
-          <span className="btn-split">
-            <button
-              className="mini-btn accent"
-              onClick={() => setModal({ kind: "rescue", jobId: jobItem.id })}
-            >
-              Find PDF
-            </button>
-            <button
-              className="mini-btn accent"
-              disabled={!landing}
-              onClick={() => setModal({ kind: "capture", jobId: jobItem.id })}
-              aria-label="Open capture browser"
-              title={
-                landing
-                  ? `Open the capture browser at ${landing}`
-                  : "No page to open for this item"
-              }
-            >
-              <GlobeIcon size={12} />
-            </button>
-          </span>
-        )}
-        {jobItem.stage === "error" && (
-          <button className="mini-btn" onClick={() => retryJob(jobItem.id)}>
-            Retry
-          </button>
-        )}
-        {(jobItem.stage === "error" ||
-          jobItem.stage === "needs-manual" ||
-          jobItem.stage === "done") && (
-          <button
-            className="icon-btn"
-            onClick={() => dismissJob(jobItem.id)}
-            aria-label="Dismiss"
-            title="Dismiss (keeps the item, skips the PDF)"
-          >
-            <CloseIcon size={12} />
-          </button>
-        )}
-      </div>
-    </div>
   );
 }
 
@@ -354,10 +246,14 @@ export function ItemList() {
     setSelectedKeys([item.key]);
   };
 
+  // A double-click reads the entry: its PDF is downloaded to this
+  // device (when it isn't yet) and opened beside the notes. An entry
+  // with no PDF opens in Zotero instead.
   const openItem = (item: ZItem) => {
     if (!REAL_KEY.test(item.key)) return;
-    // Prefer the PDF itself; fall back to selecting the entry.
-    void openInZotero(item.key, attByParent.get(item.key));
+    void readItem(item.key).then((opened) => {
+      if (!opened) void openInZotero(item.key);
+    });
   };
   const pinItem = (item: ZItem) => togglePin(selectedCollection, item.key);
 
@@ -365,6 +261,15 @@ export function ItemList() {
     sortBy === col ? (sortDir === "asc" ? " ↑" : " ↓") : "";
 
   const colWidths = useStore((s) => s.colWidths);
+  const commandHeld = useCommandHeld();
+  // Tiny covers join the list once every PDF here has its thumbnail —
+  // which a visit to the folder's icon view renders. The list itself
+  // never sets off a render.
+  const coverKeys = useMemo(
+    () => items.map((i) => attByParent.get(i.key)).filter((k): k is string => Boolean(k)),
+    [items, attByParent],
+  );
+  const showCovers = useThumbnailsReady(coverKeys) && !iconMode;
 
   return (
     <section
@@ -473,6 +378,9 @@ export function ItemList() {
         style={{ paddingRight: scrollbarW }}
       >
         <span className="col col-pin" aria-hidden="true" />
+        {showCovers && (
+          <span className="col col-cover" data-tip="First page" aria-label="First page" />
+        )}
         <button className="col col-title" onClick={() => setSort("title")}>
           Title{sortIndicator("title")}
         </button>
@@ -488,10 +396,21 @@ export function ItemList() {
           Added{sortIndicator("dateAdded")}
           <ColGrip col="added" />
         </button>
-        <span className="col col-mark" title="Abstract on record">
+        {/* Tooltips drawn in CSS (itemlist.css): these headers are bare
+            glyphs, and a native title tooltip is slow to come, when the
+            webview shows one at all. */}
+        <span className="col col-mark tip-end" data-tip="Has an abstract" aria-label="Abstract">
           <AbstractIcon size={13} />
         </span>
-        <span className="col col-mark" title="PDF attached">
+        <span
+          className="col col-mark tip-end"
+          data-tip={
+            commandHeld
+              ? "Click a row's icon to download its PDF, or to remove a downloaded one"
+              : `Has a PDF · filled: downloaded to this device · hold ${COMMAND_LABEL} to download or remove`
+          }
+          aria-label="PDF"
+        >
           <PdfIcon size={13} />
         </span>
       </div>
@@ -509,6 +428,7 @@ export function ItemList() {
             selectedKeys={selectedKeys}
             pinnedKeys={pinned}
             attByParent={attByParent}
+            commandHeld={commandHeld}
             scale={folderView.thumbScale ?? 1}
             onSelect={handleRowClick}
             onOpen={openItem}
@@ -561,7 +481,7 @@ export function ItemList() {
                 onClick={(e) => handleRowClick(e, item)}
                 onDoubleClick={() => openItem(item)}
                 onPointerDown={(e) => startItemDrag(e, item.key)}
-                title="Double-click to open in Zotero · drag onto a folder to file it there"
+                title="Double-click to read the PDF beside its notes · drag onto a folder to file it there"
               >
                 <button
                   className={`col col-pin ${pinned.includes(item.key) ? "on" : ""}`}
@@ -578,6 +498,13 @@ export function ItemList() {
                 >
                   <PinIcon size={24} filled={pinned.includes(item.key)} />
                 </button>
+                {showCovers && (
+                  <span className="col col-cover">
+                    {attByParent.has(item.key) && (
+                      <ListCover attKey={attByParent.get(item.key)!} />
+                    )}
+                  </span>
+                )}
                 <span className="col col-title" title={itemTitle(item)}>
                   <TagDots item={item} />
                   {itemTitle(item)}
@@ -595,11 +522,13 @@ export function ItemList() {
                 >
                   {withAbstract.has(item.key) && <AbstractIcon size={13} />}
                 </span>
-                <span
-                  className="col col-mark"
-                  title={withPdf.has(item.key) ? "Has a PDF" : undefined}
-                >
-                  {withPdf.has(item.key) && <PdfIcon size={13} />}
+                <span className="col col-mark">
+                  <PdfMark
+                    itemKey={item.key}
+                    attKey={attByParent.get(item.key)}
+                    hasPdf={withPdf.has(item.key)}
+                    commandHeld={commandHeld}
+                  />
                 </span>
               </div>
             );

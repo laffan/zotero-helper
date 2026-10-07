@@ -5,6 +5,7 @@
 // horizontally (`overflow-x: auto`), and any overflow value clips
 // absolutely-positioned children — the menu would vanish under the item
 // list. Fixed positioning from the anchor's rect escapes that.
+import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
 export function ToolbarMenu({
@@ -29,4 +30,23 @@ export function ToolbarMenu({
     </div>,
     document.body,
   );
+}
+
+/** Open state for one toolbar dropdown, closed by a mousedown anywhere
+ *  outside its anchor. Menus are portaled to document.body, so a
+ *  mousedown inside one (`.filter-pop`) must not count as outside —
+ *  it would close the menu before the item's click arrives. */
+export function useDropdown() {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: MouseEvent) => {
+      if ((e.target as Element).closest?.(".filter-pop")) return;
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    window.addEventListener("mousedown", onDown);
+    return () => window.removeEventListener("mousedown", onDown);
+  }, [open]);
+  return { open, setOpen, ref };
 }

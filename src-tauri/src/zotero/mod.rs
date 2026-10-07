@@ -204,6 +204,29 @@ pub async fn create_collection(
     Ok(body)
 }
 
+/// Rename a collection, failing if it changed in Zotero since `version`.
+pub async fn rename_collection(state: &AppState, key_id: &str, version: u64, name: &str) -> Result<()> {
+    let base = library_base(state).await?;
+    let key = api_key(state).await;
+    let resp = state
+        .http
+        .patch(format!("{base}/collections/{key_id}"))
+        .header("Zotero-API-Key", &key)
+        .header("Zotero-API-Version", "3")
+        .header("If-Unmodified-Since-Version", version.to_string())
+        .json(&json!({ "name": name }))
+        .send()
+        .await?;
+    let status = resp.status();
+    if !status.is_success() {
+        let body = resp.text().await.unwrap_or_default();
+        return Err(Error::msg(format!(
+            "Renaming collection failed (HTTP {status}): {body}"
+        )));
+    }
+    Ok(())
+}
+
 pub async fn delete_collection(state: &AppState, key_id: &str, version: u64) -> Result<()> {
     let base = library_base(state).await?;
     let key = api_key(state).await;

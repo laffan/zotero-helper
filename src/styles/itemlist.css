@@ -93,6 +93,72 @@
   justify-content: center;
   color: var(--accent);
 }
+/* PDF marker: outlined = in Zotero, filled = on this device. With ⌘
+   held it is a download / remove button (PdfMark.tsx). */
+.pdf-mark {
+  display: inline-flex;
+}
+.pdf-mark-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 3px;
+  margin: -3px;
+  border-radius: 4px;
+  color: var(--accent);
+}
+.pdf-mark-btn:hover {
+  background: var(--accent-soft);
+}
+.pdf-mark-btn.remove:hover {
+  color: var(--bad);
+}
+
+/* Tiny first-page covers, shown once the icon view has rendered them
+   all. Sized to sit inside the row, which keeps its height. */
+.col-cover {
+  width: 34px;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.item-row .col-cover {
+  padding: 0 4px;
+}
+.col-cover img {
+  height: 28px;
+  width: 22px;
+  object-fit: contain;
+  background: #fff;
+  box-shadow: 0 0 0 1px var(--border);
+  border-radius: 1px;
+}
+
+/* Tooltips on the header's glyph-only columns. */
+.list-header [data-tip]:hover::after {
+  content: attr(data-tip);
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  z-index: 20;
+  width: max-content;
+  max-width: 240px;
+  padding: 4px 7px;
+  border-radius: 5px;
+  background: var(--text);
+  color: var(--panel);
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.35;
+  white-space: normal;
+  pointer-events: none;
+}
+.list-header .tip-end:hover::after {
+  left: auto;
+  right: 0;
+}
+
 .list-body {
   flex: 1;
   overflow-y: auto;
@@ -411,9 +477,22 @@
   overflow: hidden;
 }
 .icon-sub {
+  display: flex;
+  align-items: center;
+  gap: 4px;
   font-size: 10px;
   color: var(--text-dim);
+}
+.icon-sub-text {
+  flex: 1;
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+/* The PDF mark, right-aligned on the author row. */
+.icon-sub .pdf-mark,
+.icon-sub .pdf-mark-btn {
+  flex-shrink: 0;
+  color: var(--accent);
 }

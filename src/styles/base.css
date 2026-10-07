@@ -86,18 +86,27 @@ select:focus {
   padding-top: max(env(safe-area-inset-top), 30px);
 }
 
+/* --- side panels folded away by the toolbar's panel buttons --- */
+/* Wide windows only: narrow ones open the panels as drawers instead, and
+   the notes beside a PDF stay in the row on a tablet (notes.css). */
+@media (min-width: 901px) {
+  .sidebar.collapsed,
+  .meta-panel.collapsed {
+    display: none;
+  }
+}
+@media (max-width: 900px) and (min-width: 600px) {
+  .meta-panel.notes-mode.collapsed {
+    display: none;
+  }
+}
+
 /* --- narrow-screen drawers (sidebar / metadata become slide-overs) --- */
 .drawer-scrim {
   display: none;
 }
-.narrow-only {
-  display: none;
-}
 
 @media (max-width: 900px) {
-  .narrow-only {
-    display: inline-flex;
-  }
   .pane-resizer {
     display: none;
   }

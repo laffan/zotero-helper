@@ -4,12 +4,13 @@ import { scheduleTrayClear } from "../components/TaskTray";
 import { itemTitle } from "./collections";
 import { loadChats } from "./ai/chat";
 import { captureFinished, downloadForJob } from "./importer";
-import { refreshCachedPdfs, startNotesSync } from "./notes";
+import { pushNote, refreshCachedPdfs, startNotesSync } from "./notes";
 import { appLog, useStore } from "./store";
 import { invoke, isTauri, on } from "./tauri";
 import type {
   LibraryCache,
   LogLine,
+  NoteMeta,
   Settings,
   SyncProgress,
 } from "./types";
@@ -143,6 +144,20 @@ export async function syncFolder(key: string): Promise<void> {
   } finally {
     useStore.getState().setSyncing(false);
     useStore.getState().setSyncProgress(null);
+  }
+}
+
+/** The Sync menu while a PDF is open: bring down what changed in
+ *  Zotero (its new highlights among it — an incremental sync is the
+ *  cheap way to reach them) and push this entry's notes if they have
+ *  unpushed edits. */
+export async function syncReadingEntry(itemKey: string): Promise<void> {
+  await syncNow(false);
+  try {
+    const notes = await invoke<NoteMeta[]>("notes_list");
+    if (notes.some((m) => m.itemKey === itemKey && m.dirty)) await pushNote(itemKey);
+  } catch (e) {
+    appLog("warn", `Pushing the notes failed: ${e}`);
   }
 }
 

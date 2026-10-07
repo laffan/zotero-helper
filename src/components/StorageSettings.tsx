@@ -6,6 +6,7 @@
 // clearable here, since they may hold words not yet pushed to Zotero.
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { refreshCachedPdfs } from "../lib/notes";
+import { forgetThumbnails } from "../lib/thumbnails";
 import { appLog, useStore } from "../lib/store";
 import { invoke } from "../lib/tauri";
 import type { StorageReport } from "../lib/types";
@@ -64,6 +65,7 @@ export function StorageSettings() {
     setBusy(label);
     try {
       await invoke(cmd, args);
+      if (cmd === "clear_thumbnails") forgetThumbnails();
     } catch (e) {
       appLog("error", `${label} failed: ${e}`);
     } finally {

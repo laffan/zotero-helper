@@ -7,7 +7,6 @@
 // page, a selected passage, a shelf highlight — into the notes.
 import { useEffect, useRef, useState } from "react";
 import { openInZotero } from "../lib/actions";
-import { creatorSummary, itemTitle, yearOf } from "../lib/collections";
 import {
   annotationIndexFor,
   annotationMarkdown,
@@ -48,6 +47,9 @@ export function ReaderPane() {
 
   const itemKey = reading?.itemKey ?? "";
   const attKey = reading?.attKey ?? null;
+  // A fresh download of this PDF (Sync → Download the PDF again)
+  // changes its saved time, and the viewer reloads with the new copy.
+  const savedMs = useStore((s) => (attKey ? s.cachedPdfs[attKey]?.savedMs : undefined));
 
   useEffect(() => {
     const host = hostRef.current;
@@ -77,11 +79,6 @@ export function ReaderPane() {
         if (cancelled) return;
         const lib = useStore.getState().library.items;
         viewer.setAnnotations(annotationIndexFor(lib).get(attKey) ?? []);
-        const item = lib.find((i) => i.key === itemKey);
-        if (item) {
-          const year = yearOf(item);
-          viewer.setToolbarInfo(itemTitle(item), [creatorSummary(item), year].filter(Boolean).join(", "));
-        }
         setState("ready");
       } catch (e) {
         if (cancelled) return;
@@ -96,7 +93,7 @@ export function ReaderPane() {
       viewerRef.current = null;
       void viewer?.destroy();
     };
-  }, [itemKey, attKey]);
+  }, [itemKey, attKey, savedMs]);
 
   // A sync that brings new or edited highlights repaints them in place.
   useEffect(() => {

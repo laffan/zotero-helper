@@ -12,26 +12,6 @@ import {
   VERTICAL_ICON,
 } from "./icons";
 
-/** Fill the centred title/author slot. */
-export function applyToolbarInfo(info: HTMLElement, title: string, author: string): void {
-  info.innerHTML = "";
-  if (!title) {
-    info.style.display = "none";
-    return;
-  }
-  info.style.display = "";
-  const t = document.createElement("span");
-  t.className = "pdf-toolbar-info-title";
-  t.textContent = title;
-  info.appendChild(t);
-  if (author) {
-    const a = document.createElement("span");
-    a.className = "pdf-toolbar-info-author";
-    a.textContent = author;
-    info.appendChild(a);
-  }
-}
-
 function btn(cls: string, text: string, title: string): HTMLButtonElement {
   const b = document.createElement("button");
   b.type = "button";
@@ -90,15 +70,12 @@ export function buildPdfToolbar() {
 
   const thumbnailBtn = svgBtn("pdf-zoom-btn pdf-thumbnail-btn", "Thumbnail view", THUMBNAIL_ICON);
 
-  const toolbarInfo = document.createElement("span");
-  toolbarInfo.className = "pdf-toolbar-info";
-
   toolbar.append(
     thumbnailBtn,
     zoomOutBtn, zoomLabel, zoomInBtn,
     scrollToggleWrap, fitToggleWrap,
     foldBtn, foldFilterBtn,
-    toolbarInfo, pageIndicator, zoteroLink,
+    pageIndicator, zoteroLink,
   );
 
   return {
@@ -107,6 +84,6 @@ export function buildPdfToolbar() {
     scrollHBtn, scrollVBtn,
     fitOneBtn, fitTwoBtn, fitThreeBtn, fitToggleWrap,
     foldBtn, foldFilterBtn,
-    pageIndicator, zoteroLink, thumbnailBtn, toolbarInfo,
+    pageIndicator, zoteroLink, thumbnailBtn,
   };
 }

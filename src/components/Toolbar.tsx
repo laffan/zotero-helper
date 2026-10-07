@@ -1,10 +1,10 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import { deleteFolder, syncFolder, syncNow } from "../lib/actions";
+import { useMemo, useState } from "react";
+import { deleteFolder } from "../lib/actions";
 import { getAbstracts, tidyItems } from "../lib/ai";
 import { startAsk } from "../lib/ai/chat";
 import { askTargetFor } from "../lib/ai/context";
+import { creatorSummary, itemTitle, yearOf } from "../lib/collections";
 import { startPdfFetch } from "../lib/importer";
-import { sharePdfs, shareAbstracts } from "../lib/share";
 import { QUESTIONS, useStore } from "../lib/store";
 import {
   FolderMinus,
@@ -14,24 +14,41 @@ import {
   PanelLeft,
   PanelRight,
   PdfIcon,
-  Refresh,
-  ShareIcon,
   Sparkles,
   Spinner,
   TerminalIcon,
 } from "./Icons";
 import { SearchBox } from "./SearchBox";
-import { ToolbarMenu } from "./ToolbarMenu";
+import { ToolbarMenu, useDropdown } from "./ToolbarMenu";
+import { ShareMenuButton, SyncMenuButton } from "./ToolbarShareSync";
 
 /** Folder controls are icon-only, so their glyphs carry the whole
  *  meaning and are drawn a touch larger than the labelled buttons'. */
 const FOLDER_ICON = 20;
 
+/** The width at which the side panels turn into drawers (base.css). */
+const narrow = () => window.matchMedia("(max-width: 900px)").matches;
+/** …except the notes beside an open PDF, which stay in the row on a
+ *  tablet (notes.css). */
+const notesInRow = () => window.matchMedia("(min-width: 600px)").matches;
+
+/** The open PDF's entry, named where the library's buttons would be. */
+function ReadingTitle({ itemKey }: { itemKey: string }) {
+  const item = useStore((s) => s.library.items.find((i) => i.key === itemKey));
+  if (!item) return null;
+  const byline = [creatorSummary(item), yearOf(item)].filter(Boolean).join(", ");
+  return (
+    <div className="toolbar-doc" title={itemTitle(item)}>
+      <span className="toolbar-doc-title">{itemTitle(item)}</span>
+      {byline && <span className="toolbar-doc-byline">{byline}</span>}
+    </div>
+  );
+}
+
 export function Toolbar() {
   const {
     selectedCollection,
     selectedKeys,
-    syncing,
     tidying,
     logOpen,
     setLogOpen,
@@ -41,17 +58,16 @@ export function Toolbar() {
     setSidebarOpen,
     metaOpen,
     setMetaOpen,
-    syncProgress,
+    sidebarHidden,
+    setSidebarHidden,
+    metaHidden,
+    setMetaHidden,
   } = useStore();
+  const reading = useStore((s) => s.reading);
   const items = useStore((s) => s.library.items);
   const askPreparing = useStore((s) => s.askPreparing);
   const [confirmDelete, setConfirmDelete] = useState(false);
-  const [syncMenuOpen, setSyncMenuOpen] = useState(false);
-  const [aiMenuOpen, setAiMenuOpen] = useState(false);
-  const [shareMenuOpen, setShareMenuOpen] = useState(false);
-  const syncMenuRef = useRef<HTMLDivElement>(null);
-  const aiMenuRef = useRef<HTMLDivElement>(null);
-  const shareMenuRef = useRef<HTMLDivElement>(null);
+  const aiMenu = useDropdown();
   const collections = useStore((s) => s.library.collections);
 
   // What the two Ask entries point at: the selection when there is one,
@@ -78,46 +94,17 @@ export function Toolbar() {
     ? collections.find((c) => c.key === selectedCollection)?.data?.name
     : undefined;
 
-  useEffect(() => {
-    if (!syncMenuOpen && !aiMenuOpen && !shareMenuOpen) return;
-    const onDown = (e: MouseEvent) => {
-      // The menus are portaled to document.body — a mousedown inside one
-      // must not close it before the item's click handler fires.
-      if ((e.target as Element).closest?.(".filter-pop")) return;
-      if (syncMenuRef.current && !syncMenuRef.current.contains(e.target as Node)) {
-        setSyncMenuOpen(false);
-      }
-      if (aiMenuRef.current && !aiMenuRef.current.contains(e.target as Node)) {
-        setAiMenuOpen(false);
-      }
-      if (shareMenuRef.current && !shareMenuRef.current.contains(e.target as Node)) {
-        setShareMenuOpen(false);
-      }
-    };
-    window.addEventListener("mousedown", onDown);
-    return () => window.removeEventListener("mousedown", onDown);
-  }, [syncMenuOpen, aiMenuOpen, shareMenuOpen]);
+  // Narrow windows slide the panels in as drawers; wide ones fold them
+  // out of the row.
+  const toggleSidebar = () =>
+    narrow() ? setSidebarOpen(!sidebarOpen) : setSidebarHidden(!sidebarHidden);
+  const toggleMeta = () =>
+    narrow() && !(reading && notesInRow())
+      ? setMetaOpen(!metaOpen)
+      : setMetaHidden(!metaHidden);
 
   const runAi = (action: () => Promise<void>) => {
-    setAiMenuOpen(false);
-    void action();
-  };
-
-  /** Runs a share action with the Share button's viewport position —
-   *  the iPad share sheet is a popover and points its arrow there. */
-  const runShare = (
-    action: (keys: string[], anchor: { x: number; y: number }) => Promise<void>,
-  ) => {
-    setShareMenuOpen(false);
-    const r = shareMenuRef.current?.getBoundingClientRect();
-    const anchor = r
-      ? { x: r.left + r.width / 2, y: r.bottom }
-      : { x: window.innerWidth / 2, y: 60 };
-    void action(useStore.getState().selectedKeys, anchor);
-  };
-
-  const runSync = (action: () => Promise<void>) => {
-    setSyncMenuOpen(false);
+    aiMenu.setOpen(false);
     void action();
   };
 
@@ -141,16 +128,28 @@ export function Toolbar() {
   };
 
   return (
-    <header className="toolbar">
-      <button
-        className="icon-btn narrow-only"
-        onClick={() => setSidebarOpen(!sidebarOpen)}
-        title="Collections"
-        aria-label="Toggle collections"
-      >
-        <PanelLeft />
-      </button>
+    <header className={`toolbar ${reading ? "reading" : ""}`}>
+      {!reading && (
+        <button
+          className="icon-btn"
+          onClick={toggleSidebar}
+          title={sidebarHidden ? "Show the collections" : "Hide the collections"}
+          aria-label="Toggle collections"
+        >
+          <PanelLeft />
+        </button>
+      )}
 
+      {reading ? (
+        // Nothing but the open PDF is on screen, so only what acts on it
+        // stays: Share and Sync, scoped to its entry, and its name.
+        <div className="toolbar-group toolbar-reading">
+          <ShareMenuButton reading={reading} />
+          <SyncMenuButton reading={reading} />
+          <span className="toolbar-sep" />
+          <ReadingTitle itemKey={reading.itemKey} />
+        </div>
+      ) : (
       <div className="toolbar-group">
         <button
           className="tool-btn icon-only"
@@ -193,18 +192,18 @@ export function Toolbar() {
           <PdfIcon />
           <span className="tool-label">Fetch PDFs</span>
         </button>
-        <div className="filter-anchor" ref={aiMenuRef}>
+        <div className="filter-anchor" ref={aiMenu.ref}>
           <button
             className="tool-btn"
-            onClick={() => setAiMenuOpen(!aiMenuOpen)}
+            onClick={() => aiMenu.setOpen(!aiMenu.open)}
             disabled={tidying || askPreparing}
             title="AI actions"
           >
             {tidying || askPreparing ? <Spinner /> : <Sparkles />}
             <span className="tool-label">AI ▾</span>
           </button>
-          {aiMenuOpen && (
-            <ToolbarMenu anchorRef={aiMenuRef}>
+          {aiMenu.open && (
+            <ToolbarMenu anchorRef={aiMenu.ref}>
               <button
                 className="menu-item"
                 disabled={selectedKeys.length === 0}
@@ -261,90 +260,10 @@ export function Toolbar() {
             </ToolbarMenu>
           )}
         </div>
-        <div className="filter-anchor" ref={shareMenuRef}>
-          <button
-            className="tool-btn"
-            onClick={() => setShareMenuOpen(!shareMenuOpen)}
-            disabled={selectedKeys.length === 0}
-            title="Share the selected items"
-          >
-            <ShareIcon />
-            <span className="tool-label">Share ▾</span>
-          </button>
-          {shareMenuOpen && (
-            <ToolbarMenu anchorRef={shareMenuRef}>
-              <button className="menu-item" onClick={() => runShare(sharePdfs)}>
-                <strong>Share PDFs</strong>
-                <span>Download the selected items’ PDFs and share them</span>
-              </button>
-              <button
-                className="menu-item"
-                onClick={() => runShare(shareAbstracts)}
-              >
-                <strong>Share abstracts</strong>
-                <span>Titles (linked to Zotero) + abstracts as Markdown</span>
-              </button>
-              <button
-                className="menu-item"
-                onClick={() => {
-                  setShareMenuOpen(false);
-                  setModal({ kind: "sendToHush" });
-                }}
-              >
-                <strong>Send to Hush</strong>
-                <span>
-                  Hush downloads the PDFs itself into a desk or project
-                </span>
-              </button>
-            </ToolbarMenu>
-          )}
-        </div>
-        <div className="filter-anchor" ref={syncMenuRef}>
-          <button
-            className="tool-btn"
-            onClick={() => setSyncMenuOpen(!syncMenuOpen)}
-            disabled={syncing}
-            title="Sync options"
-          >
-            {syncing ? <Spinner /> : <Refresh />}
-            <span className="tool-label">
-              {syncing && syncProgress
-                ? `${syncProgress.phase} ${syncProgress.done}/${syncProgress.total}`
-                : "Sync ▾"}
-            </span>
-          </button>
-          {syncMenuOpen && (
-            <ToolbarMenu anchorRef={syncMenuRef}>
-              <button
-                className="menu-item"
-                disabled={!isRealCollection}
-                onClick={() => runSync(() => syncFolder(selectedCollection))}
-              >
-                <strong>Sync this folder</strong>
-                <span>
-                  {isRealCollection
-                    ? `Fetch changes for “${currentFolderName}” only`
-                    : "Select a folder first"}
-                </span>
-              </button>
-              <button
-                className="menu-item"
-                onClick={() => runSync(() => syncNow(false))}
-              >
-                <strong>Sync all changes</strong>
-                <span>Incremental — everything changed since last sync</span>
-              </button>
-              <button
-                className="menu-item"
-                onClick={() => runSync(() => syncNow(true))}
-              >
-                <strong>Full refresh</strong>
-                <span>Re-download the entire library (slow)</span>
-              </button>
-            </ToolbarMenu>
-          )}
-        </div>
+        <ShareMenuButton reading={null} />
+        <SyncMenuButton reading={null} />
       </div>
+      )}
 
       <SearchBox />
 
@@ -366,9 +285,13 @@ export function Toolbar() {
           <GearIcon />
         </button>
         <button
-          className="icon-btn narrow-only"
-          onClick={() => setMetaOpen(!metaOpen)}
-          title="Details"
+          className="icon-btn"
+          onClick={toggleMeta}
+          title={
+            metaHidden
+              ? reading ? "Show the notes" : "Show the details panel"
+              : reading ? "Hide the notes" : "Hide the details panel"
+          }
           aria-label="Toggle details panel"
         >
           <PanelRight />

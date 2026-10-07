@@ -7,7 +7,7 @@
 // unpushed, when the app goes to the background, and when the PDF
 // beside the notes is closed. Opening a note asks Zotero first whether its copy has
 // changed, so notes written on another device arrive.
-import { REAL_KEY } from "./collections";
+import { itemTitle, pdfAttachmentOf, REAL_KEY } from "./collections";
 import { appLog, useStore } from "./store";
 import { invoke, isTauri } from "./tauri";
 import type {
@@ -120,15 +120,56 @@ export async function refreshCachedPdfs(): Promise<void> {
 
 /** Download an attachment's PDF into the cache. */
 export async function cachePdf(att: ZItem, itemKey: string, title: string): Promise<CachedPdf> {
-  const entry = await invoke<CachedPdf>("cache_pdf", {
-    attKey: att.key,
-    itemKey,
-    title,
-    filename: String(att.data?.filename ?? `${att.key}.pdf`),
-  });
-  appLog("info", `Saved “${title}” on this device (${Math.round(entry.size / 1024)} KB)`);
+  const { setPdfDownloading } = useStore.getState();
+  setPdfDownloading(att.key, true);
+  try {
+    const entry = await invoke<CachedPdf>("cache_pdf", {
+      attKey: att.key,
+      itemKey,
+      title,
+      filename: String(att.data?.filename ?? `${att.key}.pdf`),
+    });
+    appLog("info", `Saved “${title}” on this device (${Math.round(entry.size / 1024)} KB)`);
+    await refreshCachedPdfs();
+    return entry;
+  } finally {
+    setPdfDownloading(att.key, false);
+  }
+}
+
+/** Download an entry's PDF into the cache, unless it is there already. */
+export async function cacheItemPdf(itemKey: string): Promise<void> {
+  const { library, cachedPdfs, pdfsDownloading } = useStore.getState();
+  const att = pdfAttachmentOf(library.items, itemKey);
+  const item = library.items.find((i) => i.key === itemKey);
+  if (!att || !item || cachedPdfs[att.key] || pdfsDownloading.includes(att.key)) return;
+  await cachePdf(att, itemKey, itemTitle(item));
+}
+
+/** Take an attachment's PDF off this device. */
+export async function uncachePdf(attKey: string): Promise<void> {
+  await invoke("remove_cached_pdf", { attKey });
+  const title = useStore.getState().cachedPdfs[attKey]?.title;
+  appLog("info", `Removed ${title ? `“${title}”` : "the PDF"} from this device`);
   await refreshCachedPdfs();
-  return entry;
+}
+
+/** Open an entry's PDF beside its notes, downloading it first when it
+ *  isn't on this device — what a double-click on an entry does. False
+ *  when the entry has no PDF in Zotero. */
+export async function readItem(itemKey: string): Promise<boolean> {
+  const att = pdfAttachmentOf(useStore.getState().library.items, itemKey);
+  if (!att) return false;
+  try {
+    await cacheItemPdf(itemKey);
+  } catch (e) {
+    appLog("error", `Downloading the PDF failed: ${e}`);
+    return true;
+  }
+  const st = useStore.getState();
+  st.setSelectedKeys([itemKey]);
+  st.setReading({ itemKey, attKey: att.key });
+  return true;
 }
 
 /** Is the cached copy older than the file Zotero now holds? Zotero

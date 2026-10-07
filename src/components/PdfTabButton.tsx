@@ -4,7 +4,6 @@
 //                        item list's room; the notes stay on the right)
 //   open               → Close PDF
 // A copy older than the one in Zotero offers itself for re-download.
-import { useState } from "react";
 import { itemTitle, pdfAttachmentOf } from "../lib/collections";
 import { cachePdf, cachedPdfIsStale, pushDirtyNotes } from "../lib/notes";
 import { appLog, useStore } from "../lib/store";
@@ -16,21 +15,19 @@ export function PdfTabButton({ item }: { item: ZItem }) {
   const cachedPdfs = useStore((s) => s.cachedPdfs);
   const reading = useStore((s) => s.reading);
   const setReading = useStore((s) => s.setReading);
-  const [downloading, setDownloading] = useState(false);
+  const pdfsDownloading = useStore((s) => s.pdfsDownloading);
 
   const att = pdfAttachmentOf(items, item.key);
   if (!att) return null;
+  const downloading = pdfsDownloading.includes(att.key);
   const cached = cachedPdfs[att.key];
   const open = reading?.itemKey === item.key;
 
   const download = async () => {
-    setDownloading(true);
     try {
       await cachePdf(att, item.key, itemTitle(item));
     } catch (e) {
       appLog("error", `Downloading the PDF failed: ${e}`);
-    } finally {
-      setDownloading(false);
     }
   };
 

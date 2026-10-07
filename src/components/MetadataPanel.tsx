@@ -28,6 +28,7 @@ export function MetadataPanel() {
   const metaTab = useStore((s) => s.metaTab);
   const setMetaTab = useStore((s) => s.setMetaTab);
   const { metaOpen, setMetaOpen } = useStore();
+  const hidden = useStore((s) => s.metaHidden);
 
   const selected = useMemo(() => {
     // An open PDF holds the panel on its entry whatever the selection does.
@@ -106,7 +107,7 @@ export function MetadataPanel() {
       <aside
         className={`meta-panel ${metaOpen ? "open" : ""} ${chatMode ? "chat-mode" : ""} ${
           reading ? "notes-mode" : ""
-        } ${tabs ? "tabbed" : ""}`}
+        } ${tabs ? "tabbed" : ""} ${hidden ? "collapsed" : ""}`}
       >
         {tabs}
         <div className="meta-content">{content}</div>

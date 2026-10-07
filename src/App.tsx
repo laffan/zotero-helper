@@ -57,6 +57,8 @@ export default function App() {
   const selectedCollection = useStore((s) => s.selectedCollection);
   const reading = useStore((s) => s.reading);
   const { leftWidth, rightWidth, notesWidth } = useStore();
+  const sidebarHidden = useStore((s) => s.sidebarHidden);
+  const metaHidden = useStore((s) => s.metaHidden);
 
   useEffect(() => {
     void bootstrap();
@@ -85,13 +87,13 @@ export default function App() {
         ) : (
           <>
             <Sidebar />
-            <PaneResizer side="left" />
+            {!sidebarHidden && <PaneResizer side="left" />}
             {/* Questions is a folder of conversations, so it replaces
                 the item list rather than filtering it. */}
             {selectedCollection === QUESTIONS ? <ChatList /> : <ItemList />}
           </>
         )}
-        <PaneResizer side="right" />
+        {!metaHidden && <PaneResizer side="right" />}
         <MetadataPanel />
       </div>
       <Terminal />

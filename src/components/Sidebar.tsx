@@ -114,6 +114,7 @@ export function Sidebar() {
   );
   const { selectedCollection, selectCollection, sidebarOpen, setSidebarOpen } =
     useStore();
+  const hidden = useStore((s) => s.sidebarHidden);
   const dragging = useDragging();
   const chatCount = useStore((s) => s.chats.length);
   const flaggedKeys = useStore((s) => s.flaggedFolders);
@@ -143,7 +144,7 @@ export function Sidebar() {
       <nav
         className={`sidebar ${sidebarOpen ? "open" : ""} ${
           dragging ? "drop-mode" : ""
-        }`}
+        } ${hidden ? "collapsed" : ""}`}
       >
         {flagged.length > 0 && (
           <>

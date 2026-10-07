@@ -14,6 +14,31 @@
   align-items: center;
   gap: 4px;
 }
+/* With a PDF open: Share, Sync and the document's name. */
+.toolbar-reading {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.toolbar-doc {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  line-height: 1.25;
+  padding: 0 4px;
+}
+.toolbar-doc-title,
+.toolbar-doc-byline {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.toolbar-doc-title {
+  font-weight: 600;
+}
+.toolbar-doc-byline {
+  font-size: 11px;
+  color: var(--text-dim);
+}
 .toolbar-sep {
   width: 1px;
   height: 20px;

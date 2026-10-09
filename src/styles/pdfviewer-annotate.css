@@ -7,16 +7,16 @@
   display: flex;
   align-items: center;
   gap: 2px;
-  padding: 2px 3px;
+  padding: 3px 5px;
   border: 1px solid var(--border);
-  border-radius: 5px;
+  border-radius: 6px;
   background: var(--panel);
-  box-shadow: 0 1px 5px rgb(0 0 0 / 0.25);
+  box-shadow: 0 2px 8px rgb(0 0 0 / 0.25);
   white-space: nowrap;
 }
 .pdf-selection-bar-sep {
   width: 1px;
-  height: 9px;
+  height: 14px;
   margin: 0 2px;
   background: var(--border);
 }
@@ -24,14 +24,14 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 13px;
-  height: 12px;
-  border-radius: 3px;
+  width: 20px;
+  height: 18px;
+  border-radius: 4px;
   color: var(--text-dim);
 }
 .pdf-mark-mode svg {
-  width: 9px;
-  height: 9px;
+  width: 11px;
+  height: 11px;
 }
 .pdf-mark-mode:hover {
   color: var(--text);
@@ -41,8 +41,8 @@
   color: var(--text);
 }
 .pdf-selection-quote {
-  padding: 1px 5px;
-  border-radius: 3px;
+  padding: 3px 7px;
+  border-radius: 4px;
   background: var(--accent);
   color: #fff;
   font-size: 10px;
@@ -52,14 +52,14 @@
 /* A colour: a dot to highlight with, a bar to underline with. */
 .pdf-mark-swatch {
   position: relative;
-  width: 10px;
-  height: 10px;
+  width: 15px;
+  height: 15px;
   border-radius: 50%;
   background: var(--swatch);
   flex-shrink: 0;
 }
 .pdf-mark-swatch:hover {
-  transform: scale(1.15);
+  transform: scale(1.12);
 }
 .pdf-selection-bar.underline .pdf-mark-swatch {
   border-radius: 2px;
@@ -68,78 +68,63 @@
 .pdf-selection-bar.underline .pdf-mark-swatch::after {
   content: "";
   position: absolute;
-  left: 1px;
-  right: 1px;
-  bottom: 1px;
-  height: 2px;
-  border-radius: 1px;
+  left: 2px;
+  right: 2px;
+  bottom: 2px;
+  height: 3px;
+  border-radius: 1.5px;
   background: var(--swatch);
 }
 .pdf-mark-swatch.active {
-  box-shadow: 0 0 0 1px var(--panel), 0 0 0 2px var(--text-dim);
+  box-shadow: 0 0 0 1.5px var(--panel), 0 0 0 2.5px var(--text-dim);
 }
-/* Fingers: the controls are drawn small, but each answers to a wider
-   area around it than it shows. */
 @media (hover: none) {
-  .pdf-selection-bar,
-  .pdf-annot-popover-colors {
-    gap: 6px;
-  }
   .pdf-mark-swatch {
-    width: 13px;
-    height: 13px;
+    width: 20px;
+    height: 20px;
   }
   .pdf-mark-mode {
-    width: 16px;
-    height: 15px;
-  }
-  .pdf-mark-swatch::before,
-  .pdf-mark-mode::before {
-    content: "";
-    position: absolute;
-    inset: -3px;
-  }
-  .pdf-mark-mode {
-    position: relative;
+    width: 24px;
+    height: 22px;
   }
 }
 
 .pdf-annot-popover {
   position: absolute;
   z-index: 40;
-  width: 130px;
-  padding: 5px;
+  width: 195px;
+  padding: 8px;
   border: 1px solid var(--border);
-  border-radius: 5px;
+  border-radius: 6px;
   background: var(--panel);
-  box-shadow: 0 2px 9px rgb(0 0 0 / 0.25);
+  box-shadow: 0 3px 14px rgb(0 0 0 / 0.25);
   font-size: 10px;
   color: var(--text);
 }
 .pdf-annot-popover-colors {
   display: flex;
   justify-content: space-between;
-  gap: 2px;
-  margin-bottom: 4px;
+  gap: 3px;
+  margin-bottom: 6px;
 }
 .pdf-annot-popover-comment {
   display: block;
   width: 100%;
   box-sizing: border-box;
-  padding: 3px 4px;
+  padding: 5px 6px;
   border: 1px solid var(--border);
-  border-radius: 3px;
+  border-radius: 4px;
   background: var(--bg);
   color: var(--text);
   font: inherit;
   font-size: 11px;
-  line-height: 1.35;
+  line-height: 1.4;
   resize: vertical;
 }
 .pdf-annot-popover-footer {
   display: flex;
   align-items: center;
-  margin-top: 4px;
+  margin-top: 6px;
 }
 .pdf-annot-popover-insert {
   color: var(--accent);
@@ -149,8 +134,8 @@
 }
 .pdf-annot-popover-delete {
   margin-left: auto;
-  padding: 1px 4px;
-  border-radius: 3px;
+  padding: 2px 6px;
+  border-radius: 4px;
   color: var(--text-dim);
 }
 .pdf-annot-popover-delete:hover {

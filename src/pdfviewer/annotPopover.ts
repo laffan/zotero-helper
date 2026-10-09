@@ -26,7 +26,7 @@ export function createAnnotationPopover(root: HTMLElement, handlers: AnnotationE
   const comment = document.createElement("textarea");
   comment.className = "pdf-annot-popover-comment";
   comment.placeholder = "Add a comment…";
-  comment.rows = 2;
+  comment.rows = 3;
   el.appendChild(comment);
   const footer = document.createElement("div");
   footer.className = "pdf-annot-popover-footer";
@@ -98,7 +98,7 @@ export function createAnnotationPopover(root: HTMLElement, handlers: AnnotationE
     if (!current) return;
     if (!del.classList.contains("armed")) {
       del.classList.add("armed");
-      del.textContent = "Sure?";
+      del.textContent = "Delete — sure?";
       armTimer = window.setTimeout(disarm, 3000);
       return;
     }

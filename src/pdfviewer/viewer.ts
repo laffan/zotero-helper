@@ -14,14 +14,17 @@
 // own annotations into the page).
 import type { Annotation } from "../lib/highlights";
 import { PDFJS_ASSETS } from "../lib/pdfjsAssets";
+import { annotationAtPoint, draftFromRange, type AnnotationDraft } from "./annotate";
 import { createAnnotationLayer } from "./annotations";
+import { createAnnotationPopover } from "./annotPopover";
 import { createFoldLayer } from "./folds";
 import { createLinkLayerManager } from "./links";
-import { attachPageHoverButtons, attachTextLayer, createSelectionNoter } from "./pageTools";
+import { attachPageHoverButtons, attachTextLayer } from "./pageTools";
 import { drawAnnotations, pageSignatures } from "./paint";
 import { getPdfjs } from "./pdfjs";
 import { createPageRenderer } from "./render";
 import { createPdfSearch } from "./search";
+import { createSelectionBar, type MarkType } from "./selectionBar";
 import { createThumbnailManager } from "./thumbnails";
 import { buildPdfToolbar } from "./toolbar";
 import type { LayoutMode, PageRecord, PDFDocumentProxy } from "./types";
@@ -63,6 +66,15 @@ export interface PdfViewerOptions {
   onQuote?: (text: string, page: number) => void;
   /** Send a shelf annotation to the notes. */
   onInsertAnnotation?: (a: Annotation) => void;
+  /** Make, change and delete annotations; absent, they are read-only. */
+  annotate?: AnnotationWriter;
+}
+
+export interface AnnotationWriter {
+  create: (draft: AnnotationDraft, type: MarkType, color: string) => void;
+  update: (key: string, patch: { color?: string; comment?: string }) => void;
+  remove: (key: string) => void;
+  canEdit: (a: Annotation) => boolean;
 }
 
 export function createPdfViewer(container: HTMLElement, opts: PdfViewerOptions = {}) {
@@ -76,6 +88,9 @@ export function createPdfViewer(container: HTMLElement, opts: PdfViewerOptions =
   let foldedZoom = 1.0; // multiplier on the folded fit-width scale
   let fixedZoom = prefs?.fixedZoom ?? 1.0;
   let destroyed = false;
+  // The PDF's own page labels ("iv", "212"), which Zotero records on an
+  // annotation; null when the file has none.
+  let pageLabels: string[] | null = null;
 
   const root = document.createElement("div");
   root.className = "pdf-viewer";
@@ -94,6 +109,8 @@ export function createPdfViewer(container: HTMLElement, opts: PdfViewerOptions =
     goToPage: (n) => goToPage(n),
     scrollToFold: (a) => (folded ? foldLayer.scrollToAnnotation(a) : false),
     onInsert: opts.onInsertAnnotation,
+    canEdit: opts.annotate?.canEdit,
+    onEdit: (a, row) => popover?.open(a, row.getBoundingClientRect(), "left"),
   });
   const foldLayer = createFoldLayer(scrollArea, {
     getPages: () => pages,
@@ -118,7 +135,7 @@ export function createPdfViewer(container: HTMLElement, opts: PdfViewerOptions =
     paintPage: (idx, ctx, viewport) => drawAnnotations(ctx, viewport, annotLayer.getAnnotations(), idx),
     onPageRendered: (idx, page) => {
       void linkMgr.attach(idx, page);
-      if (opts.onQuote) void attachTextLayer(pages[idx], page);
+      if (opts.onQuote || opts.annotate) void attachTextLayer(pages[idx], page);
     },
     onUpdate: () => updatePageIndicator(),
   });
@@ -128,7 +145,45 @@ export function createPdfViewer(container: HTMLElement, opts: PdfViewerOptions =
   root.appendChild(tb.toolbar);
   container.appendChild(root);
   foldLayer.attachFilterUI(tb.foldFilterBtn, root);
-  const selection = opts.onQuote ? createSelectionNoter(scrollArea, root, opts.onQuote) : null;
+  const writer = opts.annotate;
+  const selection =
+    opts.onQuote || writer
+      ? createSelectionBar(scrollArea, root, {
+          onQuote: opts.onQuote,
+          onAnnotate: writer
+            ? (range, type, color) => {
+                const draft = draftFromRange(range, pages, pageLabels);
+                if (draft) writer.create(draft, type, color);
+              }
+            : undefined,
+        })
+      : null;
+  const popover = writer
+    ? createAnnotationPopover(root, {
+        update: writer.update,
+        remove: writer.remove,
+        onInsert: opts.onInsertAnnotation,
+      })
+    : null;
+
+  // A tap on one of this app's highlights or underlines opens its
+  // editor — unless it ends a text selection or lands on a link.
+  scrollArea.addEventListener("click", (e) => {
+    if (!popover || !writer || folded) return;
+    const sel = window.getSelection();
+    if (sel && !sel.isCollapsed) return;
+    const target = e.target as Element;
+    if (target.closest("a, button")) return;
+    const wrapper = target.closest<HTMLElement>(".pdf-page-wrapper");
+    const idx = Number(wrapper?.dataset.pageIndex ?? NaN);
+    const p = pages[idx];
+    if (!wrapper || !p) return;
+    const wr = wrapper.getBoundingClientRect();
+    const fx = (e.clientX - wr.left) / wr.width;
+    const fy = (e.clientY - wr.top) / wr.height;
+    const a = annotationAtPoint(p, idx, fx, fy, annotLayer.getAnnotations());
+    if (a && writer.canEdit(a)) popover.open(a, new DOMRect(e.clientX, e.clientY - 10, 0, 20));
+  });
 
   if (opts.onOpenInZotero) {
     tb.zoteroLink.style.display = "";
@@ -321,6 +376,9 @@ export function createPdfViewer(container: HTMLElement, opts: PdfViewerOptions =
     // indicator itself; folded mode short-circuits the renderer.
     if (folded) updatePageIndicator();
     else renderer.scheduleUpdate();
+    // The editor is placed beside what it edits; once that has moved
+    // away, close it (but not while its comment is being typed).
+    if (popover?.isOpen() && !root.querySelector(".pdf-annot-popover textarea:focus")) popover.close();
   });
 
   function switchLayout(mode: "horizontal" | "vertical"): void {
@@ -395,6 +453,8 @@ export function createPdfViewer(container: HTMLElement, opts: PdfViewerOptions =
       return;
     }
     pdfDoc = doc;
+    pageLabels = await doc.getPageLabels().catch(() => null);
+    if (destroyed) return;
     applyLayoutClass();
 
     // Only page 1's size is fetched up front; the other wrappers adopt
@@ -481,6 +541,7 @@ export function createPdfViewer(container: HTMLElement, opts: PdfViewerOptions =
     thumbs.destroy();
     renderer.destroy();
     selection?.destroy();
+    popover?.destroy();
     const doc = pdfDoc;
     pdfDoc = null;
     pages = [];
@@ -499,6 +560,7 @@ export function createPdfViewer(container: HTMLElement, opts: PdfViewerOptions =
       const before = pageSignatures(annotLayer.getAnnotations());
       const after = pageSignatures(list);
       annotLayer.setAnnotations(list);
+      popover?.sync(list);
       const changed = new Set<number>();
       for (const [i, sig] of after) if (before.get(i) !== sig) changed.add(i);
       for (const i of before.keys()) if (!after.has(i)) changed.add(i);

@@ -20,6 +20,8 @@ export interface Annotation {
   pageLabel: string;
   sortIndex: string;
   tags: string[];
+  /** Imported from the PDF file by Zotero, and read-only there. */
+  external: boolean;
   /** The raw item, so painters can reach `annotationPosition`. */
   _raw: ZItem;
   _parsedPosition?: AnnotationPosition | null;
@@ -30,6 +32,19 @@ export interface AnnotationPosition {
   rects?: number[][];
   paths?: number[][];
 }
+
+/** Zotero's annotation colours, in the order its reader offers them.
+ *  The API only accepts lowercase `#rrggbb`. */
+export const ANNOTATION_COLORS: ReadonlyArray<{ name: string; hex: string }> = [
+  { name: "Yellow", hex: "#ffd400" },
+  { name: "Red", hex: "#ff6666" },
+  { name: "Green", hex: "#5fb236" },
+  { name: "Blue", hex: "#2ea8e5" },
+  { name: "Purple", hex: "#a28ae5" },
+  { name: "Magenta", hex: "#e56eee" },
+  { name: "Orange", hex: "#f19837" },
+  { name: "Gray", hex: "#aaaaaa" },
+];
 
 /** PDF text extraction puts a line break at every visual line, mid-
  *  sentence or not, and a soft-hyphenated word comes out as "hyphen-
@@ -55,6 +70,7 @@ function normalize(item: ZItem): Annotation {
     pageLabel: String(d.annotationPageLabel ?? ""),
     sortIndex: String(d.annotationSortIndex ?? ""),
     tags: (item.data.tags ?? []).map((t) => t.tag).filter(Boolean),
+    external: d.annotationIsExternal === true,
     _raw: item,
   };
 }

@@ -1,0 +1,159 @@
+/* Making and editing annotations in the PDF viewer: the bar over a
+   selection, the annotation popover, the shelf's edit pencil. */
+
+.pdf-selection-bar {
+  position: absolute;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  padding: 4px 6px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel);
+  box-shadow: 0 2px 10px rgb(0 0 0 / 0.25);
+  white-space: nowrap;
+}
+.pdf-selection-bar-sep {
+  width: 1px;
+  height: 18px;
+  margin: 0 3px;
+  background: var(--border);
+}
+.pdf-mark-mode {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 24px;
+  border-radius: 5px;
+  color: var(--text-dim);
+}
+.pdf-mark-mode:hover {
+  color: var(--text);
+}
+.pdf-mark-mode.active {
+  background: var(--select);
+  color: var(--text);
+}
+.pdf-selection-quote {
+  padding: 4px 9px;
+  border-radius: 5px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+/* A colour: a dot to highlight with, a bar to underline with. */
+.pdf-mark-swatch {
+  position: relative;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--swatch);
+  flex-shrink: 0;
+}
+.pdf-mark-swatch:hover {
+  transform: scale(1.12);
+}
+.pdf-selection-bar.underline .pdf-mark-swatch {
+  border-radius: 3px;
+  background: transparent;
+}
+.pdf-selection-bar.underline .pdf-mark-swatch::after {
+  content: "";
+  position: absolute;
+  left: 3px;
+  right: 3px;
+  bottom: 3px;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--swatch);
+}
+.pdf-mark-swatch.active {
+  box-shadow: 0 0 0 2px var(--panel), 0 0 0 3.5px var(--text-dim);
+}
+@media (hover: none) {
+  .pdf-mark-swatch {
+    width: 26px;
+    height: 26px;
+  }
+  .pdf-mark-mode {
+    width: 32px;
+    height: 30px;
+  }
+}
+
+.pdf-annot-popover {
+  position: absolute;
+  z-index: 40;
+  width: 260px;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel);
+  box-shadow: 0 4px 18px rgb(0 0 0 / 0.25);
+  font-size: 12px;
+  color: var(--text);
+}
+.pdf-annot-popover-colors {
+  display: flex;
+  justify-content: space-between;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+.pdf-annot-popover-comment {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  line-height: 1.4;
+  resize: vertical;
+}
+.pdf-annot-popover-footer {
+  display: flex;
+  align-items: center;
+  margin-top: 8px;
+}
+.pdf-annot-popover-insert {
+  color: var(--accent);
+}
+.pdf-annot-popover-insert:hover {
+  text-decoration: underline;
+}
+.pdf-annot-popover-delete {
+  margin-left: auto;
+  padding: 3px 8px;
+  border-radius: 5px;
+  color: var(--text-dim);
+}
+.pdf-annot-popover-delete:hover {
+  color: var(--bad);
+}
+.pdf-annot-popover-delete.armed {
+  background: var(--bad);
+  color: #fff;
+}
+
+.pdf-annot-shelf-edit {
+  display: inline-flex;
+  padding: 0 2px;
+  color: var(--text-dim);
+}
+.pdf-annot-shelf-edit:not(.pdf-annot-shelf-insert + .pdf-annot-shelf-edit) {
+  margin-left: auto;
+}
+.pdf-annot-shelf-edit:hover {
+  color: var(--text);
+}
+.pdf-annot-shelf-edit svg {
+  width: 12px;
+  height: 12px;
+}

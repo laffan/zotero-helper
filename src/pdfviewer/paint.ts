@@ -89,14 +89,18 @@ export function drawAnnotations(
   }
 }
 
-/** A string that changes when a page's annotations do — what decides
- *  whether a rendered page has to be repainted after a sync. */
+/** A string that changes when what is drawn on a page does — what
+ *  decides whether a rendered page has to be repainted after a sync or
+ *  an edit. Only what shows counts: a repaint replaces the page's text
+ *  layer, and with it any selection being made there, so a comment
+ *  edit or a new version number from Zotero mustn't cause one. */
 export function pageSignatures(annotations: Annotation[]): Map<number, string> {
   const out = new Map<number, string>();
   for (const a of annotations) {
     const idx = annotationPosition(a)?.pageIndex;
     if (typeof idx !== "number") continue;
-    const part = `${a.key}:${a._raw.version}`;
+    const pos = (a._raw.data as Record<string, unknown>).annotationPosition;
+    const part = `${a.key}:${a.type}:${a.color}:${typeof pos === "string" ? pos : JSON.stringify(pos)}`;
     out.set(idx, out.has(idx) ? `${out.get(idx)},${part}` : part);
   }
   return out;

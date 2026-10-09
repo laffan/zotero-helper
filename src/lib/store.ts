@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+import { applyPending } from "./pendingAnnotations";
 import type {
   CachedPdf,
   Chat,
@@ -201,6 +202,7 @@ interface AppStore extends UiPrefs {
   setPdfDownloading: (attKey: string, on: boolean) => void;
 
   upsertItem: (item: ZItem) => void;
+  removeItem: (key: string) => void;
   patchItemData: (key: string, patch: Record<string, unknown>) => void;
 
   addJob: (job: ImportJob) => void;
@@ -267,7 +269,8 @@ export const useStore = create<AppStore>()(
       pdfsDownloading: [],
 
       setSettings: (settings) => set({ settings }),
-      setLibrary: (library) => set({ library }),
+      // Annotations made here and not yet in the cache stay in view.
+      setLibrary: (library) => set({ library: applyPending(library) }),
       setSyncing: (syncing) => set({ syncing }),
       setSyncProgress: (syncProgress) => set({ syncProgress }),
       setTidying: (tidying) => set({ tidying }),
@@ -411,6 +414,10 @@ export const useStore = create<AppStore>()(
           else items.push(item);
           return { library: { ...s.library, items } };
         }),
+      removeItem: (key) =>
+        set((s) => ({
+          library: { ...s.library, items: s.library.items.filter((i) => i.key !== key) },
+        })),
       patchItemData: (key, patch) =>
         set((s) => {
           const items = s.library.items.map((i) =>

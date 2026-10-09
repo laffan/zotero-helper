@@ -229,6 +229,34 @@ Windows/Linux desktops too).
   there). Page pills move the open viewer rather than leaving for
   Zotero.
 
+  **Highlighting.** Selecting text in the PDF brings up a small bar:
+  Zotero's eight colours, a highlight / underline switch beside them
+  (remembered between selections), and *Add to notes*. A colour marks
+  the passage the way Zotero's own reader does — as an annotation
+  item, child of the PDF attachment, with the same position, page
+  label and sort-index fields — so Zotero desktop, iOS and the web
+  library show it as one of theirs, and the PDF file itself is never
+  changed (Zotero keeps annotations out of the file too). Tapping a
+  highlight or underline, or the pencil on its shelf row, opens a
+  small editor: colour, comment, *Add to notes*, and *Delete* (a
+  second press confirms). The mark shows at once; the write goes into
+  an outbox on the device (`annotations-outbox.json`) and is pushed a
+  moment later, every couple of minutes while anything waits, when the
+  app goes to the background and when it comes back online — so
+  highlighting a cached PDF offline works, and reaches Zotero later.
+  An edit made against an older version than Zotero's is sent again
+  over the newer one (the last edit wins, as in Zotero's reader).
+  Annotations Zotero imported from the PDF file stay read-only, as
+  they are in Zotero; in a group library, only annotations made in
+  this app on this device are editable here, since other members'
+  are theirs. Two values are close to Zotero's rather than identical:
+  the character offset in the sort index is counted in pdf.js's text
+  layer, not Zotero's own text extraction (it only orders annotations
+  within a page), and the page label comes from the PDF's own labels,
+  falling back to the page number. The writes are
+  `src-tauri/src/annotations.rs`; selection to position is
+  `src/pdfviewer/annotate.ts`.
+
   Notes save to this device as you type and are pushed to Zotero as a
   `NOTES.md` attachment of the entry every couple of minutes while
   anything is unpushed, when the app goes to the background, and on
@@ -388,13 +416,20 @@ src/            React + TypeScript UI (Vite, zustand, MiniSearch)
   lib/highlights.ts, lib/notes.ts
                 annotations out of the library cache; NOTES.md load /
                 save / periodic push, the PDF cache
+  lib/annotationEdits.ts, lib/pendingAnnotations.ts
+                highlights made in the reader: create / edit / delete,
+                the push schedule, and unsent changes laid over the
+                library until a sync includes them
   components/   toolbar, sidebar, virtualized item list, metadata panel
                 and its tabs (Highlights, Notes), reader pane, terminal,
                 import/rescue modals, settings
   pdfviewer/    the PDF viewer beside the notes, ported from Hush (viewer,
                 render, paint (annotations into the rasters), shelf,
                 folds, thumbnails, links, toolbar) plus pageTools (text
-                layer, notes hooks) and search (find in the PDF)
+                layer, notes hooks), search (find in the PDF), and
+                annotating: selectionBar (colours over a selection),
+                annotate (selection → Zotero position, tap hit-test),
+                annotPopover (colour / comment / delete)
   noteseditor/  the notes editor: CodeMirror setup, live preview,
                 Zotero-link pills, the cite-this-page gutter
   styles/       one stylesheet per UI region (tokens, base, toolbar, …)
@@ -403,6 +438,9 @@ src-tauri/      Rust core (all networking + state)
                    writes, and attachment files (files — create, upload
                    or replace with md5 preconditions, read one item)
   src/notes.rs     NOTES.md on the device and its push/pull with Zotero
+  src/annotations.rs
+                   the outbox of annotation writes and its push (the
+                   HTTP half is src/zotero/annotations.rs)
   src/pdfcache.rs  PDFs kept on the device to read beside notes
   src/storage.rs   the Settings page's storage report
   src/resolve/     identifier → Zotero item data; one file per source

@@ -4,9 +4,16 @@
 // The viewer itself is plain DOM (src/pdfviewer/, a port of Hush's), so
 // this component only mounts it, feeds it the cached PDF and the
 // entry's Zotero annotations, and routes what it hands back — a cited
-// page, a selected passage, a shelf highlight — into the notes.
+// page, a selected passage, a shelf highlight — into the notes, and new
+// or edited highlights to Zotero (lib/annotationEdits.ts).
 import { useEffect, useRef, useState } from "react";
 import { openInZotero } from "../lib/actions";
+import {
+  canEditAnnotation,
+  createAnnotation,
+  deleteAnnotation,
+  updateAnnotation,
+} from "../lib/annotationEdits";
 import {
   annotationIndexFor,
   annotationMarkdown,
@@ -87,6 +94,21 @@ export function ReaderPane() {
           onCitePage: (page) => addToNotes(cite(page)),
           onQuote: (text, page) => addToNotes(`> ${text}\n\n— ${cite(page)}`),
           onInsertAnnotation: (a: Annotation) => addToNotes(annotationMarkdown(settings(), a)),
+          annotate: {
+            create: (d, type, color) =>
+              createAnnotation({
+                attKey,
+                type,
+                color,
+                text: d.text,
+                pageLabel: d.pageLabel,
+                sortIndex: d.sortIndex,
+                position: { pageIndex: d.pageIndex, rects: d.rects },
+              }),
+            update: updateAnnotation,
+            remove: deleteAnnotation,
+            canEdit: (a) => canEditAnnotation(a, settings()),
+          },
         });
         viewerRef.current = viewer;
         active = { attKey, viewer };

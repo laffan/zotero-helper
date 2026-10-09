@@ -1,4 +1,5 @@
 mod ai;
+mod annotations;
 mod capture;
 mod chats;
 mod error;
@@ -684,6 +685,9 @@ pub fn run() {
             notes::notes_list,
             notes::notes_pull,
             notes::notes_push,
+            annotations::annotations_outbox,
+            annotations::annotations_enqueue,
+            annotations::annotations_push,
             storage::storage_report,
             storage::clear_thumbnails,
         ])

@@ -3,6 +3,7 @@
 import { scheduleTrayClear } from "../components/TaskTray";
 import { itemTitle } from "./collections";
 import { loadChats } from "./ai/chat";
+import { startAnnotationSync } from "./annotationEdits";
 import { captureFinished, downloadForJob } from "./importer";
 import { pushNote, refreshCachedPdfs, startNotesSync } from "./notes";
 import { appLog, useStore } from "./store";
@@ -85,6 +86,8 @@ export async function bootstrap(): Promise<void> {
   await loadChats();
   await refreshCachedPdfs();
   startNotesSync();
+  // Before the library loads, so unsent annotations are laid over it.
+  await startAnnotationSync();
 
   try {
     const settings = await invoke<Settings>("get_settings");

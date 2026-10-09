@@ -27,3 +27,9 @@ export const PAGE_NOTE_ICON = `<svg viewBox="0 0 24 24" width="16" height="16" f
 export const EXPAND_ICON = `<svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6 L8 2.5 L12 6"/><path d="M4 10 L8 13.5 L12 10"/></svg>`;
 
 export const COLLAPSE_ICON = `<svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 2.5 L8 6 L12 2.5"/><path d="M4 13.5 L8 10 L12 13.5"/></svg>`;
+
+/** The selection bar's two kinds of mark: a highlighter band, and an
+ *  underlined U. */
+export const HIGHLIGHT_ICON = `<svg viewBox="0 0 16 16" width="14" height="14"><rect x="1.5" y="3.5" width="13" height="9" rx="1.5" fill="currentColor" opacity="0.3"/><path d="M4.5 8h7" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>`;
+
+export const UNDERLINE_ICON = `<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><path d="M4.5 2.5v4.5a3.5 3.5 0 0 0 7 0V2.5"/><path d="M3 14h10"/></svg>`;

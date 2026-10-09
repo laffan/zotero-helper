@@ -3,6 +3,7 @@
 //! (paginated fetches, retries, resumable initial download) lives in
 //! the `sync` submodule.
 
+pub mod annotations;
 pub mod files;
 mod sync;
 

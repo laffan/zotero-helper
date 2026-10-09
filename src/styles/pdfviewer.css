@@ -269,19 +269,6 @@
   transform: rotate(270deg) translateX(-100%);
 }
 
-.pdf-selection-note {
-  position: absolute;
-  z-index: 30;
-  padding: 5px 10px;
-  border-radius: 6px;
-  background: var(--accent);
-  color: #fff;
-  font-size: 12px;
-  font-weight: 600;
-  box-shadow: 0 2px 10px rgb(0 0 0 / 0.25);
-  white-space: nowrap;
-}
-
 /* --- bottom toolbar --- */
 .pdf-zoom-toolbar {
   display: flex;

@@ -4,9 +4,11 @@
 // paint.ts here, which draws into the page rasters instead of laying
 // boxes over them.
 //
-// One addition over Hush: each shelf row can be sent to the notes
-// (`onInsert`), which is what the shelf is for while taking notes.
+// Additions over Hush: each shelf row can be sent to the notes
+// (`onInsert`), which is what the shelf is for while taking notes, and
+// an annotation this app may edit has a pencil that opens its editor.
 import { annotationPosition, type Annotation } from "../lib/highlights";
+import { PAGE_NOTE_ICON } from "./icons";
 import type { LayoutMode, PageRecord, PageViewport } from "./types";
 
 /** PDF user-space point → top-left-origin page units for a scale-1
@@ -39,6 +41,10 @@ export interface AnnotationViewer {
   scrollToFold?: (a: Annotation) => boolean;
   /** Send an annotation to the notes; absent hides the button. */
   onInsert?: (a: Annotation) => void;
+  /** May this annotation be edited here? Absent: none may. */
+  canEdit?: (a: Annotation) => boolean;
+  /** Open the editor for an annotation, beside its shelf row. */
+  onEdit?: (a: Annotation, row: HTMLElement) => void;
 }
 
 export function createAnnotationLayer(
@@ -259,6 +265,18 @@ export function createAnnotationLayer(
           viewer.onInsert?.(annot);
         });
         meta.appendChild(ins);
+      }
+      if (viewer.onEdit && viewer.canEdit?.(annot)) {
+        const edit = document.createElement("button");
+        edit.type = "button";
+        edit.className = "pdf-annot-shelf-edit";
+        edit.innerHTML = PAGE_NOTE_ICON;
+        edit.title = "Colour, comment, delete";
+        edit.addEventListener("click", (e) => {
+          e.stopPropagation();
+          viewer.onEdit?.(annot, row);
+        });
+        meta.appendChild(edit);
       }
       row.appendChild(meta);
       shelfBody.appendChild(row);

@@ -46,11 +46,11 @@ export function createSelectionBar(
   // bar goes below it there.
   const touch = window.matchMedia("(hover: none)").matches;
 
-  const button = (cls: string, title: string) => {
+  const button = (cls: string, title?: string) => {
     const b = document.createElement("button");
     b.type = "button";
     b.className = cls;
-    b.title = title;
+    if (title) b.title = title;
     bar.appendChild(b);
     return b;
   };
@@ -61,7 +61,6 @@ export function createSelectionBar(
         underline: button("pdf-mark-mode", "Underline"),
       }
     : null;
-  const swatches: HTMLButtonElement[] = [];
   if (modeBtns) {
     modeBtns.highlight.innerHTML = HIGHLIGHT_ICON;
     modeBtns.underline.innerHTML = UNDERLINE_ICON;
@@ -79,15 +78,14 @@ export function createSelectionBar(
     const sep = document.createElement("span");
     sep.className = "pdf-selection-bar-sep";
     bar.appendChild(sep);
-    for (const c of ANNOTATION_COLORS) {
-      const s = button("pdf-mark-swatch", "");
-      s.style.setProperty("--swatch", c.hex);
+    for (const color of ANNOTATION_COLORS) {
+      const s = button("pdf-mark-swatch");
+      s.style.setProperty("--swatch", color);
       s.addEventListener("click", () => {
-        if (current) handlers.onAnnotate?.(current.range, mode, c.hex);
+        if (current) handlers.onAnnotate?.(current.range, mode, color);
         window.getSelection()?.removeAllRanges();
         hide();
       });
-      swatches.push(s);
     }
   }
   if (modeBtns && handlers.onQuote) {
@@ -110,9 +108,6 @@ export function createSelectionBar(
     modeBtns.highlight.classList.toggle("active", mode === "highlight");
     modeBtns.underline.classList.toggle("active", mode === "underline");
     bar.classList.toggle("underline", mode === "underline");
-    swatches.forEach((s, i) => {
-      s.title = `${mode === "underline" ? "Underline" : "Highlight"} in ${ANNOTATION_COLORS[i].name.toLowerCase()}`;
-    });
   }
   paintMode();
 

@@ -35,15 +35,15 @@ export interface AnnotationPosition {
 
 /** Zotero's annotation colours, in the order its reader offers them.
  *  The API only accepts lowercase `#rrggbb`. */
-export const ANNOTATION_COLORS: ReadonlyArray<{ name: string; hex: string }> = [
-  { name: "Yellow", hex: "#ffd400" },
-  { name: "Red", hex: "#ff6666" },
-  { name: "Green", hex: "#5fb236" },
-  { name: "Blue", hex: "#2ea8e5" },
-  { name: "Purple", hex: "#a28ae5" },
-  { name: "Magenta", hex: "#e56eee" },
-  { name: "Orange", hex: "#f19837" },
-  { name: "Gray", hex: "#aaaaaa" },
+export const ANNOTATION_COLORS: ReadonlyArray<string> = [
+  "#ffd400", // yellow
+  "#ff6666", // red
+  "#5fb236", // green
+  "#2ea8e5", // blue
+  "#a28ae5", // purple
+  "#e56eee", // magenta
+  "#f19837", // orange
+  "#aaaaaa", // gray
 ];
 
 /** PDF text extraction puts a line break at every visual line, mid-

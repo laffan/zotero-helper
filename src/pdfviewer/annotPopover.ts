@@ -26,7 +26,7 @@ export function createAnnotationPopover(root: HTMLElement, handlers: AnnotationE
   const comment = document.createElement("textarea");
   comment.className = "pdf-annot-popover-comment";
   comment.placeholder = "Add a comment…";
-  comment.rows = 3;
+  comment.rows = 2;
   el.appendChild(comment);
   const footer = document.createElement("div");
   footer.className = "pdf-annot-popover-footer";
@@ -46,16 +46,15 @@ export function createAnnotationPopover(root: HTMLElement, handlers: AnnotationE
   let commentTimer = 0;
   let armTimer = 0;
 
-  const swatches = ANNOTATION_COLORS.map((c) => {
+  const swatches = ANNOTATION_COLORS.map((color) => {
     const b = document.createElement("button");
     b.type = "button";
     b.className = "pdf-mark-swatch";
-    b.title = c.name;
-    b.style.setProperty("--swatch", c.hex);
+    b.style.setProperty("--swatch", color);
     b.addEventListener("click", () => {
       if (!current) return;
-      handlers.update(current.key, { color: c.hex });
-      current = { ...current, color: c.hex };
+      handlers.update(current.key, { color });
+      current = { ...current, color };
       paintColors();
     });
     colors.appendChild(b);
@@ -63,7 +62,7 @@ export function createAnnotationPopover(root: HTMLElement, handlers: AnnotationE
   });
 
   function paintColors(): void {
-    swatches.forEach((s, i) => s.classList.toggle("active", current?.color === ANNOTATION_COLORS[i].hex));
+    swatches.forEach((s, i) => s.classList.toggle("active", current?.color === ANNOTATION_COLORS[i]));
   }
 
   function commitComment(): void {
@@ -99,7 +98,7 @@ export function createAnnotationPopover(root: HTMLElement, handlers: AnnotationE
     if (!current) return;
     if (!del.classList.contains("armed")) {
       del.classList.add("armed");
-      del.textContent = "Delete — sure?";
+      del.textContent = "Sure?";
       armTimer = window.setTimeout(disarm, 3000);
       return;
     }

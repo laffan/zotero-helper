@@ -4,7 +4,8 @@
 //
 // Saving is local and immediate (debounced keystrokes); pushing to
 // Zotero is periodic — every couple of minutes while anything is
-// unpushed, when the app goes to the background, and when the PDF
+// unpushed, when the app goes to the background or returns to the
+// foreground, when it comes back online, and when the PDF
 // beside the notes is closed. Opening a note asks Zotero first whether its copy has
 // changed, so notes written on another device arrive.
 import { scheduleTrayClear } from "../components/TaskTray";
@@ -103,9 +104,10 @@ export async function pushDirtyNotes(): Promise<void> {
 export function startNotesSync(): void {
   void pushDirtyNotes();
   window.setInterval(() => void pushDirtyNotes(), PUSH_EVERY_MS);
-  document.addEventListener("visibilitychange", () => {
-    if (document.visibilityState === "hidden") void pushDirtyNotes();
-  });
+  // Leaving: send what's there before iPadOS suspends the app.
+  // Returning: the connection may have come back while suspended, and
+  // the "online" event isn't reliably delivered on resume.
+  document.addEventListener("visibilitychange", () => void pushDirtyNotes());
   window.addEventListener("online", () => void pushDirtyNotes());
 }
 

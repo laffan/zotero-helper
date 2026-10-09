@@ -245,7 +245,8 @@ Windows/Linux desktops too).
   second press confirms). The mark shows at once; the write goes into
   an outbox on the device (`annotations-outbox.json`) and is pushed a
   moment later, every couple of minutes while anything waits, when the
-  app goes to the background and when it comes back online — so
+  app goes to the background or returns to the foreground, and when it
+  comes back online — so
   highlighting a cached PDF offline works, and reaches Zotero later.
   An edit made against an older version than Zotero's is sent again
   over the newer one (the last edit wins, as in Zotero's reader).
@@ -262,8 +263,8 @@ Windows/Linux desktops too).
 
   Notes save to this device as you type and are pushed to Zotero as a
   `NOTES.md` attachment of the entry every couple of minutes while
-  anything is unpushed, when the app goes to the background, and on
-  **Close PDF**. Opening an entry's notes (online) first asks Zotero whether
+  anything is unpushed, when the app goes to the background or returns
+  to the foreground, when it comes back online, and on **Close PDF**. Opening an entry's notes (online) first asks Zotero whether
   its copy changed, so notes written on another device arrive. Editing
   in two places isn't the expected use, so the conflict handling only
   promises not to lose words: a version changed in Zotero while this

@@ -8,7 +8,8 @@
 // pendingAnnotations keeps it there across syncs) and is queued in the
 // Rust outbox (src-tauri/src/annotations.rs), which is pushed a moment
 // after each change, every couple of minutes while anything waits,
-// when the app goes to the background and when it comes back online.
+// when the app goes to the background or returns to the foreground,
+// and when it comes back online.
 import type { Annotation } from "./highlights";
 import { forget, holdDeleted, holdItem, holdPatch } from "./pendingAnnotations";
 import { appLog, useStore } from "./store";
@@ -248,8 +249,9 @@ export async function startAnnotationSync(): Promise<void> {
   }
   schedulePush(0);
   window.setInterval(() => void pushAnnotations(), PUSH_EVERY_MS);
-  document.addEventListener("visibilitychange", () => {
-    if (document.visibilityState === "hidden") void pushAnnotations();
-  });
+  // Leaving: send what's there before iPadOS suspends the app.
+  // Returning: the connection may have come back while suspended, and
+  // the "online" event isn't reliably delivered on resume.
+  document.addEventListener("visibilitychange", () => void pushAnnotations());
   window.addEventListener("online", () => void pushAnnotations());
 }

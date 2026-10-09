@@ -153,14 +153,20 @@ export function createPdfViewer(container: HTMLElement, opts: PdfViewerOptions =
           onAnnotate: writer
             ? (range, type, color) => {
                 const draft = draftFromRange(range, pages, pageLabels);
-                if (draft) writer.create(draft, type, color);
+                if (!draft) return;
+                foldLayer.include(type, color);
+                writer.create(draft, type, color);
               }
             : undefined,
         })
       : null;
   const popover = writer
     ? createAnnotationPopover(root, {
-        update: writer.update,
+        update: (key, patch) => {
+          const a = annotLayer.getAnnotations().find((x) => x.key === key);
+          if (a && patch.color) foldLayer.include(a.type, patch.color);
+          writer.update(key, patch);
+        },
         remove: writer.remove,
         onInsert: opts.onInsertAnnotation,
       })

@@ -7,6 +7,8 @@
 // Hush seeds the filter with red highlights and red handwriting, its
 // "come back to this" convention. A library without any red marks would
 // open on an empty view, so here the filter falls back to everything.
+// Marks made in this viewer always fold, whatever the filter: someone
+// who has just highlighted a passage expects to find it there.
 import { annotationPosition, type Annotation } from "../lib/highlights";
 import { pdfPointToViewport } from "./annotations";
 import { drawAnnotations } from "./paint";
@@ -79,6 +81,8 @@ export function createFoldLayer(scrollArea: HTMLElement, env: FoldEnv) {
   let lastScale: number | null = null;
   let lastAnnRef: Annotation[] | null = null;
   let lastFilterSig: string | null = null;
+  // type:colour pairs marked in this viewer (see include()).
+  const madeHere = new Set<string>();
 
   const comboKey = (a: Annotation) => `${a.type}:${(a.color || "").toLowerCase()}`;
 
@@ -101,6 +105,7 @@ export function createFoldLayer(scrollArea: HTMLElement, env: FoldEnv) {
     for (const [key, c] of combos) {
       if ((c.type === "ink" || c.type === "highlight") && isRed(c.color)) filter.add(key);
     }
+    for (const key of madeHere) if (combos.has(key)) filter.add(key);
     if (!filter.size) for (const key of combos.keys()) filter.add(key);
     return filter;
   }
@@ -342,6 +347,14 @@ export function createFoldLayer(scrollArea: HTMLElement, env: FoldEnv) {
     lastFilterSig = null;
   }
 
+  /** A mark of this type and colour was just made (or recoloured) here:
+   *  fold it, even under a filter set before the colour existed. */
+  function include(type: string, color: string): void {
+    const key = `${type}:${color.toLowerCase()}`;
+    madeHere.add(key);
+    filter?.add(key);
+  }
+
   function onAnnotationsChanged(): void {
     if (!filterCustomized) filter = null;
     if (enabled) refresh(true);
@@ -473,6 +486,7 @@ export function createFoldLayer(scrollArea: HTMLElement, env: FoldEnv) {
     disable,
     refresh,
     onAnnotationsChanged,
+    include,
     attachFilterUI,
     scrollToAnnotation,
     goToPage,

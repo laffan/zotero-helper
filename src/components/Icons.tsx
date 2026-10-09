@@ -261,6 +261,19 @@ export const ChatIcon = (p: IconProps = {}) =>
     p,
   );
 
+export const ClockIcon = (p: IconProps = {}) =>
+  svg(
+    <>
+      <circle cx="8" cy="8" r="6" />
+      <path d="M8 4.5V8l2.5 1.5" />
+    </>,
+    p,
+  );
+
+/** The PDF's table of contents: lines indented under headings. */
+export const OutlineIcon = (p: IconProps = {}) =>
+  svg(<path d="M2.5 3.5h11M5 6.5h8.5M5 9.5h8.5M2.5 12.5h11" />, p);
+
 export const TrashIcon = (p: IconProps = {}) =>
   svg(
     <>

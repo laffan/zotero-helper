@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import { bootstrap } from "./lib/actions";
+import { trackPointerDrag } from "./lib/dragGesture";
 import { QUESTIONS, useStore } from "./lib/store";
 import { AskCostModal } from "./components/AskCostModal";
 import { CaptureModal } from "./components/CaptureModal";
@@ -23,13 +24,12 @@ function PaneResizer({ side }: { side: "left" | "right" }) {
   const reading = useStore((s) => s.reading);
 
   const start = (e: React.PointerEvent) => {
-    e.preventDefault();
     const startX = e.clientX;
     // While taking notes the right edge resizes the notes, which may
     // take up to two thirds of the window.
     const notes = side === "right" && reading !== null;
     const startW = side === "left" ? leftWidth : notes ? notesWidth : rightWidth;
-    const onMove = (ev: PointerEvent) => {
+    trackPointerDrag(e, (ev) => {
       const delta = ev.clientX - startX;
       if (side === "left") {
         setPaneSizes({ leftWidth: Math.min(420, Math.max(150, startW + delta)) });
@@ -38,13 +38,7 @@ function PaneResizer({ side }: { side: "left" | "right" }) {
       } else {
         setPaneSizes({ rightWidth: Math.min(520, Math.max(200, startW - delta)) });
       }
-    };
-    const onUp = () => {
-      window.removeEventListener("pointermove", onMove);
-      window.removeEventListener("pointerup", onUp);
-    };
-    window.addEventListener("pointermove", onMove);
-    window.addEventListener("pointerup", onUp);
+    });
   };
 
   return <div className="pane-resizer" onPointerDown={start} />;

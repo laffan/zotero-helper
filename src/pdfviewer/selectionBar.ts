@@ -29,6 +29,30 @@ function storedMode(): MarkType {
   }
 }
 
+/** The box around the selected lines, built from the range's per-line
+ *  boxes: only boxes the size of a line of text, within the visible
+ *  pages, count, so a stray box (a line break, a layer) can't stretch
+ *  it and land the bar on top of the passage. */
+function selectionBox(
+  range: Range,
+  area: HTMLElement,
+): { left: number; top: number; right: number; bottom: number } | null {
+  const view = area.getBoundingClientRect();
+  const boxes = Array.from(range.getClientRects()).filter(
+    (b) => b.width >= 1 && b.height >= 1 && b.bottom > view.top && b.top < view.bottom,
+  );
+  if (!boxes.length) return null;
+  const heights = boxes.map((b) => b.height).sort((a, b) => a - b);
+  const line = heights[Math.floor(heights.length / 2)];
+  const text = boxes.filter((b) => b.height <= line * 3);
+  return {
+    left: Math.min(...text.map((b) => b.left)),
+    top: Math.max(view.top, Math.min(...text.map((b) => b.top))),
+    right: Math.max(...text.map((b) => b.right)),
+    bottom: Math.min(view.bottom, Math.max(...text.map((b) => b.bottom))),
+  };
+}
+
 export function createSelectionBar(
   scrollArea: HTMLElement,
   root: HTMLElement,
@@ -42,9 +66,6 @@ export function createSelectionBar(
   let mode = storedMode();
   let current: { text: string; page: number; range: Range } | null = null;
   let hideTimer = 0;
-  // Touch: iOS draws its own copy/look-up menu above a selection, so the
-  // bar goes below it there.
-  const touch = window.matchMedia("(hover: none)").matches;
 
   const button = (cls: string, title?: string) => {
     const b = document.createElement("button");
@@ -135,17 +156,21 @@ export function createSelectionBar(
     if (!text || !wrapper) return hide();
     clearTimeout(hideTimer);
     current = { text, page: Number(wrapper.dataset.pageIndex ?? 0) + 1, range: range.cloneRange() };
-    const r = range.getBoundingClientRect();
+    const r = selectionBox(range, scrollArea);
+    if (!r) return hide();
     const host = root.getBoundingClientRect();
     bar.style.display = "";
     const left = Math.min(
-      Math.max(8, r.left - host.left + r.width / 2 - bar.offsetWidth / 2),
+      Math.max(8, (r.left + r.right) / 2 - host.left - bar.offsetWidth / 2),
       host.width - bar.offsetWidth - 8,
     );
+    // Above the passage on every platform, clear of what is being
+    // marked; below it only when its first line is at the very top of
+    // the view.
     const above = r.top - host.top - bar.offsetHeight - 8;
     const below = r.bottom - host.top + 8;
     bar.style.left = `${left}px`;
-    bar.style.top = `${touch || above < 8 ? below : above}px`;
+    bar.style.top = `${above < 8 ? below : above}px`;
   }
 
   // Selection settles on pointer release; keyboard selection (shift +

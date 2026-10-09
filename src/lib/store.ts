@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { applyPending } from "./pendingAnnotations";
+import { noteOpened } from "./recent";
 import type {
   CachedPdf,
   Chat,
@@ -79,6 +80,8 @@ interface UiPrefs {
    *  toolbar's panel buttons. (Narrow ones use the drawers instead.) */
   sidebarHidden: boolean;
   metaHidden: boolean;
+  /** The open PDF's outline panel, at the reader's left. */
+  outlineOpen: boolean;
 }
 
 export interface FolderView {
@@ -119,7 +122,7 @@ interface AppStore extends UiPrefs {
   tidying: boolean;
 
   view: "main" | "settings";
-  selectedCollection: string; // collection key, "all", or "unfiled"
+  selectedCollection: string; // collection key, "all", "unfiled", QUESTIONS or RECENT
   selectedKeys: string[];
   searchQuery: string;
   /** Year bounds for the date-range mode — kept apart from the text
@@ -197,6 +200,7 @@ interface AppStore extends UiPrefs {
   setNotesWidth: (w: number) => void;
   setSidebarHidden: (b: boolean) => void;
   setMetaHidden: (b: boolean) => void;
+  setOutlineOpen: (b: boolean) => void;
   setReading: (r: ReadingState | null) => void;
   setCachedPdfs: (list: CachedPdf[]) => void;
   setPdfDownloading: (attKey: string, on: boolean) => void;
@@ -239,6 +243,7 @@ export const useStore = create<AppStore>()(
       notesWidth: 420,
       sidebarHidden: false,
       metaHidden: false,
+      outlineOpen: false,
       uiTasks: [],
       uiTaskLabel: "",
 
@@ -388,7 +393,10 @@ export const useStore = create<AppStore>()(
       setNotesWidth: (notesWidth) => set({ notesWidth }),
       setSidebarHidden: (sidebarHidden) => set({ sidebarHidden }),
       setMetaHidden: (metaHidden) => set({ metaHidden }),
-      setReading: (reading) =>
+      setOutlineOpen: (outlineOpen) => set({ outlineOpen }),
+      setReading: (reading) => {
+        // Every PDF opened joins the sidebar's Recent folder.
+        if (reading?.attKey) noteOpened(reading.itemKey, reading.attKey);
         // Entering closes the narrow-screen drawers: on a tablet the
         // notes sit beside the PDF (notes.css), and a drawer's scrim
         // would cover it.
@@ -396,7 +404,8 @@ export const useStore = create<AppStore>()(
           reading
             ? { reading, metaTab: "notes", sidebarOpen: false, metaOpen: false }
             : { reading },
-        ),
+        );
+      },
       setCachedPdfs: (list) =>
         set({ cachedPdfs: Object.fromEntries(list.map((p) => [p.attKey, p])) }),
       setPdfDownloading: (attKey, on) =>
@@ -465,6 +474,7 @@ export const useStore = create<AppStore>()(
         notesWidth: s.notesWidth,
         sidebarHidden: s.sidebarHidden,
         metaHidden: s.metaHidden,
+        outlineOpen: s.outlineOpen,
       }),
     },
   ),

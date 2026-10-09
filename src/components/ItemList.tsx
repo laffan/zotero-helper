@@ -17,7 +17,9 @@ import {
   yearOf,
 } from "../lib/collections";
 import { startItemDrag } from "../lib/dragdrop";
+import { trackPointerDrag } from "../lib/dragGesture";
 import { readItem } from "../lib/notes";
+import { RECENT, useRecent } from "../lib/recent";
 import {
   DEFAULT_FOLDER_VIEW,
   THUMB_SCALE,
@@ -68,20 +70,13 @@ function ListCover({ attKey }: { attKey: string }) {
  *  handle left widens it and the handle stays under the pointer. */
 function ColGrip({ col }: { col: ResizableCol }) {
   const start = (e: React.PointerEvent) => {
-    e.preventDefault();
     e.stopPropagation();
     const startX = e.clientX;
     const startW = useStore.getState().colWidths[col];
-    const onMove = (ev: PointerEvent) => {
+    trackPointerDrag(e, (ev) => {
       const w = Math.min(420, Math.max(40, startW - (ev.clientX - startX)));
       useStore.getState().setColWidth(col, w);
-    };
-    const onUp = () => {
-      window.removeEventListener("pointermove", onMove);
-      window.removeEventListener("pointerup", onUp);
-    };
-    window.addEventListener("pointermove", onMove);
-    window.addEventListener("pointerup", onUp);
+    });
   };
   return (
     <span
@@ -105,6 +100,7 @@ export function ItemList() {
   const { sortBy, sortDir, setSort } = useStore();
   const jobs = useStore((s) => s.jobs);
   const jobOrder = useStore((s) => s.jobOrder);
+  const recentOpened = useRecent((s) => s.opened);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const [scrollTop, setScrollTop] = useState(0);
@@ -155,9 +151,9 @@ export function ItemList() {
   const pinned = folderView.pinned;
   const flagged = useStore((s) => s.flaggedFolders.includes(selectedCollection));
   const toggleFlag = useStore((s) => s.toggleFlag);
-  // "All Items" and "Unfiled" already sit at the top of the sidebar.
-  const canFlag =
-    selectedCollection !== "all" && selectedCollection !== "unfiled";
+  // "All Items", "Unfiled" and "Recent" already sit at the top of the
+  // sidebar.
+  const canFlag = REAL_KEY.test(selectedCollection);
   const showTagColors = useStore((s) => s.showTagColors);
   const toggleTagColors = useStore((s) => s.toggleTagColors);
   const hasTagColors = useStore((s) => (s.library.tagColors?.length ?? 0) > 0);
@@ -178,6 +174,9 @@ export function ItemList() {
       list = searchKeys
         .map((k) => byKey.get(k))
         .filter((i): i is ZItem => Boolean(i));
+    } else if (selectedCollection === RECENT) {
+      // Recent is its own order: the last opened first.
+      list = itemsForCollection(library.items, RECENT);
     } else {
       list = itemsForCollection(library.items, selectedCollection);
       const dir = sortDir === "asc" ? 1 : -1;
@@ -206,6 +205,7 @@ export function ItemList() {
     return list;
   }, [
     library.items,
+    recentOpened,
     selectedCollection,
     searchKeys,
     sortBy,
@@ -261,8 +261,15 @@ export function ItemList() {
   };
   const pinItem = (item: ZItem) => togglePin(selectedCollection, item.key);
 
+  // Recent keeps its own order, so no column claims to sort it.
+  const isRecent = selectedCollection === RECENT && !searching;
   const sortIndicator = (col: string) =>
-    sortBy === col ? (sortDir === "asc" ? " ↑" : " ↓") : "";
+    sortBy === col && !isRecent ? (sortDir === "asc" ? " ↑" : " ↓") : "";
+  const emptyText = searching
+    ? "No results"
+    : isRecent
+      ? "PDFs you open will be listed here, the latest first"
+      : "No items here yet — use Import IDs to add some";
 
   const colWidths = useStore((s) => s.colWidths);
   const commandHeld = useCommandHeld();
@@ -347,7 +354,7 @@ export function ItemList() {
         >
           <TagIcon size={14} />
         </button>
-        {iconMode && (
+        {iconMode && !isRecent && (
           <div className="view-sort">
             {/* List view sorts by clicking column headers; the icon view
                 has none, so it gets this. */}
@@ -441,9 +448,7 @@ export function ItemList() {
           />
           {items.length === 0 && activeJobs.length === 0 && (
             <div className="list-empty">
-              {searching
-                ? "No results"
-                : "No items here yet — use Import IDs to add some"}
+              {emptyText}
             </div>
           )}
         </>
@@ -540,9 +545,7 @@ export function ItemList() {
         </div>
         {items.length === 0 && activeJobs.length === 0 && (
           <div className="list-empty">
-            {searching
-              ? "No results"
-              : "No items here yet — use Import IDs to add some"}
+            {emptyText}
           </div>
         )}
       </div>

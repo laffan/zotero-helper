@@ -14,11 +14,13 @@
 // own annotations into the page).
 import type { Annotation } from "../lib/highlights";
 import { PDFJS_ASSETS } from "../lib/pdfjsAssets";
+import { restoreAnchor, viewAnchor } from "./anchor";
 import { annotationAtPoint, draftFromRange, type AnnotationDraft } from "./annotate";
 import { createAnnotationLayer } from "./annotations";
 import { createAnnotationPopover } from "./annotPopover";
 import { createFoldLayer } from "./folds";
 import { createLinkLayerManager } from "./links";
+import { readOutline, type OutlineEntry } from "./outline";
 import { attachPageHoverButtons, attachTextLayer } from "./pageTools";
 import { drawAnnotations, pageSignatures } from "./paint";
 import { getPdfjs } from "./pdfjs";
@@ -68,6 +70,11 @@ export interface PdfViewerOptions {
   onInsertAnnotation?: (a: Annotation) => void;
   /** Make, change and delete annotations; absent, they are read-only. */
   annotate?: AnnotationWriter;
+  /** The document's outline, once loaded (empty when it has none). */
+  onOutline?: (outline: OutlineEntry[]) => void;
+  /** The page in view changed (1-based) — after the start page is
+   *  reached, so opening a PDF doesn't report page 1 on the way. */
+  onPageChange?: (page: number) => void;
 }
 
 export interface AnnotationWriter {
@@ -373,8 +380,16 @@ export function createPdfViewer(container: HTMLElement, opts: PdfViewerOptions =
     return folded ? foldLayer.getCurrentPage() : renderer.pageAtViewCenter();
   }
 
+  let reportPages = false;
+  let reportedPage = 0;
   function updatePageIndicator(): void {
     tb.pageIndicator.textContent = pages.length ? `${currentPage()} / ${pages.length}` : "";
+    if (!reportPages || !pages.length) return;
+    const page = currentPage();
+    if (page !== reportedPage) {
+      reportedPage = page;
+      opts.onPageChange?.(page);
+    }
   }
 
   scrollArea.addEventListener("scroll", () => {
@@ -425,6 +440,7 @@ export function createPdfViewer(container: HTMLElement, opts: PdfViewerOptions =
     }
     relayoutGuard = true;
     try {
+      const anchor = viewAnchor(scrollArea, pages, layoutMode === "horizontal");
       const scale = getEffectiveZoom();
       for (const p of pages) {
         const cssW = Math.round(p.viewport.width * scale);
@@ -435,6 +451,7 @@ export function createPdfViewer(container: HTMLElement, opts: PdfViewerOptions =
           p.contentEl.style.transform = Math.abs(k - 1) > 0.001 ? `scale(${k})` : "";
         }
       }
+      if (anchor) restoreAnchor(scrollArea, pages, layoutMode === "horizontal", anchor);
       renderer.invalidateGeometry();
       renderer.scheduleUpdate();
       renderer.scheduleSettle();
@@ -443,9 +460,11 @@ export function createPdfViewer(container: HTMLElement, opts: PdfViewerOptions =
     }
   }
 
-  async function loadPdf(data: ArrayBuffer | Uint8Array): Promise<void> {
+  /** Open a document, at `startPage` (1-based) when given. */
+  async function loadPdf(data: ArrayBuffer | Uint8Array, startPage?: number): Promise<void> {
     const pdfjs = await getPdfjs();
     if (destroyed) return;
+    reportPages = false;
     if (pdfDoc) await pdfDoc.loadingTask.destroy();
     pdfDoc = null;
     renderer.reset();
@@ -501,8 +520,15 @@ export function createPdfViewer(container: HTMLElement, opts: PdfViewerOptions =
     }
     renderer.update();
     if (folded) foldLayer.enable();
+    if (startPage && startPage > 1 && startPage <= pages.length) goToPage(startPage, false);
     updateToolbarState();
     updatePageIndicator();
+    // From the next frame on, pages the reader moves to are reported.
+    requestAnimationFrame(() => {
+      reportPages = true;
+      updatePageIndicator();
+    });
+    void readOutline(doc).then((o) => !destroyed && pdfDoc === doc && opts.onOutline?.(o));
     // Ready for ← / →, unless the reader is already typing somewhere
     // (the search field, the notes).
     const focused = document.activeElement;
@@ -510,15 +536,33 @@ export function createPdfViewer(container: HTMLElement, opts: PdfViewerOptions =
     search.rerun();
   }
 
-  function goToPage(n: number): void {
+  function goToPage(n: number, smooth = true): void {
     if (folded) {
       foldLayer.goToPage(n);
       return;
     }
     const w = pages[Math.max(0, Math.min(n - 1, pages.length - 1))]?.wrapper;
     if (!w) return;
-    if (layoutMode === "horizontal") w.scrollIntoView({ behavior: "smooth", inline: "start", block: "nearest" });
-    else w.scrollIntoView({ behavior: "smooth", block: "start" });
+    const behavior = smooth ? "smooth" : "auto";
+    if (layoutMode === "horizontal") w.scrollIntoView({ behavior, inline: "start", block: "nearest" });
+    else w.scrollIntoView({ behavior, block: "start" });
+  }
+
+  /** A place on a page: `top` in PDF user space (y up), null for the
+   *  page's top. Side by side, pages are whole, so only the page counts. */
+  function goToPosition(pageIndex: number, top: number | null): void {
+    const p = pages[pageIndex];
+    if (!p) return;
+    if (top == null || folded || layoutMode === "horizontal") {
+      goToPage(pageIndex + 1);
+      return;
+    }
+    const y = p.viewport.convertToViewportPoint(p.viewport.viewBox[0], top)[1];
+    const frac = Math.max(0, Math.min(1, y / p.viewport.height));
+    const wr = p.wrapper.getBoundingClientRect();
+    const ar = scrollArea.getBoundingClientRect();
+    const target = scrollArea.scrollTop + wr.top - ar.top + frac * wr.height - 16;
+    scrollArea.scrollTo({ top: Math.max(0, target), behavior: "smooth" });
   }
 
   let resizeTimer: number | null = null;
@@ -558,7 +602,8 @@ export function createPdfViewer(container: HTMLElement, opts: PdfViewerOptions =
   return {
     loadPdf,
     destroy,
-    goToPage,
+    goToPage: (n: number) => goToPage(n),
+    goToPosition,
     getPageCount: () => pdfDoc?.numPages ?? 0,
     /** Replace the annotations. Only pages whose annotations changed are
      *  repainted, so a sync that touched nothing here costs nothing. */

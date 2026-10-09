@@ -2,7 +2,7 @@
 // through: resolve → create parent item → find PDF → download → upload.
 // Jobs that cannot fetch a PDF automatically park in "needs-manual" and the
 // user finishes them via the rescue modal / capture browser.
-import { pdfMap } from "./collections";
+import { pdfMap, REAL_KEY } from "./collections";
 import { extractIdentifiers } from "./identifiers";
 import { learnPdfPattern } from "./pdfPatterns";
 import { appLog, useStore } from "./store";
@@ -23,7 +23,7 @@ export function startImport(rawText: string, collectionKey?: string): number {
       stage: "pending",
       candidates: [],
       collectionKey:
-        collectionKey && collectionKey !== "all" && collectionKey !== "unfiled"
+        collectionKey && REAL_KEY.test(collectionKey)
           ? collectionKey
           : undefined,
     });

@@ -21,11 +21,14 @@ import {
   type Annotation,
 } from "../lib/highlights";
 import { insertIntoNotes } from "../lib/notes";
+import { setOutline, setReaderPage, useOutline } from "../lib/outline";
+import { flushSavedPage, lastPage, savePage } from "../lib/recent";
 import { appLog, useStore } from "../lib/store";
 import { invoke } from "../lib/tauri";
 import type { SearchStatus } from "../pdfviewer/search";
 import type { PdfViewer } from "../pdfviewer/viewer";
 import { Spinner } from "./Icons";
+import { OutlinePanel } from "./OutlinePanel";
 
 let active: { attKey: string; viewer: PdfViewer } | null = null;
 
@@ -36,6 +39,12 @@ export function showInReader(attKey: string, page?: number, annotationKey?: stri
   if (annotationKey && active.viewer.showAnnotation(annotationKey)) return true;
   if (page) active.viewer.goToPage(page);
   return Boolean(page);
+}
+
+/** A place in the open PDF — an outline entry's: a 0-based page and a
+ *  height on it in PDF units (null for its top). */
+export function goToReaderPosition(pageIndex: number, top: number | null): void {
+  active?.viewer.goToPosition(pageIndex, top);
 }
 
 /** The page the open viewer shows, when it shows `attKey`. */
@@ -70,6 +79,8 @@ export function ReaderPane() {
   const viewerRef = useRef<PdfViewer | null>(null);
   const [state, setState] = useState<"loading" | "ready" | "error">("loading");
   const [error, setError] = useState("");
+  const outline = useOutline(reading?.attKey);
+  const outlineShown = useStore((s) => s.outlineOpen) && Boolean(outline?.length);
 
   const itemKey = reading?.itemKey ?? "";
   const attKey = reading?.attKey ?? null;
@@ -109,6 +120,12 @@ export function ReaderPane() {
             remove: deleteAnnotation,
             canEdit: (a) => canEditAnnotation(a, settings()),
           },
+          onOutline: (o) => setOutline(attKey, o),
+          // Remembered, so the PDF opens on this page next time.
+          onPageChange: (page) => {
+            setReaderPage(page);
+            savePage(attKey, page);
+          },
         });
         viewerRef.current = viewer;
         active = { attKey, viewer };
@@ -116,7 +133,7 @@ export function ReaderPane() {
         // back to Zotero for one that isn't (or was cleared meanwhile).
         const bytes = await invoke<ArrayBuffer>("download_attachment_file", { attKey });
         if (cancelled) return;
-        await viewer.loadPdf(bytes);
+        await viewer.loadPdf(bytes, lastPage(attKey) ?? undefined);
         if (cancelled) return;
         const lib = useStore.getState().library.items;
         viewer.setAnnotations(annotationIndexFor(lib).get(attKey) ?? []);
@@ -130,6 +147,7 @@ export function ReaderPane() {
     })();
     return () => {
       cancelled = true;
+      flushSavedPage();
       if (active?.viewer === viewer) active = null;
       viewerRef.current = null;
       void viewer?.destroy();
@@ -146,6 +164,7 @@ export function ReaderPane() {
   if (!reading) return null;
   return (
     <section className="reader-pane">
+      {outlineShown && attKey && <OutlinePanel key={attKey} outline={outline ?? []} />}
       {!attKey ? (
         <div className="reader-empty">
           This entry has no PDF in Zotero — the notes are on the right.

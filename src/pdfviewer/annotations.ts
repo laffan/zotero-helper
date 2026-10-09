@@ -7,6 +7,7 @@
 // Additions over Hush: each shelf row can be sent to the notes
 // (`onInsert`), which is what the shelf is for while taking notes, and
 // an annotation this app may edit has a pencil that opens its editor.
+import { beginDragGesture } from "../lib/dragGesture";
 import { annotationPosition, type Annotation } from "../lib/highlights";
 import { PAGE_NOTE_ICON } from "./icons";
 import type { LayoutMode, PageRecord, PageViewport } from "./types";
@@ -115,6 +116,7 @@ export function createAnnotationLayer(
     const startW = shelf.getBoundingClientRect().width;
     let width = startW;
     shelf.classList.add("resizing");
+    const endGesture = beginDragGesture();
     try {
       shelfResize.setPointerCapture(e.pointerId);
     } catch {
@@ -127,6 +129,7 @@ export function createAnnotationLayer(
     };
     const onUp = () => {
       shelf.classList.remove("resizing");
+      endGesture();
       shelfResize.removeEventListener("pointermove", onMove);
       shelfResize.removeEventListener("pointerup", onUp);
       shelfResize.removeEventListener("pointercancel", onUp);

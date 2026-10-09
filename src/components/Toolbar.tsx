@@ -3,8 +3,9 @@ import { deleteFolder } from "../lib/actions";
 import { getAbstracts, tidyItems } from "../lib/ai";
 import { startAsk } from "../lib/ai/chat";
 import { askTargetFor } from "../lib/ai/context";
-import { creatorSummary, itemTitle, yearOf } from "../lib/collections";
+import { creatorSummary, itemTitle, REAL_KEY, yearOf } from "../lib/collections";
 import { startPdfFetch } from "../lib/importer";
+import { useOutline } from "../lib/outline";
 import { QUESTIONS, useStore } from "../lib/store";
 import {
   FolderMinus,
@@ -64,6 +65,9 @@ export function Toolbar() {
     setMetaHidden,
   } = useStore();
   const reading = useStore((s) => s.reading);
+  const hasOutline = Boolean(useOutline(reading?.attKey)?.length);
+  const outlineOpen = useStore((s) => s.outlineOpen);
+  const setOutlineOpen = useStore((s) => s.setOutlineOpen);
   const items = useStore((s) => s.library.items);
   const askPreparing = useStore((s) => s.askPreparing);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -86,10 +90,8 @@ export function Toolbar() {
   const canAsk =
     selectedCollection !== QUESTIONS && askTarget.count > 0 && !askPreparing;
 
-  const isRealCollection =
-    selectedCollection !== "all" &&
-    selectedCollection !== "unfiled" &&
-    selectedCollection !== QUESTIONS;
+  // All Items, Unfiled, Questions and Recent are views, not folders.
+  const isRealCollection = REAL_KEY.test(selectedCollection);
   const currentFolderName = isRealCollection
     ? collections.find((c) => c.key === selectedCollection)?.data?.name
     : undefined;
@@ -142,8 +144,20 @@ export function Toolbar() {
 
       {reading ? (
         // Nothing but the open PDF is on screen, so only what acts on it
-        // stays: Share and Sync, scoped to its entry, and its name.
+        // stays: its outline (when it has one), Share and Sync, scoped
+        // to its entry, and its name.
         <div className="toolbar-group toolbar-reading">
+          {hasOutline && (
+            <button
+              className={`icon-btn ${outlineOpen ? "active" : ""}`}
+              onClick={() => setOutlineOpen(!outlineOpen)}
+              title={outlineOpen ? "Hide the outline" : "Show the PDF's outline"}
+              aria-label="Toggle outline"
+              aria-pressed={outlineOpen}
+            >
+              <PanelLeft />
+            </button>
+          )}
           <ShareMenuButton reading={reading} />
           <SyncMenuButton reading={reading} />
           <span className="toolbar-sep" />

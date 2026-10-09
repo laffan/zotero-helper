@@ -7,6 +7,7 @@
 import { create } from "zustand";
 import { addItemsToCollection } from "./actions";
 import { itemTitle } from "./collections";
+import { beginDragGesture } from "./dragGesture";
 import { useStore } from "./store";
 
 /** How far the mouse travels before a press becomes a drag. */
@@ -84,6 +85,7 @@ export function startItemDrag(e: React.PointerEvent, itemKey: string): void {
   const isTouch = e.pointerType !== "mouse";
   let active = false;
   let holdTimer: ReturnType<typeof setTimeout> | undefined;
+  let endGesture: (() => void) | null = null;
 
   // Once a touch drag is live, the page must stop scrolling under it.
   // Only a non-passive touchmove listener can say so in WebKit.
@@ -93,6 +95,7 @@ export function startItemDrag(e: React.PointerEvent, itemKey: string): void {
 
   const activate = (x: number, y: number) => {
     active = true;
+    endGesture = beginDragGesture();
     if (!selected.includes(itemKey)) {
       useStore.getState().setSelectedKeys([itemKey]);
     }
@@ -108,6 +111,7 @@ export function startItemDrag(e: React.PointerEvent, itemKey: string): void {
 
   const stop = () => {
     clearTimeout(holdTimer);
+    endGesture?.();
     window.removeEventListener("pointermove", onMove);
     window.removeEventListener("pointerup", onUp);
     window.removeEventListener("pointercancel", onCancel);

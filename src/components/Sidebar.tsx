@@ -6,12 +6,14 @@ import {
   type CollectionNode,
 } from "../lib/collections";
 import { useDragging, useIsDropTarget } from "../lib/dragdrop";
+import { RECENT, useRecent } from "../lib/recent";
 import { appLog, QUESTIONS, useStore } from "../lib/store";
 import { FolderMenu } from "./FolderMenu";
 import {
   ChatIcon,
   ChevronDown,
   ChevronRight,
+  ClockIcon,
   FlagIcon,
   Folder,
 } from "./Icons";
@@ -150,6 +152,7 @@ export function Sidebar() {
   const hidden = useStore((s) => s.sidebarHidden);
   const dragging = useDragging();
   const chatCount = useStore((s) => s.chats.length);
+  const recentCount = useRecent((s) => s.opened.length);
   const flaggedKeys = useStore((s) => s.flaggedFolders);
   const tree = useMemo(() => buildTree(collections), [collections]);
 
@@ -204,6 +207,18 @@ export function Sidebar() {
           <ChatIcon size={14} />
           <span className="tree-name">Questions</span>
           {chatCount > 0 && <span className="tree-count">{chatCount}</span>}
+        </div>
+        {/* The PDFs opened here lately, the latest first (lib/recent). */}
+        <div
+          className={`tree-row ${selectedCollection === RECENT ? "selected" : ""}`}
+          style={{ paddingLeft: 10 }}
+          onClick={() => selectCollection(RECENT)}
+          title="The last 100 PDFs opened on this device"
+        >
+          <span className="tree-toggle-spacer" />
+          <ClockIcon size={14} />
+          <span className="tree-name">Recent</span>
+          {recentCount > 0 && <span className="tree-count">{recentCount}</span>}
         </div>
         <div className="sidebar-section">Library</div>
         <div

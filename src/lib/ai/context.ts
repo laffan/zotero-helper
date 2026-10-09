@@ -18,6 +18,7 @@ import {
   yearOf,
 } from "../collections";
 import { scheduleTrayClear } from "../../components/TaskTray";
+import { RECENT } from "../recent";
 import { appLog, useStore } from "../store";
 import { invoke } from "../tauri";
 import type {
@@ -180,7 +181,9 @@ export function askTargetFor(
       ? "All Items"
       : collectionKey === "unfiled"
         ? "Unfiled"
-        : String(
+        : collectionKey === RECENT
+          ? "Recent"
+          : String(
             collections.find((c) => c.key === collectionKey)?.data?.name ??
               "This folder",
           );

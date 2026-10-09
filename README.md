@@ -121,6 +121,10 @@ Windows/Linux desktops too).
   which is the one that matters for an entry filed in several.
   Conversations are named by the model after the first exchange and live
   in the app's data dir; nothing about them is written to Zotero.
+- **Recent** — a row beneath Questions in the sidebar listing the last
+  100 PDFs opened in the app, the latest first (its own order, whatever
+  the column sort). It behaves like any folder — list or icon view,
+  double-click to read — and, like pins, lives on this device only.
 - **Re-sync** — the Sync menu offers three scopes: *Sync this folder*
   (fetches only the current collection's changes — the day-to-day option
   for five-digit libraries), *Sync all changes* (incremental via Zotero's
@@ -153,8 +157,12 @@ Windows/Linux desktops too).
 - **Folder views** — each folder remembers its own local presentation:
   items **pinned** to the top, and an **icon view** that shows each PDF's
   first page (annotations included) as a thumbnail, rendered once and
-  cached on disk. A file Zotero holds with no parent entry is its own
-  attachment, so it gets a thumbnail like anything else. Once every
+  cached on disk (`thumbs/` in the app data dir, kept between
+  launches). A cached thumbnail is redrawn only when the highlights
+  *on its first page* change — not for a highlight elsewhere in the
+  PDF, and not when a sync merely bumps item versions. A file Zotero
+  holds with no parent entry is its own attachment, so it gets a
+  thumbnail like anything else. Once every
   cover in a folder has been rendered, the list view shows them too,
   tiny, in a column before the title (the list never sets off a render
   itself). Both are app-side only — nothing is written to Zotero.
@@ -191,7 +199,11 @@ Windows/Linux desktops too).
   order, each with its page, a copy button (a Markdown blockquote with a
   link back to the page) and **Open in Zotero**, which lands on that
   highlight. Several selected entries, or one with several PDFs, list
-  under a heading per PDF.
+  under a heading per PDF. When the PDF has an outline (and is open, or
+  downloaded to this device, where its outline is read from the cached
+  file), its highlights are filed under the outline's section headings
+  — the deepest heading at or above each highlight — and headings with
+  no highlights are left out.
 - **Reading notes** — every entry has a **Notes** tab holding its
   `NOTES.md`, always open for writing: a CodeMirror editor with the
   Markdown (GitHub flavour) rendered in place — headings, emphasis,
@@ -212,7 +224,13 @@ Windows/Linux desktops too).
   a time, with *Show more matches* below), and stepped through with
   Enter / ⇧Enter; the magnifier turns into a clear button while there
   is a query, and ⌘F returns to the field. ← / → turn the page
-  while the pages have focus. The viewer is a port of Hush's: horizontal or vertical
+  while the pages have focus. A PDF opens on the page it was left on
+  (remembered per PDF on this device). When the PDF has an outline,
+  a panel button at the left of the toolbar, before Share, shows it
+  beside the pages: a folding tree of its headings, each a link to its
+  place, with the section being read marked as you go. Widen the notes
+  panel past 600px and the Highlights and Notes tabs become one, with
+  the highlights beside the notes; narrow it again and they separate. The viewer is a port of Hush's: horizontal or vertical
   scrolling, fit one / two / three pages, zoom, a thumbnail grid, the
   PDF's own links, Zotero's highlights, underlines and ink painted into
   the pages, an annotation shelf with its own filter and colour row, and
@@ -232,7 +250,9 @@ Windows/Linux desktops too).
   there). Page pills move the open viewer rather than leaving for
   Zotero.
 
-  **Highlighting.** Selecting text in the PDF brings up a small bar:
+  **Highlighting.** Selecting text in the PDF brings up a small bar
+  above the passage (below it only when the passage starts at the top
+  of the view), on iPad as on the Mac:
   Zotero's eight colours, a highlight / underline switch beside them
   (remembered between selections), and *Add to notes*. A colour marks
   the passage the way Zotero's own reader does — as an annotation
@@ -419,6 +439,12 @@ src/            React + TypeScript UI (Vite, zustand, MiniSearch)
   lib/highlights.ts, lib/notes.ts
                 annotations out of the library cache; NOTES.md load /
                 save / periodic push, the PDF cache
+  lib/recent.ts, lib/outline.ts
+                Recent and the page each PDF was left on; PDF outlines
+                and filing highlights under their sections
+  lib/dragGesture.ts
+                pointer drags (pane edges, columns, items) that keep
+                text selection off while they last
   lib/annotationEdits.ts, lib/pendingAnnotations.ts
                 highlights made in the reader: create / edit / delete,
                 the push schedule, and unsent changes laid over the
@@ -430,6 +456,8 @@ src/            React + TypeScript UI (Vite, zustand, MiniSearch)
                 render, paint (annotations into the rasters), shelf,
                 folds, thumbnails, links, toolbar) plus pageTools (text
                 layer, notes hooks), search (find in the PDF), and
+                outline (the PDF's bookmarks, resolved to places),
+                anchor (keeping the place across a relayout), and
                 annotating: selectionBar (colours over a selection),
                 annotate (selection → Zotero position, tap hit-test),
                 annotPopover (colour / comment / delete)

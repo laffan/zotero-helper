@@ -7,7 +7,8 @@
 // heading per PDF. Nothing is fetched: annotations arrive with every
 // sync (src/lib/highlights.ts), and ↻ runs an incremental one. While
 // the PDF is open beside the panel, clicking a highlight scrolls the
-// viewer to it.
+// viewer to it. A PDF with an outline (lib/outline.ts) has its
+// highlights filed under the section headings they fall in.
 import { useMemo, useState } from "react";
 import { openInZotero, syncNow } from "../lib/actions";
 import { attachmentName, itemTitle } from "../lib/collections";
@@ -20,6 +21,7 @@ import {
   matchesQuery,
   type Annotation,
 } from "../lib/highlights";
+import { sectionIndexOf, sectionsOf, useOutlines, type Section } from "../lib/outline";
 import { useStore } from "../lib/store";
 import type { ZItem } from "../lib/types";
 import { CopyIcon, Refresh, Spinner } from "./Icons";
@@ -74,6 +76,7 @@ export function HighlightsPanel({ items }: { items: ZItem[] }) {
   const [copied, setCopied] = useState<string | null>(null);
 
   const groups = useMemo(() => highlightGroups(library, items), [library, items]);
+  const outlines = useOutlines(groups.map((g) => g.att.key));
   const all = useMemo(() => groups.flatMap((g) => g.list), [groups]);
   const colors = useMemo(() => colorsOf(all), [all]);
   const activeColor = color && colors.includes(color) ? color : null;
@@ -111,6 +114,73 @@ export function HighlightsPanel({ items }: { items: ZItem[] }) {
   const open = (g: Group, a: Annotation) => {
     const page = parseInt(a.pageLabel, 10);
     void openInZotero(g.item.key, g.att.key, undefined, isNaN(page) ? undefined : page, a.key);
+  };
+
+  const row = (g: Group, a: Annotation) => (
+    <div
+      className={`hl-row ${g.att.key === openAttKey ? "navigable" : ""} ${
+        shownKey === a.key ? "shown" : ""
+      }`}
+      key={a.key}
+      style={a.color ? { borderLeftColor: a.color } : undefined}
+      onClick={() => reveal(g, a)}
+      title={g.att.key === openAttKey ? "Show in the PDF" : undefined}
+    >
+      {a.text && (
+        <div className="hl-text">
+          <Marked text={a.text} q={q} />
+        </div>
+      )}
+      {a.comment && (
+        <div className="hl-comment">
+          <Marked text={a.comment} q={q} />
+        </div>
+      )}
+      <div className="hl-meta">
+        {a.pageLabel && <span>p. {a.pageLabel}</span>}
+        {a.type !== "highlight" && <span>· {a.type}</span>}
+        {a.tags.length > 0 && <span className="hl-tags">· {a.tags.join(", ")}</span>}
+        <span className="hl-actions">
+          <button
+            className="link-btn"
+            onClick={(e) => {
+              e.stopPropagation();
+              void copy(a);
+            }}
+            title="Copy as a Markdown quote with a link back to the page"
+          >
+            {copied === a.key ? "Copied" : <CopyIcon size={11} />}
+          </button>
+          <button
+            className="link-btn"
+            onClick={(e) => {
+              e.stopPropagation();
+              open(g, a);
+            }}
+            title="Open the PDF in Zotero at this highlight"
+          >
+            Open in Zotero ↗
+          </button>
+        </span>
+      </div>
+    </div>
+  );
+
+  // With the PDF's outline known, highlights file under the heading
+  // they fall in; headings with none aren't shown.
+  const bySection = (g: Group): { section: Section | null; list: Annotation[] }[] => {
+    const sections = sectionsOf(outlines.get(g.att.key) ?? []);
+    if (!sections.length) return [{ section: null, list: g.list }];
+    const parts = new Map<number, Annotation[]>();
+    for (const a of g.list) {
+      const i = sectionIndexOf(sections, a);
+      const list = parts.get(i);
+      if (list) list.push(a);
+      else parts.set(i, [a]);
+    }
+    return [...parts.keys()]
+      .sort((x, y) => x - y)
+      .map((i) => ({ section: i < 0 ? null : sections[i], list: parts.get(i)! }));
   };
 
   return (
@@ -168,53 +238,18 @@ export function HighlightsPanel({ items }: { items: ZItem[] }) {
                   )}
                 </div>
               )}
-              {g.list.map((a) => (
-                <div
-                  className={`hl-row ${g.att.key === openAttKey ? "navigable" : ""} ${
-                    shownKey === a.key ? "shown" : ""
-                  }`}
-                  key={a.key}
-                  style={a.color ? { borderLeftColor: a.color } : undefined}
-                  onClick={() => reveal(g, a)}
-                  title={g.att.key === openAttKey ? "Show in the PDF" : undefined}
-                >
-                  {a.text && (
-                    <div className="hl-text">
-                      <Marked text={a.text} q={q} />
+              {bySection(g).map((part, i) => (
+                <div key={part.section?.id ?? `pre-${i}`}>
+                  {part.section && (
+                    <div
+                      className="hl-section"
+                      style={{ paddingLeft: Math.min(part.section.depth, 3) * 10 }}
+                      title={part.section.path.join(" › ")}
+                    >
+                      {part.section.title}
                     </div>
                   )}
-                  {a.comment && (
-                    <div className="hl-comment">
-                      <Marked text={a.comment} q={q} />
-                    </div>
-                  )}
-                  <div className="hl-meta">
-                    {a.pageLabel && <span>p. {a.pageLabel}</span>}
-                    {a.type !== "highlight" && <span>· {a.type}</span>}
-                    {a.tags.length > 0 && <span className="hl-tags">· {a.tags.join(", ")}</span>}
-                    <span className="hl-actions">
-                      <button
-                        className="link-btn"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          void copy(a);
-                        }}
-                        title="Copy as a Markdown quote with a link back to the page"
-                      >
-                        {copied === a.key ? "Copied" : <CopyIcon size={11} />}
-                      </button>
-                      <button
-                        className="link-btn"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          open(g, a);
-                        }}
-                        title="Open the PDF in Zotero at this highlight"
-                      >
-                        Open in Zotero ↗
-                      </button>
-                    </span>
-                  </div>
+                  {part.list.map((a) => row(g, a))}
                 </div>
               ))}
             </section>

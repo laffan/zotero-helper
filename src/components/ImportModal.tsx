@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { createFolder } from "../lib/actions";
+import { REAL_KEY } from "../lib/collections";
 import { startImport } from "../lib/importer";
 import { extractIdentifiers } from "../lib/identifiers";
 import { useStore } from "../lib/store";
@@ -12,7 +13,7 @@ export function ImportModal({ onClose }: { onClose: () => void }) {
 
   const targetName = useMemo(() => {
     if (selectedCollection === "all") return "My Library (no folder)";
-    if (selectedCollection === "unfiled") return "My Library (no folder)";
+    if (!REAL_KEY.test(selectedCollection)) return "My Library (no folder)";
     return (
       collections.find((c) => c.key === selectedCollection)?.data?.name ??
       "selected folder"
@@ -65,7 +66,7 @@ export function NewFolderModal({ onClose }: { onClose: () => void }) {
   const collections = useStore((s) => s.library.collections);
 
   const parentName =
-    selectedCollection !== "all" && selectedCollection !== "unfiled"
+    REAL_KEY.test(selectedCollection)
       ? collections.find((c) => c.key === selectedCollection)?.data?.name
       : undefined;
 

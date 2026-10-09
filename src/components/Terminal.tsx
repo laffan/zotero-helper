@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { trackPointerDrag } from "../lib/dragGesture";
 import { appLog, useStore } from "../lib/store";
 import { CloseIcon, CopyIcon } from "./Icons";
 
@@ -46,19 +47,12 @@ export function Terminal() {
   };
 
   const startResize = (e: React.PointerEvent) => {
-    e.preventDefault();
     const startY = e.clientY;
     const startH = termHeight;
-    const onMove = (ev: PointerEvent) => {
+    trackPointerDrag(e, (ev) => {
       const h = Math.min(500, Math.max(80, startH + (startY - ev.clientY)));
       setPaneSizes({ termHeight: h });
-    };
-    const onUp = () => {
-      window.removeEventListener("pointermove", onMove);
-      window.removeEventListener("pointerup", onUp);
-    };
-    window.addEventListener("pointermove", onMove);
-    window.addEventListener("pointerup", onUp);
+    });
   };
 
   return (

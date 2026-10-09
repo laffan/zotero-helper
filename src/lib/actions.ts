@@ -1,7 +1,7 @@
 // App-level actions: bootstrap, event listeners, sync, collection CRUD,
 // item editing.
 import { scheduleTrayClear } from "../components/TaskTray";
-import { itemTitle } from "./collections";
+import { itemTitle, REAL_KEY } from "./collections";
 import { loadChats } from "./ai/chat";
 import { startAnnotationSync } from "./annotationEdits";
 import { captureFinished, downloadForJob } from "./importer";
@@ -133,7 +133,7 @@ export async function syncNow(full: boolean): Promise<void> {
 /** Folder-scoped sync — fetches only the given collection's changes.
  *  The cheap option for very large libraries. */
 export async function syncFolder(key: string): Promise<void> {
-  if (key === "all" || key === "unfiled") return syncNow(false);
+  if (!REAL_KEY.test(key)) return syncNow(false);
   const store = useStore.getState();
   if (store.syncing) return;
   store.setSyncing(true);

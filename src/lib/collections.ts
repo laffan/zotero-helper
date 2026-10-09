@@ -1,3 +1,4 @@
+import { RECENT, recentKeys, useRecent } from "./recent";
 import type { ZCollection, ZItem, ZItemData } from "./types";
 
 export interface CollectionNode {
@@ -67,6 +68,13 @@ export function itemsForCollection(items: ZItem[], key: string): ZItem[] {
   if (key === "all") return tops;
   if (key === "unfiled")
     return tops.filter((i) => !i.data?.collections?.length);
+  if (key === RECENT) {
+    // Most recently opened first; an entry deleted since drops out.
+    const byKey = new Map(tops.map((i) => [i.key, i]));
+    return recentKeys(useRecent.getState().opened)
+      .map((k) => byKey.get(k))
+      .filter((i): i is ZItem => Boolean(i));
+  }
   return tops.filter((i) => i.data?.collections?.includes(key));
 }
 

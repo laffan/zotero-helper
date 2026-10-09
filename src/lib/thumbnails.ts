@@ -93,22 +93,31 @@ function firstPageAnnotations(attKey: string): ThumbAnnotation[] {
   return out;
 }
 
-/** Cache variant: changes when this attachment's annotations do, so an
- *  edited highlight re-renders instead of serving a stale image. */
-function annotationSignature(attKey: string): string {
-  let sum = 0;
-  let count = 0;
-  for (const i of useStore.getState().library.items) {
-    const d = i.data as Record<string, unknown> | undefined;
-    if (!d || d.parentItem !== attKey || d.itemType !== "annotation") continue;
-    sum += Number(i.version ?? 0);
-    count++;
+/** Cache variant: what is painted on the first page, so a highlight
+ *  added, recoloured or removed there re-renders the thumbnail — and
+ *  nothing else does. (It used to count every annotation in the PDF by
+ *  item version, so a highlight on page 40, or a sync that only bumped
+ *  versions, threw the thumbnail away and downloaded the PDF again.)
+ *  With nothing on page 1 it is "0x0", the old scheme's value for an
+ *  unannotated PDF, so those thumbnails stay valid across the change. */
+function annotationSignature(marks: ThumbAnnotation[]): string {
+  if (!marks.length) return "0x0";
+  const text = marks
+    .map((m) => `${m.type}|${m.color}|${JSON.stringify(m.rects)}|${JSON.stringify(m.paths)}`)
+    .sort()
+    .join("\n");
+  // FNV-1a, 32-bit: enough to tell one page's marks from another's.
+  let h = 0x811c9dc5;
+  for (let i = 0; i < text.length; i++) {
+    h ^= text.charCodeAt(i);
+    h = Math.imul(h, 0x01000193);
   }
-  return `${count.toString(36)}x${sum.toString(36)}`;
+  return `p${marks.length.toString(36)}x${(h >>> 0).toString(36)}`;
 }
 
 async function renderOne(attKey: string): Promise<void> {
-  const variant = annotationSignature(attKey);
+  const marks = firstPageAnnotations(attKey);
+  const variant = annotationSignature(marks);
   // Disk cache first — the common path after the first visit.
   const cached = await invoke<string | null>("read_thumbnail", {
     attKey,
@@ -122,12 +131,7 @@ async function renderOne(attKey: string): Promise<void> {
     import("./pdfPage"),
     invoke<ArrayBuffer>("download_attachment_file", { attKey }),
   ]);
-  const b64 = await renderFirstPageJpeg(
-    bytes,
-    THUMB_LONG_EDGE,
-    THUMB_QUALITY,
-    firstPageAnnotations(attKey),
-  );
+  const b64 = await renderFirstPageJpeg(bytes, THUMB_LONG_EDGE, THUMB_QUALITY, marks);
   cache.set(attKey, { url: `data:image/jpeg;base64,${b64}` });
   // Persist for next launch; a failure here only costs a re-render.
   void invoke("write_thumbnail", { attKey, variant, data: b64 }).catch(() => {});

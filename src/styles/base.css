@@ -16,6 +16,31 @@ body {
   background: var(--bg);
   overflow: hidden;
   -webkit-font-smoothing: antialiased;
+  /* An app, not a page: its chrome can't be text-selected, or a drag
+     across it paints a selection over everything. What is there to be
+     read and copied opts back in below. */
+  -webkit-user-select: none;
+  user-select: none;
+}
+input,
+textarea,
+[contenteditable="true"],
+.chat-msg-body,
+.meta-value,
+.meta-fact-value,
+.summary-value,
+.hl-text,
+.hl-comment,
+.error-msg {
+  -webkit-user-select: text;
+  user-select: text;
+}
+/* While something is being dragged (lib/dragGesture.ts), nothing is
+   selectable — not even text the drag passes over. */
+html.ui-dragging,
+html.ui-dragging * {
+  -webkit-user-select: none !important;
+  user-select: none !important;
 }
 button {
   font: inherit;

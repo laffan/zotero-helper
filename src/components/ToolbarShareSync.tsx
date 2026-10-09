@@ -2,10 +2,10 @@
 // on the selection and the library; with a PDF open they act on that
 // PDF's entry alone, since nothing else is on screen.
 import { syncFolder, syncNow, syncReadingEntry } from "../lib/actions";
-import { itemTitle, pdfAttachmentOf } from "../lib/collections";
+import { itemTitle, pdfAttachmentOf, REAL_KEY } from "../lib/collections";
 import { cachePdf, cachedPdfIsStale } from "../lib/notes";
 import { shareAbstracts, sharePdfs } from "../lib/share";
-import { appLog, QUESTIONS, useStore, type ReadingState } from "../lib/store";
+import { appLog, useStore, type ReadingState } from "../lib/store";
 import { Refresh, ShareIcon, Spinner } from "./Icons";
 import { ToolbarMenu, useDropdown } from "./ToolbarMenu";
 
@@ -75,8 +75,7 @@ export function SyncMenuButton({ reading }: { reading: ReadingState | null }) {
   const cachedPdfs = useStore((s) => s.cachedPdfs);
   const pdfsDownloading = useStore((s) => s.pdfsDownloading);
 
-  const isRealCollection =
-    selectedCollection !== "all" && selectedCollection !== "unfiled" && selectedCollection !== QUESTIONS;
+  const isRealCollection = REAL_KEY.test(selectedCollection);
   const folderName = collections.find((c) => c.key === selectedCollection)?.data?.name;
 
   const run = (action: () => Promise<void>) => {

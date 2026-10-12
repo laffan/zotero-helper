@@ -1,6 +1,6 @@
 // The popover for one annotation: its colour, its comment, "Add to
 // notes" and Delete. It opens on a tap on a highlight or underline in
-// the pages, and from the pencil on a shelf row. Changes go out as they
+// the pages. Changes go out as they
 // are made — a colour at once, the comment after a pause in typing and
 // when the popover closes.
 import { ANNOTATION_COLORS, type Annotation } from "../lib/highlights";
@@ -108,9 +108,9 @@ export function createAnnotationPopover(root: HTMLElement, handlers: AnnotationE
     handlers.remove(key);
   });
 
-  /** Open for `a`, beside `anchor` (client coordinates): below it, or
-   *  to its left (for a shelf row at the viewer's right edge). */
-  function open(a: Annotation, anchor: DOMRect, side: "below" | "left" = "below"): void {
+  /** Open for `a` below `anchor` (client coordinates), or above it
+   *  when there is no room below. */
+  function open(a: Annotation, anchor: DOMRect): void {
     if (current) commitComment();
     current = a;
     committed = a.comment;
@@ -122,16 +122,9 @@ export function createAnnotationPopover(root: HTMLElement, handlers: AnnotationE
     const host = root.getBoundingClientRect();
     const w = el.offsetWidth;
     const h = el.offsetHeight;
-    let left: number;
-    let top: number;
-    if (side === "left") {
-      left = anchor.left - host.left - w - 8;
-      top = anchor.top - host.top;
-    } else {
-      left = anchor.left - host.left + anchor.width / 2 - w / 2;
-      top = anchor.bottom - host.top + 8;
-      if (top + h > host.height - 8) top = anchor.top - host.top - h - 8;
-    }
+    const left = anchor.left - host.left + anchor.width / 2 - w / 2;
+    let top = anchor.bottom - host.top + 8;
+    if (top + h > host.height - 8) top = anchor.top - host.top - h - 8;
     el.style.left = `${Math.max(8, Math.min(left, host.width - w - 8))}px`;
     el.style.top = `${Math.max(8, Math.min(top, host.height - h - 8))}px`;
   }

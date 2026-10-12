@@ -196,9 +196,11 @@ Windows/Linux desktops too).
   modelled on [Hush](https://github.com/laffan/hush)'s highlight pane: a
   filter box that searches highlighted text, comments, page labels and
   tags; a column of colour swatches; and the highlights in reading
-  order, each with its page, a copy button (a Markdown blockquote with a
-  link back to the page) and **Open in Zotero**, which lands on that
-  highlight. Several selected entries, or one with several PDFs, list
+  order, each with its page and three small buttons: **Copy** (a
+  Markdown blockquote with a link back to the page), **Add** (the same
+  quote, inserted into the entry's notes at the caret — offered when one
+  entry is selected, since notes belong to an entry) and **Zotero**,
+  which opens the PDF there on that highlight. Several selected entries, or one with several PDFs, list
   under a heading per PDF. When the PDF has an outline (and is open, or
   downloaded to this device, where its outline is read from the cached
   file), its highlights are filed under the outline's section headings
@@ -233,14 +235,24 @@ Windows/Linux desktops too).
   the highlights beside the notes; narrow it again and they separate. The viewer is a port of Hush's: horizontal or vertical
   scrolling, fit one / two / three pages, zoom, a thumbnail grid, the
   PDF's own links, Zotero's highlights, underlines and ink painted into
-  the pages, an annotation shelf with its own filter and colour row, and
-  the **folded view**, which collapses the paper to the regions around
+  the pages, and the **folded view**, which collapses the paper to the regions around
   its annotations (when the PDF has red highlights or red ink, those
   alone at first — Hush's "come back to this" colour — with the
   filter button choosing others; highlights made here always fold,
-  whatever the filter). It adds what note-taking needs: selectable text with
-  an *Add to notes* bubble that quotes the passage, a pencil on each
-  page that cites it, and *Add to notes* on every shelf highlight, all
+  whatever the filter). Hush's annotation shelf is left out: the
+  Highlights tab beside the viewer already lists, filters and quotes
+  the same annotations. Beside the folded-view button, **Single /
+  Continuous** chooses between the pages as one strip and one page at
+  a time: the page is fitted whole and centred, and a swipe turns it —
+  left/right with horizontal scrolling, up/down with vertical — one
+  page per swipe however hard the flick (CSS scroll snapping, so the
+  renderer and everything over the pages is unchanged). A mouse wheel
+  notch or a trackpad swipe turns one page too, as do ← / →; zooming in
+  goes back to continuous, since a page larger than the view has no
+  single place to rest. Switching scroll direction keeps the page in
+  view. It adds what note-taking needs: selectable text with
+  an *Add to notes* bubble that quotes the passage and a pencil on each
+  page that cites it, both
   inserted at the caret with a `zotero://` link to the page. While the
   PDF is open, a faint link icon sits at the left edge of the line being
   written; pressing it heads the line with the page in view —
@@ -259,8 +271,12 @@ Windows/Linux desktops too).
   item, child of the PDF attachment, with the same position, page
   label and sort-index fields — so Zotero desktop, iOS and the web
   library show it as one of theirs, and the PDF file itself is never
-  changed (Zotero keeps annotations out of the file too). Tapping a
-  highlight or underline, or the pencil on its shelf row, opens a
+  changed (Zotero keeps annotations out of the file too). A tap
+  anywhere on the pages — text, margin or the space between pages —
+  dismisses the selection and its bar as the finger lifts (the
+  browser alone ignores taps on the unselectable parts of a page, and
+  on iPad clears a selection only after its tap gestures settle).
+  Tapping a highlight or underline opens a
   small editor: colour, comment, *Add to notes*, and *Delete* (a
   second press confirms). The mark shows at once; the write goes into
   an outbox on the device (`annotations-outbox.json`) and is pushed a
@@ -453,8 +469,10 @@ src/            React + TypeScript UI (Vite, zustand, MiniSearch)
                 and its tabs (Highlights, Notes), reader pane, terminal,
                 import/rescue modals, settings
   pdfviewer/    the PDF viewer beside the notes, ported from Hush (viewer,
-                render, paint (annotations into the rasters), shelf,
-                folds, thumbnails, links, toolbar) plus pageTools (text
+                render, paint (annotations into the rasters),
+                annotations, folds, thumbnails, links, toolbar,
+                viewPrefs (the layout last chosen)) plus single (the
+                single-page view), pageTools (text
                 layer, notes hooks), search (find in the PDF), and
                 outline (the PDF's bookmarks, resolved to places),
                 anchor (keeping the place across a relayout), and

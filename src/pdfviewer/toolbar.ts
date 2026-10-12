@@ -54,6 +54,13 @@ export function buildPdfToolbar() {
   const fitThreeBtn = svgBtn("pdf-toggle-option", "Fit three pages", FIT_THREE_ICON);
   fitToggleWrap.append(fitOneBtn, fitTwoBtn, fitThreeBtn);
 
+  // One page at a time, swiped through, or the pages as one strip.
+  const pageModeWrap = document.createElement("span");
+  pageModeWrap.className = "pdf-toggle-group pdf-page-mode";
+  const singleBtn = btn("pdf-toggle-option", "Single", "One page at a time — swipe to turn the page");
+  const continuousBtn = btn("pdf-toggle-option active", "Continuous", "The pages as one continuous strip");
+  pageModeWrap.append(singleBtn, continuousBtn);
+
   // Folded view is always offered — entering it switches to vertical
   // scroll at single-page width. The filter shows only while folded.
   const foldBtn = svgBtn("pdf-zoom-btn pdf-fold-btn", "Folded view — collapse to annotated regions", FOLD_ICON);
@@ -74,7 +81,7 @@ export function buildPdfToolbar() {
     thumbnailBtn,
     zoomOutBtn, zoomLabel, zoomInBtn,
     scrollToggleWrap, fitToggleWrap,
-    foldBtn, foldFilterBtn,
+    pageModeWrap, foldBtn, foldFilterBtn,
     pageIndicator, zoteroLink,
   );
 
@@ -83,6 +90,7 @@ export function buildPdfToolbar() {
     zoomOutBtn, zoomLabel, zoomInBtn,
     scrollHBtn, scrollVBtn,
     fitOneBtn, fitTwoBtn, fitThreeBtn, fitToggleWrap,
+    singleBtn, continuousBtn,
     foldBtn, foldFilterBtn,
     pageIndicator, zoteroLink, thumbnailBtn,
   };

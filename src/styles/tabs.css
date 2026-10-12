@@ -1,6 +1,5 @@
 /* The right panel's tabs (Details / Highlights / Notes) and the
-   Highlights tab itself. Rows and swatches share their look with the
-   PDF viewer's annotation shelf (pdfviewer-panels.css). */
+   Highlights tab itself. */
 .meta-tabs {
   display: flex;
   gap: 2px;
@@ -108,8 +107,65 @@
 .hl-list:only-child {
   padding-left: 10px;
 }
+.hl-swatch {
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  border: 1px solid rgb(0 0 0 / 0.2);
+  padding: 0;
+  background-color: #ccc;
+  opacity: 0.55;
+  transition: opacity 0.15s, transform 0.1s;
+}
+.hl-swatch:hover {
+  opacity: 0.85;
+}
+.hl-swatch.active {
+  opacity: 1;
+  transform: scale(1.1);
+  box-shadow: 0 0 0 2px var(--text);
+}
+.hl-swatch-all {
+  background-color: transparent;
+  border-color: color-mix(in srgb, var(--text) 45%, transparent);
+}
 .hl-row {
+  padding: 8px 10px;
+  margin-bottom: 6px;
+  border-left: 3px solid rgb(128 128 128 / 0.4);
+  border-radius: 0 6px 6px 0;
+  background: rgb(128 128 128 / 0.06);
   cursor: default;
+}
+.hl-row:hover {
+  background: rgb(128 128 128 / 0.12);
+}
+.hl-text {
+  font-size: 13px;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  color: var(--text);
+}
+.hl-comment {
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--text-dim);
+  font-style: italic;
+  white-space: pre-wrap;
+}
+.hl-meta {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  margin-top: 4px;
+  font-size: 11px;
+  color: var(--text-dim);
+}
+.hl-match {
+  background: rgb(255 230 0 / 0.35);
+  color: inherit;
+  border-radius: 2px;
+  padding: 0 1px;
 }
 /* The PDF is open: a row takes you to its highlight. */
 .hl-row.navigable {
@@ -155,11 +211,13 @@
   margin-left: auto;
   display: inline-flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   white-space: nowrap;
 }
 .hl-actions .link-btn {
   font-size: 11px;
   display: inline-flex;
   align-items: center;
+  gap: 3px;
+  word-break: normal;
 }

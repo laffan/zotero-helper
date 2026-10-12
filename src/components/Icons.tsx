@@ -310,6 +310,16 @@ export const PencilIcon = (p: IconProps = {}) =>
     p,
   );
 
+/** A note with a plus: add to the notes. */
+export const NoteAddIcon = (p: IconProps = {}) =>
+  svg(
+    <>
+      <path d="M13.5 8V3.5a1 1 0 0 0-1-1h-9a1 1 0 0 0-1 1v9a1 1 0 0 0 1 1H8" />
+      <path d="M5 6h6M5 9h3M12 10.5v4M10 12.5h4" />
+    </>,
+    p,
+  );
+
 export const Spinner = ({ size = 16 }: IconProps = {}) => (
   <svg
     width={size}

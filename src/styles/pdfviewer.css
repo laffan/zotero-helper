@@ -1,6 +1,6 @@
 /* PDF viewer (beside the notes) — pages, toolbar, links, text layer. Ported
-   from Hush's styles/pdf-viewer.css; the shelf, thumbnails and folded
-   view are in pdfviewer-panels.css. */
+   from Hush's styles/pdf-viewer.css; thumbnails and the folded view are
+   in pdfviewer-panels.css. */
 .pdf-viewer {
   display: flex;
   flex-direction: column;
@@ -10,8 +10,6 @@
   background: var(--bg);
   position: relative;
 }
-/* Scroll area + shelf side by side; the shelf is in-flow so it
-   constrains the scroll area's width. */
 .pdf-viewer-body {
   flex: 1;
   display: flex;
@@ -354,4 +352,37 @@
 .pdf-fold-btn.active {
   background: rgb(128 128 128 / 0.22);
   border-color: rgb(128 128 128 / 0.4);
+}
+
+/* --- single-page view (src/pdfviewer/single.ts) --- */
+.pdf-scroll-area.pdf-single {
+  gap: var(--pdf-single-gap, 12px);
+}
+.pdf-scroll-area.pdf-single.pdf-layout-horizontal {
+  scroll-snap-type: x mandatory;
+}
+.pdf-scroll-area.pdf-single.pdf-layout-fit {
+  scroll-snap-type: y mandatory;
+}
+.pdf-single .pdf-page-wrapper {
+  scroll-snap-align: center;
+  scroll-snap-stop: always;
+}
+/* Room outside the end pages, so they centre too. Margins rather than
+   padding: padding can't shrink, and would stretch the scroll area. */
+.pdf-single.pdf-layout-horizontal > .pdf-page-wrapper:first-child {
+  margin-left: var(--pdf-single-gap, 0px);
+}
+.pdf-single.pdf-layout-horizontal > .pdf-page-wrapper:last-child {
+  margin-right: var(--pdf-single-gap, 0px);
+}
+.pdf-single.pdf-layout-fit > .pdf-page-wrapper:first-child {
+  margin-top: var(--pdf-single-gap, 0px);
+}
+.pdf-single.pdf-layout-fit > .pdf-page-wrapper:last-child {
+  margin-bottom: var(--pdf-single-gap, 0px);
+}
+.pdf-page-mode .pdf-toggle-option {
+  padding: 3px 7px;
+  font-size: 11px;
 }

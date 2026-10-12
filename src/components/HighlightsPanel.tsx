@@ -1,7 +1,9 @@
 // The Highlights tab: a searchable browser of the selection's Zotero
 // annotations, modelled on Hush's highlight pane — a filter box, a
 // column of colour swatches, and the highlights in reading order, each
-// with its page and an Open in Zotero link that lands on it.
+// with its page and three actions: Copy (a Markdown quote), Add (the
+// same quote, into the entry's notes) and Zotero (opens the PDF there,
+// on the highlight).
 //
 // Several selected entries (or one with several PDFs) list under a
 // heading per PDF. Nothing is fetched: annotations arrive with every
@@ -21,10 +23,11 @@ import {
   matchesQuery,
   type Annotation,
 } from "../lib/highlights";
+import { insertIntoNotes } from "../lib/notes";
 import { sectionIndexOf, sectionsOf, useOutlines, type Section } from "../lib/outline";
 import { useStore } from "../lib/store";
 import type { ZItem } from "../lib/types";
-import { CopyIcon, Refresh, Spinner } from "./Icons";
+import { CopyIcon, ExternalIcon, NoteAddIcon, Refresh, Spinner } from "./Icons";
 import { showInReader } from "./ReaderPane";
 
 interface Group {
@@ -73,7 +76,10 @@ export function HighlightsPanel({ items }: { items: ZItem[] }) {
   const [shownKey, setShownKey] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [color, setColor] = useState<string | null>(null);
-  const [copied, setCopied] = useState<string | null>(null);
+  // The last action that just happened, shown on its button for a moment.
+  const [done, setDone] = useState<{ key: string; what: "copy" | "add" } | null>(null);
+  // Notes belong to one entry, so Add is offered only with one selected.
+  const canAdd = items.length === 1;
 
   const groups = useMemo(() => highlightGroups(library, items), [library, items]);
   const outlines = useOutlines(groups.map((g) => g.att.key));
@@ -92,14 +98,23 @@ export function HighlightsPanel({ items }: { items: ZItem[] }) {
     .filter((g) => g.list.length);
   const shown = visible.reduce((n, g) => n + g.list.length, 0);
 
+  const flash = (key: string, what: "copy" | "add") => {
+    setDone({ key, what });
+    window.setTimeout(() => setDone((d) => (d?.key === key && d.what === what ? null : d)), 1500);
+  };
+
   const copy = async (a: Annotation) => {
     try {
       await navigator.clipboard.writeText(annotationMarkdown(settings, a));
-      setCopied(a.key);
-      window.setTimeout(() => setCopied((k) => (k === a.key ? null : k)), 1500);
+      flash(a.key, "copy");
     } catch {
-      setCopied(null);
+      setDone(null);
     }
+  };
+
+  const add = (a: Annotation) => {
+    insertIntoNotes(annotationMarkdown(settings, a));
+    flash(a.key, "add");
   };
 
   /** Scroll the open PDF to the highlight. */
@@ -149,8 +164,22 @@ export function HighlightsPanel({ items }: { items: ZItem[] }) {
             }}
             title="Copy as a Markdown quote with a link back to the page"
           >
-            {copied === a.key ? "Copied" : <CopyIcon size={11} />}
+            <CopyIcon size={11} />
+            {done?.key === a.key && done.what === "copy" ? "Copied" : "Copy"}
           </button>
+          {canAdd && (
+            <button
+              className="link-btn"
+              onClick={(e) => {
+                e.stopPropagation();
+                add(a);
+              }}
+              title="Add to the notes as a quote, with a link back to the page"
+            >
+              <NoteAddIcon size={11} />
+              {done?.key === a.key && done.what === "add" ? "Added" : "Add"}
+            </button>
+          )}
           <button
             className="link-btn"
             onClick={(e) => {
@@ -159,7 +188,8 @@ export function HighlightsPanel({ items }: { items: ZItem[] }) {
             }}
             title="Open the PDF in Zotero at this highlight"
           >
-            Open in Zotero ↗
+            <ExternalIcon size={11} />
+            Zotero
           </button>
         </span>
       </div>

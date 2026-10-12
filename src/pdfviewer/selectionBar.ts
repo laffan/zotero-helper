@@ -6,6 +6,14 @@
 // Highlight vs underline is a switch at the bar's left, remembered
 // between selections — the swatches then make whichever it is set to,
 // the way Zotero's reader keeps its active tool.
+//
+// A tap anywhere on the pages dismisses the selection, and the bar
+// with it, the moment the finger (or button) lifts. Left to itself the
+// browser doesn't manage that: everything on a page but its words is
+// unselectable, and WebKit and Blink leave a selection alone when
+// unselectable content is pressed — so a tap in a margin did nothing —
+// and on iPad a tap on text cleared it only after the tap gestures had
+// been told apart.
 import { ANNOTATION_COLORS } from "../lib/highlights";
 import { rangeText } from "./annotate";
 import { HIGHLIGHT_ICON, UNDERLINE_ICON } from "./icons";
@@ -66,6 +74,10 @@ export function createSelectionBar(
   let mode = storedMode();
   let current: { text: string; page: number; range: Range } | null = null;
   let hideTimer = 0;
+  // While the bar is being pressed, and briefly after (see check()).
+  let barPressedUntil = 0;
+  // When a tap last dismissed the selection (that tap is not a click).
+  let dismissedAt = 0;
 
   const button = (cls: string, title?: string) => {
     const b = document.createElement("button");
@@ -143,6 +155,8 @@ export function createSelectionBar(
     if (!sel || sel.isCollapsed || !sel.rangeCount) {
       // A tap on the bar can collapse the selection before its click
       // arrives; keep what was selected for a moment so the tap counts.
+      // Otherwise the bar goes with the selection.
+      if (performance.now() >= barPressedUntil) return hide();
       clearTimeout(hideTimer);
       hideTimer = window.setTimeout(hide, 300);
       return;
@@ -174,18 +188,66 @@ export function createSelectionBar(
   }
 
   // Selection settles on pointer release; keyboard selection (shift +
-  // arrows) arrives as selectionchange.
+  // arrows) arrives as selectionchange. A selection that has gone is
+  // acted on at once; one still being made, once it pauses.
   let timer = 0;
   const schedule = () => {
     clearTimeout(timer);
-    timer = window.setTimeout(check, 120);
+    const sel = window.getSelection();
+    if (current && (!sel || sel.isCollapsed)) check();
+    else timer = window.setTimeout(check, 120);
   };
   document.addEventListener("selectionchange", schedule);
   scrollArea.addEventListener("scroll", hide, { passive: true });
   // Keep the selection alive while the bar is pressed.
-  bar.addEventListener("pointerdown", (e) => e.preventDefault());
+  bar.addEventListener("pointerdown", (e) => {
+    e.preventDefault();
+    barPressedUntil = Infinity;
+  });
+  const barReleased = () => (barPressedUntil = performance.now() + 400);
+  bar.addEventListener("pointerup", barReleased);
+  bar.addEventListener("pointercancel", barReleased);
+
+  // A tap on the pages while something is selected: clear it. Left
+  // alone are drags (scrolling, or selecting afresh), long presses (a
+  // new selection on iPad), shift-clicks (extending this one) and the
+  // later clicks of a double or triple click (selecting a word or a
+  // line). Where the browser has already dropped the selection itself
+  // (a click on text, on the Mac), only the bar is left to go — the
+  // caret it put there is what a double click grows into a word.
+  let press: { x: number; y: number; at: number; id: number; armed: boolean } | null = null;
+  let lastTap = { x: 0, y: 0, at: 0 };
+  const onDown = (e: PointerEvent) => {
+    press = null;
+    if (!e.isPrimary || e.button !== 0) return;
+    const now = performance.now();
+    const repeat = now - lastTap.at < 400 && Math.hypot(e.clientX - lastTap.x, e.clientY - lastTap.y) < 10;
+    const sel = window.getSelection();
+    const selected = Boolean(sel && !sel.isCollapsed && sel.anchorNode && scrollArea.contains(sel.anchorNode));
+    press = { x: e.clientX, y: e.clientY, at: now, id: e.pointerId, armed: selected && !repeat && !e.shiftKey };
+  };
+  const onUp = (e: PointerEvent) => {
+    const d = press;
+    press = null;
+    if (!d || d.id !== e.pointerId) return;
+    const now = performance.now();
+    if (Math.hypot(e.clientX - d.x, e.clientY - d.y) > 8 || now - d.at > 400) return;
+    lastTap = { x: e.clientX, y: e.clientY, at: now };
+    if (!d.armed) return;
+    const sel = window.getSelection();
+    if (sel && !sel.isCollapsed) sel.removeAllRanges();
+    dismissedAt = now;
+    hide();
+  };
+  const onCancel = () => (press = null);
+  scrollArea.addEventListener("pointerdown", onDown);
+  scrollArea.addEventListener("pointerup", onUp);
+  scrollArea.addEventListener("pointercancel", onCancel);
 
   return {
+    /** Did a tap just dismiss the selection? Its click is then not a
+     *  click on whatever lay under it (a highlight, say). */
+    justDismissed: () => performance.now() - dismissedAt < 600,
     destroy(): void {
       clearTimeout(timer);
       clearTimeout(hideTimer);

@@ -67,6 +67,21 @@ function formatSortIndex(pageIndex: number, offset: number, top: number): string
   return [pad(pageIndex, 5), pad(offset, 6), pad(top, 5)].join("|");
 }
 
+/** The whole page a node is on — a page of the pages, or a fold of the
+ *  folded view opened to its whole page — as the element that spans
+ *  that page and its index. Null on a fold's strip: marks are made on
+ *  whole pages. */
+export function pageBoxAt(node: Node | null): { box: HTMLElement; pageIndex: number } | null {
+  const el = node instanceof Element ? node : node?.parentElement;
+  const page = el?.closest<HTMLElement>(".pdf-page-wrapper, .pdf-fold-wrapper.pdf-fold-expanded");
+  if (!page) return null;
+  const box = page.classList.contains("pdf-fold-wrapper")
+    ? page.querySelector<HTMLElement>(".pdf-fold-page")
+    : page;
+  const pageIndex = Number(page.dataset.pageIndex ?? NaN);
+  return box && Number.isInteger(pageIndex) ? { box, pageIndex } : null;
+}
+
 /** The draft annotation for `range`, or null when it isn't text in the
  *  pages. A selection running onto a later page is cut at the end of
  *  the page it starts on — a Zotero annotation lives on one page. */
@@ -75,12 +90,11 @@ export function draftFromRange(
   pages: PageRecord[],
   pageLabels: string[] | null,
 ): AnnotationDraft | null {
-  const startEl =
-    range.startContainer instanceof Element ? range.startContainer : range.startContainer.parentElement;
-  const wrapper = startEl?.closest<HTMLElement>(".pdf-page-wrapper");
-  const pageIndex = Number(wrapper?.dataset.pageIndex ?? NaN);
+  const at = pageBoxAt(range.startContainer);
+  const pageIndex = at?.pageIndex ?? NaN;
+  const wrapper = at?.box;
   const p = pages[pageIndex];
-  const layer = p?.contentEl?.querySelector<HTMLElement>(".textLayer");
+  const layer = wrapper?.querySelector<HTMLElement>(".textLayer");
   if (!wrapper || !p || !layer || !layer.contains(range.startContainer)) return null;
 
   const r = range.cloneRange();
@@ -88,8 +102,8 @@ export function draftFromRange(
   const text = rangeText(r);
   if (!text) return null;
 
-  // Screen boxes → scale-1 viewport units → PDF user space. The wrapper
-  // is the page at its displayed size, whatever CSS stretch the content
+  // Screen boxes → scale-1 viewport units → PDF user space. The box is
+  // the page at its displayed size, whatever CSS stretch the content
   // box is under.
   const wr = wrapper.getBoundingClientRect();
   const k = p.viewport.width / wr.width;
@@ -162,7 +176,7 @@ export function annotationAtPoint(
 export interface AnnotationTapEnv {
   getPages: () => PageRecord[];
   getAnnotations: () => Annotation[];
-  /** Taps are ignored right now (folded view, a selection just dismissed). */
+  /** Taps are ignored right now (a selection just dismissed). */
   ignore: () => boolean;
   canEdit: (a: Annotation) => boolean;
   /** Open the editor for `a`, beside `at` (client coordinates). */
@@ -170,7 +184,8 @@ export interface AnnotationTapEnv {
 }
 
 /** A tap on one of this app's highlights or underlines opens its
- *  editor — unless it ends a text selection or lands on a link. */
+ *  editor — on a page, or a fold opened to its page — unless it ends a
+ *  text selection or lands on a link. */
 export function attachAnnotationTaps(scrollArea: HTMLElement, env: AnnotationTapEnv): void {
   scrollArea.addEventListener("click", (e) => {
     if (env.ignore()) return;
@@ -178,8 +193,9 @@ export function attachAnnotationTaps(scrollArea: HTMLElement, env: AnnotationTap
     if (sel && !sel.isCollapsed) return;
     const target = e.target as Element;
     if (target.closest("a, button")) return;
-    const wrapper = target.closest<HTMLElement>(".pdf-page-wrapper");
-    const idx = Number(wrapper?.dataset.pageIndex ?? NaN);
+    const at = pageBoxAt(target);
+    const wrapper = at?.box;
+    const idx = at?.pageIndex ?? NaN;
     const p = env.getPages()[idx];
     if (!wrapper || !p) return;
     const wr = wrapper.getBoundingClientRect();

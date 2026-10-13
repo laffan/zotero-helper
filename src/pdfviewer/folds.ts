@@ -1,7 +1,8 @@
 // Folded view — the document collapsed to just the regions that carry
 // annotations. Each fold shows the full page width but only a line or
 // two above and below the annotation; a corner toggle reveals the whole
-// page, and a filter popup picks which (type, colour) pairs make folds.
+// page, and a filter popup (foldFilter.ts) picks which (type, colour)
+// pairs make folds.
 // Ported from Hush's src/pdf/pdf-viewer-folds.js.
 //
 // Hush seeds the filter with red highlights and red handwriting, its
@@ -21,22 +22,13 @@ import { pdfPointToViewport } from "./annotations";
 import { drawAnnotations } from "./paint";
 import { COLLAPSE_ICON, EXPAND_ICON } from "./icons";
 import { renderTextLayer } from "./pageTools";
+import { createFoldFilterPopup } from "./foldFilter";
 import { capRenderScale, MAX_CONCURRENT_RENDERS, releaseCanvas } from "./render";
 import type { PageRecord, PageViewport, PDFDocumentProxy } from "./types";
 import type { FoldAnchor } from "./viewState";
 
 const FOLD_PAD = 28; // page units (~2 text lines) above/below the annotation
 const MERGE_GAP = 16; // merge folds whose padded regions come this close
-
-const TYPE_LABELS: Record<string, string> = {
-  highlight: "Highlights",
-  underline: "Underlines",
-  ink: "Handwriting",
-  note: "Notes",
-  image: "Areas",
-  text: "Text boxes",
-};
-const TYPE_ORDER = ["highlight", "underline", "ink", "note", "image", "text"];
 
 /** Zotero red is #ff6666; accept the red family without catching
  *  orange (#f19837) or magenta (#e56eee). */
@@ -99,9 +91,6 @@ export function createFoldLayer(scrollArea: HTMLElement, env: FoldEnv) {
   let emptyMsg: HTMLDivElement | null = null;
   let filter: Set<string> | null = null;
   let filterCustomized = false;
-  let popup: HTMLDivElement | null = null;
-  let filterBtnRef: HTMLElement | null = null;
-  let hostRef: HTMLElement | null = null;
   let lastScale: number | null = null;
   let lastAnnRef: Annotation[] | null = null;
   let lastFilterSig: string | null = null;
@@ -265,19 +254,72 @@ export function createFoldLayer(scrollArea: HTMLElement, env: FoldEnv) {
     setupObserver();
   }
 
-  function toggleExpand(fold: Fold): void {
-    fold.expanded = !fold.expanded;
-    fold.wrapper.classList.toggle("pdf-fold-expanded", fold.expanded);
-    fold.wrapper.style.height = `${fold.expanded ? fold.pageCssH : fold.foldCssH}px`;
-    fold.inner.style.top = fold.expanded ? "0px" : `-${Math.round(fold.top * fold.scale)}px`;
-    fold.toggle.title = fold.expanded ? "Collapse to fold" : "Reveal full page";
-    fold.toggle.innerHTML = fold.expanded ? COLLAPSE_ICON : EXPAND_ICON;
+  /** Open a fold to its whole page, or close it back to its strip.
+   *  `instant` skips the height animation (a rebuild re-opening one). */
+  function setExpanded(fold: Fold, on: boolean, instant = false): void {
+    if (fold.expanded === on) return;
+    fold.expanded = on;
+    if (instant) fold.wrapper.style.transition = "none";
+    fold.wrapper.classList.toggle("pdf-fold-expanded", on);
+    fold.wrapper.style.height = `${on ? fold.pageCssH : fold.foldCssH}px`;
+    fold.inner.style.top = on ? "0px" : `-${Math.round(fold.top * fold.scale)}px`;
+    fold.toggle.title = on ? "Collapse to fold" : "Reveal full page";
+    fold.toggle.innerHTML = on ? COLLAPSE_ICON : EXPAND_ICON;
+    if (instant) {
+      void fold.wrapper.offsetHeight; // apply it before the transition returns
+      fold.wrapper.style.transition = "";
+    }
     // Expanded, the strip's raster is redrawn as the whole page (the
     // strip stays up until the page replaces it).
-    if (fold.expanded && !fold.full) {
+    if (on && !fold.full) {
       fold.rendered = false;
       request(fold, true);
     }
+  }
+
+  /** The corner button. One page is open at a time: opening this one
+   *  closes the other at once, keeping this one where it is on screen
+   *  (an open page above it would otherwise pull it up). */
+  function toggleExpand(fold: Fold): void {
+    if (fold.expanded) return setExpanded(fold, false);
+    const other = folds.find((f) => f.expanded);
+    if (other) {
+      const before = fold.wrapper.getBoundingClientRect().top;
+      setExpanded(other, false, true);
+      scrollArea.scrollTop += fold.wrapper.getBoundingClientRect().top - before;
+    }
+    setExpanded(fold, true);
+  }
+
+  /** Is `node` on an open (whole-page) fold? Marks can be made there. */
+  const inExpanded = (node: Node | null): boolean =>
+    Boolean((node instanceof Element ? node : node?.parentElement)?.closest(".pdf-fold-wrapper.pdf-fold-expanded"));
+
+  /** The place at the view's vertical centre, as a page and a fraction
+   *  down it — on the fold there, or the nearest one, kept to the part
+   *  of its page that fold shows. For leaving the folded view without
+   *  losing the place. */
+  function centerPlace(): { pageIndex: number; frac: number } | null {
+    if (!folds.length) return null;
+    const ar = scrollArea.getBoundingClientRect();
+    const mid = ar.top + scrollArea.clientHeight / 2;
+    let best: Fold | null = null;
+    let bestDist = Infinity;
+    for (const f of folds) {
+      const r = f.wrapper.getBoundingClientRect();
+      const d = mid < r.top ? r.top - mid : mid > r.bottom ? mid - r.bottom : 0;
+      if (d < bestDist) {
+        best = f;
+        bestDist = d;
+      }
+      if (r.top > mid && d > bestDist) break;
+    }
+    if (!best) return null;
+    const w = best.wrapper.getBoundingClientRect();
+    const page = best.inner.getBoundingClientRect();
+    if (!page.height) return null;
+    const y = Math.max(w.top, Math.min(w.bottom, mid));
+    return { pageIndex: best.pageIndex, frac: (y - page.top) / page.height };
   }
 
   /** Queue a fold's render; `first` puts it at the head of the queue. */
@@ -448,7 +490,14 @@ export function createFoldLayer(scrollArea: HTMLElement, env: FoldEnv) {
     lastScale = scale;
     lastAnnRef = annRef;
     lastFilterSig = sig;
+    // A rebuild (a mark made, the filter or the zoom changed) keeps the
+    // open page open and the view where it was.
+    const openPage = folds.find((f) => f.expanded)?.pageIndex ?? null;
+    const anchor = viewAnchor();
     build();
+    const reopen = openPage === null ? undefined : folds.find((f) => f.pageIndex === openPage);
+    if (reopen) setExpanded(reopen, true, true);
+    if (anchor) restoreAnchor(anchor);
   }
 
   function enable(): void {
@@ -458,7 +507,7 @@ export function createFoldLayer(scrollArea: HTMLElement, env: FoldEnv) {
 
   function disable(): void {
     enabled = false;
-    closePopup();
+    popup.close();
     teardownDom();
     lastScale = null;
     lastAnnRef = null;
@@ -551,88 +600,18 @@ export function createFoldLayer(scrollArea: HTMLElement, env: FoldEnv) {
     return cur;
   }
 
-  // --- filter popup ---------------------------------------------------------
-  function attachFilterUI(filterBtn: HTMLElement, host: HTMLElement): void {
-    filterBtnRef = filterBtn;
-    hostRef = host;
-    filterBtn.addEventListener("click", (e) => {
-      e.stopPropagation();
-      if (popup) closePopup();
-      else openPopup();
-    });
-  }
-
-  function onDocPointerDown(e: PointerEvent): void {
-    const t = e.target as Node;
-    if (!popup || popup.contains(t) || filterBtnRef?.contains(t)) return;
-    closePopup();
-  }
-  function onDocKeydown(e: KeyboardEvent): void {
-    if (e.key === "Escape") closePopup();
-  }
-
-  function openPopup(): void {
-    if (!hostRef || !filterBtnRef) return;
-    const active = ensureFilter();
-    popup = document.createElement("div");
-    popup.className = "pdf-fold-filter-popup";
-    const title = document.createElement("div");
-    title.className = "pdf-fold-filter-title";
-    title.textContent = "Fold annotations";
-    popup.appendChild(title);
-
-    const rank = (t: string) => (TYPE_ORDER.indexOf(t) === -1 ? 99 : TYPE_ORDER.indexOf(t));
-    const combos = [...availableCombos().entries()].sort((a, b) =>
-      rank(a[1].type) !== rank(b[1].type) ? rank(a[1].type) - rank(b[1].type) : a[1].color < b[1].color ? -1 : 1,
-    );
-    if (!combos.length) {
-      const empty = document.createElement("div");
-      empty.className = "pdf-fold-filter-empty";
-      empty.textContent = "No annotations yet";
-      popup.appendChild(empty);
-    }
-    for (const [key, c] of combos) {
-      const row = document.createElement("label");
-      row.className = "pdf-fold-filter-row";
-      const check = document.createElement("input");
-      check.type = "checkbox";
-      check.checked = active.has(key);
-      check.addEventListener("change", () => {
-        filterCustomized = true;
-        if (check.checked) active.add(key);
-        else active.delete(key);
-        refresh(true);
-        env.onFilterChange?.();
-      });
-      const swatch = document.createElement("span");
-      swatch.className = "pdf-fold-filter-swatch";
-      swatch.style.background = c.color || "#ffff00";
-      const text = document.createElement("span");
-      text.textContent = TYPE_LABELS[c.type] || c.type;
-      const count = document.createElement("span");
-      count.className = "pdf-fold-filter-count";
-      count.textContent = String(c.count);
-      row.append(check, swatch, text, count);
-      popup.appendChild(row);
-    }
-    hostRef.appendChild(popup);
-    // Anchor above the toolbar at the filter button, clamped so a
-    // narrow viewer can't clip it.
-    const btnRect = filterBtnRef.getBoundingClientRect();
-    const hostRect = hostRef.getBoundingClientRect();
-    const left = Math.max(8, Math.min(btnRect.left - hostRect.left - 8, hostRect.width - popup.offsetWidth - 8));
-    popup.style.left = `${left}px`;
-    document.addEventListener("pointerdown", onDocPointerDown, true);
-    document.addEventListener("keydown", onDocKeydown, true);
-  }
-
-  function closePopup(): void {
-    if (!popup) return;
-    popup.remove();
-    popup = null;
-    document.removeEventListener("pointerdown", onDocPointerDown, true);
-    document.removeEventListener("keydown", onDocKeydown, true);
-  }
+  const popup = createFoldFilterPopup({
+    combos: availableCombos,
+    active: ensureFilter,
+    toggle: (key, on) => {
+      const active = ensureFilter();
+      filterCustomized = true;
+      if (on) active.add(key);
+      else active.delete(key);
+      refresh(true);
+      env.onFilterChange?.();
+    },
+  });
 
   return {
     enable,
@@ -640,12 +619,14 @@ export function createFoldLayer(scrollArea: HTMLElement, env: FoldEnv) {
     refresh,
     onAnnotationsChanged,
     include,
-    attachFilterUI,
+    attachFilterUI: popup.attach,
     scrollToAnnotation,
     goToPage,
     getCurrentPage,
     viewAnchor,
     restoreAnchor,
+    inExpanded,
+    centerPlace,
     getFilter,
     setFilter,
     destroy: disable,

@@ -47,3 +47,12 @@ export function scrollToPagePoint(area: HTMLElement, p: PageRecord, top: number)
   const target = area.scrollTop + wr.top - ar.top + frac * wr.height - 16;
   area.scrollTo({ top: Math.max(0, target), behavior: "smooth" });
 }
+
+/** Put the point `frac` of the way down page `p` at the centre of the
+ *  view (at once). Side by side, the page is centred across instead. */
+export function centerPagePoint(area: HTMLElement, p: PageRecord, frac: number, horiz: boolean): void {
+  const wr = p.wrapper.getBoundingClientRect();
+  const ar = area.getBoundingClientRect();
+  if (horiz) area.scrollLeft += wr.left + wr.width / 2 - (ar.left + area.clientWidth / 2);
+  else area.scrollTop += wr.top + frac * wr.height - (ar.top + area.clientHeight / 2);
+}

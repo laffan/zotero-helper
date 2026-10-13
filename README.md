@@ -260,7 +260,12 @@ Windows/Linux desktops too).
   alone at first — Hush's "come back to this" colour — with the
   filter button choosing others; highlights made here always fold,
   whatever the filter). Text in the folds can be selected, copied and
-  quoted into the notes; marking it waits for the whole page. A fold
+  quoted into the notes; marking it waits for the whole page — which a
+  fold's corner button opens in place, one page at a time (opening one
+  closes the other, without moving the one opened), and where the full
+  highlight bar and the highlight editor work as on the pages. Leaving
+  the folded view keeps the place: what was at the centre of the view
+  (on the open page, or the fold nearest the centre) stays there. A fold
   draws only its own strip of the page (all of it once expanded), so a
   screen of folds costs about what a screen of pages does to scroll. Hush's annotation shelf is left out: the
   Highlights tab beside the viewer already lists, filters and quotes

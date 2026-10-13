@@ -18,7 +18,7 @@
 // Highlights tab beside the viewer lists the same annotations).
 import type { Annotation } from "../lib/highlights";
 import { PDFJS_ASSETS } from "../lib/pdfjsAssets";
-import { restoreAnchor, scrollToPagePoint, viewAnchor } from "./anchor";
+import { centerPagePoint, restoreAnchor, scrollToPagePoint, viewAnchor } from "./anchor";
 import { attachAnnotationTaps, draftFromRange, type AnnotationDraft } from "./annotate";
 import { createAnnotationLayer } from "./annotations";
 import { createAnnotationPopover } from "./annotPopover";
@@ -179,8 +179,9 @@ export function createPdfViewer(container: HTMLElement, opts: PdfViewerOptions =
       ? createSelectionBar(scrollArea, root, {
           onQuote: opts.onQuote,
           // The folded view shows parts of pages; marks are made on
-          // whole ones, so there a selection can only be quoted.
-          canAnnotate: () => !folded,
+          // whole ones, so there a selection can only be quoted — but
+          // on a fold opened to its page, it can be marked.
+          canAnnotate: (range) => !folded || foldLayer.inExpanded(range.startContainer),
           onAnnotate: writer
             ? (range, type, color) => {
                 const draft = draftFromRange(range, pages, pageLabels);
@@ -207,7 +208,7 @@ export function createPdfViewer(container: HTMLElement, opts: PdfViewerOptions =
     attachAnnotationTaps(scrollArea, {
       getPages: () => pages,
       getAnnotations: () => annotLayer.getAnnotations(),
-      ignore: () => folded || Boolean(selection?.justDismissed()),
+      ignore: () => Boolean(selection?.justDismissed()),
       canEdit: writer.canEdit,
       open: (a, at) => popover.open(a, at),
     });
@@ -310,11 +311,19 @@ export function createPdfViewer(container: HTMLElement, opts: PdfViewerOptions =
 
   function exitFolded(skipRelayout = false): void {
     if (!folded) return;
+    // The place at the centre of the view (on the open page, if that is
+    // what is in view) stays there — unless the caller places the view
+    // itself, after its own relayout.
+    const place = skipRelayout ? null : foldLayer.centerPlace();
     folded = false;
     foldLayer.disable();
     applyLayoutClass();
     updateToolbarState();
     if (!skipRelayout) relayoutPages();
+    if (place && pages[place.pageIndex]) {
+      if (isPaged()) goToPage(place.pageIndex + 1, false);
+      else centerPagePoint(scrollArea, pages[place.pageIndex], place.frac, layoutMode === "horizontal");
+    }
     updatePageIndicator();
   }
   tb.foldBtn.addEventListener("click", () => (folded ? exitFolded() : enterFolded()));

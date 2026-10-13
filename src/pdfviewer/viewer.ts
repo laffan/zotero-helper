@@ -33,6 +33,7 @@ import { createSelectionBar, type MarkType } from "./selectionBar";
 import { attachSingleWheel, setSingleGap, singleFitZoom } from "./single";
 import { createThumbnailManager } from "./thumbnails";
 import { buildPdfToolbar } from "./toolbar";
+import { attachTooltips } from "./tooltips";
 import type { LayoutMode, PageRecord, PDFDocumentProxy } from "./types";
 import { loadViewPrefs, saveViewPrefs, type FitMode } from "./viewPrefs";
 
@@ -106,6 +107,7 @@ export function createPdfViewer(container: HTMLElement, opts: PdfViewerOptions =
     getAnnotations: () => annotLayer.getAnnotations(),
     getEffectiveZoom: () => getEffectiveZoom(),
     isDestroyed: () => destroyed,
+    selectable: Boolean(opts.onQuote || opts.annotate),
   });
   const linkMgr = createLinkLayerManager({
     getPdfDoc: () => pdfDoc,
@@ -132,12 +134,16 @@ export function createPdfViewer(container: HTMLElement, opts: PdfViewerOptions =
   const tb = buildPdfToolbar();
   root.appendChild(tb.toolbar);
   container.appendChild(root);
+  const detachTooltips = attachTooltips(tb.toolbar, root);
   foldLayer.attachFilterUI(tb.foldFilterBtn, root);
   const writer = opts.annotate;
   const selection =
     opts.onQuote || writer
       ? createSelectionBar(scrollArea, root, {
           onQuote: opts.onQuote,
+          // The folded view shows parts of pages; marks are made on
+          // whole ones, so there a selection can only be quoted.
+          canAnnotate: () => !folded,
           onAnnotate: writer
             ? (range, type, color) => {
                 const draft = draftFromRange(range, pages, pageLabels);
@@ -621,6 +627,7 @@ export function createPdfViewer(container: HTMLElement, opts: PdfViewerOptions =
     renderer.destroy();
     selection?.destroy();
     popover?.destroy();
+    detachTooltips();
     const doc = pdfDoc;
     pdfDoc = null;
     pages = [];

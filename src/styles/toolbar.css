@@ -14,7 +14,7 @@
   align-items: center;
   gap: 4px;
 }
-/* With a PDF open: Share, Sync and the document's name. */
+/* With a PDF open: back, the outline, the document's name, Share and Sync. */
 .toolbar-reading {
   flex: 1 1 auto;
   min-width: 0;

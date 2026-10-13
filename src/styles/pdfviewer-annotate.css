@@ -145,3 +145,10 @@
   background: var(--bad);
   color: #fff;
 }
+
+/* Folded view: the selection can be quoted, not marked. */
+.pdf-selection-bar.quote-only .pdf-mark-mode,
+.pdf-selection-bar.quote-only .pdf-mark-swatch,
+.pdf-selection-bar.quote-only .pdf-selection-bar-sep {
+  display: none;
+}

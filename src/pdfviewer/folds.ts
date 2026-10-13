@@ -13,6 +13,7 @@ import { annotationPosition, type Annotation } from "../lib/highlights";
 import { pdfPointToViewport } from "./annotations";
 import { drawAnnotations } from "./paint";
 import { COLLAPSE_ICON, EXPAND_ICON } from "./icons";
+import { renderTextLayer } from "./pageTools";
 import { capRenderScale, releaseCanvas } from "./render";
 import type { PageRecord, PageViewport, PDFDocumentProxy } from "./types";
 
@@ -66,6 +67,8 @@ export interface FoldEnv {
   getAnnotations: () => Annotation[];
   getEffectiveZoom: () => number;
   isDestroyed: () => boolean;
+  /** Lay selectable text over the folds. */
+  selectable?: boolean;
 }
 
 export function createFoldLayer(scrollArea: HTMLElement, env: FoldEnv) {
@@ -231,6 +234,7 @@ export function createFoldLayer(scrollArea: HTMLElement, env: FoldEnv) {
         toggleExpand(fold);
       });
       wrapper.dataset.foldIndex = String(folds.length);
+      wrapper.dataset.pageIndex = String(spec.pageIndex);
       scrollArea.appendChild(wrapper);
       folds.push(fold);
     }
@@ -314,6 +318,8 @@ export function createFoldLayer(scrollArea: HTMLElement, env: FoldEnv) {
       fold.inner.innerHTML = "";
       fold.inner.appendChild(canvas);
       fold.rendered = true;
+      // Selectable, for copying and quoting (marking is off while folded).
+      if (env.selectable) void renderTextLayer(fold.inner, page, fold.scale, () => fold.inner.contains(canvas));
     } catch (e) {
       console.error(`Failed to render fold on page ${fold.pageIndex + 1}:`, e);
     } finally {

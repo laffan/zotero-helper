@@ -195,7 +195,9 @@ Windows/Linux desktops too).
   any, the right panel gains a **Highlights** tab, a searchable browser
   modelled on [Hush](https://github.com/laffan/hush)'s highlight pane: a
   filter box that searches highlighted text, comments, page labels and
-  tags; a column of colour swatches; and the highlights in reading
+  tags; a column of colour swatches (a click shows one colour, ⌘-click —
+  Ctrl elsewhere — adds or removes one, as in a file list); and the
+  highlights in reading
   order, each with its page and three small buttons: **Copy** (a
   Markdown blockquote with a link back to the page), **Note** (the same
   quote, inserted into the entry's notes at the caret — offered when one
@@ -215,12 +217,13 @@ Windows/Linux desktops too).
   the link names one); a tap follows the link, ⌘-click shows the
   Markdown to edit it. The right end of the tab bar holds the entry's
   PDF: **Download PDF**, then **View PDF**, which turns the sidebar and
-  item list into a PDF viewer beside the notes (**Close PDF** brings
-  them back). Double-clicking an entry does both at once (an entry with
+  item list into a PDF viewer beside the notes (**Close PDF**, or the
+  back arrow at the toolbar's left, brings them back). Double-clicking an entry does both at once (an entry with
   no PDF opens in Zotero instead). While the PDF is open the toolbar
-  shrinks to what applies to it — **Share** and **Sync** for that entry
-  (Sync fetches new highlights and pushes the notes, or downloads the
-  PDF again) and the document's name — and the search field finds
+  shrinks to what applies to it — the back arrow, the document's name,
+  then **Share** and **Sync** for that entry (Sync fetches new
+  highlights and pushes the notes, or downloads the PDF again) — and
+  the search field finds
   words in the PDF: hits are boxed on the pages, listed under the field
   with their page and a few lines of the surrounding text (a hundred at
   a time, with *Show more matches* below), and stepped through with
@@ -228,18 +231,23 @@ Windows/Linux desktops too).
   is a query, and ⌘F returns to the field. ← / → turn the page
   while the pages have focus. A PDF opens on the page it was left on
   (remembered per PDF on this device). When the PDF has an outline,
-  a panel button at the left of the toolbar, before Share, shows it
+  a panel button at the left of the toolbar, before the name, shows it
   beside the pages: a folding tree of its headings, each a link to its
   place, with the section being read marked as you go. Widen the notes
   panel past 600px and the Highlights and Notes tabs become one, with
-  the highlights beside the notes; narrow it again and they separate. The viewer is a port of Hush's: horizontal or vertical
+  the highlights beside the notes (drag the edge between them to share
+  the width differently); narrow it again and they separate. The
+  viewer's bottom toolbar draws its own tooltips — after a moment's
+  hover, or on a press-and-hold with a finger, which then doesn't press
+  the button — since iPadOS shows no `title` tooltips. The viewer is a port of Hush's: horizontal or vertical
   scrolling, fit one / two / three pages, zoom, a thumbnail grid, the
   PDF's own links, Zotero's highlights, underlines and ink painted into
   the pages, and the **folded view**, which collapses the paper to the regions around
   its annotations (when the PDF has red highlights or red ink, those
   alone at first — Hush's "come back to this" colour — with the
   filter button choosing others; highlights made here always fold,
-  whatever the filter). Hush's annotation shelf is left out: the
+  whatever the filter). Text in the folds can be selected, copied and
+  quoted into the notes; marking it waits for the whole page. Hush's annotation shelf is left out: the
   Highlights tab beside the viewer already lists, filters and quotes
   the same annotations. Beside the folded-view button, a **single page /
   continuous** toggle (its icons turn with the scroll direction) chooses between the pages as one strip and one page at
@@ -475,7 +483,8 @@ src/            React + TypeScript UI (Vite, zustand, MiniSearch)
                 single-page view), pageTools (text
                 layer, notes hooks), search (find in the PDF), and
                 outline (the PDF's bookmarks, resolved to places),
-                anchor (keeping the place across a relayout), and
+                anchor (keeping the place across a relayout),
+                tooltips (the toolbar's, drawn for iPad), and
                 annotating: selectionBar (colours over a selection),
                 annotate (selection → Zotero position, tap hit-test),
                 annotPopover (colour / comment / delete)

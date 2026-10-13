@@ -76,6 +76,9 @@ interface UiPrefs {
   /** Right panel width while taking notes — wider than the details
    *  panel, since it is where the writing happens. */
   notesWidth: number;
+  /** Highlights beside the notes (the panel split while reading): the
+   *  highlights' share of the panel's width, 0–1. */
+  splitHighlights: number;
   /** Wide windows: the sidebar / right panel folded away by the
    *  toolbar's panel buttons. (Narrow ones use the drawers instead.) */
   sidebarHidden: boolean;
@@ -198,6 +201,7 @@ interface AppStore extends UiPrefs {
 
   setMetaTab: (t: MetaTab) => void;
   setNotesWidth: (w: number) => void;
+  setSplitHighlights: (f: number) => void;
   setSidebarHidden: (b: boolean) => void;
   setMetaHidden: (b: boolean) => void;
   setOutlineOpen: (b: boolean) => void;
@@ -241,6 +245,7 @@ export const useStore = create<AppStore>()(
       folderViews: {},
       metaTab: "details" as MetaTab,
       notesWidth: 420,
+      splitHighlights: 0.42,
       sidebarHidden: false,
       metaHidden: false,
       outlineOpen: false,
@@ -391,6 +396,7 @@ export const useStore = create<AppStore>()(
 
       setMetaTab: (metaTab) => set({ metaTab }),
       setNotesWidth: (notesWidth) => set({ notesWidth }),
+      setSplitHighlights: (splitHighlights) => set({ splitHighlights }),
       setSidebarHidden: (sidebarHidden) => set({ sidebarHidden }),
       setMetaHidden: (metaHidden) => set({ metaHidden }),
       setOutlineOpen: (outlineOpen) => set({ outlineOpen }),
@@ -472,6 +478,7 @@ export const useStore = create<AppStore>()(
         folderViews: s.folderViews,
         metaTab: s.metaTab,
         notesWidth: s.notesWidth,
+        splitHighlights: s.splitHighlights,
         sidebarHidden: s.sidebarHidden,
         metaHidden: s.metaHidden,
         outlineOpen: s.outlineOpen,

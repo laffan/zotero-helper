@@ -75,7 +75,10 @@ export function HighlightsPanel({ items }: { items: ZItem[] }) {
   const openAttKey = useStore((s) => s.reading?.attKey ?? null);
   const [shownKey, setShownKey] = useState<string | null>(null);
   const [query, setQuery] = useState("");
-  const [color, setColor] = useState<string | null>(null);
+  // The colours shown; none picked shows all. A click picks one colour
+  // (or, on the only one picked, all again); ⌘-click (Ctrl elsewhere)
+  // adds or removes one, as in a file list.
+  const [picked, setPicked] = useState<string[]>([]);
   // The last action that just happened, shown on its button for a moment.
   const [done, setDone] = useState<{ key: string; what: "copy" | "add" } | null>(null);
   // Notes belong to one entry, so Note is offered only with one selected.
@@ -85,14 +88,19 @@ export function HighlightsPanel({ items }: { items: ZItem[] }) {
   const outlines = useOutlines(groups.map((g) => g.att.key));
   const all = useMemo(() => groups.flatMap((g) => g.list), [groups]);
   const colors = useMemo(() => colorsOf(all), [all]);
-  const activeColor = color && colors.includes(color) ? color : null;
+  const active = picked.filter((c) => colors.includes(c));
+  const pick = (c: string, e: React.MouseEvent) => {
+    if (e.metaKey || e.ctrlKey) {
+      setPicked(active.includes(c) ? active.filter((x) => x !== c) : [...active, c]);
+    } else setPicked(active.length === 1 && active[0] === c ? [] : [c]);
+  };
   const q = query.trim().toLowerCase();
 
   const visible = groups
     .map((g) => ({
       ...g,
       list: g.list.filter(
-        (a) => (!activeColor || a.color === activeColor) && matchesQuery(a, q) && (a.text || a.comment),
+        (a) => (!active.length || active.includes(a.color)) && matchesQuery(a, q) && (a.text || a.comment),
       ),
     }))
     .filter((g) => g.list.length);
@@ -241,17 +249,17 @@ export function HighlightsPanel({ items }: { items: ZItem[] }) {
         {colors.length > 1 && (
           <div className="hl-colors">
             <button
-              className={`hl-swatch hl-swatch-all ${activeColor ? "" : "active"}`}
-              onClick={() => setColor(null)}
+              className={`hl-swatch hl-swatch-all ${active.length ? "" : "active"}`}
+              onClick={() => setPicked([])}
               title="All colours"
             />
             {colors.map((c) => (
               <button
                 key={c}
-                className={`hl-swatch ${activeColor === c ? "active" : ""}`}
+                className={`hl-swatch ${active.includes(c) ? "active" : ""}`}
                 style={{ backgroundColor: c }}
-                onClick={() => setColor(activeColor === c ? null : c)}
-                title="Only this colour"
+                onClick={(e) => pick(c, e)}
+                title="Only this colour (⌘-click to pick several)"
               />
             ))}
           </div>

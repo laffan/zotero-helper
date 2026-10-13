@@ -24,7 +24,7 @@ export const notesTheme = EditorView.theme({
   "&": {
     height: "100%",
     fontSize: "13.5px",
-    backgroundColor: "var(--panel)",
+    backgroundColor: "var(--panel-alt)",
     color: "var(--text)",
   },
   "&.cm-focused": { outline: "none" },
@@ -56,7 +56,7 @@ export const notesTheme = EditorView.theme({
   ".cm-md-codeblock": {
     fontFamily: "var(--mono)",
     fontSize: "12px",
-    backgroundColor: "var(--panel-alt)",
+    backgroundColor: "color-mix(in srgb, var(--text) 6%, transparent)",
   },
   ".cm-md-hr": { color: "var(--text-dim)" },
   ".cm-md-hr-rule": {

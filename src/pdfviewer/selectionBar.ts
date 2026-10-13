@@ -25,6 +25,8 @@ export interface SelectionBarHandlers {
   onQuote?: (text: string, page: number) => void;
   /** Mark the selected passage; absent hides the swatches. */
   onAnnotate?: (range: Range, type: MarkType, color: string) => void;
+  /** May this selection be marked now? False hides the swatches. */
+  canAnnotate?: () => boolean;
 }
 
 const MODE_KEY = "zh-pdf-mark-type";
@@ -166,8 +168,13 @@ export function createSelectionBar(
     const el = anchor instanceof Element ? anchor : anchor.parentElement;
     if (!el || !scrollArea.contains(el)) return hide();
     const text = rangeText(range);
-    const wrapper = (range.startContainer.parentElement ?? el).closest<HTMLElement>(".pdf-page-wrapper");
+    const wrapper = (range.startContainer.parentElement ?? el).closest<HTMLElement>(
+      ".pdf-page-wrapper, .pdf-fold-wrapper",
+    );
     if (!text || !wrapper) return hide();
+    const quoteOnly = Boolean(handlers.canAnnotate && !handlers.canAnnotate());
+    if (quoteOnly && !handlers.onQuote) return hide();
+    bar.classList.toggle("quote-only", quoteOnly);
     clearTimeout(hideTimer);
     current = { text, page: Number(wrapper.dataset.pageIndex ?? 0) + 1, range: range.cloneRange() };
     const r = selectionBox(range, scrollArea);

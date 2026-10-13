@@ -25,7 +25,7 @@
   min-height: 0;
   display: flex;
   flex-direction: column;
-  background: var(--panel);
+  background: var(--panel-alt); /* the right panel's own colour */
 }
 .notes-editor-head {
   display: flex;
@@ -67,11 +67,25 @@
   flex-direction: column;
 }
 .meta-split-hl {
-  flex: 0 0 42%;
+  flex: 0 0 42%; /* the share is set inline (splitHighlights) */
   min-width: 0;
   display: flex;
   flex-direction: column;
-  border-right: 1px solid var(--border);
+}
+/* The edge between them: a hairline with a wider grab strip, like the
+   pane edges (base.css). */
+.meta-split-resizer {
+  flex: 0 0 7px;
+  margin: 0 -3px;
+  position: relative;
+  z-index: 1;
+  cursor: col-resize;
+  touch-action: none;
+  background: linear-gradient(var(--border), var(--border)) center / 1px 100% no-repeat;
+}
+.meta-split-resizer:hover,
+.meta-split-resizer:active {
+  background-color: var(--accent-soft);
 }
 .meta-split > .notes-panel,
 .meta-split > .notes-loading,

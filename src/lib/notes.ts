@@ -99,6 +99,13 @@ export async function pushDirtyNotes(): Promise<void> {
   }
 }
 
+/** Close the PDF and bring the library back, pushing the notes on the
+ *  way (the toolbar's back arrow, the tab bar's Close PDF). */
+export function closeReader(): void {
+  useStore.getState().setReading(null);
+  void pushDirtyNotes();
+}
+
 /** Start the periodic push. Called once from bootstrap. */
 export function startNotesSync(): void {
   void pushDirtyNotes();

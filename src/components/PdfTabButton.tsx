@@ -5,7 +5,7 @@
 //   open               → Close PDF
 // A copy older than the one in Zotero offers itself for re-download.
 import { itemTitle, pdfAttachmentOf } from "../lib/collections";
-import { cachePdf, cachedPdfIsStale, pushDirtyNotes } from "../lib/notes";
+import { cachePdf, cachedPdfIsStale, closeReader } from "../lib/notes";
 import { appLog, useStore } from "../lib/store";
 import type { ZItem } from "../lib/types";
 import { PdfIcon, Refresh, Spinner } from "./Icons";
@@ -42,10 +42,7 @@ export function PdfTabButton({ item }: { item: ZItem }) {
     return (
       <button
         className="meta-tab-action active"
-        onClick={() => {
-          setReading(null);
-          void pushDirtyNotes();
-        }}
+        onClick={closeReader}
         title="Close the PDF and bring back the library"
       >
         Close PDF

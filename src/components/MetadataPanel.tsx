@@ -10,6 +10,7 @@
 // and Notes become one tab with the two side by side.
 import { useEffect, useMemo, useRef, useState } from "react";
 import { isStandaloneAttachment } from "../lib/collections";
+import { trackPointerDrag } from "../lib/dragGesture";
 import { QUESTIONS, useStore, type MetaTab } from "../lib/store";
 import { AttachmentPanel } from "./AttachmentPanel";
 import { ChatPanel } from "./ChatPanel";
@@ -36,6 +37,21 @@ function useWiderThanSplit(ref: React.RefObject<HTMLElement>): boolean {
   return wide;
 }
 
+/** The edge between the highlights and the notes, side by side: drag
+ *  it to share the width differently (each keeps at least 160px). */
+function SplitResizer({ split }: { split: React.RefObject<HTMLDivElement> }) {
+  const setFrac = useStore((s) => s.setSplitHighlights);
+  const start = (e: React.PointerEvent) => {
+    const box = split.current?.getBoundingClientRect();
+    if (!box || box.width < 320) return;
+    trackPointerDrag(e, (ev) => {
+      const x = Math.min(box.width - 160, Math.max(160, ev.clientX - box.left));
+      setFrac(x / box.width);
+    });
+  };
+  return <div className="meta-split-resizer" onPointerDown={start} />;
+}
+
 export function MetadataPanel() {
   const selectedKeys = useStore((s) => s.selectedKeys);
   const items = useStore((s) => s.library.items);
@@ -48,6 +64,8 @@ export function MetadataPanel() {
   const { metaOpen, setMetaOpen } = useStore();
   const hidden = useStore((s) => s.metaHidden);
   const panelRef = useRef<HTMLElement>(null);
+  const splitRef = useRef<HTMLDivElement>(null);
+  const splitFrac = useStore((s) => s.splitHighlights);
   const wide = useWiderThanSplit(panelRef);
 
   const selected = useMemo(() => {
@@ -112,11 +130,14 @@ export function MetadataPanel() {
       // One wrapper either way, so the notes editor stays mounted (caret,
       // undo history) as the panel crosses SPLIT_WIDTH.
       content = one ? (
-        <div className={split ? "meta-split" : "meta-single"}>
+        <div className={split ? "meta-split" : "meta-single"} ref={splitRef}>
           {split ? (
-            <div className="meta-split-hl">
-              <HighlightsPanel items={selected} />
-            </div>
+            <>
+              <div className="meta-split-hl" style={{ flexBasis: `${splitFrac * 100}%` }}>
+                <HighlightsPanel items={selected} />
+              </div>
+              <SplitResizer split={splitRef} />
+            </>
           ) : null}
           <NotesPanel key={one.key} item={one} />
         </div>

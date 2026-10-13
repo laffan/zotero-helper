@@ -5,9 +5,11 @@ import { startAsk } from "../lib/ai/chat";
 import { askTargetFor } from "../lib/ai/context";
 import { creatorSummary, itemTitle, REAL_KEY, yearOf } from "../lib/collections";
 import { startPdfFetch } from "../lib/importer";
+import { closeReader } from "../lib/notes";
 import { useOutline } from "../lib/outline";
 import { QUESTIONS, useStore } from "../lib/store";
 import {
+  ArrowLeftIcon,
   FolderMinus,
   FolderPlus,
   GearIcon,
@@ -144,9 +146,18 @@ export function Toolbar() {
 
       {reading ? (
         // Nothing but the open PDF is on screen, so only what acts on it
-        // stays: its outline (when it has one), Share and Sync, scoped
-        // to its entry, and its name.
+        // stays: the way back to the library, its outline (when it has
+        // one), its name, and Share and Sync, scoped to its entry.
         <div className="toolbar-group toolbar-reading">
+          <button
+            className="icon-btn"
+            onClick={closeReader}
+            title="Close the PDF and bring back the library"
+            aria-label="Close the PDF"
+          >
+            <ArrowLeftIcon />
+          </button>
+          <span className="toolbar-sep" />
           {hasOutline && (
             <button
               className={`icon-btn ${outlineOpen ? "active" : ""}`}
@@ -158,10 +169,10 @@ export function Toolbar() {
               <PanelLeft />
             </button>
           )}
+          <ReadingTitle itemKey={reading.itemKey} />
+          <span className="toolbar-sep" />
           <ShareMenuButton reading={reading} />
           <SyncMenuButton reading={reading} />
-          <span className="toolbar-sep" />
-          <ReadingTitle itemKey={reading.itemKey} />
         </div>
       ) : (
       <div className="toolbar-group">

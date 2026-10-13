@@ -386,3 +386,22 @@
 .pdf-page-mode.vertical svg {
   transform: rotate(90deg);
 }
+
+/* --- toolbar tooltips (src/pdfviewer/tooltips.ts) --- */
+.pdf-zoom-toolbar {
+  -webkit-touch-callout: none;
+}
+.pdf-tooltip {
+  position: absolute;
+  z-index: 30;
+  width: max-content;
+  max-width: 240px;
+  padding: 4px 7px;
+  border-radius: 5px;
+  background: var(--text);
+  color: var(--panel);
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.35;
+  pointer-events: none;
+}

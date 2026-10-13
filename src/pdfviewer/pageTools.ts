@@ -61,12 +61,25 @@ export function attachPageHoverButtons(
 export async function attachTextLayer(p: PageRecord, page: PDFPageProxy): Promise<void> {
   const host = p.contentEl;
   if (!host || !p.renderedZoom) return;
+  await renderTextLayer(host, page, p.renderedZoom, () => p.contentEl === host);
+}
+
+/** The text layer itself, over `host` (a page drawn at `scale` CSS px
+ *  per PDF unit) — a page's content box, or a fold of the folded view.
+ *  `current` says whether `host` still shows this page once pdf.js has
+ *  loaded. */
+export async function renderTextLayer(
+  host: HTMLElement,
+  page: PDFPageProxy,
+  scale: number,
+  current: () => boolean = () => host.isConnected,
+): Promise<void> {
   const { TextLayer } = await getPdfjs();
-  if (p.contentEl !== host) return; // evicted or re-rendered meanwhile
+  if (!current()) return; // evicted or re-rendered meanwhile
   host.querySelector(".textLayer")?.remove();
   const div = document.createElement("div");
   div.className = "textLayer";
-  div.style.setProperty("--total-scale-factor", String(p.renderedZoom));
+  div.style.setProperty("--total-scale-factor", String(scale));
   div.style.setProperty("--scale-round-x", "1px");
   div.style.setProperty("--scale-round-y", "1px");
   host.appendChild(div);
@@ -74,7 +87,7 @@ export async function attachTextLayer(p: PageRecord, page: PDFPageProxy): Promis
     await new TextLayer({
       textContentSource: page.streamTextContent(),
       container: div,
-      viewport: page.getViewport({ scale: p.renderedZoom }),
+      viewport: page.getViewport({ scale }),
     }).render();
   } catch {
     // A page with no usable text (a scan) simply isn't selectable.

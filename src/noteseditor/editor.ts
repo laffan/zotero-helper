@@ -1,5 +1,6 @@
 // The notes editor: CodeMirror 6 with Markdown parsed by lezer (GFM —
-// tables, strikethrough, task lists), rendered in place (livePreview),
+// tables, strikethrough, task lists — and `==highlights==`), rendered
+// in place (livePreview), formatted from the keyboard (formatting),
 // Zotero links as pills (zoteroLinks), and the page-cite icon on the
 // line being written (citeGutter).
 //
@@ -10,6 +11,8 @@ import { syntaxHighlighting } from "@codemirror/language";
 import { EditorState } from "@codemirror/state";
 import { EditorView, keymap, placeholder } from "@codemirror/view";
 import { citeGutter, setCiteEnabled, type CiteSource } from "./citeGutter";
+import { formattingKeymap } from "./formatting";
+import { HighlightSyntax } from "./highlightSyntax";
 import { livePreview } from "./livePreview";
 import { notesHighlight, notesTheme } from "./theme";
 import { zoteroLinks, type LinkHandlers } from "./zoteroLinks";
@@ -56,8 +59,9 @@ export function createNotesEditor(parent: HTMLElement, opts: NotesEditorOptions)
       doc: opts.doc,
       extensions: [
         history(),
+        formattingKeymap,
         keymap.of([...markdownKeymap, ...defaultKeymap, ...historyKeymap, indentWithTab]),
-        markdown({ base: markdownLanguage }),
+        markdown({ base: markdownLanguage, extensions: [HighlightSyntax] }),
         syntaxHighlighting(notesHighlight),
         EditorView.lineWrapping,
         EditorView.contentAttributes.of({ spellcheck: "true", autocapitalize: "sentences" }),

@@ -210,9 +210,14 @@ Windows/Linux desktops too).
   no highlights are left out.
 - **Reading notes** — every entry has a **Notes** tab holding its
   `NOTES.md`, always open for writing: a CodeMirror editor with the
-  Markdown (GitHub flavour) rendered in place — headings, emphasis,
+  Markdown (GitHub flavour, plus `==highlighted==` text, drawn as a
+  yellow marker band) rendered in place — headings, emphasis,
   quotes, code and links show as formatted text, and a line's marks
-  reappear only while the caret is on it. Zotero links are drawn as
+  reappear only while the caret is on it. ⌘I, ⌘B and ⌘= toggle
+  italic (`_`), bold (`**`) and highlight (`==`) on the selection, or
+  the word at the caret (inside such text, they take it off), and ⌘K
+  makes the selection a link's label with the caret where the URL
+  goes (a selected URL becomes the URL instead). Zotero links are drawn as
   small page pills ("p. 22", tinted with the highlight's colour when
   the link names one); a tap follows the link, ⌘-click shows the
   Markdown to edit it. The right end of the tab bar holds the entry's
@@ -504,7 +509,8 @@ src/            React + TypeScript UI (Vite, zustand, MiniSearch)
                 annotate (selection → Zotero position, tap hit-test),
                 annotPopover (colour / comment / delete)
   noteseditor/  the notes editor: CodeMirror setup, live preview,
-                Zotero-link pills, the cite-this-page gutter
+                Zotero-link pills, the cite-this-page gutter, the
+                formatting shortcuts, `==highlight==` syntax
   styles/       one stylesheet per UI region (tokens, base, toolbar, …)
 src-tauri/      Rust core (all networking + state)
   src/zotero/      Zotero Web API v3: paginated sync (sync), versioned

@@ -4,6 +4,7 @@
 import { HighlightStyle } from "@codemirror/language";
 import { EditorView } from "@codemirror/view";
 import { tags as t } from "@lezer/highlight";
+import { highlightTag } from "./highlightSyntax";
 
 export const notesHighlight = HighlightStyle.define([
   { tag: t.heading1, fontSize: "1.45em", fontWeight: "700" },
@@ -12,6 +13,12 @@ export const notesHighlight = HighlightStyle.define([
   { tag: [t.heading4, t.heading5, t.heading6], fontWeight: "700" },
   { tag: t.strong, fontWeight: "700" },
   { tag: t.emphasis, fontStyle: "italic" },
+  // `==text==`: a marker-pen band, in Zotero's yellow.
+  {
+    tag: highlightTag,
+    backgroundColor: "color-mix(in srgb, #ffd400 38%, transparent)",
+    borderRadius: "2px",
+  },
   { tag: t.strikethrough, textDecoration: "line-through" },
   { tag: t.monospace, fontFamily: "var(--mono)", fontSize: "0.92em" },
   { tag: t.link, color: "var(--accent)" },

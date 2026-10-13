@@ -1,5 +1,5 @@
 // Markdown rendered in place, the way Hush's editor does it: the
-// formatting marks (`#`, `**`, `_`, `` ` ``, `>`, a link's brackets and
+// formatting marks (`#`, `**`, `_`, `==`, `` ` ``, `>`, a link's brackets and
 // URL) disappear on every line except the one being edited, leaving the
 // text styled by notesHighlight. Off focus, every line is rendered.
 //
@@ -93,7 +93,7 @@ function build(view: EditorView): DecorationSet {
           if (end > node.from) out.push(HIDE.range(node.from, end));
           return;
         }
-        if (name === "EmphasisMark" || name === "StrikethroughMark") {
+        if (name === "EmphasisMark" || name === "StrikethroughMark" || name === "HighlightMark") {
           out.push(HIDE.range(node.from, node.to));
           return;
         }

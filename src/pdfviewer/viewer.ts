@@ -372,6 +372,7 @@ export function createPdfViewer(container: HTMLElement, opts: PdfViewerOptions =
     tb.scrollHBtn.classList.toggle("active", layoutMode === "horizontal");
     tb.scrollVBtn.classList.toggle("active", isVert);
     tb.fitToggleWrap.style.display = isVert && !isSingle() ? "" : "none";
+    tb.pageModeWrap.classList.toggle("vertical", layoutMode !== "horizontal");
     tb.singleBtn.classList.toggle("active", isSingle());
     tb.continuousBtn.classList.toggle("active", !folded && !isSingle());
     tb.fitOneBtn.classList.toggle("active", fitMode === "fit" && !folded);
@@ -409,10 +410,13 @@ export function createPdfViewer(container: HTMLElement, opts: PdfViewerOptions =
     if (popover?.isOpen() && !root.querySelector(".pdf-annot-popover textarea:focus")) popover.close();
   });
 
-  // The page in view stays in view: the anchor relayoutPages keeps is
-  // measured along the new direction, against the old layout.
+  // The page at the start of the view stays there: the anchor
+  // relayoutPages keeps is measured along the new direction, against
+  // the old layout. (Not the page at the centre — goToPage puts a page
+  // at the start, so that would creep a page on with every switch.)
   function switchLayout(mode: "horizontal" | "vertical"): void {
-    const page = currentPage();
+    const lead = folded ? null : viewAnchor(scrollArea, pages, layoutMode === "horizontal");
+    const page = lead ? lead.idx + 1 + (lead.frac > 0.5 ? 1 : 0) : currentPage();
     exitFolded(true);
     layoutMode = mode;
     applyLayoutClass();

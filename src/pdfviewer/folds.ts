@@ -13,7 +13,7 @@ import { annotationPosition, type Annotation } from "../lib/highlights";
 import { pdfPointToViewport } from "./annotations";
 import { drawAnnotations } from "./paint";
 import { COLLAPSE_ICON, EXPAND_ICON } from "./icons";
-import { capRenderScale } from "./render";
+import { capRenderScale, releaseCanvas } from "./render";
 import type { PageRecord, PageViewport, PDFDocumentProxy } from "./types";
 
 const FOLD_PAD = 28; // page units (~2 text lines) above/below the annotation
@@ -172,7 +172,10 @@ export function createFoldLayer(scrollArea: HTMLElement, env: FoldEnv) {
   function teardownDom(): void {
     observer?.disconnect();
     observer = null;
-    for (const f of folds) f.wrapper.remove();
+    for (const f of folds) {
+      f.inner.querySelectorAll("canvas").forEach(releaseCanvas);
+      f.wrapper.remove();
+    }
     folds = [];
     emptyMsg?.remove();
     emptyMsg = null;
@@ -254,6 +257,7 @@ export function createFoldLayer(scrollArea: HTMLElement, env: FoldEnv) {
             // Each fold holds a full-page canvas; scrolled-away ones are
             // dropped. Expanded folds stay — the reader opened those.
             if (f.rendered && !f.expanded) {
+              f.inner.querySelectorAll("canvas").forEach(releaseCanvas);
               f.inner.innerHTML = "";
               f.rendered = false;
             }
@@ -306,6 +310,7 @@ export function createFoldLayer(scrollArea: HTMLElement, env: FoldEnv) {
       // revealed page reads exactly like the normal view.
       const ctx = canvas.getContext("2d");
       if (ctx) drawAnnotations(ctx, viewport, env.getAnnotations(), fold.pageIndex);
+      fold.inner.querySelectorAll("canvas").forEach(releaseCanvas);
       fold.inner.innerHTML = "";
       fold.inner.appendChild(canvas);
       fold.rendered = true;

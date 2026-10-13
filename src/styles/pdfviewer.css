@@ -382,7 +382,7 @@
 .pdf-single.pdf-layout-fit > .pdf-page-wrapper:last-child {
   margin-bottom: var(--pdf-single-gap, 0px);
 }
-.pdf-page-mode .pdf-toggle-option {
-  padding: 3px 7px;
-  font-size: 11px;
+/* The page-mode icons follow the scroll direction. */
+.pdf-page-mode.vertical svg {
+  transform: rotate(90deg);
 }

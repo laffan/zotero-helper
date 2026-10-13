@@ -2,12 +2,14 @@
 // record so viewer.ts can wire every handler in one place. No state
 // lives here (ported from Hush's src/pdf/pdf-toolbar-build.js).
 import {
+  CONTINUOUS_ICON,
   FILTER_ICON,
   FIT_ONE_ICON,
   FIT_THREE_ICON,
   FIT_TWO_ICON,
   FOLD_ICON,
   HORIZONTAL_ICON,
+  SINGLE_PAGE_ICON,
   THUMBNAIL_ICON,
   VERTICAL_ICON,
 } from "./icons";
@@ -57,8 +59,8 @@ export function buildPdfToolbar() {
   // One page at a time, swiped through, or the pages as one strip.
   const pageModeWrap = document.createElement("span");
   pageModeWrap.className = "pdf-toggle-group pdf-page-mode";
-  const singleBtn = btn("pdf-toggle-option", "Single", "One page at a time — swipe to turn the page");
-  const continuousBtn = btn("pdf-toggle-option active", "Continuous", "The pages as one continuous strip");
+  const singleBtn = svgBtn("pdf-toggle-option", "Single page — swipe to turn the page", SINGLE_PAGE_ICON);
+  const continuousBtn = svgBtn("pdf-toggle-option active", "Continuous — the pages as one strip", CONTINUOUS_ICON);
   pageModeWrap.append(singleBtn, continuousBtn);
 
   // Folded view is always offered — entering it switches to vertical
@@ -90,7 +92,7 @@ export function buildPdfToolbar() {
     zoomOutBtn, zoomLabel, zoomInBtn,
     scrollHBtn, scrollVBtn,
     fitOneBtn, fitTwoBtn, fitThreeBtn, fitToggleWrap,
-    singleBtn, continuousBtn,
+    pageModeWrap, singleBtn, continuousBtn,
     foldBtn, foldFilterBtn,
     pageIndicator, zoteroLink, thumbnailBtn,
   };

@@ -310,13 +310,14 @@ export const PencilIcon = (p: IconProps = {}) =>
     p,
   );
 
-/** A note with a plus: add to the notes. */
-export const NoteAddIcon = (p: IconProps = {}) =>
+/** Double quotation marks: quote into the notes. */
+export const QuoteIcon = (p: IconProps = {}) =>
   svg(
-    <>
-      <path d="M13.5 8V3.5a1 1 0 0 0-1-1h-9a1 1 0 0 0-1 1v9a1 1 0 0 0 1 1H8" />
-      <path d="M5 6h6M5 9h3M12 10.5v4M10 12.5h4" />
-    </>,
+    <path
+      fill="currentColor"
+      stroke="none"
+      d="M6.6 3.2C4.1 4 2.5 6 2.5 8.7V12.8h4.2V8.6H4.6c.1-1.6.9-2.7 2.4-3.4zm6.9 0C11 4 9.4 6 9.4 8.7v4.1h4.2V8.6h-2.1c.1-1.6.9-2.7 2.4-3.4z"
+    />,
     p,
   );
 

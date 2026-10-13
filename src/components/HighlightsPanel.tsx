@@ -1,7 +1,7 @@
 // The Highlights tab: a searchable browser of the selection's Zotero
 // annotations, modelled on Hush's highlight pane — a filter box, a
 // column of colour swatches, and the highlights in reading order, each
-// with its page and three actions: Copy (a Markdown quote), Add (the
+// with its page and three actions: Copy (a Markdown quote), Note (the
 // same quote, into the entry's notes) and Zotero (opens the PDF there,
 // on the highlight).
 //
@@ -27,7 +27,7 @@ import { insertIntoNotes } from "../lib/notes";
 import { sectionIndexOf, sectionsOf, useOutlines, type Section } from "../lib/outline";
 import { useStore } from "../lib/store";
 import type { ZItem } from "../lib/types";
-import { CopyIcon, ExternalIcon, NoteAddIcon, Refresh, Spinner } from "./Icons";
+import { CopyIcon, ExternalIcon, QuoteIcon, Refresh, Spinner } from "./Icons";
 import { showInReader } from "./ReaderPane";
 
 interface Group {
@@ -78,7 +78,7 @@ export function HighlightsPanel({ items }: { items: ZItem[] }) {
   const [color, setColor] = useState<string | null>(null);
   // The last action that just happened, shown on its button for a moment.
   const [done, setDone] = useState<{ key: string; what: "copy" | "add" } | null>(null);
-  // Notes belong to one entry, so Add is offered only with one selected.
+  // Notes belong to one entry, so Note is offered only with one selected.
   const canAdd = items.length === 1;
 
   const groups = useMemo(() => highlightGroups(library, items), [library, items]);
@@ -176,8 +176,8 @@ export function HighlightsPanel({ items }: { items: ZItem[] }) {
               }}
               title="Add to the notes as a quote, with a link back to the page"
             >
-              <NoteAddIcon size={11} />
-              {done?.key === a.key && done.what === "add" ? "Added" : "Add"}
+              <QuoteIcon size={11} />
+              {done?.key === a.key && done.what === "add" ? "Added" : "Note"}
             </button>
           )}
           <button

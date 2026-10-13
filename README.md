@@ -197,7 +197,7 @@ Windows/Linux desktops too).
   filter box that searches highlighted text, comments, page labels and
   tags; a column of colour swatches; and the highlights in reading
   order, each with its page and three small buttons: **Copy** (a
-  Markdown blockquote with a link back to the page), **Add** (the same
+  Markdown blockquote with a link back to the page), **Note** (the same
   quote, inserted into the entry's notes at the caret — offered when one
   entry is selected, since notes belong to an entry) and **Zotero**,
   which opens the PDF there on that highlight. Several selected entries, or one with several PDFs, list
@@ -241,8 +241,8 @@ Windows/Linux desktops too).
   filter button choosing others; highlights made here always fold,
   whatever the filter). Hush's annotation shelf is left out: the
   Highlights tab beside the viewer already lists, filters and quotes
-  the same annotations. Beside the folded-view button, **Single /
-  Continuous** chooses between the pages as one strip and one page at
+  the same annotations. Beside the folded-view button, a **single page /
+  continuous** toggle (its icons turn with the scroll direction) chooses between the pages as one strip and one page at
   a time: the page is fitted whole and centred, and a swipe turns it —
   left/right with horizontal scrolling, up/down with vertical — one
   page per swipe however hard the flick (CSS scroll snapping, so the

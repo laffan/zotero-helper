@@ -41,6 +41,14 @@ export function capRenderScale(scale: number, viewport1: { width: number; height
   return px > MAX_CANVAS_PIXELS ? scale * Math.sqrt(MAX_CANVAS_PIXELS / px) : scale;
 }
 
+/** Let a canvas's pixels go now. WebKit otherwise holds them until the
+ *  element is garbage-collected, and a relayout drops a dozen rasters
+ *  at once — enough, in a long PDF on an iPad, for the web view to be
+ *  killed. pdf.js's own viewer does the same. */
+export function releaseCanvas(c: HTMLCanvasElement | null | undefined): void {
+  if (c) c.width = c.height = 0;
+}
+
 function isCancelError(e: unknown): boolean {
   const err = e as { name?: string; message?: string } | null;
   return Boolean(
@@ -247,6 +255,7 @@ export function createPageRenderer(scrollArea: HTMLElement, env: RendererEnv) {
     p.rendering = true;
     p.cancelled = false;
     p.wrapper.querySelector(".pdf-page-placeholder")?.classList.add("loading");
+    let canvas: HTMLCanvasElement | null = null;
     try {
       const page = await pdfDoc.getPage(idx + 1);
       if (env.isDestroyed() || p.cancelled || pages !== env.getPages()) return;
@@ -274,7 +283,7 @@ export function createPageRenderer(scrollArea: HTMLElement, env: RendererEnv) {
       const dpr = window.devicePixelRatio || 1;
       const viewport = page.getViewport({ scale: capRenderScale(scale * dpr, p.viewport) });
 
-      const canvas = document.createElement("canvas");
+      canvas = document.createElement("canvas");
       canvas.width = Math.round(viewport.width);
       canvas.height = Math.round(viewport.height);
       canvas.className = "pdf-page-canvas";
@@ -299,6 +308,7 @@ export function createPageRenderer(scrollArea: HTMLElement, env: RendererEnv) {
       content.appendChild(canvas);
       p.wrapper.querySelector(".pdf-page-placeholder")?.remove();
       p.contentEl?.remove();
+      releaseCanvas(p.canvas); // a repaint's old raster
       p.wrapper.insertBefore(content, p.wrapper.firstChild);
       p.contentEl = content;
       p.contentW = cssW;
@@ -314,6 +324,8 @@ export function createPageRenderer(scrollArea: HTMLElement, env: RendererEnv) {
     } catch (e) {
       if (!isCancelError(e)) console.error(`Failed to render page ${idx + 1}:`, e);
     } finally {
+      // A render that was cancelled or failed drops its canvas.
+      if (canvas && p.canvas !== canvas) releaseCanvas(canvas);
       p.rendering = false;
       p.renderTask = null;
       if (!p.rendered) {
@@ -336,7 +348,15 @@ export function createPageRenderer(scrollArea: HTMLElement, env: RendererEnv) {
     if (!p.rendered && !p.contentEl) return;
     p.contentEl?.remove();
     p.contentEl = null;
+    releaseCanvas(p.canvas);
     p.canvas = null;
+    // pdf.js keeps a drawn page's parsed content; let it go with the
+    // raster (it declines while a render of the page is still running).
+    void env
+      .getPdfDoc()
+      ?.getPage(idx + 1)
+      .then((page) => page.cleanup())
+      .catch(() => {});
     p.contentW = 0;
     p.contentH = 0;
     if (p.rendered) renderedBytes -= p.canvasBytes || 0;
@@ -373,6 +393,7 @@ export function createPageRenderer(scrollArea: HTMLElement, env: RendererEnv) {
   /** Forget everything about the current document — before a (re)load
    *  swaps the pages array out. */
   function reset(): void {
+    for (const p of env.getPages()) releaseCanvas(p.canvas);
     queue = [];
     lastRange = null;
     renderedBytes = 0;

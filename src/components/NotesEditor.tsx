@@ -15,7 +15,6 @@ import { NOTES_FILENAME, pushNote, registerNotesInserter, saveNote } from "../li
 import { appLog, useStore } from "../lib/store";
 import type { NoteMeta } from "../lib/types";
 import type { NotesEditorHandle } from "../noteseditor/editor";
-import { Spinner } from "./Icons";
 import { currentReaderPage, showInReader } from "./ReaderPane";
 
 const SAVE_DELAY_MS = 600;
@@ -149,9 +148,11 @@ export function NotesEditor({ itemKey, initialText, initialMeta, pdfAttKey }: Pr
       {status && (
         <div className="notes-editor-head">
           <span className={`notes-status ${meta?.dirty ? "dirty" : ""}`}>{status}</span>
-          {meta?.dirty && (
-            <button className="mini-btn" onClick={() => void push()} disabled={pushing}>
-              {pushing ? <Spinner size={11} /> : "Push now"}
+          {/* A link at the status's own size: as a button it was taller
+              than the row and pushed the notes down when it appeared. */}
+          {meta?.dirty && !pushing && (
+            <button className="link-btn notes-push" onClick={() => void push()}>
+              Push now
             </button>
           )}
         </div>

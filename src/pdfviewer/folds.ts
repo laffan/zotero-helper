@@ -295,6 +295,31 @@ export function createFoldLayer(scrollArea: HTMLElement, env: FoldEnv) {
   const inExpanded = (node: Node | null): boolean =>
     Boolean((node instanceof Element ? node : node?.parentElement)?.closest(".pdf-fold-wrapper.pdf-fold-expanded"));
 
+  /** Entering the folded view: centre the fold nearest a place on the
+   *  pages (a page and a fraction down it), reading the document as one
+   *  run of pages — on that very place when the fold shows it, else on
+   *  the fold's middle. */
+  function centerOn(place: { pageIndex: number; frac: number }): void {
+    const pages = env.getPages();
+    const heightOf = (i: number) => pages[i]?.viewport.height || 1;
+    const want = place.pageIndex + place.frac;
+    let best: Fold | null = null;
+    let bestDist = Infinity;
+    for (const f of folds) {
+      const h = heightOf(f.pageIndex);
+      const d = Math.max(0, f.pageIndex + f.top / h - want, want - (f.pageIndex + f.bottom / h));
+      if (d < bestDist) {
+        best = f;
+        bestDist = d;
+      }
+    }
+    if (!best) return;
+    const y = bestDist === 0 ? place.frac * heightOf(best.pageIndex) : (best.top + best.bottom) / 2;
+    const ar = scrollArea.getBoundingClientRect();
+    const page = best.inner.getBoundingClientRect();
+    scrollArea.scrollTop += page.top + y * best.scale - (ar.top + scrollArea.clientHeight / 2);
+  }
+
   /** The place at the view's vertical centre, as a page and a fraction
    *  down it — on the fold there, or the nearest one, kept to the part
    *  of its page that fold shows. For leaving the folded view without
@@ -626,6 +651,7 @@ export function createFoldLayer(scrollArea: HTMLElement, env: FoldEnv) {
     viewAnchor,
     restoreAnchor,
     inExpanded,
+    centerOn,
     centerPlace,
     getFilter,
     setFilter,

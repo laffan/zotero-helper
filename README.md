@@ -263,9 +263,12 @@ Windows/Linux desktops too).
   quoted into the notes; marking it waits for the whole page — which a
   fold's corner button opens in place, one page at a time (opening one
   closes the other, without moving the one opened), and where the full
-  highlight bar and the highlight editor work as on the pages. Leaving
-  the folded view keeps the place: what was at the centre of the view
-  (on the open page, or the fold nearest the centre) stays there. A fold
+  highlight bar and the highlight editor work as on the pages. Entering
+  and leaving the folded view keep the place. Going in, the fold
+  nearest what was at the centre of the view (reading the document as
+  one run of pages) is centred — on that very spot when the fold shows
+  it. Coming out, what was at the centre (on the open page, or the fold
+  nearest the centre) stays there. A fold
   draws only its own strip of the page (all of it once expanded), so a
   screen of folds costs about what a screen of pages does to scroll. Hush's annotation shelf is left out: the
   Highlights tab beside the viewer already lists, filters and quotes

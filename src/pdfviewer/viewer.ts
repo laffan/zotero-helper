@@ -18,7 +18,7 @@
 // Highlights tab beside the viewer lists the same annotations).
 import type { Annotation } from "../lib/highlights";
 import { PDFJS_ASSETS } from "../lib/pdfjsAssets";
-import { centerPagePoint, restoreAnchor, scrollToPagePoint, viewAnchor } from "./anchor";
+import { centerPagePoint, pageFracAtCenter, restoreAnchor, scrollToPagePoint, viewAnchor } from "./anchor";
 import { attachAnnotationTaps, draftFromRange, type AnnotationDraft } from "./annotate";
 import { createAnnotationLayer } from "./annotations";
 import { createAnnotationPopover } from "./annotPopover";
@@ -299,12 +299,16 @@ export function createPdfViewer(container: HTMLElement, opts: PdfViewerOptions =
 
   function enterFolded(): void {
     if (folded) return;
+    // The place at the centre of the view, to centre the folds on.
+    const at = pages.length ? currentPage() - 1 : -1;
+    const place = pages[at] ? { pageIndex: at, frac: pageFracAtCenter(scrollArea, pages[at]) } : null;
     folded = true;
     foldedZoom = 1.0;
     layoutMode = "vertical";
     fitMode = "fit";
     applyLayoutClass();
     foldLayer.enable();
+    if (place) foldLayer.centerOn(place);
     updateToolbarState();
     updatePageIndicator();
   }

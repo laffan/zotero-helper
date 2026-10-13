@@ -56,3 +56,10 @@ export function centerPagePoint(area: HTMLElement, p: PageRecord, frac: number, 
   if (horiz) area.scrollLeft += wr.left + wr.width / 2 - (ar.left + area.clientWidth / 2);
   else area.scrollTop += wr.top + frac * wr.height - (ar.top + area.clientHeight / 2);
 }
+
+/** How far down page `p` (0–1) the view's vertical centre falls. */
+export function pageFracAtCenter(area: HTMLElement, p: PageRecord): number {
+  const wr = p.wrapper.getBoundingClientRect();
+  const ar = area.getBoundingClientRect();
+  return wr.height ? Math.max(0, Math.min(1, (ar.top + area.clientHeight / 2 - wr.top) / wr.height)) : 0;
+}

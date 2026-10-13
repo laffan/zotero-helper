@@ -36,3 +36,14 @@ export function restoreAnchor(area: HTMLElement, pages: PageRecord[], horiz: boo
   if (horiz) area.scrollLeft += delta;
   else area.scrollTop += delta;
 }
+
+/** Scroll (smoothly, top to bottom) to `top`, in PDF user space (y up),
+ *  on page `p` — a little above it, so the line is not on the edge. */
+export function scrollToPagePoint(area: HTMLElement, p: PageRecord, top: number): void {
+  const y = p.viewport.convertToViewportPoint(p.viewport.viewBox[0], top)[1];
+  const frac = Math.max(0, Math.min(1, y / p.viewport.height));
+  const wr = p.wrapper.getBoundingClientRect();
+  const ar = area.getBoundingClientRect();
+  const target = area.scrollTop + wr.top - ar.top + frac * wr.height - 16;
+  area.scrollTo({ top: Math.max(0, target), behavior: "smooth" });
+}

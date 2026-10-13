@@ -1,12 +1,14 @@
 // What has been read on this device: the PDFs opened most recently
-// (the sidebar's Recent folder) and the page each PDF was left on, so
-// it opens there again. Local only, like pins and view modes — nothing
+// (the sidebar's Recent folder) and the page each PDF was left on, with
+// the viewer's state there (layout, folded view, place), so it opens
+// as it was left. Local only, like pins and view modes — nothing
 // here is written to Zotero.
 //
 // No store import: the store records opens through noteOpened, and the
 // item list reads the order through recentKeys.
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+import type { SavedView } from "../pdfviewer/viewState";
 
 /** The sidebar row that lists recently opened PDFs. Not a Zotero
  *  collection, like Questions. */
@@ -26,8 +28,9 @@ export interface RecentOpen {
 interface RecentState {
   /** Newest first, one row per entry. */
   opened: RecentOpen[];
-  /** attKey → the 1-based page last in view, and when. */
-  pages: Record<string, { page: number; ms: number }>;
+  /** attKey → the 1-based page last in view, the viewer's state, and
+   *  when. */
+  pages: Record<string, { page: number; ms: number; view?: SavedView }>;
 }
 
 export const useRecent = create<RecentState>()(
@@ -59,8 +62,13 @@ export function lastPage(attKey: string): number | null {
   return useRecent.getState().pages[attKey]?.page ?? null;
 }
 
+/** The viewer's state `attKey` was left in, or null. */
+export function lastView(attKey: string): SavedView | null {
+  return useRecent.getState().pages[attKey]?.view ?? null;
+}
+
 let pageTimer = 0;
-let pendingPage: { attKey: string; page: number } | null = null;
+let pendingPage: { attKey: string; page: number; view?: SavedView } | null = null;
 
 function flushPage(): void {
   window.clearTimeout(pageTimer);
@@ -68,8 +76,10 @@ function flushPage(): void {
   pendingPage = null;
   if (!p) return;
   useRecent.setState((s) => {
-    if (s.pages[p.attKey]?.page === p.page) return {};
-    let pages = { ...s.pages, [p.attKey]: { page: p.page, ms: Date.now() } };
+    const prev = s.pages[p.attKey];
+    if (prev?.page === p.page && (!p.view || JSON.stringify(prev.view) === JSON.stringify(p.view))) return {};
+    const view = p.view ?? prev?.view;
+    let pages = { ...s.pages, [p.attKey]: { page: p.page, ms: Date.now(), ...(view ? { view } : {}) } };
     const keys = Object.keys(pages);
     if (keys.length > PAGES_LIMIT) {
       keys.sort((a, b) => pages[a].ms - pages[b].ms);
@@ -79,11 +89,12 @@ function flushPage(): void {
   });
 }
 
-/** The reader moved to `page`. Written after a pause, since scrolling
- *  through a book passes a page every few frames. */
-export function savePage(attKey: string, page: number): void {
+/** The reader moved to `page`, the viewer now in `view`. Written after
+ *  a pause, since scrolling through a book passes a page every few
+ *  frames. */
+export function savePage(attKey: string, page: number, view?: SavedView): void {
   if (pendingPage && pendingPage.attKey !== attKey) flushPage();
-  pendingPage = { attKey, page };
+  pendingPage = { attKey, page, view: view ?? (pendingPage?.attKey === attKey ? pendingPage.view : undefined) };
   window.clearTimeout(pageTimer);
   pageTimer = window.setTimeout(flushPage, 600);
 }

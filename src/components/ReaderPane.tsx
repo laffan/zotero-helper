@@ -22,7 +22,7 @@ import {
 } from "../lib/highlights";
 import { insertIntoNotes } from "../lib/notes";
 import { setOutline, setReaderPage, useOutline } from "../lib/outline";
-import { flushSavedPage, lastPage, savePage } from "../lib/recent";
+import { flushSavedPage, lastPage, lastView, savePage } from "../lib/recent";
 import { appLog, useStore } from "../lib/store";
 import { invoke } from "../lib/tauri";
 import type { SearchStatus } from "../pdfviewer/search";
@@ -126,6 +126,9 @@ export function ReaderPane() {
             setReaderPage(page);
             savePage(attKey, page);
           },
+          // The PDF reopens as it was left: layout, folded view, place.
+          initialView: lastView(attKey),
+          onViewChange: (page, view) => savePage(attKey, page, view),
         });
         viewerRef.current = viewer;
         active = { attKey, viewer };
@@ -147,12 +150,25 @@ export function ReaderPane() {
     })();
     return () => {
       cancelled = true;
-      flushSavedPage();
       if (active?.viewer === viewer) active = null;
       viewerRef.current = null;
+      // Destroying reports the view one last time; then it is written.
       void viewer?.destroy();
+      flushSavedPage();
     };
   }, [itemKey, attKey, savedMs]);
+
+  // The app going to the background may be the last chance to write
+  // where the PDF was left.
+  useEffect(() => {
+    const onHide = () => {
+      if (document.visibilityState !== "hidden") return;
+      viewerRef.current?.flushView();
+      flushSavedPage();
+    };
+    document.addEventListener("visibilitychange", onHide);
+    return () => document.removeEventListener("visibilitychange", onHide);
+  }, []);
 
   // A sync that brings new or edited highlights repaints them in place.
   useEffect(() => {

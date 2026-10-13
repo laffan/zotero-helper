@@ -232,8 +232,13 @@ Windows/Linux desktops too).
   a time, with *Show more matches* below), and stepped through with
   Enter / ⇧Enter; the magnifier turns into a clear button while there
   is a query, and ⌘F returns to the field. ← / → turn the page
-  while the pages have focus. A PDF opens on the page it was left on
-  (remembered per PDF on this device). When the PDF has an outline,
+  while the pages have focus. A PDF opens as it was left — on switching
+  to another and back, and from one session to the next: its layout
+  (scroll direction, fit, fixed sets, zoom), the folded view with its
+  zoom and filter, and the place in it, to the pixel (remembered per
+  PDF on this device, beside Recent). A PDF never opened here takes
+  the layout last chosen. Panel widths and the outline are the app's,
+  and kept as they are left too. When the PDF has an outline,
   a panel button at the left of the toolbar, before the name, shows it
   beside the pages: a folding tree of its headings, each a link to its
   place, with the section being read marked as you go. Widen the notes
@@ -486,7 +491,9 @@ src/            React + TypeScript UI (Vite, zustand, MiniSearch)
   pdfviewer/    the PDF viewer beside the notes, ported from Hush (viewer,
                 render, paint (annotations into the rasters),
                 annotations, folds, thumbnails, links, toolbar,
-                viewPrefs (the layout last chosen)) plus paged (the
+                viewPrefs (the layout last chosen), viewState (each
+                PDF's own, as it was left), layout (the modes' CSS
+                classes and fit scales)) plus paged (the
                 fixed view's sets of pages), pageTools (text
                 layer, notes hooks), search (find in the PDF), and
                 outline (the PDF's bookmarks, resolved to places),

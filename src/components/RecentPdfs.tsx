@@ -58,7 +58,6 @@ export function ReadingTitle({ itemKey }: { itemKey: string }) {
       </button>
       {dd.open && (
         <ToolbarMenu anchorRef={dd.ref} width={380}>
-          <div className="recent-pdfs-head">Recent PDFs</div>
           {others.length === 0 && <div className="recent-pdfs-empty">No other PDFs opened lately.</div>}
           <div className="recent-pdfs-list" role="menu">
             {others.map((it) => (

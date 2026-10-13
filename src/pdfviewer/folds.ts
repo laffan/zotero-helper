@@ -23,6 +23,7 @@ import { COLLAPSE_ICON, EXPAND_ICON } from "./icons";
 import { renderTextLayer } from "./pageTools";
 import { capRenderScale, MAX_CONCURRENT_RENDERS, releaseCanvas } from "./render";
 import type { PageRecord, PageViewport, PDFDocumentProxy } from "./types";
+import type { FoldAnchor } from "./viewState";
 
 const FOLD_PAD = 28; // page units (~2 text lines) above/below the annotation
 const MERGE_GAP = 16; // merge folds whose padded regions come this close
@@ -84,6 +85,8 @@ export interface FoldEnv {
   isDestroyed: () => boolean;
   /** Lay selectable text over the folds. */
   selectable?: boolean;
+  /** The filter was changed by hand. */
+  onFilterChange?: () => void;
 }
 
 export function createFoldLayer(scrollArea: HTMLElement, env: FoldEnv) {
@@ -506,6 +509,40 @@ export function createFoldLayer(scrollArea: HTMLElement, env: FoldEnv) {
     target.wrapper.scrollIntoView({ behavior: "smooth", block: "start" });
   }
 
+  /** Where the view starts: the first fold reaching into it, and how
+   *  far into that fold (negative in the gap above it). */
+  function viewAnchor(): FoldAnchor | null {
+    const top = scrollArea.scrollTop;
+    for (const f of folds) {
+      const h = f.wrapper.offsetHeight;
+      if (f.wrapper.offsetTop + h > top && h) {
+        return { pageIndex: f.pageIndex, top: f.top, frac: (top - f.wrapper.offsetTop) / h };
+      }
+    }
+    return null;
+  }
+
+  /** Scroll back to a place `viewAnchor` gave — the same fold, else the
+   *  next one on or after its page. False while there are no folds. */
+  function restoreAnchor(a: FoldAnchor): boolean {
+    if (!folds.length) return false;
+    const f =
+      folds.find((x) => x.pageIndex === a.pageIndex && Math.abs(x.top - a.top) < 1) ??
+      folds.find((x) => x.pageIndex >= a.pageIndex) ??
+      folds[folds.length - 1];
+    const frac = Math.max(-0.5, Math.min(1, a.frac));
+    scrollArea.scrollTop = Math.max(0, f.wrapper.offsetTop + frac * f.wrapper.offsetHeight);
+    return true;
+  }
+
+  /** The filter, when it was changed by hand (else it follows the
+   *  annotations), and setting it so. */
+  const getFilter = () => (filterCustomized && filter ? [...filter] : null);
+  function setFilter(keys: string[]): void {
+    filter = new Set(keys);
+    filterCustomized = true;
+  }
+
   function getCurrentPage(): number {
     if (!folds.length) return 1;
     const mid = scrollArea.scrollTop + scrollArea.clientHeight / 2;
@@ -565,6 +602,7 @@ export function createFoldLayer(scrollArea: HTMLElement, env: FoldEnv) {
         if (check.checked) active.add(key);
         else active.delete(key);
         refresh(true);
+        env.onFilterChange?.();
       });
       const swatch = document.createElement("span");
       swatch.className = "pdf-fold-filter-swatch";
@@ -606,6 +644,10 @@ export function createFoldLayer(scrollArea: HTMLElement, env: FoldEnv) {
     scrollToAnnotation,
     goToPage,
     getCurrentPage,
+    viewAnchor,
+    restoreAnchor,
+    getFilter,
+    setFilter,
     destroy: disable,
   };
 }

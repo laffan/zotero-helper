@@ -86,6 +86,12 @@
 .pdf-fold-page .pdf-page-canvas {
   display: block;
 }
+/* A fold's raster is its strip of the page (or all of it, expanded),
+   placed where that strip sits on the page. */
+.pdf-fold-page .pdf-fold-canvas {
+  position: absolute;
+  left: 0;
+}
 .pdf-fold-page-label {
   position: absolute;
   top: 4px;

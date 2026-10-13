@@ -9,12 +9,19 @@
 // open on an empty view, so here the filter falls back to everything.
 // Marks made in this viewer always fold, whatever the filter: someone
 // who has just highlighted a passage expects to find it there.
+//
+// Scrolling folds has to cost about what scrolling pages does, though a
+// screen of folds touches many more pages. So a fold draws only its own
+// strip of the page (the whole page once it is expanded), renders queue
+// up nearest-first under the page renderer's concurrency limit, a strip
+// is kept until it is well out of view (scrolling back doesn't redraw),
+// and a fold's text layer is laid only when a pointer reaches it.
 import { annotationPosition, type Annotation } from "../lib/highlights";
 import { pdfPointToViewport } from "./annotations";
 import { drawAnnotations } from "./paint";
 import { COLLAPSE_ICON, EXPAND_ICON } from "./icons";
 import { renderTextLayer } from "./pageTools";
-import { capRenderScale, releaseCanvas } from "./render";
+import { capRenderScale, MAX_CONCURRENT_RENDERS, releaseCanvas } from "./render";
 import type { PageRecord, PageViewport, PDFDocumentProxy } from "./types";
 
 const FOLD_PAD = 28; // page units (~2 text lines) above/below the annotation
@@ -59,7 +66,15 @@ interface Fold extends FoldSpec {
   rendered: boolean;
   rendering: boolean;
   expanded: boolean;
+  /** The raster is of the whole page (drawn while expanded). */
+  full: boolean;
+  /** The text layer is laid (or being laid). */
+  text: boolean;
 }
+
+/** Strips are dropped only this far out of view, so a short scroll
+ *  back finds them still drawn. */
+const KEEP_MARGIN = "1500px";
 
 export interface FoldEnv {
   getPages: () => PageRecord[];
@@ -75,6 +90,9 @@ export function createFoldLayer(scrollArea: HTMLElement, env: FoldEnv) {
   let enabled = false;
   let folds: Fold[] = [];
   let observer: IntersectionObserver | null = null;
+  let keeper: IntersectionObserver | null = null;
+  let queue: Fold[] = [];
+  let running = 0;
   let emptyMsg: HTMLDivElement | null = null;
   let filter: Set<string> | null = null;
   let filterCustomized = false;
@@ -175,6 +193,9 @@ export function createFoldLayer(scrollArea: HTMLElement, env: FoldEnv) {
   function teardownDom(): void {
     observer?.disconnect();
     observer = null;
+    keeper?.disconnect();
+    keeper = null;
+    queue = [];
     for (const f of folds) {
       f.inner.querySelectorAll("canvas").forEach(releaseCanvas);
       f.wrapper.remove();
@@ -227,7 +248,7 @@ export function createFoldLayer(scrollArea: HTMLElement, env: FoldEnv) {
 
       const fold: Fold = {
         ...spec, wrapper, inner, toggle, scale, cssW, pageCssH, foldCssH,
-        rendered: false, rendering: false, expanded: false,
+        rendered: false, rendering: false, expanded: false, full: false, text: false,
       };
       toggle.addEventListener("click", (e) => {
         e.stopPropagation();
@@ -248,31 +269,95 @@ export function createFoldLayer(scrollArea: HTMLElement, env: FoldEnv) {
     fold.inner.style.top = fold.expanded ? "0px" : `-${Math.round(fold.top * fold.scale)}px`;
     fold.toggle.title = fold.expanded ? "Collapse to fold" : "Reveal full page";
     fold.toggle.innerHTML = fold.expanded ? COLLAPSE_ICON : EXPAND_ICON;
+    // Expanded, the strip's raster is redrawn as the whole page (the
+    // strip stays up until the page replaces it).
+    if (fold.expanded && !fold.full) {
+      fold.rendered = false;
+      request(fold, true);
+    }
   }
 
+  /** Queue a fold's render; `first` puts it at the head of the queue. */
+  function request(fold: Fold, first = false): void {
+    if (fold.rendered || fold.rendering || queue.includes(fold)) return;
+    if (first) queue.unshift(fold);
+    else queue.push(fold);
+    pump();
+  }
+  function pump(): void {
+    while (running < MAX_CONCURRENT_RENDERS && queue.length) {
+      const f = queue.shift()!;
+      if (f.rendered || f.rendering || !f.wrapper.isConnected) continue;
+      running++;
+      void renderFold(f).finally(() => {
+        running--;
+        pump();
+      });
+    }
+  }
+
+  /** Drop a fold's raster and text (it has gone well out of view). */
+  function drop(f: Fold): void {
+    queue = queue.filter((q) => q !== f);
+    if (!f.rendered || f.expanded) return;
+    f.inner.querySelectorAll("canvas").forEach(releaseCanvas);
+    f.inner.innerHTML = "";
+    f.rendered = false;
+    f.full = false;
+    f.text = false;
+  }
+
+  /** Lay the fold's text layer, for selecting — on the first pointer
+   *  over it (a mouse hovers before it presses; a finger's long press
+   *  takes longer than this does). */
+  function ensureText(f: Fold): void {
+    if (f.text || !env.selectable || !f.rendered) return;
+    f.text = true;
+    const pdfDoc = env.getPdfDoc();
+    if (!pdfDoc) return;
+    void pdfDoc
+      .getPage(f.pageIndex + 1)
+      .then((page) => renderTextLayer(f.inner, page, f.scale, () => f.text && f.wrapper.isConnected))
+      .catch(() => (f.text = false));
+  }
+  const onPointer = (e: PointerEvent) => {
+    if (!enabled) return;
+    const w = (e.target as Element | null)?.closest<HTMLElement>(".pdf-fold-wrapper");
+    const f = w ? folds[Number(w.dataset.foldIndex)] : undefined;
+    if (f) ensureText(f);
+  };
+  scrollArea.addEventListener("pointerover", onPointer);
+  scrollArea.addEventListener("pointerdown", onPointer, true);
+
   function setupObserver(): void {
+    // Near the view: draw (the fold itself first, then its neighbours).
     observer = new IntersectionObserver(
       (entries) => {
         for (const entry of entries) {
-          const idx = parseInt((entry.target as HTMLElement).dataset.foldIndex ?? "", 10);
+          if (!entry.isIntersecting) continue;
+          const idx = Number((entry.target as HTMLElement).dataset.foldIndex);
           const f = folds[idx];
           if (!f) continue;
-          if (!entry.isIntersecting) {
-            // Each fold holds a full-page canvas; scrolled-away ones are
-            // dropped. Expanded folds stay — the reader opened those.
-            if (f.rendered && !f.expanded) {
-              f.inner.querySelectorAll("canvas").forEach(releaseCanvas);
-              f.inner.innerHTML = "";
-              f.rendered = false;
-            }
-            continue;
-          }
-          for (const g of [folds[idx - 1], f, folds[idx + 1]]) if (g) void renderFold(g);
+          request(f, true);
+          for (const g of [folds[idx + 1], folds[idx - 1]]) if (g) request(g);
         }
       },
       { root: scrollArea, rootMargin: "300px" },
     );
-    for (const f of folds) observer.observe(f.wrapper);
+    // Well out of view: let go. Expanded folds stay — the reader opened those.
+    keeper = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          const f = folds[Number((entry.target as HTMLElement).dataset.foldIndex)];
+          if (f && !entry.isIntersecting) drop(f);
+        }
+      },
+      { root: scrollArea, rootMargin: KEEP_MARGIN },
+    );
+    for (const f of folds) {
+      observer.observe(f.wrapper);
+      keeper.observe(f.wrapper);
+    }
   }
 
   async function renderFold(fold: Fold): Promise<void> {
@@ -298,28 +383,47 @@ export function createFoldLayer(scrollArea: HTMLElement, env: FoldEnv) {
           return;
         }
       }
+      // The strip in view, or the whole page when expanded — a strip is
+      // a few lines, and drawing all of the page for it is most of what
+      // made scrolling folds slow.
+      const full = fold.expanded;
       const dpr = window.devicePixelRatio || 1;
-      const viewport = page.getViewport({
-        scale: capRenderScale(fold.scale * dpr, page.getViewport({ scale: 1 })),
-      });
+      const k = capRenderScale(fold.scale * dpr, page.getViewport({ scale: 1 }));
+      const top = full ? 0 : fold.top;
+      const cssH = full ? fold.pageCssH : fold.foldCssH;
+      const viewport = page.getViewport({ scale: k, offsetY: -Math.round(top * k) });
       const canvas = document.createElement("canvas");
       canvas.width = Math.round(viewport.width);
-      canvas.height = Math.round(viewport.height);
-      canvas.className = "pdf-page-canvas";
+      canvas.height = Math.max(1, Math.round((cssH / fold.scale) * k));
+      canvas.className = "pdf-page-canvas pdf-fold-canvas";
+      canvas.style.top = `${Math.round(top * fold.scale)}px`;
       canvas.style.width = `${fold.cssW}px`;
-      canvas.style.height = `${fold.pageCssH}px`;
-      await page.render({ canvas, viewport, background: "#ffffff" }).promise;
-      if (!enabled || env.isDestroyed() || !fold.wrapper.isConnected) return;
+      canvas.style.height = `${cssH}px`;
+      try {
+        await page.render({ canvas, viewport, background: "#ffffff" }).promise;
+      } catch (e) {
+        releaseCanvas(canvas);
+        throw e;
+      }
+      if (!enabled || env.isDestroyed() || !fold.wrapper.isConnected || full !== fold.expanded) {
+        releaseCanvas(canvas);
+        if (full !== fold.expanded && enabled) queueMicrotask(() => request(fold, true));
+        return;
+      }
       // Every annotation on the page, not only the filtered ones, so a
       // revealed page reads exactly like the normal view.
       const ctx = canvas.getContext("2d");
       if (ctx) drawAnnotations(ctx, viewport, env.getAnnotations(), fold.pageIndex);
-      fold.inner.querySelectorAll("canvas").forEach(releaseCanvas);
-      fold.inner.innerHTML = "";
-      fold.inner.appendChild(canvas);
+      // Only the raster is replaced: a text layer already laid stays.
+      fold.inner.querySelectorAll("canvas").forEach((c) => {
+        releaseCanvas(c);
+        c.remove();
+      });
+      fold.inner.insertBefore(canvas, fold.inner.firstChild);
       fold.rendered = true;
-      // Selectable, for copying and quoting (marking is off while folded).
-      if (env.selectable) void renderTextLayer(fold.inner, page, fold.scale, () => fold.inner.contains(canvas));
+      fold.full = full;
+      // A pointer already resting on it gets its text now.
+      if (fold.wrapper.matches(":hover")) ensureText(fold);
     } catch (e) {
       console.error(`Failed to render fold on page ${fold.pageIndex + 1}:`, e);
     } finally {

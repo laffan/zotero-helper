@@ -247,7 +247,9 @@ Windows/Linux desktops too).
   alone at first — Hush's "come back to this" colour — with the
   filter button choosing others; highlights made here always fold,
   whatever the filter). Text in the folds can be selected, copied and
-  quoted into the notes; marking it waits for the whole page. Hush's annotation shelf is left out: the
+  quoted into the notes; marking it waits for the whole page. A fold
+  draws only its own strip of the page (all of it once expanded), so a
+  screen of folds costs about what a screen of pages does to scroll. Hush's annotation shelf is left out: the
   Highlights tab beside the viewer already lists, filters and quotes
   the same annotations. Beside the folded-view button, a **single page /
   continuous** toggle (its icons turn with the scroll direction) chooses between the pages as one strip and one page at
@@ -484,7 +486,8 @@ src/            React + TypeScript UI (Vite, zustand, MiniSearch)
                 layer, notes hooks), search (find in the PDF), and
                 outline (the PDF's bookmarks, resolved to places),
                 anchor (keeping the place across a relayout),
-                tooltips (the toolbar's, drawn for iPad), and
+                tooltips (the toolbar's, drawn for iPad), keys (zoom
+                and page-turn shortcuts), and
                 annotating: selectionBar (colours over a selection),
                 annotate (selection → Zotero position, tap hit-test),
                 annotPopover (colour / comment / delete)

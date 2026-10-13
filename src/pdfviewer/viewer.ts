@@ -22,6 +22,7 @@ import { annotationAtPoint, draftFromRange, type AnnotationDraft } from "./annot
 import { createAnnotationLayer } from "./annotations";
 import { createAnnotationPopover } from "./annotPopover";
 import { createFoldLayer } from "./folds";
+import { attachViewerKeys } from "./keys";
 import { createLinkLayerManager } from "./links";
 import { readOutline, type OutlineEntry } from "./outline";
 import { attachPageHoverButtons, attachTextLayer } from "./pageTools";
@@ -304,46 +305,18 @@ export function createPdfViewer(container: HTMLElement, opts: PdfViewerOptions =
   tb.singleBtn.addEventListener("click", () => setPageMode(true));
   tb.continuousBtn.addEventListener("click", () => setPageMode(false));
 
-  // ⌘+ / ⌘- / ⌘0 while the viewer is mounted. A handler that already
-  // spent the keystroke (defaultPrevented) wins.
-  function onKeydown(e: KeyboardEvent): void {
-    if (e.defaultPrevented) return;
-    if (!(e.metaKey || e.ctrlKey) || e.shiftKey || e.altKey) return;
-    if (e.key === "=" || e.key === "+") {
-      e.preventDefault();
-      stepZoom(1);
-    } else if (e.key === "-") {
-      e.preventDefault();
-      stepZoom(-1);
-    } else if (e.key === "0") {
-      e.preventDefault();
+  const keys = attachViewerKeys(scrollArea, {
+    stepZoom,
+    resetZoom: () => {
       exitFolded(true);
       fitMode = "fit";
       switchLayout("horizontal");
-    }
-  }
-  window.addEventListener("keydown", onKeydown);
-
-  // The previous or next page. Quick steps count from the page last
-  // asked for, not the one the smooth scroll has reached so far.
-  let pageTarget: { page: number; at: number } | null = null;
-  function stepPage(dir: 1 | -1): void {
-    if (!pages.length) return;
-    const recent = pageTarget && performance.now() - pageTarget.at < 700;
-    const from = recent ? pageTarget!.page : currentPage();
-    const page = Math.max(1, Math.min(pages.length, from + dir));
-    pageTarget = { page, at: performance.now() };
-    goToPage(page);
-  }
-  // ← / → while the pages have focus.
-  scrollArea.addEventListener("keydown", (e) => {
-    if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
-    if (e.defaultPrevented || e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return;
-    if (!pages.length) return;
-    e.preventDefault();
-    stepPage(e.key === "ArrowRight" ? 1 : -1);
+    },
+    pageCount: () => pages.length,
+    currentPage: () => currentPage(),
+    goToPage: (n) => goToPage(n),
   });
-  attachSingleWheel(scrollArea, isSingle, stepPage);
+  attachSingleWheel(scrollArea, isSingle, keys.stepPage);
 
   function getEffectiveZoom(): number {
     const first = pages[0];
@@ -406,11 +379,18 @@ export function createPdfViewer(container: HTMLElement, opts: PdfViewerOptions =
     }
   }
 
+  let indicatorRaf = 0;
   scrollArea.addEventListener("scroll", () => {
     // The render-set update is rAF-coalesced and refreshes the page
-    // indicator itself; folded mode short-circuits the renderer.
-    if (folded) updatePageIndicator();
-    else renderer.scheduleUpdate();
+    // indicator itself; folded mode short-circuits the renderer, so
+    // the indicator is coalesced here.
+    if (!folded) renderer.scheduleUpdate();
+    else if (!indicatorRaf) {
+      indicatorRaf = requestAnimationFrame(() => {
+        indicatorRaf = 0;
+        updatePageIndicator();
+      });
+    }
     // The editor is placed beside what it edits; once that has moved
     // away, close it (but not while its comment is being typed).
     if (popover?.isOpen() && !root.querySelector(".pdf-annot-popover textarea:focus")) popover.close();
@@ -621,7 +601,7 @@ export function createPdfViewer(container: HTMLElement, opts: PdfViewerOptions =
     search.onChange(null);
     resizeObserver.disconnect();
     if (resizeTimer) clearTimeout(resizeTimer);
-    window.removeEventListener("keydown", onKeydown);
+    keys.detach();
     foldLayer.destroy();
     thumbs.destroy();
     renderer.destroy();

@@ -33,7 +33,8 @@ export const MAX_CANVAS_PIXELS = IS_IOS ? 8_000_000 : 16_777_216;
 
 const KEEP_BUDGET_BYTES = IS_IOS ? 192_000_000 : 512_000_000;
 const KEEP_MAX_PAGES = IS_IOS ? 24 : 48;
-const MAX_CONCURRENT_RENDERS = IS_IOS ? 1 : 2;
+/** Page renders at once — the folded view keeps to it too. */
+export const MAX_CONCURRENT_RENDERS = IS_IOS ? 1 : 2;
 
 /** Clamp a render scale so the page stays under MAX_CANVAS_PIXELS. */
 export function capRenderScale(scale: number, viewport1: { width: number; height: number }): number {

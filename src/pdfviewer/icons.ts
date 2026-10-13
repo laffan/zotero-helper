@@ -14,10 +14,10 @@ export const FIT_TWO_ICON = `<svg viewBox="0 0 16 16" width="14" height="14"><re
 
 export const FIT_THREE_ICON = `<svg viewBox="0 0 16 16" width="14" height="14"><rect x="0.5" y="2" width="4" height="12" rx="0.8" fill="none" stroke="currentColor" stroke-width="1"/><rect x="6" y="2" width="4" height="12" rx="0.8" fill="none" stroke="currentColor" stroke-width="1"/><rect x="11.5" y="2" width="4" height="12" rx="0.8" fill="none" stroke="currentColor" stroke-width="1"/></svg>`;
 
-/** Single page: one page between "turn" chevrons. Continuous: a page
- *  with its neighbours running off both edges. Drawn side to side; the
- *  toolbar turns them upright while the pages scroll vertically. */
-export const SINGLE_PAGE_ICON = `<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"><rect x="4.5" y="1.5" width="7" height="13" rx="1"/><path d="M2.3 6.3 L0.8 8 L2.3 9.7"/><path d="M13.7 6.3 L15.2 8 L13.7 9.7"/></svg>`;
+/** Fixed: a page between "turn" chevrons. Continuous: a page with its
+ *  neighbours running off both edges. Drawn side to side; the toolbar
+ *  turns them upright while the pages scroll vertically. */
+export const FIXED_ICON = `<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"><rect x="4.5" y="1.5" width="7" height="13" rx="1"/><path d="M2.3 6.3 L0.8 8 L2.3 9.7"/><path d="M13.7 6.3 L15.2 8 L13.7 9.7"/></svg>`;
 
 export const CONTINUOUS_ICON = `<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"><rect x="5" y="1.5" width="6" height="13" rx="1"/><path d="M0.5 1.5h1.5a1 1 0 0 1 1 1v11a1 1 0 0 1-1 1H0.5"/><path d="M15.5 1.5H14a1 1 0 0 0-1 1v11a1 1 0 0 0 1 1h1.5"/></svg>`;
 

@@ -2,14 +2,16 @@
 // is mounted, and ← / → turn the page while the pages have focus. A
 // handler that already spent the keystroke (defaultPrevented) wins.
 // Page steps count from the page last asked for, not the one a smooth
-// scroll has reached so far — the wheel in single-page view uses the
-// same stepper.
+// scroll has reached so far — the wheel in the fixed view uses the
+// same stepper, and there a step is a whole set of pages.
 
 export interface ViewerKeyActions {
   stepZoom: (dir: 1 | -1) => void;
   /** ⌘0: back to the default layout. */
   resetZoom: () => void;
   pageCount: () => number;
+  /** Pages to a step: the set's size in the fixed view, else one. */
+  stepSize: () => number;
   currentPage: () => number;
   goToPage: (n: number) => void;
 }
@@ -32,7 +34,7 @@ export function attachViewerKeys(scrollArea: HTMLElement, act: ViewerKeyActions)
     if (!count) return;
     const recent = pageTarget && performance.now() - pageTarget.at < 700;
     const from = recent ? pageTarget!.page : act.currentPage();
-    const page = Math.max(1, Math.min(count, from + dir));
+    const page = Math.max(1, Math.min(count, from + dir * act.stepSize()));
     pageTarget = { page, at: performance.now() };
     act.goToPage(page);
   }

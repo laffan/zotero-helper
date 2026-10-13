@@ -3,7 +3,7 @@ import { deleteFolder } from "../lib/actions";
 import { getAbstracts, tidyItems } from "../lib/ai";
 import { startAsk } from "../lib/ai/chat";
 import { askTargetFor } from "../lib/ai/context";
-import { creatorSummary, itemTitle, REAL_KEY, yearOf } from "../lib/collections";
+import { REAL_KEY } from "../lib/collections";
 import { startPdfFetch } from "../lib/importer";
 import { closeReader } from "../lib/notes";
 import { useOutline } from "../lib/outline";
@@ -22,6 +22,7 @@ import {
   TerminalIcon,
 } from "./Icons";
 import { SearchBox } from "./SearchBox";
+import { ReadingTitle } from "./RecentPdfs";
 import { ToolbarMenu, useDropdown } from "./ToolbarMenu";
 import { ShareMenuButton, SyncMenuButton } from "./ToolbarShareSync";
 
@@ -36,18 +37,6 @@ const narrow = () => window.matchMedia("(max-width: 900px)").matches;
 const notesInRow = () => window.matchMedia("(min-width: 600px)").matches;
 
 /** The open PDF's entry, named where the library's buttons would be. */
-function ReadingTitle({ itemKey }: { itemKey: string }) {
-  const item = useStore((s) => s.library.items.find((i) => i.key === itemKey));
-  if (!item) return null;
-  const byline = [creatorSummary(item), yearOf(item)].filter(Boolean).join(", ");
-  return (
-    <div className="toolbar-doc" title={itemTitle(item)}>
-      <span className="toolbar-doc-title">{itemTitle(item)}</span>
-      {byline && <span className="toolbar-doc-byline">{byline}</span>}
-    </div>
-  );
-}
-
 export function Toolbar() {
   const {
     selectedCollection,

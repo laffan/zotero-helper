@@ -220,8 +220,11 @@ Windows/Linux desktops too).
   item list into a PDF viewer beside the notes (**Close PDF**, or the
   back arrow at the toolbar's left, brings them back). Double-clicking an entry does both at once (an entry with
   no PDF opens in Zotero instead). While the PDF is open the toolbar
-  shrinks to what applies to it — the back arrow, the document's name,
-  then **Share** and **Sync** for that entry (Sync fetches new
+  shrinks to what applies to it — the back arrow, the document's name
+  (a press lists the last 20 PDFs opened, named the same way, to switch
+  to one without going back to the list; the × beside one takes it off
+  — off the sidebar's Recent too — until it is opened again), then
+  **Share** and **Sync** for that entry (Sync fetches new
   highlights and pushes the notes, or downloads the PDF again) — and
   the search field finds
   words in the PDF: hits are boxed on the pages, listed under the field
@@ -251,16 +254,18 @@ Windows/Linux desktops too).
   draws only its own strip of the page (all of it once expanded), so a
   screen of folds costs about what a screen of pages does to scroll. Hush's annotation shelf is left out: the
   Highlights tab beside the viewer already lists, filters and quotes
-  the same annotations. Beside the folded-view button, a **single page /
-  continuous** toggle (its icons turn with the scroll direction) chooses between the pages as one strip and one page at
-  a time: the page is fitted whole and centred, and a swipe turns it —
-  left/right with horizontal scrolling, up/down with vertical — one
-  page per swipe however hard the flick (CSS scroll snapping, so the
-  renderer and everything over the pages is unchanged). A mouse wheel
-  notch or a trackpad swipe turns one page too, as do ← / →; zooming in
-  goes back to continuous, since a page larger than the view has no
-  single place to rest. Switching scroll direction keeps the page in
-  view. It adds what note-taking needs: selectable text with
+  the same annotations. Beside the folded-view button, a **fixed /
+  continuous** toggle (its icons turn with the scroll direction) chooses
+  between the pages as one strip and a fixed set at a time — one, two
+  or three pages, as the fit buttons say, in either scroll direction.
+  The set is fitted whole and centred (the page indicator shows its
+  range, "7–9 / 13"), and a swipe moves to the next set — left/right
+  with horizontal scrolling, up/down with vertical — one set per swipe
+  however hard the flick (CSS scroll snapping, so the renderer and
+  everything over the pages is unchanged). A mouse wheel notch or a
+  trackpad swipe turns one set too, as do ← / →; zooming in goes back
+  to continuous, since pages larger than the view have no single place
+  to rest. Switching scroll direction keeps the page in view. It adds what note-taking needs: selectable text with
   an *Add to notes* bubble that quotes the passage and a pencil on each
   page that cites it, both
   inserted at the caret with a `zotero://` link to the page. While the
@@ -481,8 +486,8 @@ src/            React + TypeScript UI (Vite, zustand, MiniSearch)
   pdfviewer/    the PDF viewer beside the notes, ported from Hush (viewer,
                 render, paint (annotations into the rasters),
                 annotations, folds, thumbnails, links, toolbar,
-                viewPrefs (the layout last chosen)) plus single (the
-                single-page view), pageTools (text
+                viewPrefs (the layout last chosen)) plus paged (the
+                fixed view's sets of pages), pageTools (text
                 layer, notes hooks), search (find in the PDF), and
                 outline (the PDF's bookmarks, resolved to places),
                 anchor (keeping the place across a relayout),

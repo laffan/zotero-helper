@@ -5,7 +5,8 @@
 // Layout modes: horizontal scroll (pages fit to height, the default),
 // vertical scroll (fit one, two or three pages across), fixed zoom
 // (wrapping rows), and the folded view. Either scroll direction can
-// also show a single page at a time, swiped through (single.ts). A
+// also be "fixed": a set of one to three pages at a time, swiped
+// through set by set (paged.ts). A
 // relayout only resizes page wrappers and CSS-stretches existing
 // rasters; the renderer's settle pass re-renders crisp once the
 // geometry stops moving.
@@ -18,20 +19,20 @@
 import type { Annotation } from "../lib/highlights";
 import { PDFJS_ASSETS } from "../lib/pdfjsAssets";
 import { restoreAnchor, viewAnchor } from "./anchor";
-import { annotationAtPoint, draftFromRange, type AnnotationDraft } from "./annotate";
+import { attachAnnotationTaps, draftFromRange, type AnnotationDraft } from "./annotate";
 import { createAnnotationLayer } from "./annotations";
 import { createAnnotationPopover } from "./annotPopover";
 import { createFoldLayer } from "./folds";
 import { attachViewerKeys } from "./keys";
 import { createLinkLayerManager } from "./links";
 import { readOutline, type OutlineEntry } from "./outline";
-import { attachPageHoverButtons, attachTextLayer } from "./pageTools";
+import { attachTextLayer, createPageRecords } from "./pageTools";
 import { drawAnnotations, pageSignatures } from "./paint";
+import { attachPagedWheel, pagedFitZoom, SET_GAP, setPagedGap } from "./paged";
 import { getPdfjs } from "./pdfjs";
 import { createPageRenderer } from "./render";
 import { createPdfSearch } from "./search";
 import { createSelectionBar, type MarkType } from "./selectionBar";
-import { attachSingleWheel, setSingleGap, singleFitZoom } from "./single";
 import { createThumbnailManager } from "./thumbnails";
 import { buildPdfToolbar } from "./toolbar";
 import { attachTooltips } from "./tooltips";
@@ -77,8 +78,15 @@ export function createPdfViewer(container: HTMLElement, opts: PdfViewerOptions =
   let fixedZoom = prefs?.fixedZoom ?? 1.0;
   // One page at a time — in either scroll direction, not while folded
   // or at a fixed zoom.
-  let single = prefs?.single ?? false;
-  const isSingle = () => single && !folded && layoutMode !== "fixed";
+  let paged = prefs?.paged ?? prefs?.single ?? false;
+  const isPaged = () => paged && !folded && layoutMode !== "fixed";
+  /** Pages to a set in the fixed view: the fit buttons' one, two, three. */
+  const perSet = () => (fitMode === "fit-3" ? 3 : fitMode === "fit-2" ? 2 : 1);
+  /** The page in view — in the fixed view, its set's first page. */
+  const leadPage = () => {
+    const page = currentPage();
+    return isPaged() ? page - ((page - 1) % perSet()) : page;
+  };
   let destroyed = false;
   // The PDF's own page labels ("iv", "212"), which Zotero records on an
   // annotation; null when the file has none.
@@ -100,7 +108,7 @@ export function createPdfViewer(container: HTMLElement, opts: PdfViewerOptions =
     getLayoutMode: () => layoutMode,
     goToPage: (n) => goToPage(n),
     scrollToFold: (a) => (folded ? foldLayer.scrollToAnnotation(a) : false),
-    isSingle,
+    isPaged,
   });
   const foldLayer = createFoldLayer(scrollArea, {
     getPages: () => pages,
@@ -167,25 +175,15 @@ export function createPdfViewer(container: HTMLElement, opts: PdfViewerOptions =
       })
     : null;
 
-  // A tap on one of this app's highlights or underlines opens its
-  // editor — unless it ends or dismisses a text selection, or lands on
-  // a link.
-  scrollArea.addEventListener("click", (e) => {
-    if (!popover || !writer || folded || selection?.justDismissed()) return;
-    const sel = window.getSelection();
-    if (sel && !sel.isCollapsed) return;
-    const target = e.target as Element;
-    if (target.closest("a, button")) return;
-    const wrapper = target.closest<HTMLElement>(".pdf-page-wrapper");
-    const idx = Number(wrapper?.dataset.pageIndex ?? NaN);
-    const p = pages[idx];
-    if (!wrapper || !p) return;
-    const wr = wrapper.getBoundingClientRect();
-    const fx = (e.clientX - wr.left) / wr.width;
-    const fy = (e.clientY - wr.top) / wr.height;
-    const a = annotationAtPoint(p, idx, fx, fy, annotLayer.getAnnotations());
-    if (a && writer.canEdit(a)) popover.open(a, new DOMRect(e.clientX, e.clientY - 10, 0, 20));
-  });
+  if (popover && writer) {
+    attachAnnotationTaps(scrollArea, {
+      getPages: () => pages,
+      getAnnotations: () => annotLayer.getAnnotations(),
+      ignore: () => folded || Boolean(selection?.justDismissed()),
+      canEdit: writer.canEdit,
+      open: (a, at) => popover.open(a, at),
+    });
+  }
 
   if (opts.onOpenInZotero) {
     tb.zoteroLink.style.display = "";
@@ -210,7 +208,7 @@ export function createPdfViewer(container: HTMLElement, opts: PdfViewerOptions =
     isDestroyed: () => destroyed,
     reveal: (idx, x, y) => {
       exitFolded();
-      if (isSingle()) return goToPage(idx + 1);
+      if (isPaged()) return goToPage(idx + 1);
       const w = pages[idx]?.wrapper;
       if (!w) return;
       const wr = w.getBoundingClientRect();
@@ -245,7 +243,9 @@ export function createPdfViewer(container: HTMLElement, opts: PdfViewerOptions =
   tb.zoomInBtn.addEventListener("click", () => stepZoom(1));
   tb.scrollHBtn.addEventListener("click", () => {
     if (layoutMode === "horizontal") return;
-    fitMode = "fit";
+    // Side by side, continuous pages fit the height; fixed sets keep
+    // their size.
+    if (!paged) fitMode = "fit";
     switchLayout("horizontal");
   });
   tb.scrollVBtn.addEventListener("click", () => {
@@ -254,13 +254,15 @@ export function createPdfViewer(container: HTMLElement, opts: PdfViewerOptions =
   });
   const fitBtn = (b: HTMLElement, mode: FitMode) =>
     b.addEventListener("click", () => {
-      if (!folded && fitMode === mode && layoutMode === "vertical") return;
+      if (!folded && fitMode === mode && (layoutMode === "vertical" || isPaged())) return;
+      const page = leadPage();
       fitMode = mode;
       exitFolded(true);
       if (layoutMode === "fixed") layoutMode = "vertical";
       applyLayoutClass();
       updateToolbarState();
       relayoutPages();
+      if (isPaged()) goToPage(page, false);
     });
   fitBtn(tb.fitOneBtn, "fit");
   fitBtn(tb.fitTwoBtn, "fit-2");
@@ -289,12 +291,12 @@ export function createPdfViewer(container: HTMLElement, opts: PdfViewerOptions =
   }
   tb.foldBtn.addEventListener("click", () => (folded ? exitFolded() : enterFolded()));
 
-  // Single page or continuous; either leaves the folded view. A fixed
-  // zoom has no direction to swipe in, so Single goes to vertical fit.
+  // Fixed sets or continuous; either leaves the folded view. A fixed
+  // zoom has no direction to swipe in, so Fixed goes to vertical fit.
   function setPageMode(on: boolean): void {
-    if (!folded && on === isSingle()) return;
-    const page = currentPage();
-    single = on;
+    if (!folded && on === isPaged()) return;
+    const page = leadPage();
+    paged = on;
     exitFolded(true);
     if (layoutMode === "fixed") layoutMode = "vertical";
     applyLayoutClass();
@@ -302,7 +304,7 @@ export function createPdfViewer(container: HTMLElement, opts: PdfViewerOptions =
     relayoutPages();
     goToPage(page, false);
   }
-  tb.singleBtn.addEventListener("click", () => setPageMode(true));
+  tb.fixedBtn.addEventListener("click", () => setPageMode(true));
   tb.continuousBtn.addEventListener("click", () => setPageMode(false));
 
   const keys = attachViewerKeys(scrollArea, {
@@ -313,17 +315,18 @@ export function createPdfViewer(container: HTMLElement, opts: PdfViewerOptions =
       switchLayout("horizontal");
     },
     pageCount: () => pages.length,
+    stepSize: () => (isPaged() ? perSet() : 1),
     currentPage: () => currentPage(),
     goToPage: (n) => goToPage(n),
   });
-  attachSingleWheel(scrollArea, isSingle, keys.stepPage);
+  attachPagedWheel(scrollArea, isPaged, keys.stepPage);
 
   function getEffectiveZoom(): number {
     const first = pages[0];
     if (!first || !pdfDoc) return 1;
     const pad = 40;
     const gap = 12;
-    if (isSingle()) return singleFitZoom(scrollArea, first.viewport, pad);
+    if (isPaged()) return pagedFitZoom(scrollArea, first.viewport, pad, perSet());
     if (layoutMode === "vertical") {
       const availW = scrollArea.clientWidth - pad;
       if (folded) return (availW / first.viewport.width) * foldedZoom;
@@ -344,22 +347,22 @@ export function createPdfViewer(container: HTMLElement, opts: PdfViewerOptions =
         Math.abs(foldedZoom - 1) < 0.01 ? "Folded" : `Folded ${Math.round(foldedZoom * 100)}%`;
     } else if (layoutMode !== "fixed") {
       const labels: Record<FitMode, string> = { fit: "Fit", "fit-2": "Fit 2", "fit-3": "Fit 3" };
-      tb.zoomLabel.textContent = isVert ? labels[fitMode] : "Fit";
+      tb.zoomLabel.textContent = isVert || isPaged() ? labels[fitMode] : "Fit";
     } else {
       tb.zoomLabel.textContent = `${Math.round(getEffectiveZoom() * 100)}%`;
     }
     tb.scrollHBtn.classList.toggle("active", layoutMode === "horizontal");
     tb.scrollVBtn.classList.toggle("active", isVert);
-    tb.fitToggleWrap.style.display = isVert && !isSingle() ? "" : "none";
+    tb.fitToggleWrap.style.display = isVert || isPaged() ? "" : "none";
     tb.pageModeWrap.classList.toggle("vertical", layoutMode !== "horizontal");
-    tb.singleBtn.classList.toggle("active", isSingle());
-    tb.continuousBtn.classList.toggle("active", !folded && !isSingle());
+    tb.fixedBtn.classList.toggle("active", isPaged());
+    tb.continuousBtn.classList.toggle("active", !folded && !isPaged());
     tb.fitOneBtn.classList.toggle("active", fitMode === "fit" && !folded);
     tb.fitTwoBtn.classList.toggle("active", fitMode === "fit-2");
     tb.fitThreeBtn.classList.toggle("active", fitMode === "fit-3");
     tb.foldBtn.classList.toggle("active", folded);
     tb.foldFilterBtn.style.display = folded ? "" : "none";
-    if (!folded && pdfDoc) saveViewPrefs({ layoutMode, fitMode, fixedZoom, single });
+    if (!folded && pdfDoc) saveViewPrefs({ layoutMode, fitMode, fixedZoom, paged });
   }
 
   function currentPage(): number {
@@ -370,7 +373,11 @@ export function createPdfViewer(container: HTMLElement, opts: PdfViewerOptions =
   let reportPages = false;
   let reportedPage = 0;
   function updatePageIndicator(): void {
-    tb.pageIndicator.textContent = pages.length ? `${currentPage()} / ${pages.length}` : "";
+    // A fixed set of several pages shows as its range ("7–9 / 13").
+    const lead = leadPage();
+    const last = isPaged() ? Math.min(pages.length, lead + perSet() - 1) : lead;
+    const shown = last > lead ? `${lead}–${last}` : String(currentPage());
+    tb.pageIndicator.textContent = pages.length ? `${shown} / ${pages.length}` : "";
     if (!reportPages || !pages.length) return;
     const page = currentPage();
     if (page !== reportedPage) {
@@ -413,7 +420,7 @@ export function createPdfViewer(container: HTMLElement, opts: PdfViewerOptions =
 
   function applyFixedZoom(level: number): void {
     exitFolded(true);
-    single = false;
+    paged = false;
     fixedZoom = level;
     layoutMode = "fixed";
     applyLayoutClass();
@@ -422,21 +429,34 @@ export function createPdfViewer(container: HTMLElement, opts: PdfViewerOptions =
   }
 
   function applyLayoutClass(): void {
-    scrollArea.classList.remove("pdf-layout-fit", "pdf-layout-fixed", "pdf-layout-horizontal", "pdf-layout-folded");
-    if (folded) scrollArea.classList.add("pdf-layout-folded");
+    scrollArea.classList.remove(
+      "pdf-layout-fit", "pdf-layout-fixed", "pdf-layout-horizontal", "pdf-layout-folded", "pdf-layout-pagedv",
+      "pdf-paged", "pdf-paged-1", "pdf-paged-2", "pdf-paged-3",
+    );
+    if (isPaged()) {
+      // Top to bottom, a grid of rows the set's size; side by side, the
+      // usual row, with sets spaced apart by CSS.
+      scrollArea.classList.add(
+        layoutMode === "vertical" ? "pdf-layout-pagedv" : "pdf-layout-horizontal",
+        "pdf-paged",
+        `pdf-paged-${perSet()}`,
+      );
+      scrollArea.style.setProperty("--pdf-paged-cols", String(perSet()));
+    } else if (folded) scrollArea.classList.add("pdf-layout-folded");
     else if (layoutMode === "vertical") {
       scrollArea.classList.add(fitMode === "fit" ? "pdf-layout-fit" : "pdf-layout-fixed");
     } else if (layoutMode === "horizontal") scrollArea.classList.add("pdf-layout-horizontal");
     else scrollArea.classList.add("pdf-layout-fixed");
-    scrollArea.classList.toggle("pdf-single", isSingle());
   }
 
-  /** The single-page view's gap, from page 1's size at this zoom. */
-  function sizeSingleGap(scale: number): void {
+  /** The fixed view's spacing, from page 1's size at this zoom: a set
+   *  is n pages across side by side, one page tall top to bottom. */
+  function sizePagedGap(scale: number): void {
     const vp = pages[0]?.viewport;
     const horiz = layoutMode === "horizontal";
-    const size = vp ? (horiz ? vp.width : vp.height) * scale : 0;
-    setSingleGap(scrollArea, isSingle() && Boolean(vp), horiz, size);
+    const n = perSet();
+    const size = !vp ? 0 : horiz ? n * vp.width * scale + (n - 1) * SET_GAP : vp.height * scale;
+    setPagedGap(scrollArea, isPaged() && Boolean(vp), horiz, size);
   }
 
   // Geometry only — rasterising lives in render.ts. A relayout resizes
@@ -462,7 +482,7 @@ export function createPdfViewer(container: HTMLElement, opts: PdfViewerOptions =
           p.contentEl.style.transform = Math.abs(k - 1) > 0.001 ? `scale(${k})` : "";
         }
       }
-      sizeSingleGap(scale);
+      sizePagedGap(scale);
       if (anchor) restoreAnchor(scrollArea, pages, layoutMode === "horizontal", anchor);
       renderer.invalidateGeometry();
       renderer.scheduleUpdate();
@@ -494,43 +514,18 @@ export function createPdfViewer(container: HTMLElement, opts: PdfViewerOptions =
     if (destroyed) return;
     applyLayoutClass();
 
-    // Only page 1's size is fetched up front; the other wrappers adopt
-    // their real size on first render, so opening a book isn't a serial
-    // walk over every page.
     const first = await doc.getPage(1);
     if (destroyed) return;
-    const defaultViewport = first.getViewport({ scale: 1 });
-    for (let i = 0; i < doc.numPages; i++) {
-      const wrapper = document.createElement("div");
-      wrapper.className = "pdf-page-wrapper";
-      wrapper.dataset.pageIndex = String(i);
-      const placeholder = document.createElement("div");
-      placeholder.className = "pdf-page-placeholder";
-      wrapper.appendChild(placeholder);
-      attachPageHoverButtons(wrapper, i + 1, {
-        onOpenInZotero: opts.onOpenInZotero,
-        onCitePage: opts.onCitePage,
-      });
-      scrollArea.appendChild(wrapper);
-      pages.push({
-        wrapper,
-        viewport: defaultViewport,
-        realViewport: i === 0,
-        rendered: false,
-        rendering: false,
-        canvas: null,
-        renderedZoom: null,
-        contentEl: null,
-        contentW: 0,
-        contentH: 0,
-      });
-    }
+    pages = createPageRecords(scrollArea, doc.numPages, first.getViewport({ scale: 1 }), {
+      onOpenInZotero: opts.onOpenInZotero,
+      onCitePage: opts.onCitePage,
+    });
     const scale = getEffectiveZoom();
     for (const p of pages) {
       p.wrapper.style.width = `${Math.round(p.viewport.width * scale)}px`;
       p.wrapper.style.height = `${Math.round(p.viewport.height * scale)}px`;
     }
-    sizeSingleGap(scale);
+    sizePagedGap(scale);
     renderer.update();
     if (folded) foldLayer.enable();
     if (startPage && startPage > 1 && startPage <= pages.length) goToPage(startPage, false);
@@ -554,11 +549,15 @@ export function createPdfViewer(container: HTMLElement, opts: PdfViewerOptions =
       foldLayer.goToPage(n);
       return;
     }
-    const w = pages[Math.max(0, Math.min(n - 1, pages.length - 1))]?.wrapper;
+    let idx = Math.max(0, Math.min(n - 1, pages.length - 1));
+    // Fixed: the set holding the page, by its first page (its snap
+    // point; scroll-padding centres the set).
+    if (isPaged()) idx -= idx % perSet();
+    const w = pages[idx]?.wrapper;
     if (!w) return;
     const behavior = smooth ? "smooth" : "auto";
-    if (isSingle() && layoutMode === "horizontal") w.scrollIntoView({ behavior, inline: "center", block: "nearest" });
-    else if (isSingle()) w.scrollIntoView({ behavior, block: "center" });
+    if (isPaged() && layoutMode === "horizontal") w.scrollIntoView({ behavior, inline: "start", block: "nearest" });
+    else if (isPaged()) w.scrollIntoView({ behavior, block: "start" });
     else if (layoutMode === "horizontal") w.scrollIntoView({ behavior, inline: "start", block: "nearest" });
     else w.scrollIntoView({ behavior, block: "start" });
   }
@@ -568,7 +567,7 @@ export function createPdfViewer(container: HTMLElement, opts: PdfViewerOptions =
   function goToPosition(pageIndex: number, top: number | null): void {
     const p = pages[pageIndex];
     if (!p) return;
-    if (top == null || folded || layoutMode === "horizontal" || isSingle()) {
+    if (top == null || folded || layoutMode === "horizontal" || isPaged()) {
       goToPage(pageIndex + 1);
       return;
     }

@@ -44,6 +44,11 @@ export function noteOpened(itemKey: string, attKey: string): void {
   }));
 }
 
+/** Take an entry off Recent (opening its PDF again puts it back). */
+export function forgetOpened(itemKey: string): void {
+  useRecent.setState((s) => ({ opened: s.opened.filter((r) => r.itemKey !== itemKey) }));
+}
+
 /** Entry keys in Recent, newest first. */
 export function recentKeys(opened: RecentOpen[]): string[] {
   return opened.map((r) => r.itemKey);

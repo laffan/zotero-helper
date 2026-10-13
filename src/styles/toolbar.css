@@ -19,12 +19,35 @@
   flex: 1 1 auto;
   min-width: 0;
 }
+/* The document's name — a button that lists the recent PDFs
+   (components/RecentPdfs.tsx). */
+.toolbar-doc-anchor {
+  min-width: 0;
+  display: flex;
+}
 .toolbar-doc {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  padding: 2px 6px;
+  border-radius: 6px;
+  color: var(--text);
+  text-align: left;
+}
+.toolbar-doc:hover,
+.toolbar-doc.open {
+  background: var(--panel-alt);
+}
+.toolbar-doc > svg {
+  flex-shrink: 0;
+  color: var(--text-dim);
+}
+.toolbar-doc-text {
   display: flex;
   flex-direction: column;
   min-width: 0;
   line-height: 1.25;
-  padding: 0 4px;
 }
 .toolbar-doc-title,
 .toolbar-doc-byline {
@@ -38,6 +61,54 @@
 .toolbar-doc-byline {
   font-size: 11px;
   color: var(--text-dim);
+}
+.recent-pdfs-head {
+  padding: 2px 8px 4px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-dim);
+}
+.recent-pdfs-empty {
+  padding: 6px 8px;
+  font-size: 12px;
+  color: var(--text-dim);
+}
+.recent-pdfs-list {
+  max-height: 60vh;
+  overflow-y: auto;
+}
+.recent-pdf {
+  display: flex;
+  align-items: center;
+  border-radius: 5px;
+}
+.recent-pdf:hover {
+  background: var(--panel-alt);
+}
+.recent-pdf-open {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  padding: 6px 8px;
+  text-align: left;
+  color: var(--text);
+}
+/* The remove ×: faint until its row (or it) is pointed at. */
+.recent-pdf-remove {
+  flex-shrink: 0;
+  display: flex;
+  padding: 6px 8px;
+  color: var(--text-dim);
+  opacity: 0.45;
+}
+.recent-pdf:hover .recent-pdf-remove {
+  opacity: 0.8;
+}
+.recent-pdf-remove:hover {
+  opacity: 1;
+  color: var(--text);
 }
 .toolbar-sep {
   width: 1px;

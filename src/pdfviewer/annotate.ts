@@ -158,3 +158,34 @@ export function annotationAtPoint(
   }
   return hit;
 }
+
+export interface AnnotationTapEnv {
+  getPages: () => PageRecord[];
+  getAnnotations: () => Annotation[];
+  /** Taps are ignored right now (folded view, a selection just dismissed). */
+  ignore: () => boolean;
+  canEdit: (a: Annotation) => boolean;
+  /** Open the editor for `a`, beside `at` (client coordinates). */
+  open: (a: Annotation, at: DOMRect) => void;
+}
+
+/** A tap on one of this app's highlights or underlines opens its
+ *  editor — unless it ends a text selection or lands on a link. */
+export function attachAnnotationTaps(scrollArea: HTMLElement, env: AnnotationTapEnv): void {
+  scrollArea.addEventListener("click", (e) => {
+    if (env.ignore()) return;
+    const sel = window.getSelection();
+    if (sel && !sel.isCollapsed) return;
+    const target = e.target as Element;
+    if (target.closest("a, button")) return;
+    const wrapper = target.closest<HTMLElement>(".pdf-page-wrapper");
+    const idx = Number(wrapper?.dataset.pageIndex ?? NaN);
+    const p = env.getPages()[idx];
+    if (!wrapper || !p) return;
+    const wr = wrapper.getBoundingClientRect();
+    const fx = (e.clientX - wr.left) / wr.width;
+    const fy = (e.clientY - wr.top) / wr.height;
+    const a = annotationAtPoint(p, idx, fx, fy, env.getAnnotations());
+    if (a && env.canEdit(a)) env.open(a, new DOMRect(e.clientX, e.clientY - 10, 0, 20));
+  });
+}

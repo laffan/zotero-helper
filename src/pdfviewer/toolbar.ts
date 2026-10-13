@@ -4,12 +4,12 @@
 import {
   CONTINUOUS_ICON,
   FILTER_ICON,
+  FIXED_ICON,
   FIT_ONE_ICON,
   FIT_THREE_ICON,
   FIT_TWO_ICON,
   FOLD_ICON,
   HORIZONTAL_ICON,
-  SINGLE_PAGE_ICON,
   THUMBNAIL_ICON,
   VERTICAL_ICON,
 } from "./icons";
@@ -56,12 +56,13 @@ export function buildPdfToolbar() {
   const fitThreeBtn = svgBtn("pdf-toggle-option", "Fit three pages", FIT_THREE_ICON);
   fitToggleWrap.append(fitOneBtn, fitTwoBtn, fitThreeBtn);
 
-  // One page at a time, swiped through, or the pages as one strip.
+  // A fixed set of pages (as many as the fit buttons say), swiped
+  // through, or the pages as one strip.
   const pageModeWrap = document.createElement("span");
   pageModeWrap.className = "pdf-toggle-group pdf-page-mode";
-  const singleBtn = svgBtn("pdf-toggle-option", "Single page — swipe to turn the page", SINGLE_PAGE_ICON);
+  const fixedBtn = svgBtn("pdf-toggle-option", "Fixed — one, two or three pages at a time; swipe to turn", FIXED_ICON);
   const continuousBtn = svgBtn("pdf-toggle-option active", "Continuous — the pages as one strip", CONTINUOUS_ICON);
-  pageModeWrap.append(singleBtn, continuousBtn);
+  pageModeWrap.append(fixedBtn, continuousBtn);
 
   // Folded view is always offered — entering it switches to vertical
   // scroll at single-page width. The filter shows only while folded.
@@ -92,7 +93,7 @@ export function buildPdfToolbar() {
     zoomOutBtn, zoomLabel, zoomInBtn,
     scrollHBtn, scrollVBtn,
     fitOneBtn, fitTwoBtn, fitThreeBtn, fitToggleWrap,
-    pageModeWrap, singleBtn, continuousBtn,
+    pageModeWrap, fixedBtn, continuousBtn,
     foldBtn, foldFilterBtn,
     pageIndicator, zoteroLink, thumbnailBtn,
   };

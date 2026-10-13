@@ -55,6 +55,42 @@ export function attachPageHoverButtons(
   });
 }
 
+/** One page record per page, each with its wrapper (a placeholder and
+ *  the hover buttons) in `scrollArea`. Every page starts at page 1's
+ *  size, `viewport`; the others adopt their real size on first render,
+ *  so opening a book isn't a serial walk over every page. */
+export function createPageRecords(
+  scrollArea: HTMLElement,
+  count: number,
+  viewport: PageRecord["viewport"],
+  buttons: PageButtonHandlers,
+): PageRecord[] {
+  const pages: PageRecord[] = [];
+  for (let i = 0; i < count; i++) {
+    const wrapper = document.createElement("div");
+    wrapper.className = "pdf-page-wrapper";
+    wrapper.dataset.pageIndex = String(i);
+    const placeholder = document.createElement("div");
+    placeholder.className = "pdf-page-placeholder";
+    wrapper.appendChild(placeholder);
+    attachPageHoverButtons(wrapper, i + 1, buttons);
+    scrollArea.appendChild(wrapper);
+    pages.push({
+      wrapper,
+      viewport,
+      realViewport: i === 0,
+      rendered: false,
+      rendering: false,
+      canvas: null,
+      renderedZoom: null,
+      contentEl: null,
+      contentW: 0,
+      contentH: 0,
+    });
+  }
+  return pages;
+}
+
 /** Lay pdf.js's selectable text over a freshly rendered page. It joins
  *  the content box, so it stretches with the raster and is dropped with
  *  it on eviction. */

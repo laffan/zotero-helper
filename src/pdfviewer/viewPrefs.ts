@@ -10,7 +10,9 @@ export interface ViewPrefs {
   layoutMode: LayoutMode;
   fitMode: FitMode;
   fixedZoom: number;
-  /** One page at a time (single.ts); absent in prefs saved before it. */
+  /** The fixed view (paged.ts); absent in prefs saved before it. */
+  paged?: boolean;
+  /** What `paged` was first called, when it showed one page only. */
   single?: boolean;
 }
 

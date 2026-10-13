@@ -20,8 +20,8 @@ export interface AnnotationViewer {
   goToPage: (n: number) => void;
   /** Folded view's navigation, when it is active. */
   scrollToFold?: (a: Annotation) => boolean;
-  /** Single-page view: the page is the place, not a point on it. */
-  isSingle?: () => boolean;
+  /** Fixed view: the page (its set) is the place, not a point on it. */
+  isPaged?: () => boolean;
 }
 
 export function createAnnotationLayer(scrollArea: HTMLElement, viewer: AnnotationViewer) {
@@ -31,7 +31,7 @@ export function createAnnotationLayer(scrollArea: HTMLElement, viewer: Annotatio
     if (viewer.scrollToFold?.(annot)) return;
     const pages = viewer.getPages();
     const pos = annotationPosition(annot);
-    if (!pos || viewer.isSingle?.()) {
+    if (!pos || viewer.isPaged?.()) {
       const n = pos ? pos.pageIndex + 1 : parseInt(annot.pageLabel, 10);
       if (!isNaN(n)) viewer.goToPage(n);
       return;

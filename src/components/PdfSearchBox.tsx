@@ -120,8 +120,12 @@ export function PdfSearchBox({ attKey }: { attKey: string }) {
             e.preventDefault();
             step(e.shiftKey ? -1 : 1);
           } else if (e.key === "Escape") {
+            // Spent here while there is a list to close or a query to
+            // clear; after that, Escape leaves the field (shortcuts).
             if (list.open && hits.length) list.setOpen(false);
-            else clear();
+            else if (query) clear();
+            else return;
+            e.preventDefault();
           }
         }}
         aria-label="Search this PDF"

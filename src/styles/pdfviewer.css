@@ -428,17 +428,101 @@
   right: calc(var(--crop-r, 0) * 100%);
   bottom: calc(var(--crop-b, 0) * 100%);
   left: calc(var(--crop-l, 0) * 100%);
-  outline: 2px dashed var(--accent);
-  outline-offset: -1px;
   box-shadow: 0 0 0 9999px rgb(0 0 0 / 0.32);
   pointer-events: none;
   z-index: 6;
 }
+/* Each side of the trim: a dashed line with a grip at its middle, both
+   kept inside the page (which clips). The side under the pointer — or
+   being dragged — turns solid on every page, its grip filled. */
+.pdf-crop-edge {
+  position: absolute;
+  border: 0 dashed var(--accent);
+}
+.pdf-crop-edge-t,
+.pdf-crop-edge-b {
+  left: 0;
+  right: 0;
+  height: 0;
+}
+.pdf-crop-edge-l,
+.pdf-crop-edge-r {
+  top: 0;
+  bottom: 0;
+  width: 0;
+}
+.pdf-crop-edge-t {
+  top: 0;
+  border-top-width: 2px;
+}
+.pdf-crop-edge-b {
+  bottom: 0;
+  border-bottom-width: 2px;
+}
+.pdf-crop-edge-l {
+  left: 0;
+  border-left-width: 2px;
+}
+.pdf-crop-edge-r {
+  right: 0;
+  border-right-width: 2px;
+}
+.pdf-crop-grip {
+  position: absolute;
+  border: 2px solid var(--accent);
+  border-radius: 999px;
+  background: #fff;
+  box-shadow: 0 1px 4px rgb(0 0 0 / 0.3);
+  transition: transform 0.12s, background 0.12s;
+}
+.pdf-crop-edge-t .pdf-crop-grip,
+.pdf-crop-edge-b .pdf-crop-grip {
+  left: 50%;
+  width: 48px;
+  height: 12px;
+  margin-left: -24px;
+}
+.pdf-crop-edge-t .pdf-crop-grip {
+  top: 3px;
+}
+.pdf-crop-edge-b .pdf-crop-grip {
+  bottom: 3px;
+}
+.pdf-crop-edge-l .pdf-crop-grip,
+.pdf-crop-edge-r .pdf-crop-grip {
+  top: 50%;
+  width: 12px;
+  height: 48px;
+  margin-top: -24px;
+}
+.pdf-crop-edge-l .pdf-crop-grip {
+  left: 3px;
+}
+.pdf-crop-edge-r .pdf-crop-grip {
+  right: 3px;
+}
+[data-crop-edge="t"] .pdf-crop-edge-t,
+[data-crop-edge="r"] .pdf-crop-edge-r,
+[data-crop-edge="b"] .pdf-crop-edge-b,
+[data-crop-edge="l"] .pdf-crop-edge-l {
+  border-style: solid;
+  border-width: 3px;
+}
+[data-crop-edge="t"] .pdf-crop-edge-t .pdf-crop-grip,
+[data-crop-edge="r"] .pdf-crop-edge-r .pdf-crop-grip,
+[data-crop-edge="b"] .pdf-crop-edge-b .pdf-crop-grip,
+[data-crop-edge="l"] .pdf-crop-edge-l .pdf-crop-grip {
+  background: var(--accent);
+  transform: scale(1.15);
+}
+.pdf-crop-dragging .pdf-crop-grip {
+  transition: none;
+}
+/* In the corner, clear of the top edge's grip. */
 .pdf-crop-reset {
   position: absolute;
   top: 10px;
-  left: 50%;
-  transform: translateX(-50%);
+  right: 14px;
   z-index: 25;
   padding: 5px 12px;
   border-radius: 999px;

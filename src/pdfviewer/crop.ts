@@ -33,8 +33,10 @@ type Edge = keyof Crop;
 
 /** What a trim must leave of the page, each way. */
 const MIN_LEFT = 0.25;
-/** How near an edge (CSS px) a press grabs it. */
-const GRAB_PX = 12;
+/** How near an edge (CSS px) a press grabs it — a finger gets more. */
+const GRAB_PX = 14;
+const GRAB_TOUCH_PX = 28;
+const EDGES: Edge[] = ["t", "r", "b", "l"];
 /** ⌘ held this long, alone, starts the adjustment — so ⌘F, ⌘+ and the
  *  like don't flash the whole pages. */
 const HOLD_MS = 220;
@@ -78,7 +80,13 @@ export function createReadingCrop(env: CropEnv) {
   /** The key is down; long enough, and alone (not ⌘F and the like). */
   let held = false;
   let holdReady = false;
-  let pointerInside = false;
+  // Where the pointer last was: over the pages, or elsewhere (the
+  // notes). Until it has been anywhere — a PDF opened from the
+  // keyboard — it counts as over the pages.
+  let pointerInside = true;
+  let grabPx = GRAB_PX;
+  /** The edge the pointer is over (or dragging), drawn on every page. */
+  let hotEdge: Edge | null = null;
 
   const reset = document.createElement("button");
   reset.type = "button";
@@ -94,13 +102,34 @@ export function createReadingCrop(env: CropEnv) {
     reset.style.display = editing && crop ? "" : "none";
   }
 
+  /** The trim drawn over each page: the kept part framed, an edge
+   *  line and a grip on each side. */
   function addFrames(): void {
     for (const p of env.getPages()) {
       if (p.wrapper.querySelector(".pdf-crop-frame")) continue;
       const frame = document.createElement("div");
       frame.className = "pdf-crop-frame";
+      for (const e of EDGES) {
+        const edge = document.createElement("div");
+        edge.className = `pdf-crop-edge pdf-crop-edge-${e}`;
+        edge.innerHTML = '<span class="pdf-crop-grip"></span>';
+        frame.appendChild(edge);
+      }
       p.wrapper.appendChild(frame);
     }
+    showHot();
+  }
+
+  function setHot(edge: Edge | null): void {
+    if (edge === hotEdge) return;
+    hotEdge = edge;
+    showHot();
+  }
+  function showHot(): void {
+    if (hotEdge) scrollArea.dataset.cropEdge = hotEdge;
+    else delete scrollArea.dataset.cropEdge;
+    scrollArea.classList.toggle("pdf-crop-dragging", Boolean(drag));
+    scrollArea.style.cursor = hotEdge ? (hotEdge === "l" || hotEdge === "r" ? "ew-resize" : "ns-resize") : "";
   }
 
   function startEditing(): void {
@@ -116,6 +145,8 @@ export function createReadingCrop(env: CropEnv) {
     if (!editing) return;
     editing = false;
     drag = null;
+    setHot(null);
+    showHot();
     scrollArea.classList.remove("pdf-crop-editing");
     scrollArea.querySelectorAll(".pdf-crop-frame").forEach((f) => f.remove());
     if (isNone(crop)) crop = null;
@@ -123,8 +154,9 @@ export function createReadingCrop(env: CropEnv) {
     env.onChange();
   }
 
+  // The key itself, not the pointer events' modifier flags: iPadOS
+  // doesn't report ⌘ on those reliably.
   const isHoldKey = (e: KeyboardEvent) => e.key === (APPLE ? "Meta" : "Control");
-  const holding = (e: PointerEvent) => (APPLE ? e.metaKey : e.ctrlKey);
 
   /** Held a moment, alone, over the pages: adjust. (⌘ held over the
    *  notes — to ⌘-click a colour there — leaves the pages be.) */
@@ -157,9 +189,20 @@ export function createReadingCrop(env: CropEnv) {
   function onKeyup(e: KeyboardEvent): void {
     if (isHoldKey(e)) release();
   }
+  /** Follow the pointer anywhere in the window: over the pages or not. */
+  function onWindowPointer(e: PointerEvent): void {
+    const t = e.target;
+    pointerInside = t instanceof Node && (scrollArea.contains(t) || reset.contains(t));
+    grabPx = e.pointerType === "mouse" ? GRAB_PX : GRAB_TOUCH_PX;
+    // No hover on a touch screen: with the key held, the press itself
+    // starts the adjustment (and onPointerDown may grab an edge with it).
+    if (e.type === "pointerdown" && pointerInside) maybeStart();
+  }
   window.addEventListener("keydown", onKeydown);
   window.addEventListener("keyup", onKeyup);
   window.addEventListener("blur", release);
+  window.addEventListener("pointermove", onWindowPointer, true);
+  window.addEventListener("pointerdown", onWindowPointer, true);
 
   /** The trim's edge within reach of a point on a page, if any. */
   function edgeAt(wrapper: HTMLElement, x: number, y: number): Edge | null {
@@ -171,12 +214,12 @@ export function createReadingCrop(env: CropEnv) {
       t: r.top + c.t * r.height,
       b: r.bottom - c.b * r.height,
     };
-    const inY = y > box.t - GRAB_PX && y < box.b + GRAB_PX;
-    const inX = x > box.l - GRAB_PX && x < box.r + GRAB_PX;
+    const inY = y > box.t - grabPx && y < box.b + grabPx;
+    const inX = x > box.l - grabPx && x < box.r + grabPx;
     const near: [Edge, number][] = [];
     if (inY) near.push(["l", Math.abs(x - box.l)], ["r", Math.abs(x - box.r)]);
     if (inX) near.push(["t", Math.abs(y - box.t)], ["b", Math.abs(y - box.b)]);
-    const best = near.filter(([, d]) => d <= GRAB_PX).sort((a, b) => a[1] - b[1])[0];
+    const best = near.filter(([, d]) => d <= grabPx).sort((a, b) => a[1] - b[1])[0];
     return best ? best[0] : null;
   }
 
@@ -184,9 +227,6 @@ export function createReadingCrop(env: CropEnv) {
     target instanceof Element ? target.closest<HTMLElement>(".pdf-page-wrapper") : null;
 
   function onPointerMove(e: PointerEvent): void {
-    pointerInside = true;
-    // A key let go while the window was elsewhere is let go.
-    if (held && !holding(e) && !drag) return release();
     if (!editing) return void maybeStart();
     if (drag) {
       if (e.pointerId !== drag.id) return;
@@ -205,8 +245,7 @@ export function createReadingCrop(env: CropEnv) {
       return;
     }
     const w = wrapperAt(e.target);
-    const edge = w ? edgeAt(w, e.clientX, e.clientY) : null;
-    scrollArea.style.cursor = edge ? (edge === "l" || edge === "r" ? "ew-resize" : "ns-resize") : "";
+    setHot(w ? edgeAt(w, e.clientX, e.clientY) : null);
   }
 
   function onPointerDown(e: PointerEvent): void {
@@ -218,6 +257,8 @@ export function createReadingCrop(env: CropEnv) {
     e.stopPropagation();
     if (!w || !edge) return;
     drag = { edge, wrapper: w, id: e.pointerId };
+    setHot(edge);
+    showHot();
     scrollArea.setPointerCapture?.(e.pointerId);
   }
 
@@ -225,11 +266,13 @@ export function createReadingCrop(env: CropEnv) {
     if (!drag || e.pointerId !== drag.id) return;
     drag = null;
     swallowClick = true;
+    if (e.pointerType !== "mouse") setHot(null);
+    showHot();
     scrollArea.releasePointerCapture?.(e.pointerId);
     // The key let go mid-drag: done.
     if (!held) stopEditing();
   }
-  scrollArea.addEventListener("pointerleave", () => (pointerInside = false));
+  scrollArea.addEventListener("pointerleave", () => !drag && setHot(null));
   // Nor does a press while adjusting reach the pages (a highlight's
   // editor, a link) as a click.
   let swallowClick = false;
@@ -268,6 +311,8 @@ export function createReadingCrop(env: CropEnv) {
       window.removeEventListener("keydown", onKeydown);
       window.removeEventListener("keyup", onKeyup);
       window.removeEventListener("blur", release);
+      window.removeEventListener("pointermove", onWindowPointer, true);
+      window.removeEventListener("pointerdown", onWindowPointer, true);
       window.clearTimeout(holdTimer);
       reset.remove();
     },

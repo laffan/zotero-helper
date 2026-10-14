@@ -451,7 +451,14 @@ area's padding is cut to match in `pdfviewer.css` (`.pdf-paged`).
 the pointer over the pages, alone, for a moment (`HOLD_MS`, so ⌘F, ⌘+ and
 ⌘-clicks elsewhere don't set it off) shows the pages whole with the
 current trim drawn over each — what is kept framed, the rest shaded — and
-makes the trim's edges grabbable. Dragging an edge trims that margin off
+makes the trim's edges grabbable: each side has a dashed line and a
+grip at its middle, and the side under the pointer (or being dragged)
+turns solid on every page. A finger gets a wider reach than a mouse
+(`GRAB_TOUCH_PX`), and on a touch screen, with the key held, the press
+itself starts the adjustment. The hold is read from the key's own
+`keydown` / `keyup` — not the pointer events' modifier flags, which
+iPadOS doesn't report reliably — and "over the pages" from the last
+pointer event anywhere in the window. Dragging an edge trims that margin off
 every page. Letting go of the key lays the pages out again with the
 trimmed size as their bounds, so a set fits the view by what is left and
 the margins' room goes to the text. Holding the key again shows the pages
@@ -536,10 +543,12 @@ shown on a touch screen): Use writes every question as a level-3 heading
 with a line to write on under each, the caret under the first; Clear
 removes the list and keeps it away for that entry (`localStorage`,
 `zotero-helper-prompts-cleared`). Clicking a single question starts the
-notes with just that one, as a heading with the caret on the line below.
+notes with just that one, as a heading with the caret on a new line
+beneath it (`headingBlock`).
 In any note, a line begun with `?` opens the questions as a menu
 (CodeMirror autocomplete; text typed after the `?` filters it), and
-picking one turns the line into its heading. The questions are
+picking one turns the line into its heading, the caret again on a new
+line beneath it. The questions are
 `PROMPT_GROUPS` in `src/noteseditor/prompts.ts`; the list over the empty
 editor is `src/components/NotesPrompts.tsx`.
 
@@ -704,20 +713,29 @@ element's own handlers, so a field, the notes editor or a popup that
 spends a key keeps it. Nothing listens on the settings page or under a
 modal. While text is being typed — a field, the notes, a comment — only
 combos with ⌘/Ctrl/⌥ count; a bare letter, an arrow, Tab or Return there
-is typing. Return or Space on a focused button presses the button.
+is typing, and Escape leaves the field. Return or Space on a focused
+button presses the button.
+
+Where the focus is therefore decides whether a key is a shortcut, and
+iPadOS keeps focus where the desktop lets it go: tapping something that
+can't take focus (an item row, a PDF page) leaves the notes or a search
+field focused, and every key after it would be typing — the keyboard
+seemed dead until that field was unmounted. So a pointer press outside
+the focused text field blurs it (`releaseTextFocus` in `dispatch.ts`), as
+a click does on the desktop.
 
 | Where | Action | Default |
 | --- | --- | --- |
 | General | Toggle the left sidebar (the outline, while reading) | ⌘\ |
 | General | Toggle the right sidebar | ⌘⇧\ |
 | General | Focus the search field (the PDF's, while reading) | ⌘F |
-| Library | Show info / highlights / notes | I / H / N |
+| Library | Show details / highlights / notes | D / H / N |
 | Library | View the PDF | P |
 | Library | Next / previous pane (sidebar, list, details) | Tab / ⇧Tab |
 | Library | Move in the pane | arrows |
 | Library | Extend the selection | ⇧↑ / ⇧↓ |
 | Library | Open the folder (sidebar) or item (list) | Return |
-| PDF viewer | Show info / highlights / notes | I / H / N |
+| PDF viewer | Show details / highlights / notes | D / H / N |
 | PDF viewer | Search the highlights | ⌘⇧F |
 | PDF viewer | Thumbnail view | G |
 | PDF viewer | Toggle the folded view | C |

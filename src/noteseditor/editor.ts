@@ -124,6 +124,14 @@ export function createNotesEditor(parent: HTMLElement, opts: NotesEditorOptions)
       });
       caretPlaced = true;
       view.focus();
+      // WebKit can put the caret back where the press was once focus
+      // lands; put it on the line to write on again.
+      const at = Math.min(caret, text.length);
+      requestAnimationFrame(() => {
+        if (view.state.doc.length === text.length && view.state.selection.main.head !== at) {
+          view.dispatch({ selection: { anchor: at } });
+        }
+      });
     },
     /** Show the cite icon (the PDF for these notes is open). */
     setCiteEnabled(on: boolean): void {

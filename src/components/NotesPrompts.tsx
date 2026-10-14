@@ -6,7 +6,7 @@
 // them away as a placeholder would — and a line begun with "?" offers
 // them again, in the editor.
 import { useEffect, useState } from "react";
-import { allPromptsMarkdown, heading, PROMPT_GROUPS } from "../noteseditor/prompts";
+import { allPromptsMarkdown, headingBlock, PROMPT_GROUPS } from "../noteseditor/prompts";
 
 const CLEARED_KEY = "zotero-helper-prompts-cleared";
 
@@ -45,8 +45,8 @@ export function NotesPrompts({ itemKey, at, setDoc, focusEditor }: Props) {
     setDoc(text, caret);
   };
   const pick = (prompt: string) => {
-    const text = `${heading(prompt)}\n`;
-    setDoc(text, text.length);
+    const { text, caret } = headingBlock(prompt);
+    setDoc(text, caret);
   };
   const clear = () => {
     markCleared(itemKey);
@@ -59,11 +59,10 @@ export function NotesPrompts({ itemKey, at, setDoc, focusEditor }: Props) {
       <div
         className="notes-prompts-list"
         onMouseDown={(e) => {
-          // A press between the questions is a press in the notes.
-          if (e.target === e.currentTarget) {
-            e.preventDefault();
-            focusEditor();
-          }
+          // The press doesn't move the focus (or the caret the buttons
+          // place); between the questions, it is a press in the notes.
+          e.preventDefault();
+          if (e.target === e.currentTarget) focusEditor();
         }}
       >
         {PROMPT_GROUPS.map((group, g) => (

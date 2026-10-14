@@ -23,6 +23,14 @@ export const PROMPTS = PROMPT_GROUPS.flat();
 
 export const heading = (prompt: string) => `### ${prompt}`;
 
+/** A question as the heading it becomes, with a line to write on under
+ *  it (and a blank line after that, before whatever follows); `caret`
+ *  is the line to write on. */
+export function headingBlock(prompt: string): { text: string; caret: number } {
+  const h = heading(prompt);
+  return { text: `${h}\n\n`, caret: h.length + 1 };
+}
+
 /** "Use": every question as a heading, a line to write on under each. */
 export function allPromptsMarkdown(): { text: string; caret: number } {
   const first = heading(PROMPTS[0]);
@@ -45,12 +53,12 @@ function promptSource(ctx: CompletionContext) {
         boost: -i,
         apply: (view: EditorView, _c: Completion, from: number, to: number) => {
           const line = view.state.doc.lineAt(from);
-          const insert = `${heading(p)}\n`;
+          const { text, caret } = headingBlock(p);
           const lineFrom = from - 1;
           const end = Math.max(to, line.to);
           view.dispatch({
-            changes: { from: lineFrom, to: end, insert },
-            selection: { anchor: lineFrom + insert.length },
+            changes: { from: lineFrom, to: end, insert: text },
+            selection: { anchor: lineFrom + caret },
             userEvent: "input.complete",
             scrollIntoView: true,
           });

@@ -42,7 +42,7 @@ export const ACTIONS: ShortcutAction[] = [
   a("general", "toggleRight", "Toggle the right sidebar", "mod+shift+\\"),
   a("general", "focusSearch", "Focus the search field", "mod+f"),
 
-  a("list", "listInfo", "Show info", "i"),
+  a("list", "listInfo", "Show details", "d"),
   a("list", "listHighlights", "Show highlights", "h"),
   a("list", "listNotes", "Show notes", "n"),
   a("list", "listPdf", "View the PDF", "p"),
@@ -56,7 +56,7 @@ export const ACTIONS: ShortcutAction[] = [
   a("list", "extendDown", "Extend the selection down", "shift+arrowdown"),
   a("list", "activate", "Select the folder / open the item", "enter"),
 
-  a("pdf", "pdfInfo", "Show info", "i"),
+  a("pdf", "pdfInfo", "Show details", "d"),
   a("pdf", "pdfHighlights", "Show highlights", "h"),
   a("pdf", "pdfSearchHighlights", "Search the highlights", "mod+shift+f"),
   a("pdf", "pdfNotes", "Show notes", "n"),

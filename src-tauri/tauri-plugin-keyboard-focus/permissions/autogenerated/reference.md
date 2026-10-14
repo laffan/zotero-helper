@@ -1,6 +1,6 @@
 ## Default Permission
 
-No JS-facing surface: the claim is driven from the Rust core via run_mobile_plugin.
+No JS-facing surface: the plugin acts on its own, natively.
 
 ## Permission Table
 

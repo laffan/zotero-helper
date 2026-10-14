@@ -12,17 +12,19 @@
 // That makes it matter where the focus is, and iPadOS keeps it where
 // the desktop would let it go: tapping something that can't take focus
 // (an item row, a page of the PDF) leaves the notes or a search field
-// focused, so every key after it would count as typing — the keyboard
-// would seem dead until the field went away. So a press outside a text
-// field lets the field go, as a click does on the desktop.
+// focused, so every key after it would count as typing. So a tap
+// outside a text field lets the field go, as a click does on the
+// desktop — once the tap is over (its click), never during it, since a
+// blur in the middle of a touch upsets iPadOS's text input. Taps on
+// controls leave the field be: they may be acting on it (a notes
+// question, a highlight's Note).
 //
 // Underneath that, iPadOS delivers a hardware key to the page only while
-// the web view is first responder, which the page can't arrange for
-// itself: tauri-plugin-keyboard-focus claims it natively (at launch, on
-// activation, when a keyboard connects), and since letting a text field
-// go can hand the role back, the page asks for it again each time.
+// the web view is first responder; tauri-plugin-keyboard-focus claims
+// that natively, at launch and activation only. The page never asks for
+// it itself: becoming first responder refocuses the page, which on iPad
+// can put the focus back into the notes it was just taken from.
 import { useStore } from "../store";
-import { invoke, isTauri } from "../tauri";
 import { ACTIONS, bindingsOf, eventCombo, hasCommandModifier, type ShortcutContext } from "./bindings";
 import { followPointer } from "./panes";
 import { RUN } from "./run";
@@ -37,31 +39,36 @@ function typingIn(target: EventTarget | null): boolean {
   return !(field instanceof HTMLInputElement && NOT_TEXT_INPUTS.has(field.type));
 }
 
+const CONTROLS = "button, a[href], [role='button'], label, summary";
+
 /** Return or Space on a focused button is that button's press. */
 function pressingControl(target: EventTarget | null, combo: string): boolean {
   if (combo !== "enter" && combo !== "space") return false;
-  return target instanceof Element && Boolean(target.closest("button, a[href], [role='button'], summary"));
+  return target instanceof Element && Boolean(target.closest(CONTROLS));
 }
 
-/** iPadOS: have the web view take the hardware keyboard back (native,
- *  src-tauri/tauri-plugin-keyboard-focus) once the blur has gone through. */
-export function reclaimKeyboard(): void {
-  if (!isTauri || !document.documentElement.classList.contains("ipados")) return;
-  requestAnimationFrame(() => void invoke("claim_keyboard_focus").catch(() => {}));
-}
+/** The text field a tap began outside of, to let go once it ends. */
+let tapLeaving: HTMLElement | null = null;
 
-function blurField(field: HTMLElement): void {
-  field.blur();
-  reclaimKeyboard();
-}
-
-/** Let a text field go when the pointer goes down outside it. */
-function releaseTextFocus(target: EventTarget | null): void {
+function noteTapStart(target: EventTarget | null): void {
+  tapLeaving = null;
   const active = document.activeElement;
   if (!(active instanceof HTMLElement) || !typingIn(active)) return;
   if (target instanceof Node && active.contains(target)) return;
   if (target instanceof Element && target.closest(TEXT_INPUT)) return;
-  blurField(active);
+  // A control may be acting on the field (a notes question, a
+  // highlight's Note): only taps on what isn't a control let go.
+  if (target instanceof Element && target.closest(CONTROLS)) return;
+  tapLeaving = active;
+}
+
+/** After the tap's own handlers: blur the field, if it still has the
+ *  focus (a handler may have moved it on purpose). A drag or a scroll
+ *  ends in no click, and leaves the field be. */
+function finishTap(): void {
+  const field = tapLeaving;
+  tapLeaving = null;
+  if (field && document.activeElement === field) field.blur();
 }
 
 function blocked(): boolean {
@@ -86,8 +93,7 @@ function onKeydown(e: KeyboardEvent): void {
   if (typingIn(e.target) && !hasCommandModifier(combo)) {
     // Escape out of a field (a popup in it, like the "?" menu, spends
     // the key first), so the shortcuts are back without a tap.
-    const field = combo === "escape" && e.target instanceof HTMLElement ? e.target.closest<HTMLElement>(TEXT_INPUT) : null;
-    if (field) blurField(field);
+    if (combo === "escape" && e.target instanceof HTMLElement) e.target.closest<HTMLElement>(TEXT_INPUT)?.blur();
     return;
   }
   if (pressingControl(e.target, combo)) return;
@@ -112,13 +118,14 @@ export function installShortcuts(): void {
   installed = true;
   window.addEventListener("keydown", onKeydown);
   // The pane clicked in is the one the arrows then move in, and a text
-  // field pressed outside of lets go of the keyboard.
+  // field tapped outside of lets go of the keyboard once the tap is done.
   window.addEventListener(
     "pointerdown",
     (e) => {
-      releaseTextFocus(e.target);
+      noteTapStart(e.target);
       followPointer(e.target);
     },
     true,
   );
+  window.addEventListener("click", () => window.setTimeout(finishTap, 0));
 }

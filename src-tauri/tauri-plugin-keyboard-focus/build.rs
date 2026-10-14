@@ -1,5 +1,4 @@
-// No JS-invokable commands and no events — the app's Rust core proxies
-// the one call (claim) via run_mobile_plugin.
+// No commands and no events: the plugin acts on its own, natively.
 const COMMANDS: &[&str] = &[];
 
 fn main() {

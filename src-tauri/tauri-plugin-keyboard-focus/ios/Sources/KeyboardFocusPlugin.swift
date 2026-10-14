@@ -21,9 +21,12 @@ import WebKit
 // and once that field let go of focus, they stopped again.
 //
 // So the native side claims it: at load, whenever a window becomes key
-// or its scene activates (launch, app switch, Stage Manager), when a
-// keyboard connects, and when the page asks (`claim`, after it blurs a
-// text field). Only while a hardware keyboard is attached — without
+// or its scene activates (launch, app switch, Stage Manager), and when a
+// keyboard connects — and at no other time. In particular not on the
+// page's request after it blurs a text field: becoming first responder
+// marks the page focused, and WebKit can hand that focus straight back
+// to the field just let go (the notes), which then fights the page for
+// the keyboard. Only while a hardware keyboard is attached — without
 // one there are no shortcuts to deliver, and a claim with the notes
 // focused would bring up the on-screen keyboard. A claim never takes
 // the role from anything already holding it inside the web view, and
@@ -40,13 +43,6 @@ class KeyboardFocusPlugin: Plugin {
     hostWebView = webview
     observe()
     DispatchQueue.main.async { self.claimAtLoad(webview) }
-  }
-
-  @objc public func claim(_ invoke: Invoke) throws {
-    DispatchQueue.main.async {
-      if let web = self.hostWebView { KeyboardFocusPlugin.claim(web) }
-      invoke.resolve()
-    }
   }
 
   private func observe() {

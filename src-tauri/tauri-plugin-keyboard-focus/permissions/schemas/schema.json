@@ -295,10 +295,10 @@
       "type": "string",
       "oneOf": [
         {
-          "description": "No JS-facing surface: the claim is driven from the Rust core via run_mobile_plugin.",
+          "description": "No JS-facing surface: the plugin acts on its own, natively.",
           "type": "string",
           "const": "default",
-          "markdownDescription": "No JS-facing surface: the claim is driven from the Rust core via run_mobile_plugin."
+          "markdownDescription": "No JS-facing surface: the plugin acts on its own, natively."
         }
       ]
     }

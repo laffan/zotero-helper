@@ -463,7 +463,9 @@ turns solid on every page. A finger gets a wider reach than a mouse
 itself starts the adjustment. The hold is read from the key's own
 `keydown` / `keyup` — not the pointer events' modifier flags, which
 iPadOS doesn't report reliably — and "over the pages" from the last
-pointer event anywhere in the window. Dragging an edge trims that margin off
+pointer event anywhere in the window. Since iPadOS can drop ⌘'s key-up
+(after a system ⌘ shortcut or an app switch), any keydown without ⌘, a
+window blur or the app going to the background ends the hold. Dragging an edge trims that margin off
 every page. Letting go of the key lays the pages out again with the
 trimmed size as their bounds, so a set fits the view by what is left and
 the margins' room goes to the text. Holding the key again shows the pages
@@ -729,9 +731,12 @@ Where the focus is therefore decides whether a key is a shortcut, and
 iPadOS keeps focus where the desktop lets it go: tapping something that
 can't take focus (an item row, a PDF page) leaves the notes or a search
 field focused, and every key after it would be typing — the keyboard
-seemed dead until that field was unmounted. So a pointer press outside
-the focused text field blurs it (`releaseTextFocus` in `dispatch.ts`), as
-a click does on the desktop.
+seemed dead until that field was unmounted. So a tap outside the focused
+text field blurs it, as a click does on the desktop (`noteTapStart` /
+`finishTap` in `dispatch.ts`) — once the tap is over (on its click), never
+during it, since a blur mid-touch upsets iPadOS's text input. Taps on
+controls (buttons, links) leave the field be, as they may be acting on
+it, and a drag or scroll (no click) does too.
 
 Underneath that, iPadOS delivers a hardware key to the page only while
 WebKit's content view is the first responder, and nothing on the page
@@ -743,9 +748,12 @@ and stopped once the notes let go of focus. `tauri-plugin-keyboard-focus`
 (ported from Hush's `KeyboardFocus.swift`) claims the role natively: at
 load, when the window becomes key or its scene activates, and when a
 keyboard connects — only while a hardware keyboard is attached, and
-never while something is presented over the window. The page asks again
-through `claim_keyboard_focus` (`reclaimKeyboard` in `dispatch.ts`)
-after it blurs a text field and when Settings closes.
+never while something is presented over the window. The page never asks
+for it: becoming first responder marks the page focused, and WebKit can
+hand that focus straight back to the field just let go — an earlier
+version did ask after every blur, and the notes then fought the page for
+the keyboard until taps stopped registering. Losing a focused field
+doesn't cost the role, so there is nothing to reclaim.
 
 | Where | Action | Default |
 | --- | --- | --- |

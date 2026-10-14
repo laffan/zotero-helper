@@ -6,7 +6,6 @@
 // Shortcuts are this device's and act at once.
 import { useEffect, useState } from "react";
 import { bootstrap, saveSettings, syncNow } from "../../lib/actions";
-import { reclaimKeyboard } from "../../lib/shortcuts/dispatch";
 import { appLog, useStore } from "../../lib/store";
 import type { Settings } from "../../lib/types";
 import { Spinner } from "../Icons";
@@ -70,10 +69,7 @@ export function SettingsView() {
     const app = document.querySelector<HTMLElement>(".app");
     if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
     app?.setAttribute("inert", "");
-    return () => {
-      app?.removeAttribute("inert");
-      reclaimKeyboard();
-    };
+    return () => app?.removeAttribute("inert");
   }, []);
 
   // Escape closes — unless something in the page spent it first (a key

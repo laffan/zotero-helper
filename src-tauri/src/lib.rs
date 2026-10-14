@@ -580,16 +580,6 @@ async fn close_capture_window(app: AppHandle, job_id: String) -> Result<()> {
     }
 }
 
-// iPadOS: the hardware keyboard reaches the page only while the web
-// view is first responder (tauri-plugin-keyboard-focus). The frontend
-// asks for it again after letting a text field go. A no-op elsewhere.
-#[tauri::command]
-fn claim_keyboard_focus(app: AppHandle) -> Result<()> {
-    app.state::<tauri_plugin_keyboard_focus::KeyboardFocus<tauri::Wry>>()
-        .claim()
-        .map_err(Error::msg)
-}
-
 // ---------------------------------------------------------------------------
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -620,7 +610,6 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
-            claim_keyboard_focus,
             get_settings,
             save_settings,
             verify_zotero_key,

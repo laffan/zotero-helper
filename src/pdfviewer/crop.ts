@@ -180,6 +180,9 @@ export function createReadingCrop(env: CropEnv) {
       }, HOLD_MS);
       return;
     }
+    // A key-up for ⌘ can go missing on iPadOS (after a system ⌘
+    // shortcut, an app switch); a keydown without ⌘ proves it's up.
+    if (!(APPLE ? e.metaKey : e.ctrlKey)) return release();
     // ⌘ with another key is a shortcut, not a trim — for the rest of
     // this hold.
     window.clearTimeout(holdTimer);
@@ -201,6 +204,7 @@ export function createReadingCrop(env: CropEnv) {
   window.addEventListener("keydown", onKeydown);
   window.addEventListener("keyup", onKeyup);
   window.addEventListener("blur", release);
+  document.addEventListener("visibilitychange", release);
   window.addEventListener("pointermove", onWindowPointer, true);
   window.addEventListener("pointerdown", onWindowPointer, true);
 
@@ -311,6 +315,7 @@ export function createReadingCrop(env: CropEnv) {
       window.removeEventListener("keydown", onKeydown);
       window.removeEventListener("keyup", onKeyup);
       window.removeEventListener("blur", release);
+      document.removeEventListener("visibilitychange", release);
       window.removeEventListener("pointermove", onWindowPointer, true);
       window.removeEventListener("pointerdown", onWindowPointer, true);
       window.clearTimeout(holdTimer);

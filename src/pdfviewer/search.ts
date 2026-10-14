@@ -53,6 +53,16 @@ export interface SearchStatus {
   done: boolean;
 }
 
+/** How a search shows its hits. */
+export interface SearchOptions {
+  /** The hit to make current (0-based) once found — a search put back
+   *  as it was left. The first, otherwise. */
+  at?: number;
+  /** Scroll the current hit into view (by default). Not when putting
+   *  a search back: the view has its own place to return to. */
+  reveal?: boolean;
+}
+
 export interface SearchEnv {
   getPdfDoc: () => PDFDocumentProxy | null;
   getPages: () => PageRecord[];
@@ -96,6 +106,7 @@ export function createPdfSearch(env: SearchEnv) {
   let hits: Hit[] = [];
   let summaries: HitSummary[] = [];
   let current = -1;
+  let opts: SearchOptions = {};
   let query = "";
   let token = 0;
   let listener: ((s: SearchStatus) => void) | null = null;
@@ -207,7 +218,7 @@ export function createPdfSearch(env: SearchEnv) {
     if (layer.childElementCount) wrapper.appendChild(layer);
   }
 
-  function select(idx: number): void {
+  function select(idx: number, reveal = true): void {
     const prev = hits[current]?.page;
     current = idx;
     const hit = hits[idx];
@@ -215,13 +226,14 @@ export function createPdfSearch(env: SearchEnv) {
     if (!hit) return notify();
     paintPage(hit.page);
     const r = hit.rects[0];
-    env.reveal(hit.page, r ? r.x + r.w / 2 : 0.5, r ? r.y + r.h / 2 : 0);
+    if (reveal) env.reveal(hit.page, r ? r.x + r.w / 2 : 0.5, r ? r.y + r.h / 2 : 0);
     notify();
   }
 
   /** Search for `q` (case-insensitive; any run of spaces in it matches
    *  any whitespace). The first hit is shown as soon as it is found. */
-  async function search(q: string): Promise<void> {
+  async function search(q: string, o: SearchOptions = {}): Promise<void> {
+    opts = o;
     const my = ++token;
     query = q.trim();
     hits = [];
@@ -257,12 +269,15 @@ export function createPdfSearch(env: SearchEnv) {
       }
       if (found) {
         paintPage(i);
-        if (current < 0) select(0);
+        const at = opts.at ?? 0;
+        if (current < 0 && hits.length > at) select(at, opts.reveal ?? true);
         else notify();
       }
     }
     done = true;
-    notify();
+    // Fewer hits than the one to put back (the PDF changed): the first.
+    if (current < 0 && hits.length) select(0, opts.reveal ?? true);
+    else notify();
   }
 
   /** Move to the next (1) or previous (-1) hit, wrapping round. */
@@ -278,7 +293,7 @@ export function createPdfSearch(env: SearchEnv) {
 
   /** Search again for the current query — after the document loads. */
   function rerun(): void {
-    if (query) void search(query);
+    if (query) void search(query, opts);
   }
 
   function clear(): void {

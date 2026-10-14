@@ -22,6 +22,9 @@ export interface NotesEditorOptions extends LinkHandlers {
   placeholder: string;
   onChange: (text: string) => void;
   cite: CiteSource;
+  /** The caret moved (or a selection changed) — once the writer has
+   *  placed one, so a fresh editor's start-of-document doesn't count. */
+  onSelect?: (anchor: number, head: number) => void;
 }
 
 /** Put `md` at the caret as a paragraph of its own (at the end when the
@@ -75,6 +78,10 @@ export function createNotesEditor(parent: HTMLElement, opts: NotesEditorOptions)
           if (u.transactions.some((tr) => tr.isUserEvent("select") || tr.isUserEvent("input"))) {
             caretPlaced = true;
           }
+          if (u.selectionSet && caretPlaced) {
+            const { anchor, head } = u.state.selection.main;
+            opts.onSelect?.(anchor, head);
+          }
         }),
       ],
     }),
@@ -86,7 +93,24 @@ export function createNotesEditor(parent: HTMLElement, opts: NotesEditorOptions)
     insert(md: string): void {
       insertParagraph(view, md, !caretPlaced);
       caretPlaced = true;
+      const { anchor, head } = view.state.selection.main;
+      opts.onSelect?.(anchor, head);
       view.focus();
+    },
+    /** Where the view starts: the position of its first line. (A
+     *  position, not pixels — the height of lines not yet drawn is
+     *  only CodeMirror's estimate.) */
+    topPosition: (): number => view.lineBlockAtHeight(view.scrollDOM.scrollTop).from,
+    /** Put the caret (or selection) and the view back where they were
+     *  left, without taking focus. Positions past the end (the notes
+     *  changed elsewhere since) are kept to the end. */
+    restorePlace(sel: [number, number] | undefined, top: number | undefined): void {
+      const end = view.state.doc.length;
+      view.dispatch({
+        selection: sel ? { anchor: Math.min(sel[0], end), head: Math.min(sel[1], end) } : undefined,
+        effects: top ? EditorView.scrollIntoView(Math.min(top, end), { y: "start" }) : undefined,
+      });
+      if (sel) caretPlaced = true;
     },
     /** Show the cite icon (the PDF for these notes is open). */
     setCiteEnabled(on: boolean): void {

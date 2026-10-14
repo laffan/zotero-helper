@@ -6,6 +6,7 @@ import { loadChats } from "./ai/chat";
 import { startAnnotationSync } from "./annotationEdits";
 import { captureFinished, downloadForJob } from "./importer";
 import { pushNote, refreshCachedPdfs, startNotesSync } from "./notes";
+import { followReaderUi } from "./readerUi";
 import { appLog, useStore } from "./store";
 import { invoke, isTauri, on } from "./tauri";
 import type {
@@ -22,6 +23,7 @@ export async function bootstrap(): Promise<void> {
   if (bootstrapped) return;
   bootstrapped = true;
   const store = useStore.getState();
+  followReaderUi();
 
   if (!isTauri) {
     appLog(

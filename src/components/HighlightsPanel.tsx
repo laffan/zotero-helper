@@ -10,8 +10,10 @@
 // sync (src/lib/highlights.ts), and ↻ runs an incremental one. While
 // the PDF is open beside the panel, clicking a highlight scrolls the
 // viewer to it. A PDF with an outline (lib/outline.ts) has its
-// highlights filed under the section headings they fall in.
-import { useMemo, useState } from "react";
+// highlights filed under the section headings they fall in. The
+// search, the colours picked and the scroll are the open PDF's, kept
+// for it (lib/readerUi.ts); browsing the library, they are the panel's.
+import { useMemo, useRef, useState } from "react";
 import { openInZotero, syncNow } from "../lib/actions";
 import { attachmentName, itemTitle } from "../lib/collections";
 import {
@@ -25,6 +27,7 @@ import {
 } from "../lib/highlights";
 import { insertIntoNotes } from "../lib/notes";
 import { sectionIndexOf, sectionsOf, useOutlines, type Section } from "../lib/outline";
+import { usePdfUi, usePdfUiScroll } from "../lib/readerUi";
 import { useStore } from "../lib/store";
 import type { ZItem } from "../lib/types";
 import { CopyIcon, ExternalIcon, QuoteIcon, Refresh, Spinner } from "./Icons";
@@ -67,6 +70,8 @@ function Marked({ text, q }: { text: string; q: string }) {
   return <>{parts}</>;
 }
 
+const NO_COLORS: string[] = [];
+
 export function HighlightsPanel({ items }: { items: ZItem[] }) {
   const library = useStore((s) => s.library.items);
   const settings = useStore((s) => s.settings);
@@ -74,11 +79,13 @@ export function HighlightsPanel({ items }: { items: ZItem[] }) {
   // With the PDF open beside the panel, a highlight is a place to go.
   const openAttKey = useStore((s) => s.reading?.attKey ?? null);
   const [shownKey, setShownKey] = useState<string | null>(null);
-  const [query, setQuery] = useState("");
+  const [query, setQuery] = usePdfUi(openAttKey, "hlQuery", "");
   // The colours shown; none picked shows all. A click picks one colour
   // (or, on the only one picked, all again); ⌘-click (Ctrl elsewhere)
   // adds or removes one, as in a file list.
-  const [picked, setPicked] = useState<string[]>([]);
+  const [picked, setPicked] = usePdfUi(openAttKey, "hlColors", NO_COLORS);
+  const listRef = useRef<HTMLDivElement>(null);
+  usePdfUiScroll(openAttKey, "hlScroll", listRef);
   // The last action that just happened, shown on its button for a moment.
   const [done, setDone] = useState<{ key: string; what: "copy" | "add" } | null>(null);
   // Notes belong to one entry, so Note is offered only with one selected.
@@ -264,7 +271,7 @@ export function HighlightsPanel({ items }: { items: ZItem[] }) {
             ))}
           </div>
         )}
-        <div className="hl-list">
+        <div className="hl-list" ref={listRef}>
           {visible.length === 0 && <div className="meta-empty">No highlights match.</div>}
           {visible.map((g) => (
             <section key={g.att.key}>

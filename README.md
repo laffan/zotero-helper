@@ -238,12 +238,19 @@ Windows/Linux desktops too).
   Enter / ⇧Enter; the magnifier turns into a clear button while there
   is a query, and ⌘F returns to the field. ← / → turn the page
   while the pages have focus. A PDF opens as it was left — on switching
-  to another and back, and from one session to the next: its layout
-  (scroll direction, fit, fixed sets, zoom), the folded view with its
-  zoom and filter, and the place in it, to the pixel (remembered per
-  PDF on this device, beside Recent). A PDF never opened here takes
-  the layout last chosen. Panel widths and the outline are the app's,
-  and kept as they are left too. When the PDF has an outline,
+  to another and back (from the list or the recent-PDFs menu), and
+  from one session to the next: its layout (scroll direction, fit,
+  fixed sets, zoom), the folded view with its zoom and filter, and the
+  place in it, to the pixel; and everything around it — the notes
+  panel's width and whether it is shown, the highlights / notes split
+  and the tab in front, the outline (shown or not, which headings are
+  unfolded, where it is scrolled), the Highlights tab's search, colours
+  and scroll, the search in the PDF on the match it was on (without
+  moving the pages from their own place), and the caret and scroll in
+  the notes. All of it is remembered per PDF on this device, beside
+  Recent. A PDF never opened here takes the layout and panels last
+  chosen; closing a PDF gives the library its details panel back as it
+  was. When the PDF has an outline,
   a panel button at the left of the toolbar, before the name, shows it
   beside the pages: a folding tree of its headings, each a link to its
   place, with the section being read marked as you go. Widen the notes
@@ -492,9 +499,11 @@ src/            React + TypeScript UI (Vite, zustand, MiniSearch)
   lib/highlights.ts, lib/notes.ts
                 annotations out of the library cache; NOTES.md load /
                 save / periodic push, the PDF cache
-  lib/recent.ts, lib/outline.ts
-                Recent and the page each PDF was left on; PDF outlines
-                and filing highlights under their sections
+  lib/recent.ts, lib/readerUi.ts, lib/outline.ts
+                Recent and the page each PDF was left on; the reading
+                UI around each PDF (panels, filters, searches), kept
+                beside it; PDF outlines and filing highlights under
+                their sections
   lib/dragGesture.ts
                 pointer drags (pane edges, columns, items) that keep
                 text selection off while they last

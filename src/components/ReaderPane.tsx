@@ -25,7 +25,7 @@ import { setOutline, setReaderPage, useOutline } from "../lib/outline";
 import { flushSavedPage, lastPage, lastView, savePage } from "../lib/recent";
 import { appLog, useStore } from "../lib/store";
 import { invoke } from "../lib/tauri";
-import type { SearchStatus } from "../pdfviewer/search";
+import type { SearchOptions, SearchStatus } from "../pdfviewer/search";
 import type { PdfViewer } from "../pdfviewer/viewer";
 import { Spinner } from "./Icons";
 import { OutlinePanel } from "./OutlinePanel";
@@ -52,12 +52,29 @@ export function currentReaderPage(attKey: string): number | null {
   return active?.attKey === attKey ? active.viewer.currentPage() : null;
 }
 
-/** Find `query` in the open PDF; `onStatus` hears the count grow and
- *  the current hit change. Ignored before the viewer has a PDF. */
-export function searchReader(query: string, onStatus: (s: SearchStatus) => void): void {
-  if (!active) return;
-  active.viewer.onSearchChange(onStatus);
-  void active.viewer.search(query);
+type SearchRequest = { query: string; onStatus: (s: SearchStatus) => void; opts?: SearchOptions };
+/** A search asked for before `attKey`'s viewer was there — the one a
+ *  PDF was left with, put back as it opens. */
+let pendingSearch: (SearchRequest & { attKey: string }) | null = null;
+
+function runSearch(viewer: PdfViewer, r: SearchRequest): void {
+  viewer.onSearchChange(r.onStatus);
+  void viewer.search(r.query, r.opts);
+}
+
+/** Find `query` in `attKey`, the open PDF; `onStatus` hears the count
+ *  grow and the current hit change. Before its viewer is there, it
+ *  waits for it. */
+export function searchReader(
+  attKey: string,
+  query: string,
+  onStatus: (s: SearchStatus) => void,
+  opts?: SearchOptions,
+): void {
+  if (active?.attKey === attKey) {
+    pendingSearch = null;
+    runSearch(active.viewer, { query, onStatus, opts });
+  } else pendingSearch = { attKey, query, onStatus, opts };
 }
 
 /** Next (1) or previous (-1) hit of the search in the open PDF. */
@@ -132,6 +149,11 @@ export function ReaderPane() {
         });
         viewerRef.current = viewer;
         active = { attKey, viewer };
+        // Searched before the PDF opened: run once the pages are there.
+        if (pendingSearch?.attKey === attKey) {
+          runSearch(viewer, pendingSearch);
+          pendingSearch = null;
+        }
         // Cached copies come straight off the disk; the command falls
         // back to Zotero for one that isn't (or was cleared meanwhile).
         const bytes = await invoke<ArrayBuffer>("download_attachment_file", { attKey });
@@ -180,7 +202,7 @@ export function ReaderPane() {
   if (!reading) return null;
   return (
     <section className="reader-pane">
-      {outlineShown && attKey && <OutlinePanel key={attKey} outline={outline ?? []} />}
+      {outlineShown && attKey && <OutlinePanel key={attKey} attKey={attKey} outline={outline ?? []} />}
       {!attKey ? (
         <div className="reader-empty">
           This entry has no PDF in Zotero — the notes are on the right.

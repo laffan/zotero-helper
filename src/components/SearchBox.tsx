@@ -14,8 +14,11 @@ const MENU_WIDTH = 210;
 
 export function SearchBox() {
   const reading = useStore((s) => s.reading);
-  // With a PDF open the field searches that PDF (a fresh field per PDF).
-  return reading ? <PdfSearchBox key={reading.attKey ?? reading.itemKey} /> : <LibrarySearchBox />;
+  // With a PDF open the field searches that PDF (a field per PDF, each
+  // with the search it was left with). An entry read without one has
+  // nothing to search.
+  if (!reading) return <LibrarySearchBox />;
+  return reading.attKey ? <PdfSearchBox key={reading.attKey} attKey={reading.attKey} /> : null;
 }
 
 function LibrarySearchBox() {

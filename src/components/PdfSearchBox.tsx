@@ -5,7 +5,9 @@
 // Enter / ⇧Enter and the arrows step through the matches, the ✕ that
 // replaces the magnifier (or Escape) clears, and ⌘F comes back here.
 import { useEffect, useRef, useState } from "react";
-import type { SearchStatus } from "../pdfviewer/search";
+import { usePdfUi } from "../lib/readerUi";
+import { lastUi, saveUi } from "../lib/recent";
+import type { SearchOptions, SearchStatus } from "../pdfviewer/search";
 import { ChevronDown, ChevronUp, CloseIcon, SearchIcon } from "./Icons";
 import { goToReaderSearchHit, searchReader, stepReaderSearch } from "./ReaderPane";
 import { ToolbarMenu, useDropdown } from "./ToolbarMenu";
@@ -14,8 +16,10 @@ const DEBOUNCE_MS = 250;
 /** Matches listed at a time; "Show more matches" adds as many again. */
 const PAGE = 100;
 
-export function PdfSearchBox() {
-  const [query, setQuery] = useState("");
+/** One per PDF (keyed by it): the search a PDF was left with comes
+ *  back with it, on the match it was on (lib/readerUi.ts). */
+export function PdfSearchBox({ attKey }: { attKey: string }) {
+  const [query, setQuery] = usePdfUi(attKey, "search", "");
   const [status, setStatus] = useState<SearchStatus | null>(null);
   const [shown, setShown] = useState(PAGE);
   const timer = useRef(0);
@@ -23,11 +27,26 @@ export function PdfSearchBox() {
   const list = useDropdown();
   const listEl = useRef<HTMLDivElement>(null);
 
-  const run = (q: string) => {
+  const run = (q: string, opts?: SearchOptions) => {
     window.clearTimeout(timer.current);
     setShown(PAGE);
-    searchReader(q, setStatus);
+    searchReader(attKey, q, setStatus, opts);
   };
+
+  // The search left here, back on its match — without moving the view,
+  // which comes back to its own place.
+  useEffect(() => {
+    const hit = lastUi(attKey).searchHit;
+    if (query.trim()) run(query, { at: hit ? hit - 1 : 0, reveal: false });
+    // Once, as the PDF opens.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // The match being shown, to come back to.
+  const hitNow = status?.query && status.query === query.trim() ? status.current : null;
+  useEffect(() => {
+    if (hitNow) saveUi(attKey, { searchHit: hitNow });
+  }, [attKey, hitNow]);
 
   const clear = () => {
     setQuery("");

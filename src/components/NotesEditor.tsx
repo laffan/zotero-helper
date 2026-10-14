@@ -12,6 +12,7 @@ import { useEffect, useRef, useState } from "react";
 import { openInZotero } from "../lib/actions";
 import { annotationByKey, parsePdfLink, pdfLink } from "../lib/highlights";
 import { NOTES_FILENAME, pushNote, registerNotesInserter, saveNote } from "../lib/notes";
+import { lastUi, saveUi } from "../lib/recent";
 import { appLog, useStore } from "../lib/store";
 import type { NoteMeta } from "../lib/types";
 import type { NotesEditorHandle } from "../noteseditor/editor";
@@ -75,6 +76,15 @@ export function NotesEditor({ itemKey, initialText, initialMeta, pdfAttKey }: Pr
   const pdfOpen = Boolean(pdfAttKey && reading?.itemKey === itemKey && reading.attKey === pdfAttKey);
   const pdfOpenRef = useRef(pdfOpen);
   pdfOpenRef.current = pdfOpen;
+  // Beside its PDF, where the caret and the scroll were are kept with
+  // that PDF's reading UI (lib/readerUi.ts).
+  const placeKey = () => (pdfOpenRef.current ? pdfAttKey : null);
+  const restorePlace = () => {
+    const att = placeKey();
+    if (!att || !editorRef.current) return;
+    const ui = lastUi(att);
+    editorRef.current.restorePlace(ui.notesSel, ui.notesTop);
+  };
 
   useEffect(() => {
     const host = hostRef.current;
@@ -91,6 +101,10 @@ export function NotesEditor({ itemKey, initialText, initialMeta, pdfAttKey }: Pr
           clearTimeout(timer.current);
           timer.current = window.setTimeout(() => void flush(), SAVE_DELAY_MS);
         },
+        onSelect: (anchor, head) => {
+          const att = placeKey();
+          if (att) saveUi(att, { notesSel: [anchor, head] });
+        },
         follow: (href) => follow(itemKey, href),
         annotationColor: (key) => annotationByKey(useStore.getState().library.items, key)?.color,
         cite: () => {
@@ -101,10 +115,17 @@ export function NotesEditor({ itemKey, initialText, initialMeta, pdfAttKey }: Pr
       });
       editorRef.current = handle;
       handle.setCiteEnabled(pdfOpenRef.current);
+      restorePlace();
+      handle.view.scrollDOM.addEventListener("scroll", onScroll, { passive: true });
       registerNotesInserter((md) => handle?.insert(md));
     });
+    const onScroll = () => {
+      const att = placeKey();
+      if (att && handle) saveUi(att, { notesTop: handle.topPosition() });
+    };
     return () => {
       cancelled = true;
+      handle?.view.scrollDOM.removeEventListener("scroll", onScroll);
       registerNotesInserter(null);
       editorRef.current = null;
       handle?.destroy();
@@ -117,6 +138,10 @@ export function NotesEditor({ itemKey, initialText, initialMeta, pdfAttKey }: Pr
 
   useEffect(() => {
     editorRef.current?.setCiteEnabled(pdfOpen);
+    // The PDF opening beside notes already showing: back to the place
+    // they were left at beside it.
+    if (pdfOpen) restorePlace();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pdfOpen]);
 
   // Keep "pushed 3 min ago" honest.

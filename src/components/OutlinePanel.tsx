@@ -2,8 +2,12 @@
 // that folds, each a link to its place in the pages. The heading the
 // reader is in is marked as the pages scroll. Shown from the toolbar's
 // left panel button, which only appears when the PDF has an outline.
+// Which headings are unfolded, and where the list is scrolled, are kept
+// per PDF (lib/readerUi.ts).
 import { useEffect, useMemo, useRef, useState } from "react";
 import { sectionAtPage, sectionsOf, useReaderPage, type OutlineEntry } from "../lib/outline";
+import { usePdfUiScroll } from "../lib/readerUi";
+import { lastUi, saveUi } from "../lib/recent";
 import { useStore } from "../lib/store";
 import { ChevronDown, ChevronRight, CloseIcon } from "./Icons";
 import { goToReaderPosition } from "./ReaderPane";
@@ -17,11 +21,14 @@ function countEntries(list: OutlineEntry[]): number {
   return list.reduce((n, e) => n + 1 + countEntries(e.children), 0);
 }
 
-export function OutlinePanel({ outline }: { outline: OutlineEntry[] }) {
+/** Keyed by the PDF: one panel per outline. */
+export function OutlinePanel({ attKey, outline }: { attKey: string; outline: OutlineEntry[] }) {
   const setOutlineOpen = useStore((s) => s.setOutlineOpen);
   const page = useReaderPage();
   const sections = useMemo(() => sectionsOf(outline), [outline]);
   const [expanded, setExpanded] = useState<Set<string>>(() => {
+    const kept = lastUi(attKey).outlineExpanded;
+    if (kept) return new Set(kept);
     if (countEntries(outline) >= OPEN_ALL_BELOW) return new Set();
     const all = new Set<string>();
     const walk = (list: OutlineEntry[], id: string) =>
@@ -48,6 +55,7 @@ export function OutlinePanel({ outline }: { outline: OutlineEntry[] }) {
   // Keep the current heading in sight — by scrolling the list itself:
   // scrollIntoView can also cut short the pages' own smooth scroll.
   const listRef = useRef<HTMLDivElement>(null);
+  usePdfUiScroll(attKey, "outlineScroll", listRef);
   useEffect(() => {
     const list = listRef.current;
     const row = list?.querySelector<HTMLElement>(".outline-row.current");
@@ -58,12 +66,12 @@ export function OutlinePanel({ outline }: { outline: OutlineEntry[] }) {
     else if (rr.bottom > lr.bottom) list.scrollTop += rr.bottom - lr.bottom + 8;
   }, [current]);
 
-  const toggle = (id: string) =>
-    setExpanded((s) => {
-      const next = new Set(s);
-      if (!next.delete(id)) next.add(id);
-      return next;
-    });
+  const toggle = (id: string) => {
+    const next = new Set(expanded);
+    if (!next.delete(id)) next.add(id);
+    setExpanded(next);
+    saveUi(attKey, { outlineExpanded: [...next] });
+  };
 
   const rows = (list: OutlineEntry[], depth: number, parent: string): React.ReactNode =>
     list.map((e, i) => {

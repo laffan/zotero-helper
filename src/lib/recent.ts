@@ -1,14 +1,16 @@
 // What has been read on this device: the PDFs opened most recently
 // (the sidebar's Recent folder) and the page each PDF was left on, with
-// the viewer's state there (layout, folded view, place), so it opens
-// as it was left. Local only, like pins and view modes — nothing
-// here is written to Zotero.
+// the viewer's state there (layout, folded view, place) and the reading
+// UI around it (readerUi.ts: panel widths, tabs, filters, searches), so
+// it opens as it was left. Local only, like pins and view modes —
+// nothing here is written to Zotero.
 //
 // No store import: the store records opens through noteOpened, and the
 // item list reads the order through recentKeys.
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import type { SavedView } from "../pdfviewer/viewState";
+import type { ReaderUi } from "./readerUi";
 
 /** The sidebar row that lists recently opened PDFs. Not a Zotero
  *  collection, like Questions. */
@@ -28,9 +30,9 @@ export interface RecentOpen {
 interface RecentState {
   /** Newest first, one row per entry. */
   opened: RecentOpen[];
-  /** attKey → the 1-based page last in view, the viewer's state, and
-   *  when. */
-  pages: Record<string, { page: number; ms: number; view?: SavedView }>;
+  /** attKey → the 1-based page last in view, the viewer's state, the
+   *  UI around it, and when. */
+  pages: Record<string, { page: number; ms: number; view?: SavedView; ui?: ReaderUi }>;
 }
 
 export const useRecent = create<RecentState>()(
@@ -69,24 +71,51 @@ export function lastView(attKey: string): SavedView | null {
 
 let pageTimer = 0;
 let pendingPage: { attKey: string; page: number; view?: SavedView } | null = null;
+/** UI records changed since the last write, by attKey. */
+const pendingUi = new Map<string, ReaderUi>();
+
+type Pages = RecentState["pages"];
+function capped(pages: Pages): Pages {
+  const keys = Object.keys(pages);
+  if (keys.length <= PAGES_LIMIT) return pages;
+  keys.sort((a, b) => pages[a].ms - pages[b].ms);
+  return Object.fromEntries(keys.slice(-PAGES_LIMIT).map((k) => [k, pages[k]]));
+}
 
 function flushPage(): void {
   window.clearTimeout(pageTimer);
   const p = pendingPage;
   pendingPage = null;
-  if (!p) return;
+  const uis = [...pendingUi];
+  pendingUi.clear();
+  if (!p && !uis.length) return;
   useRecent.setState((s) => {
-    const prev = s.pages[p.attKey];
-    if (prev?.page === p.page && (!p.view || JSON.stringify(prev.view) === JSON.stringify(p.view))) return {};
-    const view = p.view ?? prev?.view;
-    let pages = { ...s.pages, [p.attKey]: { page: p.page, ms: Date.now(), ...(view ? { view } : {}) } };
-    const keys = Object.keys(pages);
-    if (keys.length > PAGES_LIMIT) {
-      keys.sort((a, b) => pages[a].ms - pages[b].ms);
-      pages = Object.fromEntries(keys.slice(-PAGES_LIMIT).map((k) => [k, pages[k]]));
+    let pages: Pages = s.pages;
+    const prev = p ? s.pages[p.attKey] : undefined;
+    if (p && !(prev?.page === p.page && (!p.view || JSON.stringify(prev.view) === JSON.stringify(p.view)))) {
+      const view = p.view ?? prev?.view;
+      pages = { ...pages, [p.attKey]: { ...prev, page: p.page, ms: Date.now(), ...(view ? { view } : {}) } };
     }
-    return { pages };
+    for (const [attKey, ui] of uis) {
+      const was = pages[attKey];
+      pages = { ...pages, [attKey]: { ...was, page: was?.page ?? 1, ms: Date.now(), ui } };
+    }
+    return pages === s.pages ? {} : { pages: capped(pages) };
   });
+}
+
+/** The reading UI `attKey` was left with (readerUi.ts) — the latest,
+ *  written or not. Empty when it was never read here. */
+export function lastUi(attKey: string): ReaderUi {
+  return pendingUi.get(attKey) ?? useRecent.getState().pages[attKey]?.ui ?? {};
+}
+
+/** Change part of the reading UI kept for `attKey`. Written after a
+ *  pause, like the page: a dragged panel edge changes it every frame. */
+export function saveUi(attKey: string, patch: Partial<ReaderUi>): void {
+  pendingUi.set(attKey, { ...lastUi(attKey), ...patch });
+  window.clearTimeout(pageTimer);
+  pageTimer = window.setTimeout(flushPage, 600);
 }
 
 /** The reader moved to `page`, the viewer now in `view`. Written after

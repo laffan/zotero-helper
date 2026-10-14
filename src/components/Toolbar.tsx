@@ -3,6 +3,7 @@ import { deleteFolder } from "../lib/actions";
 import { getAbstracts, tidyItems } from "../lib/ai";
 import { startAsk } from "../lib/ai/chat";
 import { askTargetFor } from "../lib/ai/context";
+import { aiConnected } from "../lib/ai/models";
 import { REAL_KEY } from "../lib/collections";
 import { startPdfFetch } from "../lib/importer";
 import { closeReader } from "../lib/notes";
@@ -51,6 +52,7 @@ export function Toolbar() {
   const setOutlineOpen = useStore((s) => s.setOutlineOpen);
   const items = useStore((s) => s.library.items);
   const askPreparing = useStore((s) => s.askPreparing);
+  const aiOn = useStore((s) => aiConnected(s.settings));
   const [confirmDelete, setConfirmDelete] = useState(false);
   const aiMenu = useDropdown();
   const collections = useStore((s) => s.library.collections);
@@ -187,74 +189,77 @@ export function Toolbar() {
           <PdfIcon />
           <span className="tool-label">Fetch PDFs</span>
         </button>
-        <div className="filter-anchor" ref={aiMenu.ref}>
-          <button
-            className="tool-btn"
-            onClick={() => aiMenu.setOpen(!aiMenu.open)}
-            disabled={tidying || askPreparing}
-            title="AI actions"
-          >
-            {tidying || askPreparing ? <Spinner /> : <Sparkles />}
-            <span className="tool-label">AI ▾</span>
-          </button>
-          {aiMenu.open && (
-            <ToolbarMenu anchorRef={aiMenu.ref}>
-              <button
-                className="menu-item"
-                disabled={selectedKeys.length === 0}
-                onClick={() =>
-                  runAi(() => getAbstracts(useStore.getState().selectedKeys))
-                }
-              >
-                <strong>Get abstract</strong>
-                <span>
-                  {selectedKeys.length === 0
-                    ? "Select an item first"
-                    : "Read it out of the PDF's first pages (items without one)"}
-                </span>
-              </button>
-              <button
-                className="menu-item"
-                disabled={selectedKeys.length === 0}
-                onClick={() =>
-                  runAi(() => tidyItems(useStore.getState().selectedKeys))
-                }
-              >
-                <strong>Tidy metadata</strong>
-                <span>
-                  {selectedKeys.length === 0
-                    ? "Select an item first"
-                    : "Clean up all fields against CrossRef"}
-                </span>
-              </button>
-              <span className="menu-sep" />
-              <button
-                className="menu-item"
-                disabled={!canAsk}
-                onClick={() => runAi(() => startAsk(askTarget, "abstracts"))}
-              >
-                <strong>Ask Abstracts ({ASK_CONTEXT[askTarget.kind]})</strong>
-                <span>
-                  {canAsk
-                    ? `Chat about the abstracts of ${askTarget.label}`
-                    : "Nothing here to ask about"}
-                </span>
-              </button>
-              <button
-                className="menu-item"
-                disabled={!canAsk}
-                onClick={() => runAi(() => startAsk(askTarget, "full"))}
-              >
-                <strong>Ask Full Papers ({ASK_CONTEXT[askTarget.kind]})</strong>
-                <span>
-                  {canAsk
-                    ? `Read the PDFs of ${askTarget.label} and chat about them`
-                    : "Nothing here to ask about"}
-                </span>
-              </button>
-            </ToolbarMenu>
-          )}
-        </div>
+        {/* Only with an AI service connected (Settings → AI). */}
+        {aiOn && (
+          <div className="filter-anchor" ref={aiMenu.ref}>
+            <button
+              className="tool-btn"
+              onClick={() => aiMenu.setOpen(!aiMenu.open)}
+              disabled={tidying || askPreparing}
+              title="AI actions"
+            >
+              {tidying || askPreparing ? <Spinner /> : <Sparkles />}
+              <span className="tool-label">AI ▾</span>
+            </button>
+            {aiMenu.open && (
+              <ToolbarMenu anchorRef={aiMenu.ref}>
+                <button
+                  className="menu-item"
+                  disabled={selectedKeys.length === 0}
+                  onClick={() =>
+                    runAi(() => getAbstracts(useStore.getState().selectedKeys))
+                  }
+                >
+                  <strong>Get abstract</strong>
+                  <span>
+                    {selectedKeys.length === 0
+                      ? "Select an item first"
+                      : "Read it out of the PDF's first pages (items without one)"}
+                  </span>
+                </button>
+                <button
+                  className="menu-item"
+                  disabled={selectedKeys.length === 0}
+                  onClick={() =>
+                    runAi(() => tidyItems(useStore.getState().selectedKeys))
+                  }
+                >
+                  <strong>Tidy metadata</strong>
+                  <span>
+                    {selectedKeys.length === 0
+                      ? "Select an item first"
+                      : "Clean up all fields against CrossRef"}
+                  </span>
+                </button>
+                <span className="menu-sep" />
+                <button
+                  className="menu-item"
+                  disabled={!canAsk}
+                  onClick={() => runAi(() => startAsk(askTarget, "abstracts"))}
+                >
+                  <strong>Ask Abstracts ({ASK_CONTEXT[askTarget.kind]})</strong>
+                  <span>
+                    {canAsk
+                      ? `Chat about the abstracts of ${askTarget.label}`
+                      : "Nothing here to ask about"}
+                  </span>
+                </button>
+                <button
+                  className="menu-item"
+                  disabled={!canAsk}
+                  onClick={() => runAi(() => startAsk(askTarget, "full"))}
+                >
+                  <strong>Ask Full Papers ({ASK_CONTEXT[askTarget.kind]})</strong>
+                  <span>
+                    {canAsk
+                      ? `Read the PDFs of ${askTarget.label} and chat about them`
+                      : "Nothing here to ask about"}
+                  </span>
+                </button>
+              </ToolbarMenu>
+            )}
+          </div>
+        )}
         <ShareMenuButton reading={null} />
         <SyncMenuButton reading={null} />
       </div>

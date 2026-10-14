@@ -8,6 +8,7 @@ import {
 import { useDragging, useIsDropTarget } from "../lib/dragdrop";
 import { RECENT, useRecent } from "../lib/recent";
 import { appLog, QUESTIONS, useStore } from "../lib/store";
+import { aiConnected } from "../lib/ai/models";
 import { FolderMenu } from "./FolderMenu";
 import {
   ChatIcon,
@@ -152,6 +153,7 @@ export function Sidebar() {
   const hidden = useStore((s) => s.sidebarHidden);
   const dragging = useDragging();
   const chatCount = useStore((s) => s.chats.length);
+  const aiOn = useStore((s) => aiConnected(s.settings));
   const recentCount = useRecent((s) => s.opened.length);
   const flaggedKeys = useStore((s) => s.flaggedFolders);
   const tree = useMemo(() => buildTree(collections), [collections]);
@@ -196,22 +198,26 @@ export function Sidebar() {
         )}
         {/* Conversations, not a Zotero collection — hence no drop
             target and no flag. It sits above Library because it is
-            about the library rather than part of it. */}
-        <div
-          className={`tree-row ${selectedCollection === QUESTIONS ? "selected" : ""}`}
-          style={{ paddingLeft: 10, marginTop: 10 }}
-          onClick={() => selectCollection(QUESTIONS)}
-          title="Conversations with the AI about your works"
-        >
-          <span className="tree-toggle-spacer" />
-          <ChatIcon size={14} />
-          <span className="tree-name">Questions</span>
-          {chatCount > 0 && <span className="tree-count">{chatCount}</span>}
-        </div>
+            about the library rather than part of it. Shown only with
+            an AI service connected; the conversations stay on disk
+            meanwhile. */}
+        {aiOn && (
+          <div
+            className={`tree-row ${selectedCollection === QUESTIONS ? "selected" : ""}`}
+            style={{ paddingLeft: 10, marginTop: 10 }}
+            onClick={() => selectCollection(QUESTIONS)}
+            title="Conversations with the AI about your works"
+          >
+            <span className="tree-toggle-spacer" />
+            <ChatIcon size={14} />
+            <span className="tree-name">Questions</span>
+            {chatCount > 0 && <span className="tree-count">{chatCount}</span>}
+          </div>
+        )}
         {/* The PDFs opened here lately, the latest first (lib/recent). */}
         <div
           className={`tree-row ${selectedCollection === RECENT ? "selected" : ""}`}
-          style={{ paddingLeft: 10 }}
+          style={{ paddingLeft: 10, marginTop: aiOn ? 0 : 10 }}
           onClick={() => selectCollection(RECENT)}
           title="The last 100 PDFs opened on this device"
         >

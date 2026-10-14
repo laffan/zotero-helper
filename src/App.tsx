@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import { bootstrap } from "./lib/actions";
+import { aiConnected } from "./lib/ai/models";
 import { trackPointerDrag } from "./lib/dragGesture";
 import { installShortcuts } from "./lib/shortcuts/dispatch";
 import { usePane } from "./lib/shortcuts/panes";
@@ -62,6 +63,15 @@ export default function App() {
     void bootstrap();
     installShortcuts();
   }, []);
+
+  // Questions is an AI feature: with no service connected it isn't in
+  // the sidebar, so a remembered visit to it falls back to All Items.
+  const settings = useStore((s) => s.settings);
+  useEffect(() => {
+    if (settings && !aiConnected(settings) && selectedCollection === QUESTIONS) {
+      useStore.getState().selectCollection("all");
+    }
+  }, [settings, selectedCollection]);
 
   if (view === "settings") {
     return <SettingsView />;

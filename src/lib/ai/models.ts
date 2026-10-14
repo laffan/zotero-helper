@@ -7,7 +7,7 @@
 //
 // Prices are USD per million tokens, from each provider's public rate
 // card. They move; when they do, this table is the only place to edit.
-import type { AiService, ChatUsage } from "../types";
+import type { AiService, ChatUsage, Settings } from "../types";
 
 export interface AiModel {
   id: string;
@@ -102,6 +102,15 @@ export const CACHE_TTL_MS: Record<AiService, number> = {
   anthropic: 5 * 60 * 1000,
   openai: 30 * 60 * 1000,
 };
+
+/** Is an AI service connected — a key in for the one chosen? The AI
+ *  features (the toolbar's AI menu, Questions in the sidebar) are only
+ *  shown when it is; Settings → AI is where it gets connected. */
+export function aiConnected(s: Settings | null): boolean {
+  if (!s) return false;
+  const key = s.aiService === "openai" ? s.openaiApiKey : s.anthropicApiKey;
+  return Boolean(key?.trim());
+}
 
 export function modelsFor(service: AiService): AiModel[] {
   return AI_MODELS.filter((m) => m.service === service);

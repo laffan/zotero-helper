@@ -600,21 +600,28 @@ export function createFoldLayer(scrollArea: HTMLElement, env: FoldEnv) {
    *  far into that fold (negative in the gap above it). */
   function viewAnchor(): FoldAnchor | null {
     const top = scrollArea.scrollTop;
-    for (const f of folds) {
+    let nth = 0;
+    for (let i = 0; i < folds.length; i++) {
+      const f = folds[i];
+      nth = i > 0 && folds[i - 1].pageIndex === f.pageIndex ? nth + 1 : 0;
       const h = f.wrapper.offsetHeight;
       if (f.wrapper.offsetTop + h > top && h) {
-        return { pageIndex: f.pageIndex, top: f.top, frac: (top - f.wrapper.offsetTop) / h };
+        return { pageIndex: f.pageIndex, top: f.top, nth, frac: (top - f.wrapper.offsetTop) / h };
       }
     }
     return null;
   }
 
-  /** Scroll back to a place `viewAnchor` gave — the same fold, else the
-   *  next one on or after its page. False while there are no folds. */
+  /** Scroll back to a place `viewAnchor` gave — the same fold (by its
+   *  top, else by its place among its page's folds: the top moves when
+   *  the page's real size arrives), else the next one on or after its
+   *  page. False while there are no folds. */
   function restoreAnchor(a: FoldAnchor): boolean {
     if (!folds.length) return false;
+    const onPage = folds.filter((x) => x.pageIndex === a.pageIndex);
     const f =
-      folds.find((x) => x.pageIndex === a.pageIndex && Math.abs(x.top - a.top) < 1) ??
+      onPage.find((x) => Math.abs(x.top - a.top) < 1) ??
+      (a.nth != null ? onPage[Math.min(a.nth, onPage.length - 1)] : undefined) ??
       folds.find((x) => x.pageIndex >= a.pageIndex) ??
       folds[folds.length - 1];
     const frac = Math.max(-0.5, Math.min(1, a.frac));

@@ -13,6 +13,8 @@ import type { FitMode, ViewPrefs } from "./viewPrefs";
 export interface FoldAnchor {
   pageIndex: number;
   top: number;
+  /** Which of its page's folds (0 the first); absent in older records. */
+  nth?: number;
   frac: number;
 }
 

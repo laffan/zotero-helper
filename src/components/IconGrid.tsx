@@ -3,6 +3,7 @@
 // are cached on disk, so a folder is slow only the first time.
 import { useEffect, useRef, useState } from "react";
 import { creatorSummary, itemTitle, yearOf } from "../lib/collections";
+import { gridNav } from "../lib/shortcuts/listNav";
 import { useThumbnail } from "../lib/thumbnails";
 import type { ZItem } from "../lib/types";
 import { PdfIcon, PinIcon, Spinner } from "./Icons";
@@ -132,6 +133,17 @@ export function IconGrid({
   const cellH = cellW * PAGE_RATIO + CAPTION_H;
   const rowH = cellH + GAP;
   const rows = Math.ceil(items.length / cols);
+  // Its shape, for the arrow keys (lib/shortcuts/listNav.ts).
+  useEffect(() => {
+    gridNav.cols = cols;
+    gridNav.reveal = (idx) => {
+      const el = ref.current;
+      if (!el) return;
+      const top = GAP + Math.floor(idx / cols) * rowH;
+      if (top < el.scrollTop) el.scrollTop = top - GAP;
+      else if (top + cellH > el.scrollTop + el.clientHeight) el.scrollTop = top + cellH + GAP - el.clientHeight;
+    };
+  });
   const firstRow = Math.max(0, Math.floor(scrollTop / rowH) - OVERSCAN_ROWS);
   const lastRow = Math.min(
     rows,

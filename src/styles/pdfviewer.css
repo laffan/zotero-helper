@@ -275,7 +275,7 @@
   padding: 6px 12px;
   border-top: 1px solid var(--border);
   background: var(--panel);
-  font-size: 12px;
+  font-size: calc(12px * var(--font-scale));
   color: var(--text);
   flex-shrink: 0;
 }
@@ -285,7 +285,7 @@
   border: 1px solid rgb(128 128 128 / 0.2);
   background: rgb(128 128 128 / 0.06);
   color: var(--text);
-  font-size: 13px;
+  font-size: calc(13px * var(--font-scale));
   line-height: 1;
   transition: background 0.15s;
 }
@@ -327,16 +327,16 @@
 .pdf-zoom-label {
   min-width: 36px;
   text-align: center;
-  font-size: 12px;
+  font-size: calc(12px * var(--font-scale));
   color: var(--text-dim);
 }
 .pdf-page-indicator {
   margin-left: auto;
-  font-size: 11px;
+  font-size: calc(11px * var(--font-scale));
   color: var(--text-dim);
 }
 .pdf-zotero-link {
-  font-size: 11px;
+  font-size: calc(11px * var(--font-scale));
   color: var(--text-dim);
   text-decoration: none;
   margin-left: 8px;
@@ -355,10 +355,13 @@
 }
 
 /* --- fixed view: sets of 1–3 pages, paged by snapping
-   (src/pdfviewer/paged.ts) --- */
+   (src/pdfviewer/paged.ts). A set takes all of the view but PAGED_PAD,
+   and its pages sit SET_GAP (4px) apart. --- */
 .pdf-scroll-area.pdf-paged.pdf-layout-horizontal {
   scroll-snap-type: x mandatory;
   scroll-padding-inline: var(--pdf-paged-pad, 0px);
+  padding: 4px 0;
+  gap: 4px;
 }
 /* Top to bottom, a grid of rows the set's size. Padding is safe here
    (a set's room plus two pads is the view), unlike in the flex column. */
@@ -367,9 +370,10 @@
   grid-template-columns: repeat(var(--pdf-paged-cols, 1), max-content);
   justify-content: center;
   align-content: start;
-  column-gap: 12px;
+  column-gap: 4px;
   row-gap: var(--pdf-paged-gap, 24px);
-  padding-block: var(--pdf-paged-pad, 20px);
+  padding-block: var(--pdf-paged-pad, 4px);
+  padding-inline: 4px;
   scroll-snap-type: y mandatory;
   scroll-padding-block: var(--pdf-paged-pad, 0px);
 }
@@ -380,18 +384,69 @@
   scroll-snap-align: start;
   scroll-snap-stop: always;
 }
+/* A trimmed page (crop.ts) is clipped to what is left, and its trimmed
+   edges' room is closed up by negative margins — --cm-* on each page,
+   zero when untrimmed. The scroll margins match, so the snapping
+   centres what is left rather than the whole page. */
+.pdf-paged > .pdf-page-wrapper {
+  margin: var(--cm-t, 0px) var(--cm-r, 0px) var(--cm-b, 0px) var(--cm-l, 0px);
+}
+.pdf-cropped > .pdf-page-wrapper {
+  scroll-margin: var(--cm-t, 0px) var(--cm-r, 0px) var(--cm-b, 0px) var(--cm-l, 0px);
+  clip-path: inset(
+    calc(var(--crop-t) * 100%) calc(var(--crop-r) * 100%) calc(var(--crop-b) * 100%)
+      calc(var(--crop-l) * 100%)
+  );
+}
 /* Side by side: room outside the end sets, and between sets. Margins
    rather than padding, which would stretch the flex row's height. */
 .pdf-paged.pdf-layout-horizontal > .pdf-page-wrapper:first-child {
-  margin-left: var(--pdf-paged-pad, 0px);
+  margin-left: calc(var(--pdf-paged-pad, 0px) + var(--cm-l, 0px));
 }
 .pdf-paged.pdf-layout-horizontal > .pdf-page-wrapper:last-child {
-  margin-right: var(--pdf-paged-pad, 0px);
+  margin-right: calc(var(--pdf-paged-pad, 0px) + var(--cm-r, 0px));
 }
 .pdf-paged-1.pdf-layout-horizontal > .pdf-page-wrapper:not(:first-child),
 .pdf-paged-2.pdf-layout-horizontal > .pdf-page-wrapper:nth-child(2n + 1):not(:first-child),
 .pdf-paged-3.pdf-layout-horizontal > .pdf-page-wrapper:nth-child(3n + 1):not(:first-child) {
-  margin-left: calc(var(--pdf-paged-gap, 24px) - 12px);
+  margin-left: calc(var(--pdf-paged-gap, 24px) - 4px + var(--cm-l, 0px));
+}
+
+/* Adjusting the trim (⌘ held): the pages show whole, the trim drawn
+   over each of them — what is kept framed, the rest shaded. */
+.pdf-crop-editing .textLayer,
+.pdf-crop-editing .pdf-link-layer {
+  pointer-events: none;
+}
+.pdf-crop-editing .pdf-page-zotero-btn,
+.pdf-crop-editing .pdf-page-note-btn {
+  display: none;
+}
+.pdf-crop-frame {
+  position: absolute;
+  top: calc(var(--crop-t, 0) * 100%);
+  right: calc(var(--crop-r, 0) * 100%);
+  bottom: calc(var(--crop-b, 0) * 100%);
+  left: calc(var(--crop-l, 0) * 100%);
+  outline: 2px dashed var(--accent);
+  outline-offset: -1px;
+  box-shadow: 0 0 0 9999px rgb(0 0 0 / 0.32);
+  pointer-events: none;
+  z-index: 6;
+}
+.pdf-crop-reset {
+  position: absolute;
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 25;
+  padding: 5px 12px;
+  border-radius: 999px;
+  background: var(--text);
+  color: var(--panel);
+  font-size: calc(12px * var(--font-scale));
+  font-weight: 600;
+  box-shadow: 0 2px 10px rgb(0 0 0 / 0.25);
 }
 /* The page-mode icons follow the scroll direction. */
 .pdf-page-mode.vertical svg {
@@ -411,7 +466,7 @@
   border-radius: 5px;
   background: var(--text);
   color: var(--panel);
-  font-size: 11px;
+  font-size: calc(11px * var(--font-scale));
   font-weight: 500;
   line-height: 1.35;
   pointer-events: none;

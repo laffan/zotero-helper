@@ -1,6 +1,8 @@
 import { useEffect } from "react";
 import { bootstrap } from "./lib/actions";
 import { trackPointerDrag } from "./lib/dragGesture";
+import { installShortcuts } from "./lib/shortcuts/dispatch";
+import { usePane } from "./lib/shortcuts/panes";
 import { QUESTIONS, useStore } from "./lib/store";
 import { AskCostModal } from "./components/AskCostModal";
 import { CaptureModal } from "./components/CaptureModal";
@@ -13,7 +15,7 @@ import { PageViewModal } from "./components/PageViewModal";
 import { PdfRescueModal } from "./components/PdfRescueModal";
 import { ReaderPane } from "./components/ReaderPane";
 import { SendToHushModal } from "./components/SendToHushModal";
-import { SettingsView } from "./components/SettingsView";
+import { SettingsView } from "./components/settings/SettingsView";
 import { Sidebar } from "./components/Sidebar";
 import { Terminal } from "./components/Terminal";
 import { Toolbar } from "./components/Toolbar";
@@ -53,9 +55,12 @@ export default function App() {
   const { leftWidth, rightWidth, notesWidth } = useStore();
   const sidebarHidden = useStore((s) => s.sidebarHidden);
   const metaHidden = useStore((s) => s.metaHidden);
+  // The pane the keyboard is moving in, outlined while it is.
+  const kbdPane = usePane((s) => (s.shown ? s.pane : undefined));
 
   useEffect(() => {
     void bootstrap();
+    installShortcuts();
   }, []);
 
   if (view === "settings") {
@@ -67,6 +72,7 @@ export default function App() {
       <Toolbar />
       <div
         className="panes"
+        data-kbd-pane={reading ? undefined : kbdPane}
         style={
           {
             "--left-w": `${leftWidth}px`,

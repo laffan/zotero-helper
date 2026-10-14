@@ -1,6 +1,7 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App";
+import { initAppearance } from "./lib/appearance";
 import "./styles/index.css";
 
 // iPadOS reports a desktop-class ("Macintosh") user agent — multitouch
@@ -12,6 +13,8 @@ if (
 ) {
   document.documentElement.classList.add("ipados");
 }
+
+initAppearance();
 
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
   <React.StrictMode>

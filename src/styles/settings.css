@@ -8,25 +8,111 @@
   background: var(--bg);
 }
 .settings-card {
-  width: min(560px, 100%);
+  width: min(860px, 100%);
+  min-height: min(620px, calc(100dvh - 48px));
   background: var(--panel);
   border: 1px solid var(--border);
   border-radius: 12px;
-  padding: 24px;
   height: fit-content;
+  display: grid;
+  grid-template-columns: 190px minmax(0, 1fr);
+  overflow: hidden;
+}
+/* The sections, down the left. */
+.settings-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 20px 10px;
+  background: var(--panel-alt);
+  border-right: 1px solid var(--border);
+}
+.settings-nav h1 {
+  font-size: calc(20px * var(--font-scale));
+  padding: 0 10px 12px;
+}
+.settings-nav-item {
+  text-align: left;
+  padding: 7px 10px;
+  border-radius: var(--radius);
+  font-size: calc(13px * var(--font-scale));
+}
+.settings-nav-item:hover {
+  background: var(--select);
+}
+.settings-nav-item.on {
+  background: var(--select-strong);
+  font-weight: 600;
+}
+.settings-main {
+  display: flex;
+  flex-direction: column;
+  padding: 24px;
+  min-width: 0;
+}
+.settings-section {
+  flex: 1;
   display: flex;
   flex-direction: column;
   gap: 12px;
 }
-.settings-card h1 {
-  font-size: 20px;
+/* Fields keep their own height; the section's spare room stays below. */
+.settings-section > .settings-field {
+  flex: 0 0 auto;
 }
-.settings-card h2 {
-  font-size: 13px;
+.settings-section h2 {
+  font-size: calc(13px * var(--font-scale));
   text-transform: uppercase;
   letter-spacing: 0.05em;
   color: var(--text-dim);
   margin-top: 10px;
+}
+.settings-section h2.settings-section-title {
+  font-size: calc(17px * var(--font-scale));
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--text);
+  margin-top: 0;
+}
+/* Narrow windows: the sections become a row of tabs over the page. */
+@media (max-width: 640px) {
+  .settings-card {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .settings-nav {
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    padding: 12px;
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+  }
+  .settings-nav h1 {
+    width: 100%;
+    padding: 0 4px 6px;
+  }
+  .settings-main {
+    padding: 16px;
+  }
+}
+/* A choice of a few, side by side (Appearance). */
+.settings-segmented {
+  display: inline-flex;
+  align-self: flex-start;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+.settings-segmented button {
+  padding: 5px 12px;
+  font-size: calc(12px * var(--font-scale));
+}
+.settings-segmented button:not(:last-child) {
+  border-right: 1px solid var(--border);
+}
+.settings-segmented button.on {
+  background: var(--select-strong);
+  font-weight: 600;
 }
 .settings-field {
   display: flex;
@@ -35,7 +121,7 @@
   flex: 1;
 }
 .settings-field > span {
-  font-size: 12px;
+  font-size: calc(12px * var(--font-scale));
   font-weight: 600;
 }
 .settings-row {
@@ -46,8 +132,16 @@
 .settings-actions {
   display: flex;
   justify-content: flex-end;
+  align-items: center;
   gap: 8px;
-  margin-top: 14px;
+  margin-top: 20px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+}
+.settings-actions-note {
+  margin-right: auto;
+  font-size: calc(12px * var(--font-scale));
+  color: var(--text-dim);
 }
 .settings-actions .tool-btn {
   border: 1px solid var(--border);
@@ -56,7 +150,7 @@
   border-color: var(--accent);
 }
 .verify-msg {
-  font-size: 12px;
+  font-size: calc(12px * var(--font-scale));
   color: var(--text-dim);
 }
 
@@ -72,7 +166,7 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  font-size: 13px;
+  font-size: calc(13px * var(--font-scale));
 }
 .storage-line > span {
   margin-left: auto;
@@ -80,7 +174,7 @@
   font-variant-numeric: tabular-nums;
 }
 .storage-detail {
-  font-size: 12px;
+  font-size: calc(12px * var(--font-scale));
   color: var(--text-dim);
   line-height: 1.5;
 }
@@ -96,7 +190,7 @@
   align-items: center;
   gap: 8px;
   padding: 3px 0;
-  font-size: 12px;
+  font-size: calc(12px * var(--font-scale));
 }
 .storage-name {
   flex: 1;
@@ -109,4 +203,84 @@
   color: var(--text-dim);
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
+}
+
+/* --- Keyboard Shortcuts --- */
+.shortcut-group h2 {
+  margin-bottom: 4px;
+}
+.shortcut-list {
+  list-style: none;
+  border-top: 1px solid var(--border);
+}
+.shortcut-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 5px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: calc(13px * var(--font-scale));
+}
+.shortcut-label {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+.shortcut-context {
+  color: var(--text-dim);
+  font-size: calc(11px * var(--font-scale));
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.shortcut-reset {
+  font-size: calc(11px * var(--font-scale));
+}
+.shortcut-keys {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 4px;
+}
+.shortcut-chip {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  background: var(--panel-alt);
+  overflow: hidden;
+}
+.shortcut-chip.clash {
+  border-color: var(--warn);
+  background: color-mix(in srgb, var(--warn) 14%, var(--panel-alt));
+}
+.shortcut-key {
+  min-width: 28px;
+  padding: 2px 7px;
+  font-family: var(--sans);
+  font-size: calc(12px * var(--font-scale));
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+.shortcut-chip.fixed .shortcut-key {
+  color: var(--text-dim);
+}
+.shortcut-remove {
+  display: flex;
+  align-items: center;
+  padding: 0 5px;
+  align-self: stretch;
+  color: var(--text-dim);
+  border-left: 1px solid var(--border);
+}
+.shortcut-remove:hover,
+.shortcut-add:hover {
+  color: var(--text);
+}
+.shortcut-add {
+  width: 22px;
+  border: 1px dashed var(--border);
+  border-radius: 5px;
+  color: var(--text-dim);
 }

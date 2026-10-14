@@ -13,9 +13,15 @@
 // from skipping past the next one. The space between sets is just wide
 // enough to keep the neighbours out of sight, so a swipe travels about
 // one view, and the first and last set get as much again outside them.
+//
+// A set is fitted to all of the view but a hair: the reading is the
+// point, so there is no frame of margin around it, and the pages of a
+// set sit a few pixels apart.
 
-/** Pages side by side within a set. */
-export const SET_GAP = 12;
+/** Pages side by side within a set (pdfviewer.css matches it). */
+export const SET_GAP = 4;
+/** The room left around a set, both ways together (CSS px). */
+export const PAGED_PAD = 8;
 
 /** The scale at which a set of `n` pages fits the view, both ways. */
 export function pagedFitZoom(

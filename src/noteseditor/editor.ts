@@ -1,25 +1,26 @@
 // The notes editor: CodeMirror 6 with Markdown parsed by lezer (GFM —
 // tables, strikethrough, task lists — and `==highlights==`), rendered
 // in place (livePreview), formatted from the keyboard (formatting),
-// Zotero links as pills (zoteroLinks), and the page-cite icon on the
-// line being written (citeGutter).
+// Zotero links as pills (zoteroLinks), the page-cite icon on the line
+// being written (citeGutter), and the reading questions offered on a
+// line begun with "?" (prompts).
 //
 // Plain DOM, like the PDF viewer; NotesEditor.tsx mounts it.
 import { defaultKeymap, history, historyKeymap, indentWithTab } from "@codemirror/commands";
 import { markdown, markdownKeymap, markdownLanguage } from "@codemirror/lang-markdown";
 import { syntaxHighlighting } from "@codemirror/language";
 import { EditorState } from "@codemirror/state";
-import { EditorView, keymap, placeholder } from "@codemirror/view";
+import { EditorView, keymap } from "@codemirror/view";
 import { citeGutter, setCiteEnabled, type CiteSource } from "./citeGutter";
 import { formattingKeymap } from "./formatting";
 import { HighlightSyntax } from "./highlightSyntax";
 import { livePreview } from "./livePreview";
+import { promptCompletion } from "./prompts";
 import { notesHighlight, notesTheme } from "./theme";
 import { zoteroLinks, type LinkHandlers } from "./zoteroLinks";
 
 export interface NotesEditorOptions extends LinkHandlers {
   doc: string;
-  placeholder: string;
   onChange: (text: string) => void;
   cite: CiteSource;
   /** The caret moved (or a selection changed) — once the writer has
@@ -68,7 +69,7 @@ export function createNotesEditor(parent: HTMLElement, opts: NotesEditorOptions)
         syntaxHighlighting(notesHighlight),
         EditorView.lineWrapping,
         EditorView.contentAttributes.of({ spellcheck: "true", autocapitalize: "sentences" }),
-        placeholder(opts.placeholder),
+        promptCompletion,
         livePreview,
         zoteroLinks({ follow: opts.follow, annotationColor: opts.annotationColor }),
         citeGutter(opts.cite),
@@ -111,6 +112,18 @@ export function createNotesEditor(parent: HTMLElement, opts: NotesEditorOptions)
         effects: top ? EditorView.scrollIntoView(Math.min(top, end), { y: "start" }) : undefined,
       });
       if (sel) caretPlaced = true;
+    },
+    /** Replace the whole text (an empty note's questions), the caret at
+     *  `caret`, and take focus. */
+    setDoc(text: string, caret: number): void {
+      view.dispatch({
+        changes: { from: 0, to: view.state.doc.length, insert: text },
+        selection: { anchor: Math.min(caret, text.length) },
+        userEvent: "input",
+        scrollIntoView: true,
+      });
+      caretPlaced = true;
+      view.focus();
     },
     /** Show the cite icon (the PDF for these notes is open). */
     setCiteEnabled(on: boolean): void {

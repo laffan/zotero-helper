@@ -61,6 +61,8 @@ export interface RendererEnv {
   getPages: () => PageRecord[];
   getPdfDoc: () => PDFDocumentProxy | null;
   getEffectiveZoom: () => number;
+  /** Size a page's wrapper at a scale (layout.ts sizePage). */
+  sizePage: (p: PageRecord, scale: number) => void;
   getLayoutMode: () => LayoutMode;
   isFolded: () => boolean;
   isDestroyed: () => boolean;
@@ -274,9 +276,7 @@ export function createPageRenderer(scrollArea: HTMLElement, env: RendererEnv) {
           Math.abs(vp1.height - p.viewport.height) > 0.5
         ) {
           p.viewport = vp1;
-          const s = env.getEffectiveZoom();
-          p.wrapper.style.width = `${Math.round(vp1.width * s)}px`;
-          p.wrapper.style.height = `${Math.round(vp1.height * s)}px`;
+          env.sizePage(p, env.getEffectiveZoom());
           invalidateGeometry();
         } else {
           p.viewport = vp1;

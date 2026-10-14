@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+import type { Appearance } from "./appearance";
 import { applyPending } from "./pendingAnnotations";
 import { noteOpened } from "./recent";
 import type {
@@ -85,6 +86,10 @@ interface UiPrefs {
   metaHidden: boolean;
   /** The open PDF's outline panel, at the reader's left. */
   outlineOpen: boolean;
+  /** Settings → General (lib/appearance.ts). */
+  appearance: Appearance;
+  /** The UI's base font size, px (13 is the size it was drawn at). */
+  uiFontSize: number;
 }
 
 export interface FolderView {
@@ -205,6 +210,8 @@ interface AppStore extends UiPrefs {
   setSidebarHidden: (b: boolean) => void;
   setMetaHidden: (b: boolean) => void;
   setOutlineOpen: (b: boolean) => void;
+  setAppearance: (a: Appearance) => void;
+  setUiFontSize: (px: number) => void;
   setReading: (r: ReadingState | null) => void;
   setCachedPdfs: (list: CachedPdf[]) => void;
   setPdfDownloading: (attKey: string, on: boolean) => void;
@@ -249,6 +256,8 @@ export const useStore = create<AppStore>()(
       sidebarHidden: false,
       metaHidden: false,
       outlineOpen: false,
+      appearance: "system" as Appearance,
+      uiFontSize: 13,
       uiTasks: [],
       uiTaskLabel: "",
 
@@ -400,6 +409,8 @@ export const useStore = create<AppStore>()(
       setSidebarHidden: (sidebarHidden) => set({ sidebarHidden }),
       setMetaHidden: (metaHidden) => set({ metaHidden }),
       setOutlineOpen: (outlineOpen) => set({ outlineOpen }),
+      setAppearance: (appearance) => set({ appearance }),
+      setUiFontSize: (uiFontSize) => set({ uiFontSize }),
       setReading: (reading) => {
         // Every PDF opened joins the sidebar's Recent folder.
         if (reading?.attKey) noteOpened(reading.itemKey, reading.attKey);
@@ -482,6 +493,8 @@ export const useStore = create<AppStore>()(
         sidebarHidden: s.sidebarHidden,
         metaHidden: s.metaHidden,
         outlineOpen: s.outlineOpen,
+        appearance: s.appearance,
+        uiFontSize: s.uiFontSize,
       }),
     },
   ),

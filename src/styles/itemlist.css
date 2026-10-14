@@ -22,7 +22,7 @@
 }
 .list-header .col {
   text-align: left;
-  font-size: 11px;
+  font-size: calc(11px * var(--font-scale));
   font-weight: 600;
   color: var(--text-dim);
   padding: 6px 8px;
@@ -166,7 +166,7 @@
   border-radius: 5px;
   background: var(--text);
   color: var(--panel);
-  font-size: 11px;
+  font-size: calc(11px * var(--font-scale));
   font-weight: 500;
   line-height: 1.35;
   white-space: normal;
@@ -210,7 +210,7 @@
   gap: 12px;
   border-top: 1px solid var(--border);
   padding: 5px 10px;
-  font-size: 11px;
+  font-size: calc(11px * var(--font-scale));
   color: var(--text-dim);
   background: var(--panel);
 }
@@ -260,7 +260,7 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 11px;
+  font-size: calc(11px * var(--font-scale));
   color: var(--text-dim);
   margin-top: 3px;
   overflow: hidden;
@@ -363,11 +363,11 @@
   align-items: center;
   gap: 5px;
   margin-left: auto;
-  font-size: 11px;
+  font-size: calc(11px * var(--font-scale));
   color: var(--text-dim);
 }
 .view-sort select {
-  font-size: 11px;
+  font-size: calc(11px * var(--font-scale));
   padding: 2px 4px;
 }
 
@@ -391,7 +391,7 @@
 /* An emoji-named tag shows its glyph instead of the swatch. Sized to sit
    on the text baseline without pushing the row taller. */
 .tag-emoji {
-  font-size: 12px;
+  font-size: calc(12px * var(--font-scale));
   line-height: 1;
   flex-shrink: 0;
   font-family: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji",
@@ -405,7 +405,7 @@
   height: 7px;
 }
 .icon-sub .tag-emoji {
-  font-size: 10px;
+  font-size: calc(10px * var(--font-scale));
 }
 
 /* --- Icon (thumbnail) view --- */
@@ -489,7 +489,7 @@
   color: var(--accent);
 }
 .icon-title {
-  font-size: 11px;
+  font-size: calc(11px * var(--font-scale));
   line-height: 1.25;
   max-height: 2.5em;
   overflow: hidden;
@@ -498,7 +498,7 @@
   display: flex;
   align-items: center;
   gap: 4px;
-  font-size: 10px;
+  font-size: calc(10px * var(--font-scale));
   color: var(--text-dim);
 }
 .icon-sub-text {

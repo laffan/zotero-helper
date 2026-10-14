@@ -59,12 +59,12 @@
   font-weight: 600;
 }
 .toolbar-doc-byline {
-  font-size: 11px;
+  font-size: calc(11px * var(--font-scale));
   color: var(--text-dim);
 }
 .recent-pdfs-empty {
   padding: 6px 8px;
-  font-size: 12px;
+  font-size: calc(12px * var(--font-scale));
   color: var(--text-dim);
 }
 .recent-pdfs-list {
@@ -141,7 +141,7 @@
   align-items: center;
   gap: 4px;
   min-width: 0;
-  font-size: 12px;
+  font-size: calc(12px * var(--font-scale));
 }
 .search-dates input {
   width: 4.5em;
@@ -156,7 +156,7 @@
   color: var(--text-dim);
 }
 .pdf-search-count {
-  font-size: 11px;
+  font-size: calc(11px * var(--font-scale));
   color: var(--text-dim);
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
@@ -202,14 +202,14 @@
 .pdf-hit-page {
   flex-shrink: 0;
   width: 3.6em;
-  font-size: 11px;
+  font-size: calc(11px * var(--font-scale));
   color: var(--text-dim);
   font-variant-numeric: tabular-nums;
 }
 .pdf-hit-text {
   flex: 1;
   min-width: 0;
-  font-size: 12px;
+  font-size: calc(12px * var(--font-scale));
   line-height: 1.4;
   display: -webkit-box;
   -webkit-box-orient: vertical;
@@ -224,7 +224,7 @@
 }
 .pdf-hits-more {
   padding: 8px;
-  font-size: 12px;
+  font-size: calc(12px * var(--font-scale));
   color: var(--accent);
   border-radius: 5px;
 }
@@ -255,7 +255,7 @@
   cursor: default;
 }
 .menu-item span {
-  font-size: 11px;
+  font-size: calc(11px * var(--font-scale));
   color: var(--text-dim);
 }
 /* Divides a menu's groups — cleanup actions above, conversations below. */

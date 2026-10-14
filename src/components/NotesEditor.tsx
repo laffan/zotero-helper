@@ -6,16 +6,18 @@
 // With the entry's PDF open beside it, the viewer sends quotes, page
 // citations and highlights here (insertIntoNotes), Zotero links move the
 // viewer instead of opening Zotero, and the line being written gets the
-// cite-this-page icon.
+// cite-this-page icon. An empty note shows the reading questions to
+// start from (NotesPrompts).
 import { openUrl } from "@tauri-apps/plugin-opener";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { openInZotero } from "../lib/actions";
 import { annotationByKey, parsePdfLink, pdfLink } from "../lib/highlights";
-import { NOTES_FILENAME, pushNote, registerNotesInserter, saveNote } from "../lib/notes";
+import { pushNote, registerNotesInserter, saveNote } from "../lib/notes";
 import { lastUi, saveUi } from "../lib/recent";
 import { appLog, useStore } from "../lib/store";
 import type { NoteMeta } from "../lib/types";
 import type { NotesEditorHandle } from "../noteseditor/editor";
+import { NotesPrompts } from "./NotesPrompts";
 import { currentReaderPage, showInReader } from "./ReaderPane";
 
 const SAVE_DELAY_MS = 600;
@@ -56,7 +58,19 @@ export function NotesEditor({ itemKey, initialText, initialMeta, pdfAttKey }: Pr
   const [pushing, setPushing] = useState(false);
   const [, tick] = useState(0);
   const hostRef = useRef<HTMLDivElement>(null);
+  const wrapRef = useRef<HTMLDivElement>(null);
   const editorRef = useRef<NotesEditorHandle | null>(null);
+  const [empty, setEmpty] = useState(initialText === "");
+  // Where the first line starts, for the questions an empty note shows.
+  const [firstLine, setFirstLine] = useState<{ top: number; left: number } | null>(null);
+  const measure = useCallback(() => {
+    const view = editorRef.current?.view;
+    const wrap = wrapRef.current;
+    const at = view?.coordsAtPos(0);
+    if (!wrap || !at) return setFirstLine(null);
+    const box = wrap.getBoundingClientRect();
+    setFirstLine({ top: Math.round(at.top - box.top), left: Math.round(at.left - box.left) });
+  }, []);
   const pending = useRef<string | null>(null);
   const timer = useRef(0);
 
@@ -95,8 +109,8 @@ export function NotesEditor({ itemKey, initialText, initialMeta, pdfAttKey }: Pr
       if (cancelled) return;
       handle = createNotesEditor(host, {
         doc: initialText,
-        placeholder: `Write notes in Markdown. They're saved on this device and kept in Zotero as ${NOTES_FILENAME}.`,
         onChange: (text) => {
+          setEmpty(text === "");
           pending.current = text;
           clearTimeout(timer.current);
           timer.current = window.setTimeout(() => void flush(), SAVE_DELAY_MS);
@@ -116,6 +130,7 @@ export function NotesEditor({ itemKey, initialText, initialMeta, pdfAttKey }: Pr
       editorRef.current = handle;
       handle.setCiteEnabled(pdfOpenRef.current);
       restorePlace();
+      requestAnimationFrame(measure);
       handle.view.scrollDOM.addEventListener("scroll", onScroll, { passive: true });
       registerNotesInserter((md) => handle?.insert(md));
     });
@@ -141,8 +156,18 @@ export function NotesEditor({ itemKey, initialText, initialMeta, pdfAttKey }: Pr
     // The PDF opening beside notes already showing: back to the place
     // they were left at beside it.
     if (pdfOpen) restorePlace();
+    // The cite icon's gutter moves the first line.
+    requestAnimationFrame(measure);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pdfOpen]);
+
+  useEffect(() => {
+    const wrap = wrapRef.current;
+    if (!wrap || !empty) return;
+    const ro = new ResizeObserver(() => measure());
+    ro.observe(wrap);
+    return () => ro.disconnect();
+  }, [empty, measure]);
 
   // Keep "pushed 3 min ago" honest.
   useEffect(() => {
@@ -182,7 +207,17 @@ export function NotesEditor({ itemKey, initialText, initialMeta, pdfAttKey }: Pr
           )}
         </div>
       )}
-      <div className="notes-cm" ref={hostRef} />
+      <div className="notes-cm-wrap" ref={wrapRef}>
+        <div className="notes-cm" ref={hostRef} />
+        {empty && (
+          <NotesPrompts
+            itemKey={itemKey}
+            at={firstLine}
+            setDoc={(text, caret) => editorRef.current?.setDoc(text, caret)}
+            focusEditor={() => editorRef.current?.focus()}
+          />
+        )}
+      </div>
     </div>
   );
 }

@@ -11,7 +11,7 @@ body,
 }
 body {
   font-family: var(--sans);
-  font-size: 13px;
+  font-size: calc(13px * var(--font-scale));
   color: var(--text);
   background: var(--bg);
   overflow: hidden;

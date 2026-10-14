@@ -2,7 +2,7 @@
 // Repository rule: no code file of ANY kind (Rust, TS/TSX, CSS, scripts…)
 // may exceed 700 lines. Runs as part of `npm run build`; run standalone via
 // `npm run check:lines`. When a file approaches the limit, split it by
-// feature (see "Code organization rules" in README.md) — do not raise LIMIT.
+// feature (see "Code organization rules" in README_TECHNICAL.md) — do not raise LIMIT.
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -46,7 +46,7 @@ if (violations.length) {
     console.error(`  ${String(v.lines).padStart(5)}  ${v.file}`);
   }
   console.error(
-    "\nSplit these by feature (see 'Code organization rules' in README.md).",
+    "\nSplit these by feature (see 'Code organization rules' in README_TECHNICAL.md).",
   );
   process.exit(1);
 }

@@ -1,6 +1,8 @@
 // The viewer's bottom bar, built as plain DOM and handed back as a flat
 // record so viewer.ts can wire every handler in one place. No state
 // lives here (ported from Hush's src/pdf/pdf-toolbar-build.js).
+import type { LayoutMode } from "./types";
+import type { FitMode } from "./viewPrefs";
 import {
   CONTINUOUS_ICON,
   FILTER_ICON,
@@ -97,4 +99,43 @@ export function buildPdfToolbar() {
     foldBtn, foldFilterBtn,
     pageIndicator, zoteroLink, thumbnailBtn,
   };
+}
+export type PdfToolbar = ReturnType<typeof buildPdfToolbar>;
+
+/** The viewer's modes, as the bar shows them. */
+export interface ToolbarState {
+  layoutMode: LayoutMode;
+  fitMode: FitMode;
+  folded: boolean;
+  /** The fixed view (sets of pages) is on. */
+  paged: boolean;
+  foldedZoom: number;
+  /** The scale, for the fixed-zoom label. */
+  zoom: () => number;
+}
+
+/** Light the buttons for the modes in force, label the zoom, and show
+ *  only the controls that apply. */
+export function syncToolbar(tb: PdfToolbar, s: ToolbarState): void {
+  const isVert = s.layoutMode === "vertical";
+  if (s.folded) {
+    tb.zoomLabel.textContent =
+      Math.abs(s.foldedZoom - 1) < 0.01 ? "Folded" : `Folded ${Math.round(s.foldedZoom * 100)}%`;
+  } else if (s.layoutMode !== "fixed") {
+    const labels: Record<FitMode, string> = { fit: "Fit", "fit-2": "Fit 2", "fit-3": "Fit 3" };
+    tb.zoomLabel.textContent = isVert || s.paged ? labels[s.fitMode] : "Fit";
+  } else {
+    tb.zoomLabel.textContent = `${Math.round(s.zoom() * 100)}%`;
+  }
+  tb.scrollHBtn.classList.toggle("active", s.layoutMode === "horizontal");
+  tb.scrollVBtn.classList.toggle("active", isVert);
+  tb.fitToggleWrap.style.display = isVert || s.paged ? "" : "none";
+  tb.pageModeWrap.classList.toggle("vertical", s.layoutMode !== "horizontal");
+  tb.fixedBtn.classList.toggle("active", s.paged);
+  tb.continuousBtn.classList.toggle("active", !s.folded && !s.paged);
+  tb.fitOneBtn.classList.toggle("active", s.fitMode === "fit" && !s.folded);
+  tb.fitTwoBtn.classList.toggle("active", s.fitMode === "fit-2");
+  tb.fitThreeBtn.classList.toggle("active", s.fitMode === "fit-3");
+  tb.foldBtn.classList.toggle("active", s.folded);
+  tb.foldFilterBtn.style.display = s.folded ? "" : "none";
 }

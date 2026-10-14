@@ -2,8 +2,9 @@
 // class each one uses (pdfviewer.css), and the scale it fits pages at.
 // The modes themselves — which one is on, and switching between them —
 // are viewer.ts's.
-import { pagedFitZoom } from "./paged";
-import type { LayoutMode, PageViewport } from "./types";
+import { cropWrapper, croppedSize, type Crop } from "./crop";
+import { pagedFitZoom, PAGED_PAD, SET_GAP, setPagedGap } from "./paged";
+import type { LayoutMode, PageRecord, PageViewport } from "./types";
 import type { FitMode } from "./viewPrefs";
 
 export interface LayoutState {
@@ -16,11 +17,13 @@ export interface LayoutState {
   perSet: number;
   foldedZoom: number;
   fixedZoom: number;
+  /** The fixed view's trim (crop.ts), when one is in effect. */
+  crop: Crop | null;
 }
 
 const LAYOUT_CLASSES = [
   "pdf-layout-fit", "pdf-layout-fixed", "pdf-layout-horizontal", "pdf-layout-folded", "pdf-layout-pagedv",
-  "pdf-paged", "pdf-paged-1", "pdf-paged-2", "pdf-paged-3",
+  "pdf-paged", "pdf-paged-1", "pdf-paged-2", "pdf-paged-3", "pdf-cropped",
 ];
 
 export function applyLayoutClasses(area: HTMLElement, s: LayoutState): void {
@@ -34,6 +37,7 @@ export function applyLayoutClasses(area: HTMLElement, s: LayoutState): void {
       `pdf-paged-${s.perSet}`,
     );
     area.style.setProperty("--pdf-paged-cols", String(s.perSet));
+    if (s.crop) area.classList.add("pdf-cropped");
   } else if (s.folded) area.classList.add("pdf-layout-folded");
   else if (s.layoutMode === "vertical") {
     area.classList.add(s.fitMode === "fit" ? "pdf-layout-fit" : "pdf-layout-fixed");
@@ -45,7 +49,7 @@ export function applyLayoutClasses(area: HTMLElement, s: LayoutState): void {
 export function fitZoom(area: HTMLElement, first: PageViewport, s: LayoutState): number {
   const pad = 40;
   const gap = 12;
-  if (s.paged) return pagedFitZoom(area, first, pad, s.perSet);
+  if (s.paged) return pagedFitZoom(area, croppedSize(first, s.crop), PAGED_PAD, s.perSet);
   if (s.layoutMode === "vertical") {
     const availW = area.clientWidth - pad;
     if (s.folded) return (availW / first.width) * s.foldedZoom;
@@ -55,4 +59,25 @@ export function fitZoom(area: HTMLElement, first: PageViewport, s: LayoutState):
   }
   if (s.layoutMode === "horizontal") return (area.clientHeight - pad) / first.height;
   return s.fixedZoom;
+}
+
+/** Size a page's wrapper at `scale` — and, in the fixed view, close up
+ *  the room its trimmed edges would take (crop.ts). */
+export function sizePage(p: PageRecord, scale: number, crop: Crop | null): void {
+  const w = Math.round(p.viewport.width * scale);
+  const h = Math.round(p.viewport.height * scale);
+  p.wrapper.style.width = `${w}px`;
+  p.wrapper.style.height = `${h}px`;
+  cropWrapper(p.wrapper, w, h, crop);
+}
+
+/** The fixed view's spacing, from page 1's (trimmed) size at this
+ *  scale: a set is n pages across side by side, one page tall top to
+ *  bottom. */
+export function sizePagedGap(area: HTMLElement, pages: PageRecord[], scale: number, s: LayoutState): void {
+  const vp = pages[0] ? croppedSize(pages[0].viewport, s.crop) : null;
+  const horiz = s.layoutMode === "horizontal";
+  const n = s.perSet;
+  const size = !vp ? 0 : horiz ? n * vp.width * scale + (n - 1) * SET_GAP : vp.height * scale;
+  setPagedGap(area, s.paged && Boolean(vp), horiz, size);
 }

@@ -1,16 +1,16 @@
-// Settings → Storage: what this app keeps on the device. Highlights and
+// Settings → Cache: what this app keeps on the device. Highlights and
 // downloaded PDFs both take room, so the library cache (its size, what
 // it holds, when it was last refreshed) and the PDF cache are reported
 // separately, and the PDF cache can be emptied or trimmed one file at a
 // time. Thumbnails can be cleared too; notes are listed but not
 // clearable here, since they may hold words not yet pushed to Zotero.
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { refreshCachedPdfs } from "../lib/notes";
-import { forgetThumbnails } from "../lib/thumbnails";
-import { appLog, useStore } from "../lib/store";
-import { invoke } from "../lib/tauri";
-import type { StorageReport } from "../lib/types";
-import { Spinner, TrashIcon } from "./Icons";
+import { refreshCachedPdfs } from "../../lib/notes";
+import { forgetThumbnails } from "../../lib/thumbnails";
+import { appLog, useStore } from "../../lib/store";
+import { invoke } from "../../lib/tauri";
+import type { StorageReport } from "../../lib/types";
+import { Spinner, TrashIcon } from "../Icons";
 
 function formatBytes(n: number): string {
   if (n < 1024) return `${n} B`;
@@ -28,7 +28,7 @@ function when(ms: number): string {
   return ms ? new Date(ms).toLocaleString() : "never";
 }
 
-export function StorageSettings() {
+export function CacheSettings() {
   const library = useStore((s) => s.library);
   const cachedPdfs = useStore((s) => s.cachedPdfs);
   const [report, setReport] = useState<StorageReport | null>(null);
@@ -76,7 +76,10 @@ export function StorageSettings() {
 
   return (
     <>
-      <h2>Storage on this device</h2>
+      <p className="hint">
+        What the app keeps on this device. Clearing any of it only frees
+        space — the copy of record stays in Zotero.
+      </p>
       <div className="storage-block">
         <div className="storage-line">
           <strong>Zotero library cache</strong>

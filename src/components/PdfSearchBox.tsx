@@ -55,20 +55,9 @@ export function PdfSearchBox({ attKey }: { attKey: string }) {
     input.current?.focus();
   };
 
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && !e.shiftKey && !e.altKey && e.key.toLowerCase() === "f") {
-        e.preventDefault();
-        input.current?.focus();
-        input.current?.select();
-      }
-    };
-    window.addEventListener("keydown", onKey);
-    return () => {
-      window.removeEventListener("keydown", onKey);
-      window.clearTimeout(timer.current);
-    };
-  }, []);
+  // ⌘F coming back here is the app's "Focus the search field"
+  // shortcut (lib/shortcuts/).
+  useEffect(() => () => window.clearTimeout(timer.current), []);
 
   // Keep the current match in sight as Enter steps through the list.
   const current = status?.current ?? 0;

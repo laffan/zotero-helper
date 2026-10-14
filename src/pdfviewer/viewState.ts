@@ -1,10 +1,11 @@
 // A PDF's viewer state, kept per PDF so it reopens as it was left —
 // on switching to another PDF and back, and between sessions: the
 // layout (scroll direction, fit, fixed sets, zoom), the folded view
-// with its zoom and filter, and the place in the document, finer than
-// the page. The record lives with the PDF's last page (lib/recent.ts);
+// with its zoom and filter, the fixed view's trim, and the place in the
+// document, finer than the page. The record lives with the PDF's last page (lib/recent.ts);
 // a PDF without one opens in the layout last chosen (viewPrefs.ts).
 import type { ViewAnchor } from "./anchor";
+import type { Crop } from "./crop";
 import type { LayoutMode } from "./types";
 import type { FitMode, ViewPrefs } from "./viewPrefs";
 
@@ -27,6 +28,8 @@ export interface SavedView extends ViewPrefs {
   at?: ViewAnchor;
   /** The place, folded. */
   foldAt?: FoldAnchor;
+  /** The fixed view's trim (crop.ts), if the reader set one. */
+  crop?: Crop | null;
 }
 
 /** The layout a viewer starts in: the PDF's own, else the last chosen,

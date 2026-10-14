@@ -1,0 +1,17 @@
+/* Moving around from the keyboard (src/lib/shortcuts/): the pane the
+   arrows act in is outlined while the keyboard is in use, and the
+   sidebar's cursor marks the folder Return would open. */
+.panes[data-kbd-pane="sidebar"] > .sidebar,
+.panes[data-kbd-pane="list"] > .item-list,
+.panes[data-kbd-pane="meta"] > .meta-panel {
+  /* An outline, not an inset shadow: it is drawn over the pane's
+     rows and headers rather than under them. */
+  outline: 2px solid color-mix(in srgb, var(--accent) 45%, transparent);
+  outline-offset: -2px;
+}
+.tree-row[data-kbd-cursor] {
+  box-shadow: inset 0 0 0 1.5px var(--accent);
+}
+.panes:not([data-kbd-pane="sidebar"]) .tree-row[data-kbd-cursor] {
+  box-shadow: none;
+}

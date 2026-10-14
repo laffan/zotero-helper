@@ -3,7 +3,7 @@
 
 /* --- Conversation list --- */
 .chat-list-heading {
-  font-size: 11px;
+  font-size: calc(11px * var(--font-scale));
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.06em;
@@ -42,7 +42,7 @@
   white-space: nowrap;
 }
 .chat-row-context {
-  font-size: 11px;
+  font-size: calc(11px * var(--font-scale));
   color: var(--text-dim);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -52,7 +52,7 @@
 /* --- "View Titles": the works, in the Questions list and in a
    conversation's own header --- */
 .work-titles {
-  font-size: 11px;
+  font-size: calc(11px * var(--font-scale));
   color: var(--text-dim);
   margin-top: 3px;
 }
@@ -81,7 +81,7 @@
   display: list-item;
 }
 .work-titles .link-btn {
-  font-size: 11px;
+  font-size: calc(11px * var(--font-scale));
   padding: 0;
   word-break: normal;
   overflow-wrap: anywhere;
@@ -101,7 +101,7 @@
   flex-direction: column;
   align-items: flex-end;
   gap: 2px;
-  font-size: 11px;
+  font-size: calc(11px * var(--font-scale));
   color: var(--text-dim);
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
@@ -145,12 +145,12 @@
   line-height: 1.3;
 }
 .chat-head-sub {
-  font-size: 11px;
+  font-size: calc(11px * var(--font-scale));
   color: var(--text-dim);
   margin-top: 3px;
 }
 .chat-head-warn {
-  font-size: 11px;
+  font-size: calc(11px * var(--font-scale));
   color: var(--warn);
   margin-top: 3px;
 }
@@ -165,14 +165,14 @@
 }
 .chat-empty {
   color: var(--text-dim);
-  font-size: 12px;
+  font-size: calc(12px * var(--font-scale));
   padding: 20px 0;
   text-align: center;
 }
 .chat-msg-body {
   /* The question is shown as typed, line breaks and all. */
   white-space: pre-wrap;
-  font-size: 13px;
+  font-size: calc(13px * var(--font-scale));
   line-height: 1.55;
   overflow-wrap: anywhere;
 }
@@ -198,7 +198,7 @@
 .chat-md h2,
 .chat-md h3,
 .chat-md h4 {
-  font-size: 13px;
+  font-size: calc(13px * var(--font-scale));
   font-weight: 600;
   margin: 14px 0 5px;
 }
@@ -219,7 +219,7 @@
 }
 .chat-md code {
   font-family: var(--mono);
-  font-size: 11.5px;
+  font-size: calc(11.5px * var(--font-scale));
   background: var(--panel);
   border: 1px solid var(--border);
   border-radius: 4px;
@@ -266,7 +266,7 @@
   border-radius: 999px;
   background: var(--panel);
   color: var(--text);
-  font-size: 11px;
+  font-size: calc(11px * var(--font-scale));
   line-height: 1.5;
   white-space: nowrap;
 }
@@ -318,7 +318,7 @@
 }
 .chat-md-table table {
   border-collapse: collapse;
-  font-size: 12px;
+  font-size: calc(12px * var(--font-scale));
   min-width: 100%;
 }
 .chat-md-table th,
@@ -373,13 +373,13 @@
 }
 .chat-compose textarea {
   resize: vertical;
-  font-size: 13px;
+  font-size: calc(13px * var(--font-scale));
 }
 .chat-meter {
   display: flex;
   align-items: center;
   gap: 10px;
-  font-size: 11px;
+  font-size: calc(11px * var(--font-scale));
   color: var(--text-dim);
   font-variant-numeric: tabular-nums;
 }
@@ -402,7 +402,7 @@
 }
 .chat-actions .tool-btn {
   border-color: var(--border);
-  font-size: 12px;
+  font-size: calc(12px * var(--font-scale));
 }
 
 /* --- Cost popup --- */
@@ -417,16 +417,16 @@
   gap: 2px;
 }
 .ask-cost-headline strong {
-  font-size: 20px;
+  font-size: calc(20px * var(--font-scale));
 }
 .ask-cost-headline span {
-  font-size: 12px;
+  font-size: calc(12px * var(--font-scale));
   color: var(--text-dim);
 }
 .ask-cost-table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 13px;
+  font-size: calc(13px * var(--font-scale));
 }
 .ask-cost-table th {
   text-align: left;
@@ -441,11 +441,11 @@
 }
 .ask-cost-note {
   display: block;
-  font-size: 11px;
+  font-size: calc(11px * var(--font-scale));
   color: var(--text-dim);
 }
 .ask-cost-warn {
-  font-size: 12px;
+  font-size: calc(12px * var(--font-scale));
   color: var(--warn);
   line-height: 1.5;
 }
@@ -484,13 +484,13 @@
 }
 .page-view-title {
   font-weight: 600;
-  font-size: 13px;
+  font-size: calc(13px * var(--font-scale));
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 .page-view-sub {
-  font-size: 11px;
+  font-size: calc(11px * var(--font-scale));
   color: var(--text-dim);
 }
 .page-view-stage {
@@ -525,7 +525,7 @@
   align-items: center;
   gap: 6px;
   color: var(--text-dim);
-  font-size: 12px;
+  font-size: calc(12px * var(--font-scale));
   padding: 40px 0;
 }
 .page-view-actions {

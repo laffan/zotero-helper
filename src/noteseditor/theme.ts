@@ -30,7 +30,7 @@ export const notesHighlight = HighlightStyle.define([
 export const notesTheme = EditorView.theme({
   "&": {
     height: "100%",
-    fontSize: "13.5px",
+    fontSize: "calc(13.5px * var(--font-scale))",
     backgroundColor: "var(--panel-alt)",
     color: "var(--text)",
   },
@@ -62,7 +62,7 @@ export const notesTheme = EditorView.theme({
   },
   ".cm-md-codeblock": {
     fontFamily: "var(--mono)",
-    fontSize: "12px",
+    fontSize: "calc(12px * var(--font-scale))",
     backgroundColor: "color-mix(in srgb, var(--text) 6%, transparent)",
   },
   ".cm-md-hr": { color: "var(--text-dim)" },

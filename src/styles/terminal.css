@@ -27,21 +27,21 @@
 }
 .terminal-title {
   font-weight: 600;
-  font-size: 12px;
+  font-size: calc(12px * var(--font-scale));
   margin-right: auto;
 }
 .terminal-pin {
   display: flex;
   gap: 4px;
   align-items: center;
-  font-size: 11px;
+  font-size: calc(11px * var(--font-scale));
   color: var(--text-dim);
 }
 .terminal-body {
   flex: 1;
   overflow-y: auto;
   font-family: var(--mono);
-  font-size: 11px;
+  font-size: calc(11px * var(--font-scale));
   line-height: 1.55;
   padding: 6px 10px;
   user-select: text;

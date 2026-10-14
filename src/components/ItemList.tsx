@@ -20,6 +20,7 @@ import { startItemDrag } from "../lib/dragdrop";
 import { trackPointerDrag } from "../lib/dragGesture";
 import { readItem } from "../lib/notes";
 import { RECENT, useRecent } from "../lib/recent";
+import { gridNav, useListNav } from "../lib/shortcuts/listNav";
 import {
   DEFAULT_FOLDER_VIEW,
   THUMB_SCALE,
@@ -260,6 +261,24 @@ export function ItemList() {
     });
   };
   const pinItem = (item: ZItem) => togglePin(selectedCollection, item.key);
+
+  // The arrows and Return (lib/shortcuts/listNav.ts).
+  useListNav({
+    keys: items.map((i) => i.key),
+    open: (key) => {
+      const item = items.find((i) => i.key === key);
+      if (item) openItem(item);
+    },
+    columns: () => (iconMode ? gridNav.cols : 1),
+    reveal: (idx) => {
+      if (iconMode) return gridNav.reveal(idx);
+      const el = containerRef.current;
+      if (!el) return;
+      const top = jobsHeight + idx * ROW_HEIGHT;
+      if (top < el.scrollTop) el.scrollTop = top;
+      else if (top + ROW_HEIGHT > el.scrollTop + el.clientHeight) el.scrollTop = top + ROW_HEIGHT - el.clientHeight;
+    },
+  });
 
   // Recent keeps its own order, so no column claims to sort it.
   const isRecent = selectedCollection === RECENT && !searching;

@@ -7,6 +7,8 @@ import { REAL_KEY } from "../lib/collections";
 import { startPdfFetch } from "../lib/importer";
 import { closeReader } from "../lib/notes";
 import { useOutline } from "../lib/outline";
+import { toggleMeta, toggleSidebar } from "../lib/panels";
+import { shortcutHint } from "../lib/shortcuts/bindings";
 import { QUESTIONS, useStore } from "../lib/store";
 import {
   ArrowLeftIcon,
@@ -30,12 +32,6 @@ import { ShareMenuButton, SyncMenuButton } from "./ToolbarShareSync";
  *  meaning and are drawn a touch larger than the labelled buttons'. */
 const FOLDER_ICON = 20;
 
-/** The width at which the side panels turn into drawers (base.css). */
-const narrow = () => window.matchMedia("(max-width: 900px)").matches;
-/** …except the notes beside an open PDF, which stay in the row on a
- *  tablet (notes.css). */
-const notesInRow = () => window.matchMedia("(min-width: 600px)").matches;
-
 /** The open PDF's entry, named where the library's buttons would be. */
 export function Toolbar() {
   const {
@@ -46,14 +42,8 @@ export function Toolbar() {
     setLogOpen,
     setModal,
     setView,
-    sidebarOpen,
-    setSidebarOpen,
-    metaOpen,
-    setMetaOpen,
     sidebarHidden,
-    setSidebarHidden,
     metaHidden,
-    setMetaHidden,
   } = useStore();
   const reading = useStore((s) => s.reading);
   const hasOutline = Boolean(useOutline(reading?.attKey)?.length);
@@ -87,15 +77,6 @@ export function Toolbar() {
     ? collections.find((c) => c.key === selectedCollection)?.data?.name
     : undefined;
 
-  // Narrow windows slide the panels in as drawers; wide ones fold them
-  // out of the row.
-  const toggleSidebar = () =>
-    narrow() ? setSidebarOpen(!sidebarOpen) : setSidebarHidden(!sidebarHidden);
-  const toggleMeta = () =>
-    narrow() && !(reading && notesInRow())
-      ? setMetaOpen(!metaOpen)
-      : setMetaHidden(!metaHidden);
-
   const runAi = (action: () => Promise<void>) => {
     aiMenu.setOpen(false);
     void action();
@@ -126,7 +107,7 @@ export function Toolbar() {
         <button
           className="icon-btn"
           onClick={toggleSidebar}
-          title={sidebarHidden ? "Show the collections" : "Hide the collections"}
+          title={`${sidebarHidden ? "Show the collections" : "Hide the collections"}${shortcutHint("toggleLeft")}`}
           aria-label="Toggle collections"
         >
           <PanelLeft />
@@ -151,7 +132,7 @@ export function Toolbar() {
             <button
               className={`icon-btn ${outlineOpen ? "active" : ""}`}
               onClick={() => setOutlineOpen(!outlineOpen)}
-              title={outlineOpen ? "Hide the outline" : "Show the PDF's outline"}
+              title={`${outlineOpen ? "Hide the outline" : "Show the PDF's outline"}${shortcutHint("toggleLeft")}`}
               aria-label="Toggle outline"
               aria-pressed={outlineOpen}
             >
@@ -302,9 +283,9 @@ export function Toolbar() {
           className="icon-btn"
           onClick={toggleMeta}
           title={
-            metaHidden
+            (metaHidden
               ? reading ? "Show the notes" : "Show the details panel"
-              : reading ? "Hide the notes" : "Hide the details panel"
+              : reading ? "Hide the notes" : "Hide the details panel") + shortcutHint("toggleRight")
           }
           aria-label="Toggle details panel"
         >

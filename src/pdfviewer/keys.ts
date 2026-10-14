@@ -1,9 +1,10 @@
 // The viewer's keyboard: ⌘+ / ⌘- / ⌘0 (Ctrl elsewhere) zoom while it
-// is mounted, and ← / → turn the page while the pages have focus. A
-// handler that already spent the keystroke (defaultPrevented) wins.
-// Page steps count from the page last asked for, not the one a smooth
-// scroll has reached so far — the wheel in the fixed view uses the
-// same stepper, and there a step is a whole set of pages.
+// is mounted. A handler that already spent the keystroke
+// (defaultPrevented) wins. The page-turning keys are the app's
+// rebindable shortcuts (lib/shortcuts/, through commands.ts), which
+// use the stepper here: steps count from the page last asked for, not
+// the one a smooth scroll has reached so far — the wheel in the fixed
+// view uses the same stepper, and there a step is a whole set of pages.
 
 export interface ViewerKeyActions {
   stepZoom: (dir: 1 | -1) => void;
@@ -16,7 +17,7 @@ export interface ViewerKeyActions {
   goToPage: (n: number) => void;
 }
 
-export function attachViewerKeys(scrollArea: HTMLElement, act: ViewerKeyActions) {
+export function attachViewerKeys(act: ViewerKeyActions) {
   function onKeydown(e: KeyboardEvent): void {
     if (e.defaultPrevented) return;
     if (!(e.metaKey || e.ctrlKey) || e.shiftKey || e.altKey) return;
@@ -38,14 +39,6 @@ export function attachViewerKeys(scrollArea: HTMLElement, act: ViewerKeyActions)
     pageTarget = { page, at: performance.now() };
     act.goToPage(page);
   }
-  scrollArea.addEventListener("keydown", (e) => {
-    if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
-    if (e.defaultPrevented || e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return;
-    if (!act.pageCount()) return;
-    e.preventDefault();
-    stepPage(e.key === "ArrowRight" ? 1 : -1);
-  });
-
   return {
     stepPage,
     detach: () => window.removeEventListener("keydown", onKeydown),

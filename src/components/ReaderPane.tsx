@@ -25,6 +25,7 @@ import { setOutline, setReaderPage, useOutline } from "../lib/outline";
 import { flushSavedPage, lastPage, lastView, savePage } from "../lib/recent";
 import { appLog, useStore } from "../lib/store";
 import { invoke } from "../lib/tauri";
+import type { ViewerCommand } from "../pdfviewer/commands";
 import type { SearchOptions, SearchStatus } from "../pdfviewer/search";
 import type { PdfViewer } from "../pdfviewer/viewer";
 import { Spinner } from "./Icons";
@@ -45,6 +46,11 @@ export function showInReader(attKey: string, page?: number, annotationKey?: stri
  *  height on it in PDF units (null for its top). */
 export function goToReaderPosition(pageIndex: number, top: number | null): void {
   active?.viewer.goToPosition(pageIndex, top);
+}
+
+/** A keyboard command for the open viewer (lib/shortcuts/). */
+export function readerCommand(cmd: ViewerCommand): void {
+  active?.viewer.command(cmd);
 }
 
 /** The page the open viewer shows, when it shows `attKey`. */

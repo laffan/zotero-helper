@@ -567,6 +567,13 @@ no highlights are left out.
 
 ### AI
 
+The AI features — the toolbar's **AI** menu and **Questions** in the
+sidebar — show only once a service is connected: a key entered in
+Settings → AI for the service chosen there (`aiConnected` in
+`src/lib/ai/models.ts`). Without one they are hidden, not disabled;
+saved conversations stay on disk and come back with the key, and a
+remembered visit to Questions opens All Items instead.
+
 **AI Tidy Metadata** — with an API key configured, selected items are
 cleaned up by the model (grounded in a fresh CrossRef record when a DOI
 exists): casing, missing abstracts/pages/ISSNs, normalized author names.
@@ -672,7 +679,8 @@ it:
   library type, and PDF retrieval: the contact email for the
   Unpaywall/CrossRef polite pools and the pause between downloads.
 - **Cache** — what the app keeps on the device (see "Cache" above).
-- **AI** — the service, its key and the model.
+- **AI** — the service, its key and the model. Until a key is in, the
+  AI menu and Questions are hidden (see "AI" above).
 - **Keyboard Shortcuts** — every rebindable shortcut, grouped by where
   it works, plus a list of the built-in ones. See below.
 

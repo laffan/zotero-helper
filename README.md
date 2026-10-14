@@ -270,7 +270,11 @@ Windows/Linux desktops too).
   it. Coming out, what was at the centre (on the open page, or the fold
   nearest the centre) stays there. A fold
   draws only its own strip of the page (all of it once expanded), so a
-  screen of folds costs about what a screen of pages does to scroll. Hush's annotation shelf is left out: the
+  screen of folds costs about what a screen of pages does to scroll —
+  and an hour in the folded view costs what a minute does: what a fold
+  out of reach was holding (its raster, its text layer, pdf.js's copy
+  of its page) is let go, and the pages' own rasters are dropped while
+  the folds are up. Hush's annotation shelf is left out: the
   Highlights tab beside the viewer already lists, filters and quotes
   the same annotations. Beside the folded-view button, a **fixed /
   continuous** toggle (its icons turn with the scroll direction) chooses
@@ -503,7 +507,8 @@ src/            React + TypeScript UI (Vite, zustand, MiniSearch)
                 import/rescue modals, settings
   pdfviewer/    the PDF viewer beside the notes, ported from Hush (viewer,
                 render, paint (annotations into the rasters),
-                annotations, folds, thumbnails, links, toolbar,
+                annotations, folds and foldSpecs (the regions that
+                fold), thumbnails, links, toolbar,
                 viewPrefs (the layout last chosen), viewState (each
                 PDF's own, as it was left), layout (the modes' CSS
                 classes and fit scales)) plus paged (the

@@ -17,36 +17,29 @@
 // up nearest-first under the page renderer's concurrency limit, a strip
 // is kept until it is well out of view (scrolling back doesn't redraw),
 // and a fold's text layer is laid only when a pointer reaches it.
+//
+// Reading in the folded view for an hour must cost no more than reading
+// in it for a minute. So what a fold leaves behind is let go as it goes
+// out of reach: its raster, its text layer (only the last few laid are
+// kept), and what pdf.js holds for its page (the parsed page and its
+// decoded images, which pdf.js keeps until told to clean up — for a
+// scanned book, megabytes a page).
 import { annotationPosition, type Annotation } from "../lib/highlights";
-import { pdfPointToViewport } from "./annotations";
 import { drawAnnotations } from "./paint";
 import { COLLAPSE_ICON, EXPAND_ICON } from "./icons";
 import { renderTextLayer } from "./pageTools";
 import { createFoldFilterPopup } from "./foldFilter";
+import {
+  annotationExtent,
+  availableCombos,
+  computeFolds,
+  defaultFilter,
+  foldedPages,
+  type FoldSpec,
+} from "./foldSpecs";
 import { capRenderScale, MAX_CONCURRENT_RENDERS, releaseCanvas } from "./render";
-import type { PageRecord, PageViewport, PDFDocumentProxy } from "./types";
+import type { PageRecord, PDFDocumentProxy, PDFPageProxy } from "./types";
 import type { FoldAnchor } from "./viewState";
-
-const FOLD_PAD = 28; // page units (~2 text lines) above/below the annotation
-const MERGE_GAP = 16; // merge folds whose padded regions come this close
-
-/** Zotero red is #ff6666; accept the red family without catching
- *  orange (#f19837) or magenta (#e56eee). */
-function isRed(color: string): boolean {
-  const m = /^#?([0-9a-f]{6})$/i.exec((color || "").trim());
-  if (!m) return false;
-  const v = parseInt(m[1], 16);
-  const r = v >> 16;
-  const g = (v >> 8) & 0xff;
-  const b = v & 0xff;
-  return r >= 180 && g < 140 && b < 140;
-}
-
-interface FoldSpec {
-  pageIndex: number;
-  top: number;
-  bottom: number;
-}
 
 interface Fold extends FoldSpec {
   wrapper: HTMLDivElement;
@@ -68,6 +61,24 @@ interface Fold extends FoldSpec {
 /** Strips are dropped only this far out of view, so a short scroll
  *  back finds them still drawn. */
 const KEEP_MARGIN = "1500px";
+/** Text layers kept at once. Each is the whole page's words, one
+ *  element apiece, and on a touch screen every fold a scroll starts on
+ *  gets one; the oldest go first. */
+const MAX_TEXT_LAYERS = 6;
+/** How long after a fold lets go before its page's pdf.js data does. */
+const RELEASE_DELAY_MS = 1000;
+
+/** Adopt a page's real size; pages are seeded from page 1's until they
+ *  are drawn. True when it differed. */
+function adoptRealViewport(p: PageRecord, page: PDFPageProxy): boolean {
+  if (p.realViewport) return false;
+  const vp1 = page.getViewport({ scale: 1 });
+  const differed =
+    Math.abs(vp1.width - p.viewport.width) > 0.5 || Math.abs(vp1.height - p.viewport.height) > 0.5;
+  p.realViewport = true;
+  p.viewport = vp1;
+  return differed;
+}
 
 export interface FoldEnv {
   getPages: () => PageRecord[];
@@ -92,95 +103,22 @@ export function createFoldLayer(scrollArea: HTMLElement, env: FoldEnv) {
   let filter: Set<string> | null = null;
   let filterCustomized = false;
   let lastScale: number | null = null;
-  let lastAnnRef: Annotation[] | null = null;
   let lastFilterSig: string | null = null;
   // type:colour pairs marked in this viewer (see include()).
   const madeHere = new Set<string>();
-
-  const comboKey = (a: Annotation) => `${a.type}:${(a.color || "").toLowerCase()}`;
-
-  function availableCombos(): Map<string, { type: string; color: string; count: number }> {
-    const map = new Map<string, { type: string; color: string; count: number }>();
-    for (const a of env.getAnnotations()) {
-      if (typeof annotationPosition(a)?.pageIndex !== "number") continue;
-      const key = comboKey(a);
-      const entry = map.get(key) || { type: a.type, color: (a.color || "").toLowerCase(), count: 0 };
-      entry.count++;
-      map.set(key, entry);
-    }
-    return map;
-  }
+  // Folds with a text layer, oldest first.
+  let texted: Fold[] = [];
+  // Pages pdf.js has parsed for a fold, not yet told to let go.
+  const touched = new Set<number>();
+  let releaseTimer = 0;
+  let rebuildTimer = 0;
 
   function ensureFilter(): Set<string> {
-    if (filter) return filter;
-    const combos = availableCombos();
-    filter = new Set();
-    for (const [key, c] of combos) {
-      if ((c.type === "ink" || c.type === "highlight") && isRed(c.color)) filter.add(key);
-    }
-    for (const key of madeHere) if (combos.has(key)) filter.add(key);
-    if (!filter.size) for (const key of combos.keys()) filter.add(key);
+    filter ??= defaultFilter(availableCombos(env.getAnnotations()), madeHere);
     return filter;
   }
 
   const filterSig = () => [...ensureFilter()].sort().join(",");
-
-  /** Vertical extent of an annotation in top-based page units. */
-  function annotationExtent(annot: Annotation, viewport: PageViewport) {
-    const pos = annotationPosition(annot);
-    if (!pos) return null;
-    let top = Infinity;
-    let bottom = -Infinity;
-    const take = (x: number, y: number) => {
-      const [, vy] = pdfPointToViewport(viewport, x, y);
-      top = Math.min(top, vy);
-      bottom = Math.max(bottom, vy);
-    };
-    for (const r of pos.rects ?? []) {
-      if (!Array.isArray(r) || r.length < 4) continue;
-      take(r[0], r[1]);
-      take(r[2], r[3]);
-    }
-    for (const path of pos.paths ?? []) {
-      if (!Array.isArray(path)) continue;
-      for (let i = 1; i < path.length; i += 2) take(path[i - 1], path[i]);
-    }
-    return top === Infinity ? null : { top, bottom };
-  }
-
-  /** Padded, per-page-merged fold intervals for the active filter. */
-  function computeFolds(): FoldSpec[] {
-    const active = ensureFilter();
-    const pages = env.getPages();
-    const byPage = new Map<number, { top: number; bottom: number }[]>();
-    for (const a of env.getAnnotations()) {
-      if (!active.has(comboKey(a))) continue;
-      const pos = annotationPosition(a);
-      const p = pos ? pages[pos.pageIndex] : undefined;
-      if (!pos || !p) continue;
-      const ext = annotationExtent(a, p.viewport);
-      if (!ext) continue;
-      const list = byPage.get(pos.pageIndex) || [];
-      list.push({
-        top: Math.max(0, ext.top - FOLD_PAD),
-        bottom: Math.min(p.viewport.height, ext.bottom + FOLD_PAD),
-      });
-      byPage.set(pos.pageIndex, list);
-    }
-    const out: FoldSpec[] = [];
-    for (const idx of [...byPage.keys()].sort((a, b) => a - b)) {
-      const list = byPage.get(idx)!.sort((a, b) => a.top - b.top);
-      let cur: FoldSpec | null = null;
-      for (const iv of list) {
-        if (cur && iv.top <= cur.bottom + MERGE_GAP) cur.bottom = Math.max(cur.bottom, iv.bottom);
-        else {
-          cur = { pageIndex: idx, top: iv.top, bottom: iv.bottom };
-          out.push(cur);
-        }
-      }
-    }
-    return out;
-  }
 
   function teardownDom(): void {
     observer?.disconnect();
@@ -193,15 +131,80 @@ export function createFoldLayer(scrollArea: HTMLElement, env: FoldEnv) {
       f.wrapper.remove();
     }
     folds = [];
+    texted = [];
     emptyMsg?.remove();
     emptyMsg = null;
+    scheduleRelease();
+  }
+
+  /** Tell pdf.js to let go of the pages no fold is drawing or about to
+   *  draw (all of them, with `all`: leaving the folded view). It keeps
+   *  a page parsed, images decoded, until told — a drawn raster doesn't
+   *  need it, only drawing it again does. */
+  function releasePages(all = false): void {
+    window.clearTimeout(releaseTimer);
+    releaseTimer = 0;
+    const pdfDoc = env.getPdfDoc();
+    for (const idx of [...touched]) {
+      const busy =
+        !all &&
+        folds.some(
+          (f) => f.pageIndex === idx && (f.rendering || queue.includes(f) || (f.rendered && f.wrapper.isConnected)),
+        );
+      if (busy) continue;
+      touched.delete(idx);
+      // Deferred by pdf.js while a render of the page is still running.
+      void pdfDoc?.getPage(idx + 1).then((page) => page.cleanup()).catch(() => {});
+    }
+  }
+  function scheduleRelease(): void {
+    if (releaseTimer || !touched.size) return;
+    releaseTimer = window.setTimeout(() => {
+      releaseTimer = 0;
+      releasePages();
+    }, RELEASE_DELAY_MS);
+  }
+
+  /** Rebuild once, soon — however many folds learn their page's real
+   *  size in the meantime. */
+  function scheduleRebuild(): void {
+    if (rebuildTimer) return;
+    rebuildTimer = window.setTimeout(() => {
+      rebuildTimer = 0;
+      refresh(true);
+    }, 0);
+  }
+
+  /** Learn the real size of every page that folds, all at once. Pages
+   *  start at page 1's size, so a fold on a page of another size (a
+   *  JSTOR cover makes it every page) is misplaced until its page is
+   *  known; learning that one fold at a time, as each draws, meant a
+   *  rebuild of the whole view per page. */
+  function sizeFoldPages(): void {
+    const pdfDoc = env.getPdfDoc();
+    const pages = env.getPages();
+    if (!pdfDoc) return;
+    const todo = [...foldedPages(env.getAnnotations(), ensureFilter())].filter(
+      (i) => pages[i] && !pages[i].realViewport,
+    );
+    if (!todo.length) return;
+    void Promise.all(
+      todo.map((i) =>
+        pdfDoc
+          .getPage(i + 1)
+          .then((page) => env.getPages() === pages && adoptRealViewport(pages[i], page))
+          .catch(() => false),
+      ),
+    ).then((differed) => {
+      if (differed.some(Boolean) && enabled && env.getPdfDoc() === pdfDoc) scheduleRebuild();
+    });
   }
 
   function build(): void {
     teardownDom();
     const scale = env.getEffectiveZoom();
     const pages = env.getPages();
-    const specs = computeFolds();
+    const specs = computeFolds(env.getAnnotations(), pages, ensureFilter());
     if (!specs.length) {
       emptyMsg = document.createElement("div");
       emptyMsg.className = "pdf-fold-empty";
@@ -375,6 +378,8 @@ export function createFoldLayer(scrollArea: HTMLElement, env: FoldEnv) {
     f.rendered = false;
     f.full = false;
     f.text = false;
+    texted = texted.filter((t) => t !== f);
+    scheduleRelease();
   }
 
   /** Lay the fold's text layer, for selecting — on the first pointer
@@ -383,6 +388,17 @@ export function createFoldLayer(scrollArea: HTMLElement, env: FoldEnv) {
   function ensureText(f: Fold): void {
     if (f.text || !env.selectable || !f.rendered) return;
     f.text = true;
+    texted.push(f);
+    // Let the oldest go — not the open page's, nor one the selection
+    // is in.
+    const sel = window.getSelection();
+    for (const old of texted.slice(0, Math.max(0, texted.length - MAX_TEXT_LAYERS))) {
+      const layer = old.inner.querySelector(".textLayer");
+      if (old.expanded || (layer && sel?.anchorNode && layer.contains(sel.anchorNode))) continue;
+      layer?.remove();
+      old.text = false;
+      texted = texted.filter((t) => t !== old);
+    }
     const pdfDoc = env.getPdfDoc();
     if (!pdfDoc) return;
     void pdfDoc
@@ -438,21 +454,14 @@ export function createFoldLayer(scrollArea: HTMLElement, env: FoldEnv) {
     try {
       const page = await pdfDoc.getPage(fold.pageIndex + 1);
       if (!enabled || env.isDestroyed() || !fold.wrapper.isConnected) return;
-      // Pages are seeded from page 1's size until first render; adopt
-      // the real one here so folds on odd-sized pages correct themselves.
+      // A page sizeFoldPages hasn't reached yet: its folds are placed
+      // for page 1's size, so they are rebuilt (once, for all of them).
       const p = env.getPages()[fold.pageIndex];
-      if (p && !p.realViewport) {
-        const vp1 = page.getViewport({ scale: 1 });
-        const differed =
-          Math.abs(vp1.width - p.viewport.width) > 0.5 ||
-          Math.abs(vp1.height - p.viewport.height) > 0.5;
-        p.realViewport = true;
-        p.viewport = vp1;
-        if (differed) {
-          queueMicrotask(() => refresh(true));
-          return;
-        }
+      if (p && adoptRealViewport(p, page)) {
+        scheduleRebuild();
+        return;
       }
+      touched.add(fold.pageIndex);
       // The strip in view, or the whole page when expanded — a strip is
       // a few lines, and drawing all of the page for it is most of what
       // made scrolling folds slow.
@@ -506,14 +515,15 @@ export function createFoldLayer(scrollArea: HTMLElement, env: FoldEnv) {
     return emptyMsg ? emptyMsg.isConnected : false;
   }
 
+  // A changed annotation forces its own rebuild (onAnnotationsChanged),
+  // so here only the zoom and the filter count: a resize — the iPad's
+  // keyboard coming up for the notes — rebuilds nothing.
   function refresh(force = false): void {
     if (!enabled) return;
     const scale = env.getEffectiveZoom();
-    const annRef = env.getAnnotations();
     const sig = filterSig();
-    if (!force && scale === lastScale && annRef === lastAnnRef && sig === lastFilterSig && domAlive()) return;
+    if (!force && scale === lastScale && sig === lastFilterSig && domAlive()) return;
     lastScale = scale;
-    lastAnnRef = annRef;
     lastFilterSig = sig;
     // A rebuild (a mark made, the filter or the zoom changed) keeps the
     // open page open and the view where it was.
@@ -523,6 +533,7 @@ export function createFoldLayer(scrollArea: HTMLElement, env: FoldEnv) {
     const reopen = openPage === null ? undefined : folds.find((f) => f.pageIndex === openPage);
     if (reopen) setExpanded(reopen, true, true);
     if (anchor) restoreAnchor(anchor);
+    sizeFoldPages();
   }
 
   function enable(): void {
@@ -533,9 +544,11 @@ export function createFoldLayer(scrollArea: HTMLElement, env: FoldEnv) {
   function disable(): void {
     enabled = false;
     popup.close();
+    window.clearTimeout(rebuildTimer);
+    rebuildTimer = 0;
     teardownDom();
+    releasePages(true);
     lastScale = null;
-    lastAnnRef = null;
     lastFilterSig = null;
   }
 
@@ -626,7 +639,7 @@ export function createFoldLayer(scrollArea: HTMLElement, env: FoldEnv) {
   }
 
   const popup = createFoldFilterPopup({
-    combos: availableCombos,
+    combos: () => availableCombos(env.getAnnotations()),
     active: ensureFilter,
     toggle: (key, on) => {
       const active = ensureFilter();

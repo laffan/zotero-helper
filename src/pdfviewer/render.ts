@@ -90,6 +90,9 @@ export function createPageRenderer(scrollArea: HTMLElement, env: RendererEnv) {
   let inFlight = 0;
   const inFlightIdx = new Set<number>();
   let lastRange: [number, number] | null = null;
+  // Pages still showing a raster that is waiting to be redrawn (see
+  // repaint) — uncounted in renderedBytes, so let go of explicitly.
+  const stale = new Set<number>();
 
   function invalidateGeometry(): void {
     geom = null;
@@ -168,7 +171,7 @@ export function createPageRenderer(scrollArea: HTMLElement, env: RendererEnv) {
       const p = pages[i];
       return p && !p.rendered && !p.rendering;
     });
-    for (const i of [...inFlightIdx]) {
+    for (const i of [...inFlightIdx, ...stale]) {
       if (i < rFrom || i > rTo) clearPage(i);
     }
     pump();
@@ -315,6 +318,7 @@ export function createPageRenderer(scrollArea: HTMLElement, env: RendererEnv) {
       p.contentW = cssW;
       p.contentH = cssH;
       p.rendered = true;
+      stale.delete(idx);
       p.renderedZoom = scale;
       p.canvas = canvas;
       p.canvasBytes = canvas.width * canvas.height * 4;
@@ -337,6 +341,7 @@ export function createPageRenderer(scrollArea: HTMLElement, env: RendererEnv) {
 
   function clearPage(idx: number): void {
     const p = env.getPages()[idx];
+    stale.delete(idx);
     if (!p) return;
     if (p.rendering) {
       p.cancelled = true;
@@ -378,9 +383,17 @@ export function createPageRenderer(scrollArea: HTMLElement, env: RendererEnv) {
     for (const i of indices) {
       const p = pages[i];
       if (!p?.rendered) continue;
+      // Only pages about to be redrawn keep their old raster meanwhile;
+      // anywhere else (or folded away) it would hang on unredrawn.
+      const near = lastRange && i >= lastRange[0] - RENDER_BUFFER && i <= lastRange[1] + RENDER_BUFFER;
+      if (env.isFolded() || !near) {
+        clearPage(i);
+        continue;
+      }
       renderedBytes -= p.canvasBytes || 0;
       p.canvasBytes = 0;
       p.rendered = false;
+      stale.add(i);
     }
     scheduleUpdate();
   }
@@ -395,6 +408,7 @@ export function createPageRenderer(scrollArea: HTMLElement, env: RendererEnv) {
    *  swaps the pages array out. */
   function reset(): void {
     for (const p of env.getPages()) releaseCanvas(p.canvas);
+    stale.clear();
     queue = [];
     lastRange = null;
     renderedBytes = 0;

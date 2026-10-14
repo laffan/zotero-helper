@@ -3,6 +3,7 @@
 // src/pdf/pdf-viewer-thumbnails.js.
 import type { Annotation } from "../lib/highlights";
 import { drawAnnotations } from "./paint";
+import { releaseCanvas } from "./render";
 import type { PageRecord, PDFDocumentProxy } from "./types";
 
 const THUMB_WIDTH = 180;
@@ -80,7 +81,13 @@ export function createThumbnailManager(root: HTMLElement, env: ThumbnailEnv) {
   function clearThumb(cell: HTMLElement): void {
     if (!cell.dataset.thumbRendered) return;
     delete cell.dataset.thumbRendered;
-    cell.querySelector(".pdf-thumb-canvas")?.remove();
+    const canvas = cell.querySelector<HTMLCanvasElement>(".pdf-thumb-canvas");
+    releaseCanvas(canvas);
+    canvas?.remove();
+    // And what pdf.js parsed to draw it: a grid scrolled end to end
+    // would otherwise keep every page of the book.
+    const idx = Number(cell.dataset.thumbIdx);
+    void env.getPdfDoc()?.getPage(idx + 1).then((page) => page.cleanup()).catch(() => {});
     if (!cell.querySelector(".pdf-thumb-placeholder")) {
       const placeholder = document.createElement("div");
       placeholder.className = "pdf-thumb-placeholder";

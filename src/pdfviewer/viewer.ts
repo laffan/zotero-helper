@@ -306,6 +306,9 @@ export function createPdfViewer(container: HTMLElement, opts: PdfViewerOptions =
     foldedZoom = 1.0;
     layoutMode = "vertical";
     fitMode = "fit";
+    // The pages are hidden while folded; their rasters (up to the
+    // renderer's whole budget) would sit beside the folds' all along.
+    renderer.clearAll();
     applyLayoutClass();
     foldLayer.enable();
     if (place) foldLayer.centerOn(place);
@@ -625,6 +628,9 @@ export function createPdfViewer(container: HTMLElement, opts: PdfViewerOptions =
     pages = [];
     root.remove();
     if (doc) await doc.loadingTask.destroy().catch(() => {});
+    // pdf.js's text layers share a few measuring canvases and a cache
+    // of font metrics across documents; with none open, let them go.
+    (await getPdfjs()).TextLayer.cleanup();
   }
 
   return {

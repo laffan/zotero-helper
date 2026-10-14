@@ -73,73 +73,74 @@ export default function App() {
     }
   }, [settings, selectedCollection]);
 
-  if (view === "settings") {
-    return <SettingsView />;
-  }
-
   return (
-    <div className="app">
-      <Toolbar />
-      <div
-        className="panes"
-        data-kbd-pane={reading ? undefined : kbdPane}
-        style={
-          {
-            "--left-w": `${leftWidth}px`,
-            "--right-w": `${rightWidth}px`,
-            "--notes-w": `${notesWidth}px`,
-          } as React.CSSProperties
-        }
-      >
-        {reading ? (
-          // An open PDF takes the sidebar's and the list's room.
-          <ReaderPane />
-        ) : (
-          <>
-            <Sidebar />
-            {!sidebarHidden && <PaneResizer side="left" />}
-            {/* Questions is a folder of conversations, so it replaces
-                the item list rather than filtering it. */}
-            {selectedCollection === QUESTIONS ? <ChatList /> : <ItemList />}
-          </>
-        )}
-        {!metaHidden && <PaneResizer side="right" />}
-        <MetadataPanel />
-      </div>
-      <Terminal />
-      <TaskTray />
-      <DragLayer />
+    <>
+      <div className="app">
+        <Toolbar />
+        <div
+          className="panes"
+          data-kbd-pane={reading ? undefined : kbdPane}
+          style={
+            {
+              "--left-w": `${leftWidth}px`,
+              "--right-w": `${rightWidth}px`,
+              "--notes-w": `${notesWidth}px`,
+            } as React.CSSProperties
+          }
+        >
+          {reading ? (
+            // An open PDF takes the sidebar's and the list's room.
+            <ReaderPane />
+          ) : (
+            <>
+              <Sidebar />
+              {!sidebarHidden && <PaneResizer side="left" />}
+              {/* Questions is a folder of conversations, so it replaces
+                  the item list rather than filtering it. */}
+              {selectedCollection === QUESTIONS ? <ChatList /> : <ItemList />}
+            </>
+          )}
+          {!metaHidden && <PaneResizer side="right" />}
+          <MetadataPanel />
+        </div>
+        <Terminal />
+        <TaskTray />
+        <DragLayer />
 
-      {modal?.kind === "import" && <ImportModal onClose={() => setModal(null)} />}
-      {modal?.kind === "newFolder" && (
-        <NewFolderModal onClose={() => setModal(null)} />
-      )}
-      {modal?.kind === "sendToHush" && (
-        <SendToHushModal onClose={() => setModal(null)} />
-      )}
-      {modal?.kind === "askCost" && (
-        <AskCostModal
-          onClose={() => {
-            useStore.getState().setPendingAsk(null);
-            setModal(null);
-          }}
-        />
-      )}
-      {modal?.kind === "pdfPage" && (
-        <PageViewModal
-          itemKey={modal.itemKey}
-          page={modal.page}
-          title={modal.title}
-          quote={modal.quote}
-          onClose={() => setModal(null)}
-        />
-      )}
-      {modal?.kind === "rescue" && (
-        <PdfRescueModal jobId={modal.jobId} onClose={() => setModal(null)} />
-      )}
-      {modal?.kind === "capture" && (
-        <CaptureModal jobId={modal.jobId} onClose={() => setModal(null)} />
-      )}
-    </div>
+        {modal?.kind === "import" && <ImportModal onClose={() => setModal(null)} />}
+        {modal?.kind === "newFolder" && (
+          <NewFolderModal onClose={() => setModal(null)} />
+        )}
+        {modal?.kind === "sendToHush" && (
+          <SendToHushModal onClose={() => setModal(null)} />
+        )}
+        {modal?.kind === "askCost" && (
+          <AskCostModal
+            onClose={() => {
+              useStore.getState().setPendingAsk(null);
+              setModal(null);
+            }}
+          />
+        )}
+        {modal?.kind === "pdfPage" && (
+          <PageViewModal
+            itemKey={modal.itemKey}
+            page={modal.page}
+            title={modal.title}
+            quote={modal.quote}
+            onClose={() => setModal(null)}
+          />
+        )}
+        {modal?.kind === "rescue" && (
+          <PdfRescueModal jobId={modal.jobId} onClose={() => setModal(null)} />
+        )}
+        {modal?.kind === "capture" && (
+          <CaptureModal jobId={modal.jobId} onClose={() => setModal(null)} />
+        )}
+      </div>
+      {/* Over the app, not instead of it: the library (or the open PDF)
+          stays where it was underneath. */}
+      {view === "settings" && <SettingsView />}
+    </>
   );
 }

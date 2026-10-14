@@ -15,7 +15,14 @@
 // focused, so every key after it would count as typing — the keyboard
 // would seem dead until the field went away. So a press outside a text
 // field lets the field go, as a click does on the desktop.
+//
+// Underneath that, iPadOS delivers a hardware key to the page only while
+// the web view is first responder, which the page can't arrange for
+// itself: tauri-plugin-keyboard-focus claims it natively (at launch, on
+// activation, when a keyboard connects), and since letting a text field
+// go can hand the role back, the page asks for it again each time.
 import { useStore } from "../store";
+import { invoke, isTauri } from "../tauri";
 import { ACTIONS, bindingsOf, eventCombo, hasCommandModifier, type ShortcutContext } from "./bindings";
 import { followPointer } from "./panes";
 import { RUN } from "./run";
@@ -36,13 +43,25 @@ function pressingControl(target: EventTarget | null, combo: string): boolean {
   return target instanceof Element && Boolean(target.closest("button, a[href], [role='button'], summary"));
 }
 
+/** iPadOS: have the web view take the hardware keyboard back (native,
+ *  src-tauri/tauri-plugin-keyboard-focus) once the blur has gone through. */
+export function reclaimKeyboard(): void {
+  if (!isTauri || !document.documentElement.classList.contains("ipados")) return;
+  requestAnimationFrame(() => void invoke("claim_keyboard_focus").catch(() => {}));
+}
+
+function blurField(field: HTMLElement): void {
+  field.blur();
+  reclaimKeyboard();
+}
+
 /** Let a text field go when the pointer goes down outside it. */
 function releaseTextFocus(target: EventTarget | null): void {
   const active = document.activeElement;
   if (!(active instanceof HTMLElement) || !typingIn(active)) return;
   if (target instanceof Node && active.contains(target)) return;
   if (target instanceof Element && target.closest(TEXT_INPUT)) return;
-  active.blur();
+  blurField(active);
 }
 
 function blocked(): boolean {
@@ -67,7 +86,8 @@ function onKeydown(e: KeyboardEvent): void {
   if (typingIn(e.target) && !hasCommandModifier(combo)) {
     // Escape out of a field (a popup in it, like the "?" menu, spends
     // the key first), so the shortcuts are back without a tap.
-    if (combo === "escape" && e.target instanceof HTMLElement) e.target.closest<HTMLElement>(TEXT_INPUT)?.blur();
+    const field = combo === "escape" && e.target instanceof HTMLElement ? e.target.closest<HTMLElement>(TEXT_INPUT) : null;
+    if (field) blurField(field);
     return;
   }
   if (pressingControl(e.target, combo)) return;

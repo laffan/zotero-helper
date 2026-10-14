@@ -1,18 +1,21 @@
-/* Full-screen settings page. The card keeps to the window: a long
-   section (Keyboard Shortcuts) scrolls inside it, with the section list
-   and Save staying where they are. */
+/* The settings window: an overlay over the app, centred. The card keeps
+   to the window — a long section (Keyboard Shortcuts) scrolls inside it,
+   with the section list and Save staying where they are. */
 .settings-view {
-  height: 100dvh;
-  overflow: hidden;
+  position: fixed;
+  inset: 0;
+  z-index: 90; /* over the drawers (60); modals opened from it (100) go over it */
   display: flex;
+  align-items: center;
   justify-content: center;
-  padding: 24px 16px calc(24px + env(safe-area-inset-bottom));
-  background: var(--bg);
+  padding: max(24px, env(safe-area-inset-top)) 16px max(24px, env(safe-area-inset-bottom));
+  background: rgb(0 0 0 / 0.4);
 }
 .settings-card {
   width: min(860px, 100%);
   height: min(680px, 100%);
   background: var(--panel);
+  box-shadow: 0 20px 60px rgb(0 0 0 / 0.3);
   border: 1px solid var(--border);
   border-radius: 12px;
   display: grid;

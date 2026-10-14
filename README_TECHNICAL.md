@@ -137,6 +137,11 @@ src-tauri/      Rust core (all networking + state)
                    dispatch, anthropic, openai, tidy, chat)
   src/chats.rs     the Questions conversations on disk
   src/capture.rs   desktop capture-browser window (download interception)
+  tauri-plugin-capture-view/, tauri-plugin-share-sheet/,
+  tauri-plugin-keyboard-focus/
+                   the app's own iOS plugins: the capture browser's
+                   WKWebView, the share sheet, and handing the web view
+                   the hardware keyboard (first responder)
 ```
 
 ### State and where it lives
@@ -673,9 +678,13 @@ debugging.
 
 ## Settings
 
-The settings page (`src/components/settings/`) has a list of sections at
-its left — a row of tabs on a narrow window — and the open section beside
-it:
+The settings window (`src/components/settings/`) is an overlay over the
+app, centred, with a list of sections at its left — a row of tabs on a
+narrow window — and the open section beside it. It keeps to the window:
+a long section scrolls inside it. Escape or a press on the backdrop
+closes it (like Close, dropping unsaved edits); while it is up the app
+beneath is `inert`, so a notes editor still focused there can't take the
+iPad's typing.
 
 - **General** — appearance (match the system, light or dark) and the UI
   font size (11–18px; 13 is the size the UI was drawn at). Both apply at
@@ -723,6 +732,20 @@ field focused, and every key after it would be typing — the keyboard
 seemed dead until that field was unmounted. So a pointer press outside
 the focused text field blurs it (`releaseTextFocus` in `dispatch.ts`), as
 a click does on the desktop.
+
+Underneath that, iPadOS delivers a hardware key to the page only while
+WebKit's content view is the first responder, and nothing on the page
+can arrange that: wry makes the web view first responder on macOS but
+not on iOS, and WebKit promotes it only for a finger tap on editable
+text — never for `focus()` from script, nor for a trackpad click. So
+without help the shortcuts worked only after the notes had been tapped,
+and stopped once the notes let go of focus. `tauri-plugin-keyboard-focus`
+(ported from Hush's `KeyboardFocus.swift`) claims the role natively: at
+load, when the window becomes key or its scene activates, and when a
+keyboard connects — only while a hardware keyboard is attached, and
+never while something is presented over the window. The page asks again
+through `claim_keyboard_focus` (`reclaimKeyboard` in `dispatch.ts`)
+after it blurs a text field and when Settings closes.
 
 | Where | Action | Default |
 | --- | --- | --- |

@@ -339,29 +339,6 @@ async fn save_chats(state: State<'_, AppState>, chats: Vec<Value>) -> Result<()>
 }
 
 // ---------------------------------------------------------------------------
-// Hush integration
-// ---------------------------------------------------------------------------
-
-/// Desk/project roster of a local Hush install (empty when unavailable).
-#[tauri::command]
-async fn list_hush_desks() -> Result<Vec<hush::HushDesk>> {
-    Ok(hush::list_desks())
-}
-
-/// Fire a hushwriter:// deep link at the Hush app. Restricted to that
-/// scheme so this command can't be used as a generic URL opener.
-#[tauri::command]
-async fn open_in_hush(app: AppHandle, url: String) -> Result<()> {
-    if !url.starts_with("hushwriter://") {
-        return Err(Error::msg("open_in_hush only accepts hushwriter:// URLs"));
-    }
-    use tauri_plugin_opener::OpenerExt;
-    app.opener()
-        .open_url(url, None::<String>)
-        .map_err(|e| Error::msg(format!("Could not open Hush — is it installed? ({e})")))
-}
-
-// ---------------------------------------------------------------------------
 // Share (iOS share sheet via tauri-plugin-share-sheet; desktop exports
 // staged files through save/folder dialogs instead)
 // ---------------------------------------------------------------------------
@@ -603,6 +580,16 @@ async fn close_capture_window(app: AppHandle, job_id: String) -> Result<()> {
     }
 }
 
+// iPadOS: the hardware keyboard reaches the page only while the web
+// view is first responder (tauri-plugin-keyboard-focus). The frontend
+// asks for it again after letting a text field go. A no-op elsewhere.
+#[tauri::command]
+fn claim_keyboard_focus(app: AppHandle) -> Result<()> {
+    app.state::<tauri_plugin_keyboard_focus::KeyboardFocus<tauri::Wry>>()
+        .claim()
+        .map_err(Error::msg)
+}
+
 // ---------------------------------------------------------------------------
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -612,6 +599,7 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_capture_view::init())
         .plugin(tauri_plugin_share_sheet::init())
+        .plugin(tauri_plugin_keyboard_focus::init())
         .setup(|app| {
             let data_dir = app
                 .path()
@@ -632,6 +620,7 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            claim_keyboard_focus,
             get_settings,
             save_settings,
             verify_zotero_key,
@@ -659,8 +648,8 @@ pub fn run() {
             load_chats,
             save_chats,
             download_attachment_file,
-            list_hush_desks,
-            open_in_hush,
+            hush::list_hush_desks,
+            hush::open_in_hush,
             open_in_zotero,
             read_thumbnail,
             write_thumbnail,

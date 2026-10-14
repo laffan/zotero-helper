@@ -1,9 +1,12 @@
-// The settings page: a list of sections at the left, the open section
-// beside it. Zotero and AI edit a draft of the stored settings (kept in
+// The settings window: an overlay over the app, centred, with a list of
+// sections at the left and the open section beside it. Escape or a
+// press on the backdrop closes it (as Close does, dropping unsaved
+// edits). Zotero and AI edit a draft of the stored settings (kept in
 // the Rust core), committed by Save; General, Cache and Keyboard
 // Shortcuts are this device's and act at once.
 import { useEffect, useState } from "react";
 import { bootstrap, saveSettings, syncNow } from "../../lib/actions";
+import { reclaimKeyboard } from "../../lib/shortcuts/dispatch";
 import { appLog, useStore } from "../../lib/store";
 import type { Settings } from "../../lib/types";
 import { Spinner } from "../Icons";
@@ -60,6 +63,29 @@ export function SettingsView() {
     if (stored) setDraft(stored);
   }, [stored]);
 
+  // While it is up, the app beneath takes no keys or presses: a notes
+  // editor still focused there would otherwise get the typing (iPad's
+  // hardware keyboard follows focus, not what is on top).
+  useEffect(() => {
+    const app = document.querySelector<HTMLElement>(".app");
+    if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
+    app?.setAttribute("inert", "");
+    return () => {
+      app?.removeAttribute("inert");
+      reclaimKeyboard();
+    };
+  }, []);
+
+  // Escape closes — unless something in the page spent it first (a key
+  // being recorded, a field's own Escape).
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && !e.defaultPrevented && !saving) setView("main");
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [saving, setView]);
+
   const pick = (id: SectionId) => {
     lastSection = id;
     setSection(id);
@@ -101,8 +127,14 @@ export function SettingsView() {
   const dirty = Boolean(stored) && JSON.stringify(stored) !== JSON.stringify(draft);
 
   return (
-    <div className="settings-view">
-      <div className="settings-card">
+    <div className="settings-view" onMouseDown={() => !saving && setView("main")}>
+      <div
+        className="settings-card"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Settings"
+        onMouseDown={(e) => e.stopPropagation()}
+      >
         <nav className="settings-nav" aria-label="Settings sections">
           <h1>Settings</h1>
           {SECTIONS.map((s) => (

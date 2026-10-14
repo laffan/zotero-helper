@@ -11,10 +11,12 @@
 //! yields an empty list and the UI falls back to free-text names, which
 //! Hush resolves case-insensitively on its side.
 
+use crate::error::{Error, Result};
 use serde::Serialize;
 use serde_json::Value;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
+use tauri::AppHandle;
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -150,4 +152,25 @@ pub fn list_desks() -> Vec<HushDesk> {
             }
         })
         .collect()
+}
+
+// --- the commands (registered in lib.rs) ---
+
+/// Desk/project roster of a local Hush install (empty when unavailable).
+#[tauri::command]
+pub async fn list_hush_desks() -> Result<Vec<HushDesk>> {
+    Ok(list_desks())
+}
+
+/// Fire a hushwriter:// deep link at the Hush app. Restricted to that
+/// scheme so this command can't be used as a generic URL opener.
+#[tauri::command]
+pub async fn open_in_hush(app: AppHandle, url: String) -> Result<()> {
+    if !url.starts_with("hushwriter://") {
+        return Err(Error::msg("open_in_hush only accepts hushwriter:// URLs"));
+    }
+    use tauri_plugin_opener::OpenerExt;
+    app.opener()
+        .open_url(url, None::<String>)
+        .map_err(|e| Error::msg(format!("Could not open Hush — is it installed? ({e})")))
 }

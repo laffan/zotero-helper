@@ -1,11 +1,26 @@
-// The page bookmark button's naming box, and the mark on pages that
-// have a bookmark. Pressing a page's bookmark button opens a small box
-// beside it, the name filled in ("p. 12") and selected: Enter (or Add)
-// makes the bookmark, Escape or a press elsewhere drops it. The
-// bookmarks themselves are the app's (lib/bookmarks.ts).
+// The page bookmark button's naming box, and what a bookmarked page
+// shows. Pressing a page's bookmark button opens a small box beside it:
+// on a page without one, the name filled in ("p. 12") and selected —
+// Enter (or Add) makes the bookmark; on a page with one, that bookmark's
+// name, to rename it (Save) or Remove it. Escape or a press elsewhere
+// drops the box. The bookmarks themselves are the app's
+// (lib/bookmarks.ts).
 import type { PageRecord } from "./types";
 
-export function createBookmarkPrompt(host: HTMLElement, onSave: (pageIndex: number, name: string) => void) {
+/** A bookmark as a page shows it. */
+export interface PageBookmark {
+  id: string;
+  pageIndex: number;
+  name: string;
+}
+
+interface PromptActions {
+  create: (pageIndex: number, name: string) => void;
+  rename: (id: string, name: string) => void;
+  remove: (id: string) => void;
+}
+
+export function createBookmarkPrompt(host: HTMLElement, act: PromptActions) {
   let box: HTMLFormElement | null = null;
 
   function close(): void {
@@ -17,18 +32,26 @@ export function createBookmarkPrompt(host: HTMLElement, onSave: (pageIndex: numb
     if (box && !box.contains(e.target as Node)) close();
   }
 
-  function open(pageIndex: number, button: HTMLElement, defaultName: string): void {
+  /** `existing`: the page's bookmark, to rename or remove. */
+  function open(pageIndex: number, button: HTMLElement, defaultName: string, existing?: PageBookmark): void {
     close();
     const form = document.createElement("form");
     form.className = "pdf-bookmark-box";
-    form.innerHTML = `<input type="text" aria-label="Bookmark name" /><button type="submit">Add</button>`;
+    form.innerHTML =
+      `<input type="text" aria-label="Bookmark name" /><button type="submit">${existing ? "Save" : "Add"}</button>` +
+      (existing ? `<button type="button" class="pdf-bookmark-remove">Remove</button>` : "");
     const input = form.querySelector("input")!;
-    input.value = defaultName;
+    input.value = existing?.name ?? defaultName;
     form.addEventListener("submit", (e) => {
       e.preventDefault();
-      const name = input.value.trim() || defaultName;
+      const name = input.value.trim() || existing?.name || defaultName;
       close();
-      onSave(pageIndex, name);
+      if (existing) act.rename(existing.id, name);
+      else act.create(pageIndex, name);
+    });
+    form.querySelector(".pdf-bookmark-remove")?.addEventListener("click", () => {
+      close();
+      if (existing) act.remove(existing.id);
     });
     input.addEventListener("keydown", (e) => {
       if (e.key !== "Escape") return;
@@ -51,10 +74,16 @@ export function createBookmarkPrompt(host: HTMLElement, onSave: (pageIndex: numb
   return { open, close, destroy: close };
 }
 
-/** Fill the bookmark button on pages that have a bookmark. */
-export function markBookmarkedPages(pages: PageRecord[], indices: number[]): void {
-  const on = new Set(indices);
+/** Fill the bookmark button on pages that have a bookmark, and put the
+ *  bookmark's name beside it (the first, and how many more). Both show
+ *  only near the corner, like the button itself (pageTools.ts). */
+export function markBookmarkedPages(pages: PageRecord[], marks: PageBookmark[]): void {
+  const byPage = new Map<number, PageBookmark[]>();
+  for (const m of marks) byPage.set(m.pageIndex, [...(byPage.get(m.pageIndex) ?? []), m]);
   pages.forEach((p, i) => {
-    p.wrapper.querySelector(".pdf-page-bookmark-btn")?.classList.toggle("marked", on.has(i));
+    const list = byPage.get(i);
+    p.wrapper.querySelector(".pdf-page-bookmark-btn")?.classList.toggle("marked", Boolean(list));
+    const label = p.wrapper.querySelector<HTMLElement>(".pdf-page-bookmark-label");
+    if (label) label.textContent = list ? list[0].name + (list.length > 1 ? ` +${list.length - 1}` : "") : "";
   });
 }

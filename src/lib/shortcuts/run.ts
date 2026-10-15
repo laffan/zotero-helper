@@ -3,6 +3,7 @@
 // the keyboard and the pointer never drift apart.
 import { readerCommand } from "../../components/ReaderPane";
 import type { ViewerCommand } from "../../pdfviewer/commands";
+import { aiConnected } from "../ai/models";
 import { readItem } from "../notes";
 import { showMeta, toggleMeta, toggleSidebar } from "../panels";
 import { appLog, useStore, type MetaTab } from "../store";
@@ -28,6 +29,12 @@ function showTab(tab: MetaTab): void {
   if (!s.reading && !s.selectedKeys.length) return;
   s.setMetaTab(tab);
   showMeta();
+}
+
+/** The conversations tab exists only with AI connected, for one entry. */
+function showChats(): void {
+  const s = useStore.getState();
+  if (aiConnected(s.settings) && (s.reading || s.selectedKeys.length === 1)) showTab("chats");
 }
 
 function toggleLeft(): void {
@@ -56,6 +63,7 @@ export const RUN: Record<string, () => void> = {
   listInfo: () => showTab("details"),
   listHighlights: () => showTab("highlights"),
   listNotes: () => showTab("notes"),
+  listChats: showChats,
   listPdf: viewPdf,
   nextPane: () => cyclePane(1),
   prevPane: () => cyclePane(-1),
@@ -70,6 +78,7 @@ export const RUN: Record<string, () => void> = {
   pdfInfo: () => showTab("details"),
   pdfHighlights: () => showTab("highlights"),
   pdfNotes: () => showTab("notes"),
+  pdfChats: showChats,
   pdfSearchHighlights: () => {
     showTab("highlights");
     focusWhenShown(".meta-panel .hl-search", true);

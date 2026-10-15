@@ -550,8 +550,48 @@
 .item-chats-start {
   display: flex;
   gap: 6px;
-  padding: 10px 12px;
+  padding: 8px 12px 4px;
   border-bottom: 1px solid var(--border);
+}
+/* The PDF tab button's look (tabs.css), here side by side. */
+.item-chats-start .meta-tab-action {
+  margin: 0 0 4px;
+}
+/* The conversations this entry was only part of: links into Questions. */
+.item-chats-shared {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+}
+.item-chats-shared-head {
+  font-size: calc(11px * var(--font-scale));
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-dim);
+}
+.item-chats-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  max-width: 100%;
+  text-align: left;
+  font-size: calc(12px * var(--font-scale));
+}
+.item-chats-link span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.item-chats .chat-row {
+  position: relative;
+}
+.item-chats .chat-row-delete {
+  position: absolute;
+  top: 6px;
+  right: 6px;
 }
 .item-chats-list {
   flex: 1;

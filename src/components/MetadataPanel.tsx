@@ -20,7 +20,7 @@ import { AttachmentPanel } from "./AttachmentPanel";
 import { ChatPanel } from "./ChatPanel";
 import { highlightGroups, HighlightsPanel } from "./HighlightsPanel";
 import { ChatIcon } from "./Icons";
-import { ItemChats } from "./ItemChats";
+import { isAbout, ItemChats } from "./ItemChats";
 import { ItemEditor } from "./ItemEditor";
 import { NotesPanel } from "./NotesPanel";
 import { PdfTabButton } from "./PdfTabButton";
@@ -91,8 +91,9 @@ export function MetadataPanel() {
     !reading && collectionKey === QUESTIONS && chats.some((c) => c.id === selectedChatId);
 
   const aiOn = useStore((s) => aiConnected(s.settings));
+  // The tab counts the conversations about this entry alone.
   const chatCount = useStore((s) =>
-    selected.length === 1 ? s.chats.filter((c) => c.source.itemKeys.includes(selected[0].key)).length : 0,
+    selected.length === 1 ? s.chats.filter((c) => isAbout(c, selected[0].key)).length : 0,
   );
   // A remembered tab that has nothing to show falls back to Details.
   const tab: MetaTab =
@@ -132,7 +133,7 @@ export function MetadataPanel() {
       <div className="meta-tabs" role="tablist">
         {tabButton("details", one ? "Details" : "Summary")}
         {split ? (
-          tabButton("notes", `Highlights ${highlightCount} & Notes`, tab !== "details")
+          tabButton("notes", `Highlights ${highlightCount} & Notes`, tab === "notes" || tab === "highlights")
         ) : (
           <>
             {highlightCount > 0 && tabButton("highlights", `Highlights ${highlightCount}`)}

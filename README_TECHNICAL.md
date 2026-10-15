@@ -597,11 +597,12 @@ saved conversations stay on disk and come back with the key, and a
 remembered visit to Questions opens All Items instead.
 
 **The conversations tab.** With a service connected, one entry in the
-right panel gets a fourth tab (the conversation icon, with a count): the
-Questions conversations that include it — asked about it alone, or in a
-selection or folder it was part of (`source.itemKeys`) — newest first,
-with Ask Abstract / Ask Full Paper to start one about it
-(`ItemChats.tsx`). A conversation opens in the tab, in place of the
+right panel gets a fourth tab (the conversation icon, with a count; Q
+from the keyboard): the Questions conversations about that entry alone
+(`isAbout`), newest first, with Ask Abstract / Ask Full Paper to start
+one (`ItemChats.tsx`). Conversations it was only part of — a selection
+or a folder asked about — are listed above as links, which open in
+Questions (leaving the PDF). A conversation opens in the tab, in place of the
 list, so it can be read beside the PDF; one started while a PDF is open
 opens there too, rather than moving the hidden library to Questions
 (`confirmAsk`).
@@ -684,8 +685,12 @@ button at the top right of each page in the reader (a bookmark; it
 replaced an earlier "cite this page in the notes" pencil) opens a small
 box to name it, filled in with the page ("p. 12") and selected: Enter
 or Add makes it, Escape or a press elsewhere drops it
-(`src/pdfviewer/bookmarks.ts`). A page with a bookmark keeps its button
-showing, filled.
+(`src/pdfviewer/bookmarks.ts`). On a page that already has one, the
+button opens that bookmark instead — its name, to rename (Save) or
+Remove. The button shows only with the pointer within 100px of the
+page's top-right corner (always on a screen with no hovering pointer at
+all); on a bookmarked page it is filled, with the bookmark's name
+beside it.
 
 The Highlights tab lists bookmarks among the highlights: each is turned
 into an Annotation-shaped entry (type `bookmark`, a sort index at the
@@ -801,12 +806,14 @@ doesn't cost the role, so there is nothing to reclaim.
 | General | Toggle the right sidebar | ⌘⇧\ |
 | General | Focus the search field (the PDF's, while reading) | ⌘F |
 | Library | Show details / highlights / notes | D / H / N |
+| Library | Show AI conversations (AI connected) | Q |
 | Library | View the PDF | P |
 | Library | Next / previous pane (sidebar, list, details) | Tab / ⇧Tab |
 | Library | Move in the pane | arrows |
 | Library | Extend the selection | ⇧↑ / ⇧↓ |
 | Library | Open the folder (sidebar) or item (list) | Return |
 | PDF viewer | Show details / highlights / notes | D / H / N |
+| PDF viewer | Show AI conversations (AI connected) | Q |
 | PDF viewer | Search the highlights | ⌘⇧F |
 | PDF viewer | Thumbnail view | G |
 | PDF viewer | Toggle the folded view | C |

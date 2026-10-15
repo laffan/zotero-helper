@@ -154,12 +154,44 @@
 }
 
 /* --- bookmarks (src/pdfviewer/bookmarks.ts) --- */
-/* A page with a bookmark keeps its button showing, filled, in the
-   accent colour. */
+/* A page with a bookmark: its button filled, in the accent colour, and
+   the bookmark's name beside it — both showing only near the corner,
+   like the button on any page. */
 .pdf-page-bookmark-btn.marked {
-  opacity: 1;
-  pointer-events: auto;
   background: var(--accent);
+}
+.pdf-page-bookmark-label {
+  position: absolute;
+  top: 12px;
+  right: 42px;
+  max-width: 60%;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: #fff;
+  font-size: calc(12px * var(--font-scale));
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s;
+  z-index: 5;
+}
+.pdf-page-bookmark-label:empty {
+  display: none;
+}
+.pdf-page-bookmark-label.visible {
+  opacity: 1;
+}
+@media (hover: none) and (any-hover: none) {
+  .pdf-page-bookmark-label {
+    opacity: 0.85;
+  }
+}
+.pdf-crop-editing .pdf-page-bookmark-label {
+  display: none;
 }
 .pdf-page-bookmark-btn.marked svg path {
   fill: currentColor;
@@ -181,11 +213,17 @@
   padding: 4px 6px;
   font-size: calc(13px * var(--font-scale));
 }
-.pdf-bookmark-box button {
+.pdf-bookmark-box button[type="submit"] {
   padding: 4px 10px;
   border-radius: var(--radius);
   background: var(--accent);
   color: #fff;
   font-size: calc(12px * var(--font-scale));
   font-weight: 600;
+}
+.pdf-bookmark-remove {
+  padding: 4px 8px;
+  border-radius: var(--radius);
+  color: var(--bad);
+  font-size: calc(12px * var(--font-scale));
 }

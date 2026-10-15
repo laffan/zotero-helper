@@ -43,16 +43,26 @@ export function attachPageHoverButtons(
   const nBtn = handlers.onBookmarkPage
     ? make("pdf-page-bookmark-btn", `Bookmark page ${pageNum}`, BOOKMARK_ICON, handlers.onBookmarkPage)
     : null;
+  // A bookmarked page's name, beside its button (bookmarks.ts fills it).
+  const label = nBtn ? document.createElement("span") : null;
+  if (label) {
+    label.className = "pdf-page-bookmark-label";
+    wrapper.appendChild(label);
+  }
   if (!zBtn && !nBtn) return;
+  // Each button shows only with the pointer within 100px of its corner.
   wrapper.addEventListener("mousemove", (e) => {
     const r = wrapper.getBoundingClientRect();
     const nearRight = r.right - e.clientX < 100;
     zBtn?.classList.toggle("visible", nearRight && r.bottom - e.clientY < 100);
-    nBtn?.classList.toggle("visible", nearRight && e.clientY - r.top < 100);
+    const top = nearRight && e.clientY - r.top < 100;
+    nBtn?.classList.toggle("visible", top);
+    label?.classList.toggle("visible", top);
   });
   wrapper.addEventListener("mouseleave", () => {
     zBtn?.classList.remove("visible");
     nBtn?.classList.remove("visible");
+    label?.classList.remove("visible");
   });
 }
 

@@ -21,7 +21,7 @@ import {
   pdfLink,
   type Annotation,
 } from "../lib/highlights";
-import { addBookmark, bookmarksOf, useBookmarks } from "../lib/bookmarks";
+import { addBookmark, bookmarksOf, removeBookmark, renameBookmark, useBookmarks } from "../lib/bookmarks";
 import { insertIntoNotes, readItem } from "../lib/notes";
 import { setOutline, setReaderPage, useOutline } from "../lib/outline";
 import { flushSavedPage, lastPage, lastView, savePage } from "../lib/recent";
@@ -142,6 +142,8 @@ export function ReaderPane() {
           onOpenInZotero: (page) => void openInZotero(itemKey, attKey, undefined, page),
           onBookmark: (pageIndex, top, name, pageLabel) =>
             addBookmark({ attKey, itemKey, pageIndex, top, name, pageLabel }),
+          onRenameBookmark: renameBookmark,
+          onRemoveBookmark: removeBookmark,
           onQuote: (text, page) => addToNotes(`> ${text}\n\n— ${cite(page)}`),
           onInsertAnnotation: (a: Annotation) => addToNotes(annotationMarkdown(settings(), a)),
           annotate: {
@@ -218,11 +220,12 @@ export function ReaderPane() {
     return () => document.removeEventListener("visibilitychange", onHide);
   }, []);
 
-  // The pages with a bookmark show it on their bookmark button.
+  // The pages with a bookmark show it (and its name) at their bookmark
+  // button.
   const bookmarks = useBookmarks((s) => s.list);
   useEffect(() => {
     if (state === "ready" && attKey) {
-      viewerRef.current?.setBookmarkedPages(bookmarksOf(bookmarks, attKey).map((b) => b.pageIndex));
+      viewerRef.current?.setPageBookmarks(bookmarksOf(bookmarks, attKey));
     }
   }, [bookmarks, attKey, state]);
 

@@ -183,8 +183,9 @@
 .pdf-page-bookmark-btn:hover {
   background: rgb(0 0 0 / 0.75);
 }
-/* Touch screens have no hover: keep the bookmark button reachable. */
-@media (hover: none) {
+/* A screen with no hovering pointer at all (a finger alone — not an
+   iPad with a trackpad) can't bring the button up: keep it showing. */
+@media (hover: none) and (any-hover: none) {
   .pdf-page-bookmark-btn {
     opacity: 0.6;
     pointer-events: auto;

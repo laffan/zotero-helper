@@ -23,7 +23,7 @@ import { centerPagePoint, pageFracAtCenter, restoreAnchor, scrollToPagePoint, vi
 import { attachAnnotationTaps, draftFromRange, type AnnotationDraft } from "./annotate";
 import { createAnnotationLayer } from "./annotations";
 import { createAnnotationPopover } from "./annotPopover";
-import { createBookmarkPrompt, markBookmarkedPages } from "./bookmarks";
+import { createBookmarkPrompt, markBookmarkedPages, type PageBookmark } from "./bookmarks";
 import { createViewerCommands } from "./commands";
 import { createReadingCrop } from "./crop";
 import { createFoldLayer } from "./folds";
@@ -51,8 +51,11 @@ export interface PdfViewerOptions {
   /** Open the PDF in Zotero at a page (toolbar link, page pop-out). */
   onOpenInZotero?: (page: number) => void;
   /** Bookmark a page (its hover button), named as it is made; `top`
-   *  is the page's top in PDF units. */
+   *  is the page's top in PDF units. A bookmarked page's button renames
+   *  or removes its bookmark instead. */
   onBookmark?: (pageIndex: number, top: number, name: string, pageLabel?: string) => void;
+  onRenameBookmark?: (id: string, name: string) => void;
+  onRemoveBookmark?: (id: string) => void;
   /** Quote selected text into the notes. */
   onQuote?: (text: string, page: number) => void;
   /** Send an annotation to the notes (its editor's Add to notes). */
@@ -176,9 +179,12 @@ export function createPdfViewer(container: HTMLElement, opts: PdfViewerOptions =
     },
     (v) => opts.onViewChange?.(currentPage(), v),
   );
-  const bookmarkPrompt = createBookmarkPrompt(root, (idx, name) =>
-    opts.onBookmark?.(idx, pages[idx]?.viewport.height ?? 0, name, pageLabels?.[idx]),
-  );
+  let pageMarks: PageBookmark[] = [];
+  const bookmarkPrompt = createBookmarkPrompt(root, {
+    create: (idx, name) => opts.onBookmark?.(idx, pages[idx]?.viewport.height ?? 0, name, pageLabels?.[idx]),
+    rename: (id, name) => opts.onRenameBookmark?.(id, name),
+    remove: (id) => opts.onRemoveBookmark?.(id),
+  });
   // The fixed view's trim: adjusting it shows the pages whole, ending
   // the adjustment lays them out trimmed — on the same set.
   const cropper = createReadingCrop({
@@ -535,7 +541,8 @@ export function createPdfViewer(container: HTMLElement, opts: PdfViewerOptions =
     pages = createPageRecords(scrollArea, doc.numPages, first.getViewport({ scale: 1 }), {
       onOpenInZotero: opts.onOpenInZotero,
       onBookmarkPage: opts.onBookmark
-        ? (page, button) => bookmarkPrompt.open(page - 1, button, `p. ${pageLabels?.[page - 1] ?? page}`)
+        ? (page, button) =>
+            bookmarkPrompt.open(page - 1, button, `p. ${pageLabels?.[page - 1] ?? page}`, pageMarks.find((m) => m.pageIndex === page - 1))
         : undefined,
     });
     const scale = getEffectiveZoom();
@@ -657,8 +664,11 @@ export function createPdfViewer(container: HTMLElement, opts: PdfViewerOptions =
     },
     /** The page in view, 1-based. */
     currentPage: () => currentPage(),
-    /** Fill the bookmark button on these pages (0-based). */
-    setBookmarkedPages: (indices: number[]) => markBookmarkedPages(pages, indices),
+    /** The PDF's bookmarks, shown on their pages. */
+    setPageBookmarks: (marks: PageBookmark[]) => {
+      pageMarks = marks;
+      markBookmarkedPages(pages, marks);
+    },
     /** A keyboard command (lib/shortcuts/): a mode, a page or fold step. */
     command,
     /** Report a view change still waiting out its pause. */

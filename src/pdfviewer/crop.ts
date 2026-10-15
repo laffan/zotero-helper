@@ -1,5 +1,6 @@
-// Trimmed reading: holding ⌘ (Ctrl elsewhere) with the pointer over the
-// pages makes their edges grabbable. Dragging one trims that margin off
+// Trimmed reading: holding Control (⌃) with the pointer over the pages
+// makes their edges grabbable — Control on every platform, so ⌘ stays
+// free for ⌘-clicks and shortcuts. Dragging one trims that margin off
 // every page; letting go of the key lays the pages out again with the
 // trimmed size as their bounds, so the pages fit the view by what is
 // left and the margins' room goes to the text.
@@ -18,7 +19,6 @@
 // page — close up the room its trimmed edges would take; matching
 // negative scroll margins make scrolling to a page (and the fixed
 // view's snapping) line up what is left. See `.pdf-cropped` in pdfviewer.css.
-import { APPLE } from "../lib/shortcuts/bindings";
 import type { PageRecord } from "./types";
 
 /** Fractions of the page trimmed off each edge. */
@@ -37,8 +37,8 @@ const MIN_LEFT = 0.25;
 const GRAB_PX = 14;
 const GRAB_TOUCH_PX = 28;
 const EDGES: Edge[] = ["t", "r", "b", "l"];
-/** ⌘ held this long, alone, starts the adjustment — so ⌘F, ⌘+ and the
- *  like don't flash the whole pages. */
+/** ⌃ held this long, alone, starts the adjustment — so a ⌃ shortcut
+ *  doesn't flash the whole pages. */
 const HOLD_MS = 220;
 
 const isNone = (c: Crop | null) => !c || c.t + c.r + c.b + c.l < 0.002;
@@ -77,7 +77,7 @@ export function createReadingCrop(env: CropEnv) {
   let editing = false;
   let drag: { edge: Edge; wrapper: HTMLElement; id: number } | null = null;
   let holdTimer = 0;
-  /** The key is down; long enough, and alone (not ⌘F and the like). */
+  /** The key is down; long enough, and alone (not part of a shortcut). */
   let held = false;
   let holdReady = false;
   // Where the pointer last was: over the pages, or elsewhere (the
@@ -155,11 +155,11 @@ export function createReadingCrop(env: CropEnv) {
   }
 
   // The key itself, not the pointer events' modifier flags: iPadOS
-  // doesn't report ⌘ on those reliably.
-  const isHoldKey = (e: KeyboardEvent) => e.key === (APPLE ? "Meta" : "Control");
+  // doesn't report modifiers on those reliably.
+  const isHoldKey = (e: KeyboardEvent) => e.key === "Control";
 
-  /** Held a moment, alone, over the pages: adjust. (⌘ held over the
-   *  notes — to ⌘-click a colour there — leaves the pages be.) */
+  /** Held a moment, alone, over the pages: adjust. (⌃ held with the
+   *  pointer over the notes leaves the pages be.) */
   const maybeStart = () => holdReady && pointerInside && env.active() && startEditing();
 
   function release(): void {
@@ -180,10 +180,10 @@ export function createReadingCrop(env: CropEnv) {
       }, HOLD_MS);
       return;
     }
-    // A key-up for ⌘ can go missing on iPadOS (after a system ⌘
-    // shortcut, an app switch); a keydown without ⌘ proves it's up.
-    if (!(APPLE ? e.metaKey : e.ctrlKey)) return release();
-    // ⌘ with another key is a shortcut, not a trim — for the rest of
+    // A key-up can go missing on iPadOS (after a system shortcut, an
+    // app switch); a keydown without ⌃ proves it's up.
+    if (!e.ctrlKey) return release();
+    // ⌃ with another key is a shortcut, not a trim — for the rest of
     // this hold.
     window.clearTimeout(holdTimer);
     holdReady = false;
@@ -253,7 +253,8 @@ export function createReadingCrop(env: CropEnv) {
   }
 
   function onPointerDown(e: PointerEvent): void {
-    if (!editing || e.button !== 0) return;
+    // On a Mac, a ⌃-click is a secondary click and may report button 2.
+    if (!editing || (e.button !== 0 && !(e.button === 2 && e.ctrlKey))) return;
     const w = wrapperAt(e.target);
     const edge = w ? edgeAt(w, e.clientX, e.clientY) : null;
     // While adjusting, the pages are for adjusting: no selecting text.
@@ -290,6 +291,8 @@ export function createReadingCrop(env: CropEnv) {
     },
     true,
   );
+  // …nor, with ⌃ held on a Mac, as a secondary click's context menu.
+  scrollArea.addEventListener("contextmenu", (e) => editing && e.preventDefault(), true);
   scrollArea.addEventListener("pointermove", onPointerMove);
   scrollArea.addEventListener("pointerdown", onPointerDown, true);
   scrollArea.addEventListener("pointerup", onPointerUp);

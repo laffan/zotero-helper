@@ -6,8 +6,8 @@
 // vertical scroll (fit one, two or three pages across), fixed zoom
 // (wrapping rows), and the folded view. Either scroll direction can
 // also be "fixed": a set of one to three pages at a time, swiped
-// through set by set (paged.ts), with the pages' edges trimmed if the
-// reader has trimmed them (crop.ts). A
+// through set by set (paged.ts). Outside the folded view, the pages'
+// edges are trimmed if the reader has trimmed them (crop.ts). A
 // relayout only resizes page wrappers and CSS-stretches existing
 // rasters; the renderer's settle pass re-renders crisp once the
 // geometry stops moving.
@@ -185,19 +185,21 @@ export function createPdfViewer(container: HTMLElement, opts: PdfViewerOptions =
     rename: (id, name) => opts.onRenameBookmark?.(id, name),
     remove: (id) => opts.onRemoveBookmark?.(id),
   });
-  // The fixed view's trim: adjusting it shows the pages whole, ending
-  // the adjustment lays them out trimmed — on the same set.
+  // The reading crop: adjusting it shows the pages whole, ending the
+  // adjustment lays them out trimmed — at the same place.
   const cropper = createReadingCrop({
     scrollArea,
     host: body,
     getPages: () => pages,
-    active: isPaged,
+    // Every view but the folded one, which trims pages its own way.
+    active: () => !folded,
     initial: saved?.crop ?? null,
     onChange: () => {
+      // The relayout keeps the place; the fixed view also re-snaps.
       const page = leadPage();
       applyLayoutClass();
       relayoutPages();
-      goToPage(page, false);
+      if (isPaged()) goToPage(page, false);
       viewReporter.changed();
     },
   });

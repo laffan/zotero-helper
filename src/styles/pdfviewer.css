@@ -270,10 +270,12 @@
 }
 
 /* --- bottom toolbar --- */
+/* Sections (thumbnails, zoom, scroll, fit, fixed / continuous, folding)
+   sit 14px apart; inside one, its controls are tight. */
 .pdf-zoom-toolbar {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 14px;
   padding: 6px 12px;
   border-top: 1px solid var(--border);
   background: var(--panel);
@@ -341,14 +343,26 @@
   font-size: calc(11px * var(--font-scale));
   color: var(--text-dim);
   text-decoration: none;
-  margin-left: 8px;
 }
 .pdf-zotero-link:hover {
   color: var(--text);
   text-decoration: underline;
 }
-.pdf-zoom-toolbar > .pdf-thumbnail-btn {
-  margin-right: 8px;
+.pdf-toolbar-section {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+/* − and +, a group of their own: always at full strength (the group's
+   options dim when not the one chosen). */
+.pdf-toggle-option.pdf-zoom-step {
+  opacity: 1;
+  padding: 2px 9px;
+  font-size: calc(13px * var(--font-scale));
+}
+.pdf-zoom-toolbar .pdf-zoom-label {
+  min-width: 3.4em;
+  text-align: left;
 }
 .pdf-thumbnail-btn.active,
 .pdf-fold-btn.active {
@@ -390,7 +404,8 @@
    edges' room is closed up by negative margins — --cm-* on each page,
    zero when untrimmed. The scroll margins match, so the snapping
    centres what is left rather than the whole page. */
-.pdf-paged > .pdf-page-wrapper {
+.pdf-paged > .pdf-page-wrapper,
+.pdf-cropped > .pdf-page-wrapper {
   margin: var(--cm-t, 0px) var(--cm-r, 0px) var(--cm-b, 0px) var(--cm-l, 0px);
 }
 .pdf-cropped > .pdf-page-wrapper {
@@ -556,4 +571,9 @@
   font-weight: 500;
   line-height: 1.35;
   pointer-events: none;
+}
+/* The key for what the button does, after its text. */
+.pdf-tooltip-keys {
+  margin-left: 6px;
+  opacity: 0.5;
 }

@@ -404,7 +404,12 @@ the highlights beside the notes (drag the edge between them to share
 the width differently); narrow it again and they separate. The
 viewer's bottom toolbar draws its own tooltips — after a moment's
 hover, or on a press-and-hold with a finger, which then doesn't press
-the button — since iPadOS shows no `title` tooltips. The viewer is a port of Hush's: horizontal or vertical
+the button — since iPadOS shows no `title` tooltips; a button with a
+keyboard shortcut shows the key after its text, dimmed, as currently
+bound (`data-shortcut` on the button, read by `tooltips.ts`). The bar
+is in sections 14px apart — thumbnails, zoom (− and + as a group, the
+zoom or fit to their right), scroll direction, fit, fixed / continuous,
+folding. The viewer is a port of Hush's: horizontal or vertical
 scrolling, fit one / two / three pages, zoom, a thumbnail grid, the
 PDF's own links, Zotero's highlights, underlines and ink painted into
 the pages, and the **folded view**, which collapses the paper to the regions around
@@ -456,7 +461,7 @@ frame of margin above and below, so the pages are as large as the view
 allows, and the pages of a set sit `SET_GAP` (4px) apart. The scroll
 area's padding is cut to match in `pdfviewer.css` (`.pdf-paged`).
 
-**Trimmed reading.** In the fixed view, holding ⌘ (Ctrl elsewhere) with
+**Trimmed reading.** In any view but the folded one, holding ⌘ (Ctrl elsewhere) with
 the pointer over the pages, alone, for a moment (`HOLD_MS`, so ⌘F, ⌘+ and
 ⌘-clicks elsewhere don't set it off) shows the pages whole with the
 current trim drawn over each — what is kept framed, the rest shaded — and
@@ -471,11 +476,11 @@ pointer event anywhere in the window. Since iPadOS can drop ⌘'s key-up
 (after a system ⌘ shortcut or an app switch), any keydown without ⌘, a
 window blur or the app going to the background ends the hold. Dragging an edge trims that margin off
 every page. Letting go of the key lays the pages out again with the
-trimmed size as their bounds, so a set fits the view by what is left and
+trimmed size as their bounds, so the pages fit the view by what is left and
 the margins' room goes to the text. Holding the key again shows the pages
 whole for the next adjustment, with a **Reset Reading Crop** button over
-them. The trim is the fixed view's only — continuous, folded and the
-thumbnails show whole pages — and it is kept with the PDF's view
+them. The folded view (which shows strips of the pages its own way) and
+the thumbnails always show whole pages. The trim is kept with the PDF's view
 (`SavedView.crop`), on this device; the file is never touched.
 
 How it is drawn (`src/pdfviewer/crop.ts`): page wrappers keep their full

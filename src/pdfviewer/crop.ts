@@ -1,23 +1,23 @@
-// Trimmed reading: in the fixed view, holding ⌘ (Ctrl elsewhere) with
-// the pointer over the pages makes their edges grabbable. Dragging one trims that margin off
+// Trimmed reading: holding ⌘ (Ctrl elsewhere) with the pointer over the
+// pages makes their edges grabbable. Dragging one trims that margin off
 // every page; letting go of the key lays the pages out again with the
-// trimmed size as their bounds, so a set fits the view by what is left
-// and the margins' room goes to the text.
+// trimmed size as their bounds, so the pages fit the view by what is
+// left and the margins' room goes to the text.
 //
 // Holding the key again shows the pages whole (the trim drawn over
 // them) for the next adjustment — drag an edge back out, or press
-// Reset Reading Crop, which appears while the key is held. The trim is
-// the fixed view's only: the continuous and folded views and the
-// thumbnails always show whole pages. It is kept with the PDF's view
-// (viewState.ts), on this device, and never touches the file.
+// Reset Reading Crop, which appears while the key is held. The trim
+// applies in every view but the folded one, which shows strips of the
+// pages its own way, and never to the thumbnails. It is kept with the
+// PDF's view (viewState.ts), on this device, and never touches the file.
 //
 // The page wrappers keep their full size, so everything that reads a
 // page's geometry (the text layer, annotations, search hits, the
 // place kept across a relayout) works unchanged. A trimmed page is
 // drawn clipped (clip-path), and negative margins — sized here, per
 // page — close up the room its trimmed edges would take; matching
-// negative scroll margins make the fixed view's snapping centre what
-// is left. See `.pdf-cropped` in pdfviewer.css.
+// negative scroll margins make scrolling to a page (and the fixed
+// view's snapping) line up what is left. See `.pdf-cropped` in pdfviewer.css.
 import { APPLE } from "../lib/shortcuts/bindings";
 import type { PageRecord } from "./types";
 
@@ -63,7 +63,7 @@ interface CropEnv {
   /** Where the Reset button goes (over the pages). */
   host: HTMLElement;
   getPages: () => PageRecord[];
-  /** The fixed view is on (not folded, not zoomed). */
+  /** A view the trim applies in (not the folded one). */
   active: () => boolean;
   initial: Crop | null;
   /** The trim in effect changed (adjusting began or ended, or reset):
@@ -305,7 +305,7 @@ export function createReadingCrop(env: CropEnv) {
 
   return {
     /** The trim the layout uses: none while adjusting (the pages show
-     *  whole) or outside the fixed view. */
+     *  whole) or in the folded view. */
     effective: (): Crop | null => (crop && !editing && env.active() ? crop : null),
     /** The trim set, to keep with the PDF's view. */
     get: (): Crop | null => (crop ? { ...crop } : null),

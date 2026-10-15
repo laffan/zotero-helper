@@ -5,8 +5,22 @@
 // mouse, trackpad or pencil, and on a press-and-hold with a finger. A
 // hold that brought up its tooltip doesn't count as a tap, so asking
 // what a button does never does it.
+//
+// A button that stands for a keyboard shortcut (`data-shortcut`: an
+// action id, or a fixed combo) shows the key after its text, dimmed —
+// looked up as it shows, so a rebinding (Settings) is what it says.
+
+import { ACTIONS, bindingsOf, formatCombo } from "../lib/shortcuts/bindings";
 
 const HOVER_MS = 450;
+
+/** The key a `data-shortcut` names, as currently bound — none when the
+ *  action has been left without one. */
+function shortcutLabel(ref: string | undefined): string {
+  if (!ref) return "";
+  const combo = ACTIONS.some((a) => a.id === ref) ? bindingsOf(ref)[0] : ref;
+  return combo ? formatCombo(combo) : "";
+}
 const HOLD_MS = 450;
 const HOLD_SHOWN_MS = 1600;
 
@@ -45,6 +59,13 @@ export function attachTooltips(bar: HTMLElement, host: HTMLElement): () => void 
     if (!text || !el.isConnected) return;
     shownFor = el;
     tip.textContent = text;
+    const keys = shortcutLabel(el.dataset.shortcut);
+    if (keys) {
+      const k = document.createElement("span");
+      k.className = "pdf-tooltip-keys";
+      k.textContent = keys;
+      tip.appendChild(k);
+    }
     tip.style.display = "";
     const h = host.getBoundingClientRect();
     const r = el.getBoundingClientRect();

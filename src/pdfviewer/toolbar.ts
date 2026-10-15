@@ -16,61 +16,66 @@ import {
   VERTICAL_ICON,
 } from "./icons";
 
-function btn(cls: string, text: string, title: string): HTMLButtonElement {
+/** `shortcut`: the keyboard shortcut the button stands for — an action
+ *  id from lib/shortcuts/bindings.ts, or a fixed combo ("mod+=") — shown
+ *  after its tooltip (tooltips.ts), as currently bound. */
+function btn(cls: string, text: string, title: string, shortcut?: string): HTMLButtonElement {
   const b = document.createElement("button");
   b.type = "button";
   b.className = cls;
   b.textContent = text;
   b.title = title;
+  if (shortcut) b.dataset.shortcut = shortcut;
   return b;
 }
 
-function svgBtn(cls: string, title: string, svg: string): HTMLButtonElement {
-  const b = document.createElement("button");
-  b.type = "button";
-  b.className = cls;
-  b.title = title;
+function svgBtn(cls: string, title: string, svg: string, shortcut?: string): HTMLButtonElement {
+  const b = btn(cls, "", title, shortcut);
   b.innerHTML = svg;
   return b;
+}
+
+function group(cls: string, ...children: HTMLElement[]): HTMLSpanElement {
+  const g = document.createElement("span");
+  g.className = cls;
+  g.append(...children);
+  return g;
 }
 
 export function buildPdfToolbar() {
   const toolbar = document.createElement("div");
   toolbar.className = "pdf-zoom-toolbar";
 
-  const zoomOutBtn = btn("pdf-zoom-btn", "−", "Zoom out");
+  // − and + as one group, the zoom (or fit) they set to their right.
+  const zoomOutBtn = btn("pdf-toggle-option pdf-zoom-step", "−", "Zoom out", "mod+-");
+  const zoomInBtn = btn("pdf-toggle-option pdf-zoom-step", "+", "Zoom in", "mod+=");
   const zoomLabel = document.createElement("span");
   zoomLabel.className = "pdf-zoom-label";
   zoomLabel.textContent = "Fit";
-  const zoomInBtn = btn("pdf-zoom-btn", "+", "Zoom in");
+  const zoomWrap = group("pdf-toolbar-section", group("pdf-toggle-group", zoomOutBtn, zoomInBtn), zoomLabel);
 
-  const scrollToggleWrap = document.createElement("span");
-  scrollToggleWrap.className = "pdf-toggle-group";
-  const scrollHBtn = svgBtn("pdf-toggle-option active", "Horizontal scroll", HORIZONTAL_ICON);
-  const scrollVBtn = svgBtn("pdf-toggle-option", "Vertical scroll", VERTICAL_ICON);
-  scrollToggleWrap.append(scrollHBtn, scrollVBtn);
+  const scrollHBtn = svgBtn("pdf-toggle-option active", "Horizontal scroll", HORIZONTAL_ICON, "pdfHorizontal");
+  const scrollVBtn = svgBtn("pdf-toggle-option", "Vertical scroll", VERTICAL_ICON, "pdfVertical");
+  const scrollToggleWrap = group("pdf-toggle-group", scrollHBtn, scrollVBtn);
 
-  const fitToggleWrap = document.createElement("span");
-  fitToggleWrap.className = "pdf-toggle-group";
+  const fitOneBtn = svgBtn("pdf-toggle-option active", "Fit one page", FIT_ONE_ICON, "pdfFit1");
+  const fitTwoBtn = svgBtn("pdf-toggle-option", "Fit two pages", FIT_TWO_ICON, "pdfFit2");
+  const fitThreeBtn = svgBtn("pdf-toggle-option", "Fit three pages", FIT_THREE_ICON, "pdfFit3");
+  const fitToggleWrap = group("pdf-toggle-group", fitOneBtn, fitTwoBtn, fitThreeBtn);
   fitToggleWrap.style.display = "none";
-  const fitOneBtn = svgBtn("pdf-toggle-option active", "Fit one page", FIT_ONE_ICON);
-  const fitTwoBtn = svgBtn("pdf-toggle-option", "Fit two pages", FIT_TWO_ICON);
-  const fitThreeBtn = svgBtn("pdf-toggle-option", "Fit three pages", FIT_THREE_ICON);
-  fitToggleWrap.append(fitOneBtn, fitTwoBtn, fitThreeBtn);
 
   // A fixed set of pages (as many as the fit buttons say), swiped
   // through, or the pages as one strip.
-  const pageModeWrap = document.createElement("span");
-  pageModeWrap.className = "pdf-toggle-group pdf-page-mode";
-  const fixedBtn = svgBtn("pdf-toggle-option", "Fixed — one, two or three pages at a time; swipe to turn", FIXED_ICON);
-  const continuousBtn = svgBtn("pdf-toggle-option active", "Continuous — the pages as one strip", CONTINUOUS_ICON);
-  pageModeWrap.append(fixedBtn, continuousBtn);
+  const fixedBtn = svgBtn("pdf-toggle-option", "Fixed — one, two or three pages at a time; swipe to turn", FIXED_ICON, "pdfFixed");
+  const continuousBtn = svgBtn("pdf-toggle-option active", "Continuous — the pages as one strip", CONTINUOUS_ICON, "pdfContinuous");
+  const pageModeWrap = group("pdf-toggle-group pdf-page-mode", fixedBtn, continuousBtn);
 
   // Folded view is always offered — entering it switches to vertical
   // scroll at single-page width. The filter shows only while folded.
-  const foldBtn = svgBtn("pdf-zoom-btn pdf-fold-btn", "Folded view — collapse to annotated regions", FOLD_ICON);
-  const foldFilterBtn = svgBtn("pdf-zoom-btn pdf-fold-filter-btn", "Filter fold annotations", FILTER_ICON);
+  const foldBtn = svgBtn("pdf-zoom-btn pdf-fold-btn", "Folded view — collapse to annotated regions", FOLD_ICON, "pdfFolded");
+  const foldFilterBtn = svgBtn("pdf-zoom-btn pdf-fold-filter-btn", "Filter fold annotations", FILTER_ICON, "pdfFoldFilters");
   foldFilterBtn.style.display = "none";
+  const foldWrap = group("pdf-toolbar-section", foldBtn, foldFilterBtn);
 
   const pageIndicator = document.createElement("span");
   pageIndicator.className = "pdf-page-indicator";
@@ -80,13 +85,15 @@ export function buildPdfToolbar() {
   zoteroLink.textContent = "Open in Zotero ↗";
   zoteroLink.style.display = "none";
 
-  const thumbnailBtn = svgBtn("pdf-zoom-btn pdf-thumbnail-btn", "Thumbnail view", THUMBNAIL_ICON);
+  const thumbnailBtn = svgBtn("pdf-zoom-btn pdf-thumbnail-btn", "Thumbnail view", THUMBNAIL_ICON, "pdfThumbnails");
 
+  // Sections, spaced apart by the bar (pdfviewer.css): the thumbnails;
+  // zoom; scroll direction; fit; fixed / continuous; folding.
   toolbar.append(
     thumbnailBtn,
-    zoomOutBtn, zoomLabel, zoomInBtn,
+    zoomWrap,
     scrollToggleWrap, fitToggleWrap,
-    pageModeWrap, foldBtn, foldFilterBtn,
+    pageModeWrap, foldWrap,
     pageIndicator, zoteroLink,
   );
 

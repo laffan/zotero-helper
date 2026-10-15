@@ -37,19 +37,22 @@ export function applyLayoutClasses(area: HTMLElement, s: LayoutState): void {
       `pdf-paged-${s.perSet}`,
     );
     area.style.setProperty("--pdf-paged-cols", String(s.perSet));
-    if (s.crop) area.classList.add("pdf-cropped");
   } else if (s.folded) area.classList.add("pdf-layout-folded");
   else if (s.layoutMode === "vertical") {
     area.classList.add(s.fitMode === "fit" ? "pdf-layout-fit" : "pdf-layout-fixed");
   } else if (s.layoutMode === "horizontal") area.classList.add("pdf-layout-horizontal");
   else area.classList.add("pdf-layout-fixed");
+  // A reading crop applies in every view but the folded one (crop.ts).
+  if (s.crop && !s.folded) area.classList.add("pdf-cropped");
 }
 
-/** CSS px per PDF unit for the mode, from page 1's scale-1 viewport. */
-export function fitZoom(area: HTMLElement, first: PageViewport, s: LayoutState): number {
+/** CSS px per PDF unit for the mode, from page 1's scale-1 viewport —
+ *  trimmed by a reading crop, so what is left of a page is what fits. */
+export function fitZoom(area: HTMLElement, page1: PageViewport, s: LayoutState): number {
+  const first = croppedSize(page1, s.crop);
   const pad = 40;
   const gap = 12;
-  if (s.paged) return pagedFitZoom(area, croppedSize(first, s.crop), PAGED_PAD, s.perSet);
+  if (s.paged) return pagedFitZoom(area, first, PAGED_PAD, s.perSet);
   if (s.layoutMode === "vertical") {
     const availW = area.clientWidth - pad;
     if (s.folded) return (availW / first.width) * s.foldedZoom;

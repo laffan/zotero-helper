@@ -8,6 +8,7 @@
     "core:window:allow-close",
     "dialog:default",
     "opener:default",
-    "capture-view:default"
+    "capture-view:default",
+    "pencil:default"
   ]
 }

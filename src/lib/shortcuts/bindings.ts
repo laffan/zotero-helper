@@ -76,6 +76,7 @@ export const ACTIONS: ShortcutAction[] = [
   a("pdf", "pdfFit3", "Fit three pages", "3"),
   a("pdf", "pdfFixed", "Paged view", "p"),
   a("pdf", "pdfContinuous", "Continuous view", "c"),
+  a("pdf", "pdfInk", "Draw (ink mode) on / off", "i"),
   a("pdf", "pdfNext", "Next page (next fold, when folded)", "arrowright", "arrowdown"),
   a("pdf", "pdfPrev", "Previous page (previous fold, when folded)", "arrowleft", "arrowup"),
 ];
@@ -88,6 +89,8 @@ export const FIXED_SHORTCUTS: { context: string; keys: string; label: string }[]
   { context: "PDF viewer", keys: "mod+0", label: "Back to the default layout" },
   { context: "PDF viewer", keys: "mod", label: "Hold in the paged view to trim the pages' edges" },
   { context: "PDF search", keys: "enter", label: "Next match (⇧ for the previous)" },
+  { context: "Drawing", keys: "mod+z", label: "Undo (⇧ to redo)" },
+  { context: "Drawing", keys: "backspace", label: "Delete the selected drawings" },
   { context: "Notes", keys: "mod+i", label: "Italic" },
   { context: "Notes", keys: "mod+b", label: "Bold" },
   { context: "Notes", keys: "mod+=", label: "Highlight" },

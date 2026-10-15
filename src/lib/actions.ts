@@ -7,6 +7,7 @@ import { startAnnotationSync } from "./annotationEdits";
 import { loadBookmarks } from "./bookmarks";
 import { captureFinished, downloadForJob } from "./importer";
 import { pushNote, refreshCachedPdfs, startNotesSync } from "./notes";
+import { listenForPencil } from "./pencil";
 import { followReaderUi } from "./readerUi";
 import { appLog, useStore } from "./store";
 import { invoke, isTauri, on } from "./tauri";
@@ -83,6 +84,8 @@ export async function bootstrap(): Promise<void> {
       appLog("debug", `Capture plugin events unavailable: ${e}`);
     }
   }
+  // iPad: the Pencil's double-tap and squeeze, for the viewer's ink mode.
+  await listenForPencil();
 
   // Conversations are local to this app, so they load whether or not
   // Zotero credentials are in place yet.

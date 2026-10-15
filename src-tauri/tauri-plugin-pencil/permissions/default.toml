@@ -1,0 +1,15 @@
+"$schema" = "schemas/schema.json"
+
+[[permission]]
+identifier = "allow-register-listener"
+description = "Allow JS to register a listener for the Pencil's events (tap / squeeze) via addPluginListener()."
+commands.allow = ["registerListener"]
+
+[[permission]]
+identifier = "allow-remove-listener"
+description = "Allow JS to remove a previously registered plugin-event listener."
+commands.allow = ["removeListener"]
+
+[default]
+description = "Default permissions: allow JS to subscribe to and unsubscribe from the Pencil's events."
+permissions = ["allow-register-listener", "allow-remove-listener"]

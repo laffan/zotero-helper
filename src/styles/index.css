@@ -11,6 +11,7 @@
 @import "./pdfviewer.css";
 @import "./pdfviewer-panels.css";
 @import "./pdfviewer-annotate.css";
+@import "./pdfviewer-ink.css";
 @import "./chat.css";
 @import "./terminal.css";
 @import "./tasktray.css";

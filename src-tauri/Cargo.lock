@@ -3819,6 +3819,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "tauri-plugin-pencil"
+version = "0.1.0"
+dependencies = [
+ "tauri",
+ "tauri-plugin",
+]
+
+[[package]]
 name = "tauri-plugin-share-sheet"
 version = "0.1.0"
 dependencies = [
@@ -5328,6 +5336,7 @@ dependencies = [
  "tauri-plugin-dialog",
  "tauri-plugin-keyboard-focus",
  "tauri-plugin-opener",
+ "tauri-plugin-pencil",
  "tauri-plugin-share-sheet",
  "thiserror 2.0.19",
  "tokio",

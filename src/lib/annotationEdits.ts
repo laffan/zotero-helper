@@ -1,6 +1,6 @@
-// Highlights and underlines made in the reader, written the way Zotero's
-// own reader writes them: as annotation items, children of the PDF
-// attachment. The PDF file itself is never touched — Zotero doesn't
+// Highlights, underlines and ink made in the reader, written the way
+// Zotero's own reader writes them: as annotation items, children of the
+// PDF attachment. The PDF file itself is never touched — Zotero doesn't
 // keep annotations in it either — so Zotero desktop, iOS and the web
 // library all show these as their own.
 //
@@ -21,20 +21,25 @@ const PUSH_EVERY_MS = 2 * 60 * 1000;
 const MAX_TEXT = 7500;
 const MAX_PAGE_LABEL = 50;
 
-/** What the reader hands over for a new highlight or underline. */
-export interface NewAnnotation {
+/** What the reader hands over for a new highlight, underline or ink
+ *  drawing. Ink carries no text (Zotero refuses it there) and comes
+ *  with its key, which the viewer gave it as it was drawn. */
+export type NewAnnotation = {
   attKey: string;
-  type: "highlight" | "underline";
   color: string;
-  text: string;
   pageLabel: string;
   sortIndex: string;
-  position: { pageIndex: number; rects: number[][] };
-}
+} & (
+  | { type: "highlight" | "underline"; text: string; position: { pageIndex: number; rects: number[][] } }
+  | { type: "ink"; key: string; position: { pageIndex: number; width: number; paths: number[][] } }
+);
 
 export interface AnnotationPatch {
   color?: string;
   comment?: string;
+  /** The position as stored (JSON) — an ink drawing moved or erased. */
+  position?: string;
+  sortIndex?: string;
 }
 
 interface OutboxOp {
@@ -116,16 +121,16 @@ function itemOf(key: string): ZItem | undefined {
   return useStore.getState().library.items.find((i) => i.key === key);
 }
 
-/** Create a highlight or underline. Returns its key. */
+/** Create a highlight, underline or ink drawing. Returns its key. */
 export function createAnnotation(n: NewAnnotation): string {
-  const key = newItemKey();
+  const key = n.type === "ink" ? n.key : newItemKey();
   const data: Record<string, unknown> = {
     key,
     version: 0,
     itemType: "annotation",
     parentItem: n.attKey,
     annotationType: n.type,
-    annotationText: n.text.slice(0, MAX_TEXT),
+    ...(n.type === "ink" ? {} : { annotationText: n.text.slice(0, MAX_TEXT) }),
     annotationComment: "",
     annotationColor: n.color.toLowerCase(),
     annotationPageLabel: n.pageLabel.slice(0, MAX_PAGE_LABEL),
@@ -139,13 +144,15 @@ export function createAnnotation(n: NewAnnotation): string {
   return key;
 }
 
-/** Change an annotation's colour and/or comment. */
+/** Change an annotation's colour, comment or (ink) position. */
 export function updateAnnotation(key: string, patch: AnnotationPatch): void {
   const item = itemOf(key);
   if (!item) return;
   const fields: Record<string, unknown> = {};
   if (patch.color !== undefined) fields.annotationColor = patch.color.toLowerCase();
   if (patch.comment !== undefined) fields.annotationComment = patch.comment;
+  if (patch.position !== undefined) fields.annotationPosition = patch.position;
+  if (patch.sortIndex !== undefined) fields.annotationSortIndex = patch.sortIndex;
   const changed = Object.keys(fields).filter((f) => item.data[f] !== fields[f]);
   if (!changed.length) return;
   show({ ...item, data: { ...item.data, ...fields } });

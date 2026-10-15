@@ -30,7 +30,9 @@ export interface Annotation {
 export interface AnnotationPosition {
   pageIndex: number;
   rects?: number[][];
+  /** Ink: its lines, each a run of x, y pairs, drawn `width` wide. */
   paths?: number[][];
+  width?: number;
 }
 
 /** Zotero's annotation colours, in the order its reader offers them.

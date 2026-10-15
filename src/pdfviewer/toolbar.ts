@@ -15,6 +15,7 @@ import {
   THUMBNAIL_ICON,
   VERTICAL_ICON,
 } from "./icons";
+import { PEN_ICON } from "./ink/icons";
 
 /** `shortcut`: the keyboard shortcut the button stands for — an action
  *  id from lib/shortcuts/bindings.ts, or a fixed combo ("mod+=") — shown
@@ -87,13 +88,17 @@ export function buildPdfToolbar() {
 
   const thumbnailBtn = svgBtn("pdf-zoom-btn pdf-thumbnail-btn", "Thumbnail view", THUMBNAIL_ICON, "pdfThumbnails");
 
+  // Ink mode: draw with the Pencil (or a mouse), as Zotero's pen does.
+  const inkBtn = svgBtn("pdf-zoom-btn pdf-ink-btn", "Draw — the Pencil writes, a finger scrolls", PEN_ICON, "pdfInk");
+
   // Sections, spaced apart by the bar (pdfviewer.css): the thumbnails;
   // pages per screen; scroll direction; fixed / continuous; folding;
-  // zoom.
+  // drawing; zoom.
   toolbar.append(
     thumbnailBtn,
     fitToggleWrap, scrollToggleWrap,
     pageModeWrap, foldWrap,
+    inkBtn,
     zoomWrap,
     pageIndicator, zoteroLink,
   );
@@ -105,7 +110,7 @@ export function buildPdfToolbar() {
     fitOneBtn, fitTwoBtn, fitThreeBtn, fitToggleWrap,
     pageModeWrap, fixedBtn, continuousBtn,
     foldBtn, foldFilterBtn,
-    pageIndicator, zoteroLink, thumbnailBtn,
+    pageIndicator, zoteroLink, thumbnailBtn, inkBtn,
   };
 }
 export type PdfToolbar = ReturnType<typeof buildPdfToolbar>;

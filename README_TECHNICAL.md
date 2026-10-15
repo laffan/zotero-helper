@@ -90,9 +90,11 @@ src/            React + TypeScript UI (Vite, zustand, MiniSearch)
                 Settings → General's theme and UI font size; showing and
                 hiding the side panels (toolbar buttons and shortcuts)
   lib/annotationEdits.ts, lib/pendingAnnotations.ts
-                highlights made in the reader: create / edit / delete,
-                the push schedule, and unsent changes laid over the
-                library until a sync includes them
+                highlights and drawings made in the reader: create /
+                edit / delete, the push schedule, and unsent changes
+                laid over the library until a sync includes them
+  lib/pencil.ts the Apple Pencil's double-tap and squeeze, from
+                tauri-plugin-pencil, as a window event for ink mode
   components/   toolbar, sidebar, virtualized item list, metadata panel
                 and its tabs (Highlights, Notes — NotesPrompts is an
                 empty note's reading questions), reader pane, terminal,
@@ -119,7 +121,15 @@ src/            React + TypeScript UI (Vite, zustand, MiniSearch)
                 citeMark (an AI citation's passage, marked), and
                 annotating: selectionBar (colours over a selection),
                 annotate (selection → Zotero position, tap hit-test),
-                annotPopover (colour / comment / delete)
+                annotPopover (colour / comment / delete);
+                viewerOptions (what the host hands the viewer)
+  pdfviewer/ink/
+                drawing (Zotero's pen): index (ink mode, wiring),
+                session (the drawings and this viewer's unwritten
+                changes, merge rule, undo, the deferred write), layer
+                (each page's ink as SVG), live (the stroke under the
+                pen), input (Pencil / mouse / finger rules), geometry
+                (Zotero's smoothing, eraser, merge distances), bar
   noteseditor/  the notes editor: CodeMirror setup, live preview,
                 Zotero-link pills, the cite-this-page gutter, the
                 formatting shortcuts, `==highlight==` syntax, prompts
@@ -147,10 +157,11 @@ src-tauri/      Rust core (all networking + state)
   src/bookmarks.rs the reader's bookmarks on disk (bookmarks.json)
   src/capture.rs   desktop capture-browser window (download interception)
   tauri-plugin-capture-view/, tauri-plugin-share-sheet/,
-  tauri-plugin-keyboard-focus/
+  tauri-plugin-keyboard-focus/, tauri-plugin-pencil/
                    the app's own iOS plugins: the capture browser's
-                   WKWebView, the share sheet, and handing the web view
-                   the hardware keyboard (first responder)
+                   WKWebView, the share sheet, handing the web view
+                   the hardware keyboard (first responder), and the
+                   Apple Pencil's double-tap / squeeze
 ```
 
 ### State and where it lives
@@ -533,6 +544,85 @@ falling back to the page number. The writes are
 `src-tauri/src/annotations.rs`; selection to position is
 `src/pdfviewer/annotate.ts`.
 
+**Drawing (ink).** The pen button in the bottom bar (I from the
+keyboard) turns on ink mode: Zotero's pen tool. A drawing is an ink
+annotation exactly as Zotero's reader makes one — `annotationType`
+"ink", a position of `{ pageIndex, width, paths }` (each path a run of
+x, y pairs in PDF points), a colour, page label and sort index, and no
+text (the server refuses text on ink) — so Zotero shows what is drawn
+here, and what is drawn in Zotero shows here, editable like the
+app's own highlights. The rules are Zotero's (`zotero/reader`
+`src/pdf/lib/path.js` and `pdf-view.js`, mirrored in
+`src/pdfviewer/ink/geometry.ts`): a finished stroke is smoothed (two
+rounds of Chaikin, points closer than 1pt dropped, 3 decimals); a stroke
+drawn within 10s and 50pt of the last one, with the same colour and
+width, is added to that annotation, so a written word is one annotation;
+the eraser takes out the points inside its circle, splitting a line in
+two, and deletes a drawing it empties. A floating bar over the foot of
+the pages (over them, so starting to draw never relays out the pages)
+holds the pen, eraser and select tools; Zotero's eight colours and
+black; the width over Zotero's range of steps (0.2–25pt; the eraser's
+size, with the eraser); undo / redo (⌘Z / ⇧⌘Z); Delete for a selection;
+and Done. Select takes a drawing by a tap on its line, or every drawing
+a dragged box touches; a drag from inside the selection moves it, the
+colours and width restyle it, ⌫ deletes it. The tool, colour and sizes
+are this device's (`localStorage`, `zh-ink`). Only drawings this app may
+edit (`canEditAnnotation`) can be erased, selected or added to.
+
+Who draws: the Apple Pencil and a mouse; a finger never does — it keeps
+scrolling and zooming natively, so reading and writing need no mode
+change beyond the pen in hand (`input.ts`; `pointerType` tells them
+apart in WKWebView). The Pencil's touches are cancelled
+(`touchType === "stylus"`) so it can't scroll or select text, and while
+it is down every touch is, so a resting hand can't move the page. Those
+non-passive touch listeners exist only in ink mode — they make each
+scroll wait on the main thread. A pen's eraser button erases whatever
+tool is on. The Pencil's double-tap (and the Pencil Pro's squeeze) does
+what Settings → Apple Pencil says — switch to the eraser and back, or to
+the last tool — through `tauri-plugin-pencil` (ported from Hush's: a
+`UIPencilInteraction` on the web view, events `tap` / `squeeze` with the
+preferred action) and `src/lib/pencil.ts`.
+
+Why it keeps up with fast writing:
+- *No page re-render per stroke.* Highlights are painted into the pdf.js
+  raster (`paint.ts`), which costs a page render per change. Ink on the
+  pages is instead an `<svg>` per page (`layer.ts`), its outer group
+  mapping PDF space through the page's viewport transform: a stroke is
+  one `<path>` appended, an erase rebuilds one annotation's group, and
+  the viewBox carries it through every zoom without a redraw.
+  `changedPages(…, withInk = false)` keeps ink out of the pages' repaint
+  decision. (Thumbnails and the folded view still paint ink into their
+  rasters; nothing is drawn there.)
+- *A constant cost per sample.* The stroke under the pen is drawn on one
+  canvas over the pages (`live.ts`), one curve segment per sample, with
+  no layout read (the page's box is read once at pen-down) and no
+  redraw; at pen-up it moves into the SVG and its region is cleared in
+  the same task. The canvas is allocated when ink mode starts and
+  released when it ends — never mid-stroke, which on iPad drops samples
+  (Hush measured it). Coalesced events are used off iOS only, as in
+  Hush.
+- *Nothing written while writing.* A change reaches the store and the
+  annotation outbox only once the pen has rested 1.2s (or after 15s of
+  unbroken writing, at the next pen-up; and at once on Done, closing the
+  PDF, or the app going to the background — ahead of the push that same
+  event starts). Store writes re-render React and outbox writes are IPC;
+  either, mid-stroke, would cost the stroke samples. Until then the
+  session's changes override the store's copy, so a sync landing
+  mid-sentence can't undo it, and the store's echo of a write is
+  recognised by its position string and draws nothing.
+
+Measured in Chromium (`npm run dev`, the viewer driven with synthetic pen
+events): about 0.01ms of script per pen sample, and under 1ms on average
+at pen-up (smoothing, merge, SVG). Hush's stroke engine (tile-baked
+canvases, brush atlases) was not needed: Zotero's ink is one width per
+annotation with round caps, which SVG draws natively.
+
+An annotation's position may be at most 65,535 characters (the server's
+limit); an annotation that would outgrow 60,000 starts a new one, and a
+single stroke too long for one is split across several. Not yet done:
+Zotero's resize and rotate handles for a selection, moving a drawing to
+another page, and drawing in the folded view (ink mode leaves it).
+
 **Notes sync.** Notes save to this device as you type and are pushed to Zotero as a
 `NOTES.md` attachment of the entry every couple of minutes while
 anything is unpushed, when the app goes to the background, and on
@@ -845,6 +935,7 @@ doesn't cost the role, so there is nothing to reclaim.
 | PDF viewer | Horizontal / vertical scroll | Z / V |
 | PDF viewer | Fit one / two / three pages | 1 / 2 / 3 |
 | PDF viewer | Paged / continuous view | P / C |
+| PDF viewer | Draw (ink mode) on / off | I |
 | PDF viewer | Next page (next fold, when folded) | → or ↓ |
 | PDF viewer | Previous page (previous fold, when folded) | ← or ↑ |
 
@@ -876,9 +967,10 @@ registers its order and scrolling with); in the details panel ← / →
 switch tabs, ↑ / ↓ scroll and Return goes to the notes.
 
 Built in and not rebindable: the viewer's ⌘+ / ⌘- / ⌘0 zoom, holding ⌘
-for trimmed reading, Enter / ⇧Enter in the PDF search, and the notes'
-⌘I / ⌘B / ⌘= / ⌘K and `?` — they're listed at the foot of the settings
-section (`FIXED_SHORTCUTS`).
+for trimmed reading, Enter / ⇧Enter in the PDF search, ink mode's ⌘Z /
+⇧⌘Z and ⌫ (handled by ink mode itself, outside text fields, so a
+field's own undo keeps ⌘Z), and the notes' ⌘I / ⌘B / ⌘= / ⌘K and `?` —
+they're listed at the foot of the settings section (`FIXED_SHORTCUTS`).
 
 ## Hush integration
 

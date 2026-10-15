@@ -11,6 +11,7 @@
 // transform maps PDF user space straight to canvas pixels, honouring a
 // CropBox origin that isn't (0,0) and any /Rotate.
 import { annotationPosition, type Annotation } from "../lib/highlights";
+import { inkStrokeColor } from "./ink/geometry";
 import type { PageViewport } from "./types";
 
 /** Highlights are drawn the way a highlighter marks paper: multiplied
@@ -28,23 +29,28 @@ function box(viewport: PageViewport, r: number[]) {
   return { x: Math.min(ax, bx), y: Math.min(ay, by), w: Math.abs(bx - ax), h: Math.abs(by - ay) };
 }
 
-/** Paint the annotations on page `pageIndex` (0-based) into `ctx`. */
+/** Paint the annotations on page `pageIndex` (0-based) into `ctx` —
+ *  ink too unless `withInk` is false (the pages draw theirs over the
+ *  raster, ink/layer.ts). */
 export function drawAnnotations(
   ctx: CanvasRenderingContext2D,
   viewport: PageViewport,
   annotations: Annotation[],
   pageIndex: number,
+  withInk = true,
 ): void {
   const scale = viewport.scale;
   for (const a of annotations) {
+    if (a.type === "ink" && !withInk) continue;
     const pos = annotationPosition(a);
     if (!pos || pos.pageIndex !== pageIndex) continue;
     const color = a.color || (a.type === "ink" ? "#ff0000" : "#ffd400");
     ctx.save();
     if (a.type === "ink" && pos.paths?.length) {
-      // Zotero records the pen width in PDF units beside the paths.
-      const width = Number((pos as { width?: number }).width) || 1;
-      ctx.strokeStyle = color;
+      // Zotero records the pen width in PDF units beside the paths, and
+      // draws ink a shade darker than its colour.
+      const width = Number(pos.width) || 1;
+      ctx.strokeStyle = inkStrokeColor(color);
       ctx.lineWidth = Math.max(0.75, width * scale);
       ctx.lineCap = "round";
       ctx.lineJoin = "round";
@@ -94,9 +100,10 @@ export function drawAnnotations(
  *  an edit. Only what shows counts: a repaint replaces the page's text
  *  layer, and with it any selection being made there, so a comment
  *  edit or a new version number from Zotero mustn't cause one. */
-export function pageSignatures(annotations: Annotation[]): Map<number, string> {
+export function pageSignatures(annotations: Annotation[], withInk = true): Map<number, string> {
   const out = new Map<number, string>();
   for (const a of annotations) {
+    if (a.type === "ink" && !withInk) continue;
     const idx = annotationPosition(a)?.pageIndex;
     if (typeof idx !== "number") continue;
     const pos = (a._raw.data as Record<string, unknown>).annotationPosition;
@@ -104,4 +111,14 @@ export function pageSignatures(annotations: Annotation[]): Map<number, string> {
     out.set(idx, out.has(idx) ? `${out.get(idx)},${part}` : part);
   }
   return out;
+}
+
+/** The pages whose drawing differs between two lists of annotations. */
+export function changedPages(before: Annotation[], after: Annotation[], withInk: boolean): Set<number> {
+  const a = pageSignatures(before, withInk);
+  const b = pageSignatures(after, withInk);
+  const changed = new Set<number>();
+  for (const [i, sig] of b) if (a.get(i) !== sig) changed.add(i);
+  for (const i of a.keys()) if (!b.has(i)) changed.add(i);
+  return changed;
 }

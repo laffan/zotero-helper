@@ -1,0 +1,13 @@
+[package]
+name = "tauri-plugin-pencil"
+version = "0.1.0"
+description = "iPadOS: the Apple Pencil's double-tap and squeeze, as plugin events"
+edition = "2021"
+rust-version = "1.77"
+links = "tauri-plugin-pencil"
+
+[build-dependencies]
+tauri-plugin = { version = "2", features = ["build"] }
+
+[dependencies]
+tauri = { version = "2" }

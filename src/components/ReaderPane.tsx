@@ -13,6 +13,7 @@ import {
   canEditAnnotation,
   createAnnotation,
   deleteAnnotation,
+  newItemKey,
   updateAnnotation,
 } from "../lib/annotationEdits";
 import {
@@ -199,6 +200,17 @@ export function ReaderPane() {
                 pageLabel: d.pageLabel,
                 sortIndex: d.sortIndex,
                 position: { pageIndex: d.pageIndex, rects: d.rects },
+              }),
+            newKey: newItemKey,
+            createInk: (d) =>
+              createAnnotation({
+                attKey,
+                type: "ink",
+                key: d.key,
+                color: d.color,
+                pageLabel: d.pageLabel,
+                sortIndex: d.sortIndex,
+                position: { pageIndex: d.pageIndex, width: d.width, paths: d.paths },
               }),
             update: updateAnnotation,
             remove: deleteAnnotation,

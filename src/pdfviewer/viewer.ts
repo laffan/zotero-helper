@@ -20,7 +20,7 @@
 import type { Annotation } from "../lib/highlights";
 import { PDFJS_ASSETS } from "../lib/pdfjsAssets";
 import { centerPagePoint, pageFracAtCenter, restoreAnchor, scrollToPagePoint, viewAnchor } from "./anchor";
-import { attachAnnotationTaps, draftFromRange, type AnnotationDraft } from "./annotate";
+import { attachAnnotationTaps, draftFromRange } from "./annotate";
 import { createAnnotationLayer } from "./annotations";
 import { createAnnotationPopover } from "./annotPopover";
 import { createBookmarkPrompt, markBookmarkedPages, type PageBookmark } from "./bookmarks";
@@ -28,58 +28,29 @@ import { createCiteMark } from "./citeMark";
 import { createViewerCommands } from "./commands";
 import { createReadingCrop } from "./crop";
 import { createFoldLayer } from "./folds";
+import { createInkTool } from "./ink";
 import { attachViewerKeys } from "./keys";
 import { applyLayoutClasses, fitZoom, sizePage, sizePagedGap } from "./layout";
 import { createLinkLayerManager } from "./links";
-import { readOutline, type OutlineEntry } from "./outline";
+import { readOutline } from "./outline";
 import { attachTextLayer, createPageRecords } from "./pageTools";
-import { drawAnnotations, pageSignatures } from "./paint";
+import { changedPages, drawAnnotations } from "./paint";
 import { attachPagedWheel } from "./paged";
 import { getPdfjs } from "./pdfjs";
 import { createPageRenderer } from "./render";
 import { createPdfSearch } from "./search";
-import { createSelectionBar, type MarkType } from "./selectionBar";
+import { createSelectionBar } from "./selectionBar";
 import { createThumbnailManager } from "./thumbnails";
 import { buildPdfToolbar, syncToolbar } from "./toolbar";
 import { attachTooltips } from "./tooltips";
 import type { LayoutMode, PageRecord, PDFDocumentProxy } from "./types";
 import { loadViewPrefs, saveViewPrefs, type FitMode } from "./viewPrefs";
+import type { PdfViewerOptions } from "./viewerOptions";
 import { createViewReporter, initialLayout, type FoldAnchor, type SavedView } from "./viewState";
 
+export type { AnnotationWriter, PdfViewerOptions } from "./viewerOptions";
+
 const ZOOM_LEVELS = [0.5, 0.75, 1.0, 1.25, 1.5, 2.0];
-
-export interface PdfViewerOptions {
-  /** Open the PDF in Zotero at a page (toolbar link, page pop-out). */
-  onOpenInZotero?: (page: number) => void;
-  /** Bookmark a page (its hover button), named as it is made; `top`
-   *  is the page's top in PDF units. A bookmarked page's button renames
-   *  or removes its bookmark instead. */
-  onBookmark?: (pageIndex: number, top: number, name: string, pageLabel?: string) => void;
-  onRenameBookmark?: (id: string, name: string) => void;
-  onRemoveBookmark?: (id: string) => void;
-  /** Quote selected text into the notes. */
-  onQuote?: (text: string, page: number) => void;
-  /** Send an annotation to the notes (its editor's Add to notes). */
-  onInsertAnnotation?: (a: Annotation) => void;
-  /** Make, change and delete annotations; absent, they are read-only. */
-  annotate?: AnnotationWriter;
-  /** The document's outline, once loaded (empty when it has none). */
-  onOutline?: (outline: OutlineEntry[]) => void;
-  /** The page in view changed (1-based) — after the start page is
-   *  reached, so opening a PDF doesn't report page 1 on the way. */
-  onPageChange?: (page: number) => void;
-  /** This PDF's view as it was left (viewState.ts), to open it so. */
-  initialView?: SavedView | null;
-  /** The view changed — reported once it settles, and on closing. */
-  onViewChange?: (page: number, view: SavedView) => void;
-}
-
-export interface AnnotationWriter {
-  create: (draft: AnnotationDraft, type: MarkType, color: string) => void;
-  update: (key: string, patch: { color?: string; comment?: string }) => void;
-  remove: (key: string) => void;
-  canEdit: (a: Annotation) => boolean;
-}
 
 export function createPdfViewer(container: HTMLElement, opts: PdfViewerOptions = {}) {
   const saved = opts.initialView ?? null;
@@ -151,9 +122,11 @@ export function createPdfViewer(container: HTMLElement, opts: PdfViewerOptions =
     getLayoutMode: () => layoutMode,
     isFolded: () => folded,
     isDestroyed: () => destroyed,
-    paintPage: (idx, ctx, viewport) => drawAnnotations(ctx, viewport, annotLayer.getAnnotations(), idx),
+    // Ink is drawn over the pages (ink/layer.ts), not into them.
+    paintPage: (idx, ctx, viewport) => drawAnnotations(ctx, viewport, annotLayer.getAnnotations(), idx, false),
     onPageRendered: (idx, page) => {
       void linkMgr.attach(idx, page);
+      ink.pageRendered(idx);
       if (opts.onQuote || opts.annotate) void attachTextLayer(pages[idx], page);
     },
     onUpdate: () => updatePageIndicator(),
@@ -163,6 +136,16 @@ export function createPdfViewer(container: HTMLElement, opts: PdfViewerOptions =
   const tb = buildPdfToolbar();
   root.appendChild(tb.toolbar);
   container.appendChild(root);
+  // Ink mode draws on whole pages, so it leaves the folded view.
+  const ink = createInkTool({
+    body,
+    scrollArea,
+    button: tb.inkBtn,
+    getPages: () => pages,
+    getPageLabels: () => pageLabels,
+    writer: opts.annotate,
+    onStart: () => exitFolded(),
+  });
   const detachTooltips = attachTooltips(tb.toolbar, root);
   foldLayer.attachFilterUI(tb.foldFilterBtn, root);
   if (saved?.foldFilter) foldLayer.setFilter(saved.foldFilter);
@@ -242,7 +225,7 @@ export function createPdfViewer(container: HTMLElement, opts: PdfViewerOptions =
     attachAnnotationTaps(scrollArea, {
       getPages: () => pages,
       getAnnotations: () => annotLayer.getAnnotations(),
-      ignore: () => Boolean(selection?.justDismissed()),
+      ignore: () => Boolean(selection?.justDismissed()) || ink.isActive(),
       canEdit: writer.canEdit,
       open: (a, at) => popover.open(a, at),
     });
@@ -331,6 +314,7 @@ export function createPdfViewer(container: HTMLElement, opts: PdfViewerOptions =
 
   function enterFolded(): void {
     if (folded) return;
+    ink.setActive(false);
     // The place at the centre of the view, to centre the folds on.
     const at = pages.length ? currentPage() - 1 : -1;
     const place = pages[at] ? { pageIndex: at, frac: pageFracAtCenter(scrollArea, pages[at]) } : null;
@@ -523,6 +507,7 @@ export function createPdfViewer(container: HTMLElement, opts: PdfViewerOptions =
     if (pdfDoc) await pdfDoc.loadingTask.destroy();
     pdfDoc = null;
     renderer.reset();
+    ink.reset();
     pages = [];
     scrollArea.innerHTML = "";
 
@@ -629,6 +614,7 @@ export function createPdfViewer(container: HTMLElement, opts: PdfViewerOptions =
     renderer.destroy();
     selection?.destroy();
     popover?.destroy();
+    ink.destroy();
     detachTooltips();
     const doc = pdfDoc;
     pdfDoc = null;
@@ -647,19 +633,17 @@ export function createPdfViewer(container: HTMLElement, opts: PdfViewerOptions =
     goToPosition,
     getPageCount: () => pdfDoc?.numPages ?? 0,
     /** Replace the annotations. Only pages whose annotations changed are
-     *  repainted, so a sync that touched nothing here costs nothing. */
+     *  repainted (and ink, never), so a sync that touched nothing here
+     *  costs nothing. */
     setAnnotations: (list: Annotation[]) => {
-      const before = pageSignatures(annotLayer.getAnnotations());
-      const after = pageSignatures(list);
+      const old = annotLayer.getAnnotations();
       annotLayer.setAnnotations(list);
       popover?.sync(list);
-      const changed = new Set<number>();
-      for (const [i, sig] of after) if (before.get(i) !== sig) changed.add(i);
-      for (const i of before.keys()) if (!after.has(i)) changed.add(i);
-      if (changed.size) {
-        renderer.repaint(changed);
-        foldLayer.onAnnotationsChanged();
-      }
+      ink.setAnnotations(list);
+      // The pages' rasters hold everything but ink; the folds' hold ink too.
+      const changed = changedPages(old, list, false);
+      if (changed.size) renderer.repaint(changed);
+      if (changed.size || changedPages(old, list, true).size) foldLayer.onAnnotationsChanged();
       restorePendingFold();
       if (!list.length) pendingFoldAt = null; // nothing to fold back to
     },

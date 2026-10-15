@@ -18,9 +18,11 @@ Windows/Linux desktops too).
   capture browser lets you fetch it by hand, and the app learns where each
   publisher keeps its PDFs.
 - **Read and annotate** — a PDF viewer beside Markdown reading notes, with
-  Zotero-compatible highlights, a folded view of just the annotated passages,
-  a paged view of one to three pages at a time (with an adjustable reading
-  crop), search, outlines and page citations into the notes.
+  Zotero-compatible highlights and pen drawings (Apple Pencil on iPad; the
+  same ink annotations Zotero's reader makes), a folded view of just the
+  annotated passages, a paged view of one to three pages at a time (with
+  an adjustable reading crop), search, outlines and page citations into
+  the notes.
 - **AI helpers (optional)** — tidy metadata, extract abstracts, and ask
   questions of abstracts or full papers with page-cited answers, using
   Anthropic or OpenAI models.

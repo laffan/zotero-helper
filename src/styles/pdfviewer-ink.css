@@ -1,0 +1,136 @@
+/* Drawing in the PDF viewer (src/pdfviewer/ink/): the ink over each
+   page, the stroke under the pen, the eraser and selection marks, and
+   the ink bar above the bottom bar. */
+
+/* A page's ink: over the raster and its text, never in the way of a
+   press (the pen's input is read on the scroll area). */
+.pdf-ink-layer {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 3;
+  overflow: visible;
+}
+.pdf-ink-selection {
+  fill: rgb(46 168 229 / 0.06);
+  stroke: #2ea8e5;
+  stroke-width: 1px;
+  stroke-dasharray: 4 3;
+  vector-effect: non-scaling-stroke;
+}
+
+/* The stroke still under the pen, the eraser's circle and the select
+   tool's box: over the pages, under everything else. */
+.pdf-ink-live {
+  position: absolute;
+  pointer-events: none;
+  z-index: 4;
+}
+.pdf-ink-cursor {
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: none;
+  border: 1px dashed rgb(0 0 0 / 0.6);
+  border-radius: 50%;
+  box-shadow: 0 0 0 1px rgb(255 255 255 / 0.6);
+  pointer-events: none;
+  z-index: 5;
+}
+.pdf-ink-marquee {
+  position: absolute;
+  display: none;
+  border: 1px dashed #2ea8e5;
+  background: rgb(46 168 229 / 0.08);
+  pointer-events: none;
+  z-index: 5;
+}
+
+/* In ink mode the Pencil draws everywhere on a page: no text selection,
+   no long-press callout, and the PDF's links don't take the press. */
+.pdf-scroll-area.pdf-ink-active {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+.pdf-ink-active .pdf-link {
+  pointer-events: none;
+}
+@media (hover: hover) {
+  .pdf-ink-active .pdf-page-wrapper {
+    cursor: crosshair;
+  }
+}
+
+/* --- the ink bar: floating over the foot of the pages --- */
+.pdf-ink-bar {
+  position: absolute;
+  left: 50%;
+  bottom: 10px;
+  transform: translateX(-50%);
+  z-index: 20;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 8px 14px;
+  width: max-content;
+  max-width: calc(100% - 20px);
+  box-sizing: border-box;
+  padding: 6px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--panel);
+  box-shadow: 0 3px 14px rgb(0 0 0 / 0.2);
+  font-size: calc(12px * var(--font-scale));
+  color: var(--text);
+  flex-shrink: 0;
+}
+.pdf-ink-colors {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.pdf-ink-width-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.pdf-ink-width {
+  width: 110px;
+  accent-color: var(--accent);
+}
+.pdf-ink-width-label {
+  min-width: 3.4em;
+  font-size: calc(11px * var(--font-scale));
+  color: var(--text-dim);
+  font-variant-numeric: tabular-nums;
+}
+.pdf-ink-bar .pdf-zoom-btn:disabled {
+  opacity: 0.35;
+}
+.pdf-ink-delete {
+  color: var(--bad);
+}
+.pdf-ink-done {
+  font-size: calc(12px * var(--font-scale));
+}
+.pdf-ink-btn.active {
+  background: rgb(128 128 128 / 0.22);
+  border-color: rgb(128 128 128 / 0.4);
+}
+@media (hover: none) {
+  .pdf-ink-bar {
+    gap: 10px 16px;
+    padding: 7px 12px;
+  }
+  .pdf-ink-bar .pdf-toggle-option,
+  .pdf-ink-bar .pdf-zoom-btn {
+    padding: 6px 10px;
+  }
+  .pdf-ink-width {
+    width: 150px;
+  }
+}

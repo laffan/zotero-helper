@@ -75,8 +75,9 @@ export function createBookmarkPrompt(host: HTMLElement, act: PromptActions) {
 }
 
 /** Fill the bookmark button on pages that have a bookmark, and put the
- *  bookmark's name beside it (the first, and how many more). Both show
- *  only near the corner, like the button itself (pageTools.ts). */
+ *  bookmark's name beside it (the first, and how many more). On those
+ *  pages both stay showing; elsewhere the button shows only near its
+ *  corner (pageTools.ts). */
 export function markBookmarkedPages(pages: PageRecord[], marks: PageBookmark[]): void {
   const byPage = new Map<number, PageBookmark[]>();
   for (const m of marks) byPage.set(m.pageIndex, [...(byPage.get(m.pageIndex) ?? []), m]);
@@ -84,6 +85,8 @@ export function markBookmarkedPages(pages: PageRecord[], marks: PageBookmark[]):
     const list = byPage.get(i);
     p.wrapper.querySelector(".pdf-page-bookmark-btn")?.classList.toggle("marked", Boolean(list));
     const label = p.wrapper.querySelector<HTMLElement>(".pdf-page-bookmark-label");
-    if (label) label.textContent = list ? list[0].name + (list.length > 1 ? ` +${list.length - 1}` : "") : "";
+    if (!label) return;
+    label.textContent = list ? list[0].name + (list.length > 1 ? ` +${list.length - 1}` : "") : "";
+    label.classList.toggle("marked", Boolean(list));
   });
 }

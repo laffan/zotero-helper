@@ -155,10 +155,12 @@
 
 /* --- bookmarks (src/pdfviewer/bookmarks.ts) --- */
 /* A page with a bookmark: its button filled, in the accent colour, and
-   the bookmark's name beside it — both showing only near the corner,
-   like the button on any page. */
+   the bookmark's name beside it — both always showing (on other pages
+   the button shows only near the corner). */
 .pdf-page-bookmark-btn.marked {
   background: var(--accent);
+  opacity: 1;
+  pointer-events: auto;
 }
 .pdf-page-bookmark-label {
   position: absolute;
@@ -182,8 +184,24 @@
 .pdf-page-bookmark-label:empty {
   display: none;
 }
-.pdf-page-bookmark-label.visible {
+.pdf-page-bookmark-label.visible,
+.pdf-page-bookmark-label.marked {
   opacity: 1;
+}
+/* Under a reading crop (crop.ts), the page's corner buttons and the
+   name move in to the corner of what is shown — the trim's fractions
+   are on the scroll area, and these percentages are of the page. */
+.pdf-cropped .pdf-page-bookmark-btn {
+  top: calc(var(--crop-t, 0) * 100% + 8px);
+  right: calc(var(--crop-r, 0) * 100% + 8px);
+}
+.pdf-cropped .pdf-page-bookmark-label {
+  top: calc(var(--crop-t, 0) * 100% + 12px);
+  right: calc(var(--crop-r, 0) * 100% + 42px);
+}
+.pdf-cropped .pdf-page-zotero-btn {
+  bottom: calc(var(--crop-b, 0) * 100% + 8px);
+  right: calc(var(--crop-r, 0) * 100% + 8px);
 }
 @media (hover: none) and (any-hover: none) {
   .pdf-page-bookmark-label {

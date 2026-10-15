@@ -689,8 +689,10 @@ or Add makes it, Escape or a press elsewhere drops it
 button opens that bookmark instead — its name, to rename (Save) or
 Remove. The button shows only with the pointer within 100px of the
 page's top-right corner (always on a screen with no hovering pointer at
-all); on a bookmarked page it is filled, with the bookmark's name
-beside it.
+all); on a bookmarked page it always shows, filled, with the bookmark's
+name beside it. Under a reading crop the corner buttons move in to the
+corner of what is shown (CSS on `.pdf-cropped`, from the trim's
+fractions), and "near" is measured from the button itself.
 
 The Highlights tab lists bookmarks among the highlights: each is turned
 into an Annotation-shaped entry (type `bookmark`, a sort index at the

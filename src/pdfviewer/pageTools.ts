@@ -50,12 +50,17 @@ export function attachPageHoverButtons(
     wrapper.appendChild(label);
   }
   if (!zBtn && !nBtn) return;
-  // Each button shows only with the pointer within 100px of its corner.
+  // Each button shows only with the pointer within 100px of its corner —
+  // measured from the button, which sits 8px in from the corner of what
+  // is shown of the page (a reading crop moves it in; pdfviewer.css).
+  const near = (b: HTMLElement, e: MouseEvent, bottom: boolean) => {
+    const r = b.getBoundingClientRect();
+    const dy = bottom ? r.bottom + 8 - e.clientY : e.clientY - (r.top - 8);
+    return r.right + 8 - e.clientX < 100 && dy < 100 && dy > -8;
+  };
   wrapper.addEventListener("mousemove", (e) => {
-    const r = wrapper.getBoundingClientRect();
-    const nearRight = r.right - e.clientX < 100;
-    zBtn?.classList.toggle("visible", nearRight && r.bottom - e.clientY < 100);
-    const top = nearRight && e.clientY - r.top < 100;
+    zBtn?.classList.toggle("visible", near(zBtn, e, true));
+    const top = nBtn ? near(nBtn, e, false) : false;
     nBtn?.classList.toggle("visible", top);
     label?.classList.toggle("visible", top);
   });

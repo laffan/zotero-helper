@@ -87,6 +87,15 @@
   text-align: left;
   color: var(--text);
 }
+/* ⌘1–⌘5 on the first five, at the row's right. */
+.recent-pdf-key {
+  flex-shrink: 0;
+  align-self: center;
+  margin-left: auto;
+  padding-left: 10px;
+  color: var(--text-dim);
+  font-size: calc(11px * var(--font-scale));
+}
 /* The remove ×: faint until its row (or it) is pointed at. */
 .recent-pdf-remove {
   flex-shrink: 0;

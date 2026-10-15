@@ -66,7 +66,8 @@
 }
 .pdf-cite-mark {
   position: absolute;
-  background: color-mix(in srgb, var(--cite-mark) 55%, transparent);
+  /* Light enough to read the words through, like a highlighter. */
+  background: color-mix(in srgb, var(--cite-mark) 30%, transparent);
   mix-blend-mode: multiply;
   border-radius: 1px;
   animation: pdf-cite-arrive 1.2s ease-out;

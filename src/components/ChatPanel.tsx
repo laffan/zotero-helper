@@ -129,7 +129,7 @@ function CitePill({
       {who && <span className="cite-who">{who}</span>}
       <span className="cite-label">{label}</span>
       <button
-        onClick={() => openReaderAt(itemKey, att.key, cite.page, cite.quote)}
+        onClick={() => openReaderAt(itemKey, att.key, cite.page, { quote: cite.quote, tab: "chats" })}
         aria-label={`Show page ${cite.page} in the PDF`}
         title={
           cite.quote

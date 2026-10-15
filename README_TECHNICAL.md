@@ -108,14 +108,14 @@ src/            React + TypeScript UI (Vite, zustand, MiniSearch)
                 viewPrefs (the layout last chosen), viewState (each
                 PDF's own, as it was left), layout (the modes' CSS
                 classes and fit scales)) plus paged (the
-                fixed view's sets of pages), pageTools (text
+                paged view's sets of pages), pageTools (text
                 layer, notes hooks), search (find in the PDF), and
                 outline (the PDF's bookmarks, resolved to places),
                 anchor (keeping the place across a relayout),
                 tooltips (the toolbar's, drawn for iPad), keys (zoom
                 shortcuts and the page stepper), commands (the
                 keyboard's viewer commands: modes, page and fold
-                steps), crop (the fixed view's trimmed reading),
+                steps), crop (the paged view's trimmed reading),
                 citeMark (an AI citation's passage, marked), and
                 annotating: selectionBar (colours over a selection),
                 annotate (selection → Zotero position, tap hit-test),
@@ -389,17 +389,19 @@ is a query, and ⌘F returns to the field. The arrow keys turn the page (see
 [Keyboard shortcuts](#keyboard-shortcuts)). A PDF opens as it was left — on switching
 to another and back (from the list or the recent-PDFs menu), and
 from one session to the next: its layout (scroll direction, fit,
-fixed sets, zoom), the folded view with its zoom and filter, and the
+paged sets, zoom), the folded view with its zoom and filter, and the
 place in it, to the pixel; and everything around it — the notes
-panel's width and whether it is shown, the highlights / notes split
-and the tab in front, the outline (shown or not, which headings are
+panel's width and whether it is shown, the highlights / notes split,
+the outline (shown or not, which headings are
 unfolded, where it is scrolled), the Highlights tab's search, colours
 and scroll, the search in the PDF on the match it was on (without
 moving the pages from their own place), and the caret and scroll in
 the notes. All of it is remembered per PDF on this device, beside
 Recent. A PDF never opened here takes the layout and panels last
 chosen; closing a PDF gives the library its details panel back as it
-was. When the PDF has an outline,
+was. The tab in front is not remembered: a PDF opens on Highlights
+(on Notes when it has none), except one opened from a conversation's
+citation, which keeps the conversation in front (`setReading`'s tab). When the PDF has an outline,
 a panel button at the left of the toolbar, before the name, shows it
 beside the pages: a folding tree of its headings, each a link to its
 place, with the section being read marked as you go. Widen the notes
@@ -412,7 +414,7 @@ the button — since iPadOS shows no `title` tooltips; a button with a
 keyboard shortcut shows the key after its text, dimmed, as currently
 bound (`data-shortcut` on the button, read by `tooltips.ts`). The bar
 is in sections 14px apart — thumbnails, pages per screen (fit one /
-two / three), scroll direction, fixed / continuous, folding, zoom (−
+two / three), scroll direction, paged / continuous, folding, zoom (−
 and + as a group, the zoom or fit to their right). The viewer is a port of Hush's: horizontal or vertical
 scrolling, fit one / two / three pages, zoom, a thumbnail grid, the
 PDF's own links, Zotero's highlights, underlines and ink painted into
@@ -436,9 +438,9 @@ out of reach was holding (its raster, its text layer, pdf.js's copy
 of its page) is let go, and the pages' own rasters are dropped while
 the folds are up. Hush's annotation shelf is left out: the
 Highlights tab beside the viewer already lists, filters and quotes
-the same annotations. Beside the folded-view button, a **fixed /
+the same annotations. Beside the folded-view button, a **paged /
 continuous** toggle (its icons turn with the scroll direction) chooses
-between the pages as one strip and a fixed set at a time — one, two
+between the pages as one strip and a set at a time — one, two
 or three pages, as the fit buttons say, in either scroll direction.
 The set is fitted whole and centred (the page indicator shows its
 range, "7–9 / 13"), and a swipe moves to the next set — left/right
@@ -459,7 +461,7 @@ written; pressing it heads the line with the page in view —
 there). Page pills move the open viewer rather than leaving for
 Zotero.
 
-**The fixed view's use of space.** A fixed set is fitted to the whole of
+**The paged view's use of space.** A set is fitted to the whole of
 the viewer but a few pixels (`PAGED_PAD` in `src/pdfviewer/paged.ts`): no
 frame of margin above and below, so the pages are as large as the view
 allows, and the pages of a set sit `SET_GAP` (4px) apart. The scroll
@@ -656,7 +658,9 @@ on — and, where a specific passage is the point, to quote it exactly.
 Those citations come back as inline **See on p. 12** pills with two
 buttons: the eye opens the PDF in the app's own reader (downloading it
 first if it isn't on this device; in place when it is already the PDF
-open) and scrolls to the quoted passage, marked in neon pink
+open), keeps the conversation in front in the right panel's
+conversations tab — even one about several works, which that tab
+otherwise only links to — and scrolls to the quoted passage, marked in neon pink
 (`--cite-mark`) — a colour no Zotero highlight or search hit uses, so
 it is never mistaken for one of your own marks. The other opens it in
 Zotero's reader at the same page. Which means an answer is checkable —
@@ -823,6 +827,7 @@ doesn't cost the role, so there is nothing to reclaim.
 | General | Toggle the left sidebar (the outline, while reading) | ⌘\ |
 | General | Toggle the right sidebar | ⌘⇧\ |
 | General | Focus the search field (the PDF's, while reading) | ⌘F |
+| General | Open recent PDF 1–5 | ⌘1 – ⌘5 |
 | Library | Show details / highlights / notes | D / H / N |
 | Library | Show AI conversations (AI connected) | Q |
 | Library | View the PDF | P |
@@ -834,26 +839,28 @@ doesn't cost the role, so there is nothing to reclaim.
 | PDF viewer | Show AI conversations (AI connected) | Q |
 | PDF viewer | Search the highlights | ⌘⇧F |
 | PDF viewer | Thumbnail view | G |
-| PDF viewer | Toggle the folded view | C |
+| PDF viewer | Toggle the folded view | F |
 | PDF viewer | Folded view filters | ⇧F |
 | PDF viewer | Open / close the fold under the pointer | E |
-| PDF viewer | Horizontal / vertical scroll | ⇧H / V |
+| PDF viewer | Horizontal / vertical scroll | Z / V |
 | PDF viewer | Fit one / two / three pages | 1 / 2 / 3 |
-| PDF viewer | Fixed / continuous view | F / ⇧C |
+| PDF viewer | Paged / continuous view | P / C |
 | PDF viewer | Next page (next fold, when folded) | → or ↓ |
 | PDF viewer | Previous page (previous fold, when folded) | ← or ↑ |
 
 H is Show highlights in both the library and the viewer, so the
-viewer's horizontal scroll is ⇧H; C toggles the folded view, so
-continuous is ⇧C (F, its partner, is the fixed view).
+viewer's horizontal scroll is Z. ⌘1–⌘5 open the first five of the
+recent-PDFs menu (the toolbar's PDF name): the PDFs opened lately,
+newest first, leaving out the one open — so while reading, ⌘1 is the
+PDF read before this one. The menu shows each one's key.
 
 How the actions work (`run.ts`): most press the button already on screen
 or set what it sets, so the keys and the pointer can't drift apart. The
 viewer's (`src/pdfviewer/commands.ts`, reached through `readerCommand`
 in `ReaderPane.tsx`) click the bottom bar's buttons; from horizontal
 scroll, a fit key switches to vertical, since the fit buttons only apply
-there and in the fixed view. Page steps use the same stepper as the
-fixed view's wheel (`keys.ts`): they count from the page last asked for,
+there and in the paged view. Page steps use the same stepper as the
+paged view's wheel (`keys.ts`): they count from the page last asked for,
 so pressing quickly while a smooth scroll is under way doesn't lose
 steps. Fold steps centre the next fold (a fold opened to its page goes to
 its top). E opens the fold under the pointer, or the one at the centre

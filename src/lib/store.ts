@@ -203,7 +203,9 @@ interface AppStore extends UiPrefs {
   setOutlineOpen: (b: boolean) => void;
   setAppearance: (a: Appearance) => void;
   setUiFontSize: (px: number) => void;
-  setReading: (r: ReadingState | null) => void;
+  /** Open (or close, with null) a PDF. The right panel comes up on
+   *  `tab` — Highlights unless the caller says otherwise. */
+  setReading: (r: ReadingState | null, tab?: MetaTab) => void;
   setCachedPdfs: (list: CachedPdf[]) => void;
   setPdfDownloading: (attKey: string, on: boolean) => void;
 
@@ -402,7 +404,7 @@ export const useStore = create<AppStore>()(
       setOutlineOpen: (outlineOpen) => set({ outlineOpen }),
       setAppearance: (appearance) => set({ appearance }),
       setUiFontSize: (uiFontSize) => set({ uiFontSize }),
-      setReading: (reading) => {
+      setReading: (reading, tab = "highlights") => {
         // Every PDF opened joins the sidebar's Recent folder.
         if (reading?.attKey) noteOpened(reading.itemKey, reading.attKey);
         // Entering closes the narrow-screen drawers: on a tablet the
@@ -410,7 +412,7 @@ export const useStore = create<AppStore>()(
         // would cover it.
         set(
           reading
-            ? { reading, metaTab: "notes", sidebarOpen: false, metaOpen: false }
+            ? { reading, metaTab: tab, sidebarOpen: false, metaOpen: false }
             : { reading },
         );
       },

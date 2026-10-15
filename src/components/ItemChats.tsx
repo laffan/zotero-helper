@@ -5,7 +5,8 @@
 // as links, which open in Questions, the main conversations window.
 // A conversation about the entry opens here, in place of the list (with
 // the way back above it), to be read beside the PDF; one started from
-// here with the PDF open opens here too (confirmAsk).
+// here with the PDF open opens here too (confirmAsk), and so does any
+// conversation whose citation opened the PDF (ChatPanel's eye).
 import { useMemo } from "react";
 import { startAsk } from "../lib/ai/chat";
 import { askTargetFor } from "../lib/ai/context";
@@ -37,7 +38,10 @@ export function ItemChats({ item }: { item: ZItem }) {
     () => allChats.filter((c) => !isAbout(c, item.key) && c.source.itemKeys.includes(item.key)),
     [allChats, item.key],
   );
-  const open = own.find((c) => c.id === selectedChatId);
+  // The open conversation, if it covers this entry: one about it alone,
+  // or a wider one whose citation opened this PDF (the conversation
+  // stays in front beside the page it cited).
+  const open = allChats.find((c) => c.id === selectedChatId && c.source.itemKeys.includes(item.key));
 
   if (open) {
     return (

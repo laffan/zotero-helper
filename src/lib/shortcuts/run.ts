@@ -4,7 +4,8 @@
 import { readerCommand } from "../../components/ReaderPane";
 import type { ViewerCommand } from "../../pdfviewer/commands";
 import { aiConnected } from "../ai/models";
-import { readItem } from "../notes";
+import { pushDirtyNotes, readItem } from "../notes";
+import { otherRecent, useRecent } from "../recent";
 import { showMeta, toggleMeta, toggleSidebar } from "../panels";
 import { appLog, useStore, type MetaTab } from "../store";
 import { moveSelection } from "./listNav";
@@ -55,10 +56,26 @@ function viewPdf(): void {
 
 const viewer = (cmd: ViewerCommand) => () => readerCommand(cmd);
 
+/** ⌘1–⌘5: the nth PDF of the recent-PDFs menu — opened lately, newest
+ *  first, not counting the one open. */
+function openRecent(n: number): void {
+  const s = useStore.getState();
+  const inLibrary = new Set(s.library.items.map((i) => i.key));
+  const key = otherRecent(useRecent.getState().opened, (k) => inLibrary.has(k), s.reading?.itemKey ?? null)[n - 1];
+  if (!key) return;
+  void pushDirtyNotes();
+  void readItem(key);
+}
+
 export const RUN: Record<string, () => void> = {
   toggleLeft,
   toggleRight: toggleMeta,
   focusSearch: () => focusWhenShown(".toolbar .toolbar-search input", true),
+  recent1: () => openRecent(1),
+  recent2: () => openRecent(2),
+  recent3: () => openRecent(3),
+  recent4: () => openRecent(4),
+  recent5: () => openRecent(5),
 
   listInfo: () => showTab("details"),
   listHighlights: () => showTab("highlights"),

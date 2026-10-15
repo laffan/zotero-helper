@@ -54,6 +54,13 @@ export function forgetOpened(itemKey: string): void {
   useRecent.setState((s) => ({ opened: s.opened.filter((r) => r.itemKey !== itemKey) }));
 }
 
+/** The PDFs to go back to, newest first: Recent less the entry open
+ *  (`openKey`) and any no longer in the library. The recent-PDFs menu
+ *  lists these, and ⌘1–⌘5 open its first five. */
+export function otherRecent(opened: RecentOpen[], inLibrary: (itemKey: string) => boolean, openKey: string | null): string[] {
+  return opened.filter((r) => r.itemKey !== openKey && inLibrary(r.itemKey)).map((r) => r.itemKey);
+}
+
 /** Entry keys in Recent, newest first. */
 export function recentKeys(opened: RecentOpen[]): string[] {
   return opened.map((r) => r.itemKey);

@@ -1,4 +1,4 @@
-// The fixed view ("Fixed" on the toolbar, against "Continuous"): one
+// The paged view ("Paged" on the toolbar, against "Continuous"): one
 // set of pages at a time — one, two or three, as the fit buttons say —
 // fitted whole and centred, and a swipe moves exactly one set: left/
 // right when the pages run side by side, up/down when they run top to

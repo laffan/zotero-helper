@@ -25,7 +25,7 @@ import { addBookmark, bookmarksOf, removeBookmark, renameBookmark, useBookmarks 
 import { insertIntoNotes, readItem } from "../lib/notes";
 import { setOutline, setReaderPage, useOutline } from "../lib/outline";
 import { flushSavedPage, lastPage, lastView, savePage } from "../lib/recent";
-import { appLog, useStore } from "../lib/store";
+import { appLog, useStore, type MetaTab } from "../lib/store";
 import { invoke } from "../lib/tauri";
 import type { ViewerCommand } from "../pdfviewer/commands";
 import type { SearchOptions, SearchStatus } from "../pdfviewer/search";
@@ -79,8 +79,14 @@ async function showQuote(viewer: PdfViewer, attKey: string, page: number, quote:
 
 /** Show page `page` (1-based) of `attKey` — in the open viewer, or by
  *  opening it (downloading it first if it isn't on this device). With
- *  `quote`, the passage decides the page and is marked there. */
-export function openReaderAt(itemKey: string, attKey: string, page: number, quote?: string): void {
+ *  `quote`, the passage decides the page and is marked there; `tab` is
+ *  the right panel's tab when the PDF has to be opened. */
+export function openReaderAt(
+  itemKey: string,
+  attKey: string,
+  page: number,
+  { quote, tab }: { quote?: string; tab?: MetaTab } = {},
+): void {
   if (quote?.trim() && active?.attKey === attKey) {
     // Still loading: the passage is searched once the pages are there.
     if (active.viewer.getPageCount()) void showQuote(active.viewer, attKey, page, quote);
@@ -90,8 +96,8 @@ export function openReaderAt(itemKey: string, attKey: string, page: number, quot
   if (showInReader(attKey, page)) return;
   pendingPage = { attKey, page, quote };
   const st = useStore.getState();
-  if (st.cachedPdfs[attKey]) st.setReading({ itemKey, attKey });
-  else void readItem(itemKey);
+  if (st.cachedPdfs[attKey]) st.setReading({ itemKey, attKey }, tab);
+  else void readItem(itemKey, tab);
 }
 
 /** A place in the open PDF — an outline entry's: a 0-based page and a

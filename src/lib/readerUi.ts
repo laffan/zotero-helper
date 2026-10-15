@@ -2,10 +2,12 @@
 // (lib/recent.ts), so that coming back to a PDF — from the list, or
 // through the recent-PDFs menu — finds everything as it was left: the
 // notes panel's width and whether it is shown, the highlights / notes
-// split and the tab in front, the outline (open, which headings are
+// split, the outline (open, which headings are
 // unfolded, where it is scrolled), the Highlights tab's search, colours
 // and scroll, the search in the PDF and the match it was on, and the
-// caret and scroll in the notes. The viewer's own state (layout,
+// caret and scroll in the notes. Not the tab in front: a PDF opens on
+// Highlights, or on the conversation it was opened from (setReading).
+// The viewer's own state (layout,
 // folded view and its filter, the place) is viewState.ts's.
 //
 // A PDF read here for the first time takes the panels as they were
@@ -13,14 +15,13 @@
 // gives the library back its details panel as it was.
 import { useCallback, useLayoutEffect, useState, type RefObject } from "react";
 import { lastUi, saveUi } from "./recent";
-import { useStore, type MetaTab } from "./store";
+import { useStore } from "./store";
 
 export interface ReaderUi {
   /** The panels, held in the app's store while the PDF is open. */
   notesWidth?: number;
   splitHighlights?: number;
   metaHidden?: boolean;
-  metaTab?: MetaTab;
   outlineOpen?: boolean;
   /** The outline's unfolded headings (OutlinePanel's ids). */
   outlineExpanded?: string[];
@@ -38,7 +39,7 @@ export interface ReaderUi {
   notesTop?: number;
 }
 
-const PANEL_FIELDS = ["notesWidth", "splitHighlights", "metaHidden", "metaTab", "outlineOpen"] as const;
+const PANEL_FIELDS = ["notesWidth", "splitHighlights", "metaHidden", "outlineOpen"] as const;
 
 let following = false;
 

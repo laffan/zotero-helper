@@ -95,11 +95,16 @@ export function MetadataPanel() {
   const chatCount = useStore((s) =>
     selected.length === 1 ? s.chats.filter((c) => isAbout(c, selected[0].key)).length : 0,
   );
-  // A remembered tab that has nothing to show falls back to Details.
+  // A tab that has nothing to show falls back to Details — or, for a
+  // PDF with no highlights (which opens on Highlights), to its notes.
   const tab: MetaTab =
-    (metaTab === "highlights" && highlightCount === 0) || (metaTab === "chats" && !(aiOn && selected.length === 1))
-      ? "details"
-      : metaTab;
+    metaTab === "highlights" && highlightCount === 0
+      ? reading
+        ? "notes"
+        : "details"
+      : metaTab === "chats" && !(aiOn && selected.length === 1)
+        ? "details"
+        : metaTab;
   // Highlights beside the notes, under one tab — reading, with room.
   const split = Boolean(reading) && wide && highlightCount > 0;
 

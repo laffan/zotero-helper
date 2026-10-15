@@ -9,7 +9,7 @@
 // changed, so notes written on another device arrive.
 import { scheduleTrayClear } from "../components/TaskTray";
 import { itemsForCollection, itemTitle, pdfAttachmentOf, REAL_KEY } from "./collections";
-import { appLog, useStore } from "./store";
+import { appLog, useStore, type MetaTab } from "./store";
 import { invoke, isTauri } from "./tauri";
 import type {
   CachedPdf,
@@ -200,7 +200,7 @@ export async function uncachePdf(attKey: string): Promise<void> {
 /** Open an entry's PDF beside its notes, downloading it first when it
  *  isn't on this device — what a double-click on an entry does. False
  *  when the entry has no PDF in Zotero. */
-export async function readItem(itemKey: string): Promise<boolean> {
+export async function readItem(itemKey: string, tab?: MetaTab): Promise<boolean> {
   const att = pdfAttachmentOf(useStore.getState().library.items, itemKey);
   if (!att) return false;
   try {
@@ -211,7 +211,7 @@ export async function readItem(itemKey: string): Promise<boolean> {
   }
   const st = useStore.getState();
   st.setSelectedKeys([itemKey]);
-  st.setReading({ itemKey, attKey: att.key });
+  st.setReading({ itemKey, attKey: att.key }, tab);
   return true;
 }
 

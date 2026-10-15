@@ -66,7 +66,7 @@ export function buildPdfToolbar() {
 
   // A fixed set of pages (as many as the fit buttons say), swiped
   // through, or the pages as one strip.
-  const fixedBtn = svgBtn("pdf-toggle-option", "Fixed — one, two or three pages at a time; swipe to turn", FIXED_ICON, "pdfFixed");
+  const fixedBtn = svgBtn("pdf-toggle-option", "Paged — one, two or three pages at a time; swipe to turn", FIXED_ICON, "pdfFixed");
   const continuousBtn = svgBtn("pdf-toggle-option active", "Continuous — the pages as one strip", CONTINUOUS_ICON, "pdfContinuous");
   const pageModeWrap = group("pdf-toggle-group pdf-page-mode", fixedBtn, continuousBtn);
 

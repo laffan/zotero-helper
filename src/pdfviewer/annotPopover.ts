@@ -133,6 +133,9 @@ export function createAnnotationPopover(root: HTMLElement, handlers: AnnotationE
     commitComment();
     disarm();
     current = null;
+    // Hidden, the comment would keep the focus (WebKit), and with it
+    // every key.
+    if (el.contains(document.activeElement)) (document.activeElement as HTMLElement).blur();
     el.style.display = "none";
   }
 

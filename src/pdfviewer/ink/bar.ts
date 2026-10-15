@@ -118,7 +118,11 @@ export function createInkBar(handlers: InkBarHandlers) {
     label.textContent = `${step()} pt`;
     handlers.width(step(), false);
   });
-  slider.addEventListener("change", () => handlers.width(step(), true));
+  slider.addEventListener("change", () => {
+    handlers.width(step(), true);
+    // Let go, so the keys are the viewer's again.
+    slider.blur();
+  });
   const width = group("pdf-ink-width-wrap", slider, label);
 
   const undo = button("pdf-zoom-btn", "Undo", UNDO_ICON, handlers.undo);

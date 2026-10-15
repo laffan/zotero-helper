@@ -19,6 +19,15 @@
 // controls leave the field be: they may be acting on it (a notes
 // question, a highlight's Note).
 //
+// And a field can keep the focus after it is hidden: fold the right
+// panel away (⌘⇧\) with the notes focused, or close a highlight's
+// editor from its comment, and WebKit leaves the focus in the field
+// nobody can see. Every bare key then counted as typing there — the
+// arrows moved the hidden notes' caret, G and 1–3 did nothing — while
+// ⌘ shortcuts still worked, until closing the PDF unmounted the notes.
+// So a key aimed at a field that isn't rendered is taken back: the
+// field lets go and the key is sent again from the page (rescueKey).
+//
 // Underneath that, iPadOS delivers a hardware key to the page only while
 // the web view is first responder; tauri-plugin-keyboard-focus claims
 // that natively, at launch and activation only. The page never asks for
@@ -30,13 +39,27 @@ import { followPointer } from "./panes";
 import { RUN } from "./run";
 
 const TEXT_INPUT = "input, textarea, select, [contenteditable=''], [contenteditable='true'], .cm-editor";
-const NOT_TEXT_INPUTS = new Set(["checkbox", "radio", "button", "submit", "reset", "color", "file"]);
+const NOT_TEXT_INPUTS = new Set(["checkbox", "radio", "button", "submit", "reset", "color", "file", "range"]);
 
 function typingIn(target: EventTarget | null): boolean {
   if (!(target instanceof Element)) return false;
   const field = target.closest(TEXT_INPUT);
   if (!field) return false;
   return !(field instanceof HTMLInputElement && NOT_TEXT_INPUTS.has(field.type));
+}
+
+/** Before anything else sees a key: if it is aimed at a text field
+ *  that isn't on screen (hidden, or no longer in the page), let the
+ *  field go and send the key again from the page, so it isn't lost. */
+function rescueKey(e: KeyboardEvent): void {
+  if (!e.isTrusted || !typingIn(e.target)) return;
+  const field = (e.target as Element).closest<HTMLElement>(TEXT_INPUT)!;
+  if (field.isConnected && field.getClientRects().length) return;
+  e.preventDefault();
+  e.stopImmediatePropagation();
+  const active = document.activeElement;
+  if (active instanceof HTMLElement) active.blur();
+  document.body.dispatchEvent(new KeyboardEvent(e.type, e));
 }
 
 const CONTROLS = "button, a[href], [role='button'], label, summary";
@@ -116,6 +139,7 @@ let installed = false;
 export function installShortcuts(): void {
   if (installed) return;
   installed = true;
+  window.addEventListener("keydown", rescueKey, true);
   window.addEventListener("keydown", onKeydown);
   // The pane clicked in is the one the arrows then move in, and a text
   // field tapped outside of lets go of the keyboard once the tap is done.

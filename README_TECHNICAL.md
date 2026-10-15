@@ -72,6 +72,9 @@ src/            React + TypeScript UI (Vite, zustand, MiniSearch)
                 UI around each PDF (panels, filters, searches), kept
                 beside it; PDF outlines and filing highlights under
                 their sections
+  lib/pdfQuote.ts, lib/pdfHighlight.ts
+                finding an AI citation's quoted passage in a PDF (the
+                page sweep; the word matching)
   lib/dragGesture.ts
                 pointer drags (pane edges, columns, items) that keep
                 text selection off while they last
@@ -112,7 +115,8 @@ src/            React + TypeScript UI (Vite, zustand, MiniSearch)
                 tooltips (the toolbar's, drawn for iPad), keys (zoom
                 shortcuts and the page stepper), commands (the
                 keyboard's viewer commands: modes, page and fold
-                steps), crop (the fixed view's trimmed reading), and
+                steps), crop (the fixed view's trimmed reading),
+                citeMark (an AI citation's passage, marked), and
                 annotating: selectionBar (colours over a selection),
                 annotate (selection → Zotero position, tap hit-test),
                 annotPopover (colour / comment / delete)
@@ -650,11 +654,18 @@ five papers arrives as a table).
 markers in it, and the model is asked to cite the page a claim rests
 on — and, where a specific passage is the point, to quote it exactly.
 Those citations come back as inline **See on p. 12** pills with two
-buttons: one renders that PDF page in the app with the quoted passage
-highlighted, the other opens it in Zotero's reader at the same page.
-Which means an answer is checkable — you can be looking at the
-sentence it is talking about in one click, rather than taking its word
-for it. The passage is found by comparing words rather than
+buttons: the eye opens the PDF in the app's own reader (downloading it
+first if it isn't on this device; in place when it is already the PDF
+open) and scrolls to the quoted passage, marked in neon pink
+(`--cite-mark`) — a colour no Zotero highlight or search hit uses, so
+it is never mistaken for one of your own marks. The other opens it in
+Zotero's reader at the same page. Which means an answer is checkable —
+you can be looking at the sentence it is talking about in one click,
+rather than taking its word for it. The search is `lib/pdfQuote.ts`,
+run on the viewer's own document; the mark is `pdfviewer/citeMark.ts`,
+an overlay drawn like a search hit's, one passage at a time, never
+written to Zotero, and gone with the next citation or when the PDF
+closes. A citation with no quote just goes to its page. The passage is found by comparing words rather than
 characters — anchored on the quote's first and last pair of words,
 with the interior words deciding between candidates — so line
 wrapping, a word hyphenated across a break, ligatures and stray
@@ -669,11 +680,12 @@ of a citation a model most easily gets wrong (a paper whose running
 head reads "CONSUMING WITH OTHERS 507" invites citing the folio
 however plainly you ask for the marker). The search spirals out from the cited
 page across the whole document, so a book cited by its printed folio
-still lands on the right page. The page then says where the passage
-actually was. When it genuinely isn't in the PDF, the page says that
-too, rather than looking verified — and the activity log says *why*:
-the words are nowhere in the document, or the pages are images with
-no text layer, or the sweep hit its cap on a very long PDF. Each conversation lists the works it
+still lands on the right page; the activity log says which page it
+was found on. When it genuinely isn't in the PDF, nothing is marked —
+the reader is left on the cited page, unmarked, rather than looking
+verified — and the activity log says *why*: the words are nowhere in
+the document, or the pages are images with no text layer, or the
+sweep hit its cap on a very long PDF. Each conversation lists the works it
 covers behind a **View Titles** twirl-down, and every title there opens
 that entry in Zotero *inside the folder the question was asked from* —
 which is the one that matters for an entry filed in several.

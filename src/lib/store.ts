@@ -23,16 +23,6 @@ export type ModalState =
   | { kind: "newFolder" }
   | { kind: "sendToHush" }
   | { kind: "askCost" }
-  /** A cited PDF page, rendered in the app. `page` is 1-based and
-   *  counts PDF pages. */
-  | {
-      kind: "pdfPage";
-      itemKey: string;
-      page: number;
-      title: string;
-      /** Passage to highlight on the page, when the citation named one. */
-      quote?: string;
-    }
   | { kind: "rescue"; jobId: string }
   | { kind: "capture"; jobId: string };
 

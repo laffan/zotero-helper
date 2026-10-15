@@ -19,6 +19,12 @@
   --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue",
     sans-serif;
   --radius: 7px;
+  /* An AI citation's passage in the reader (pdfviewer/citeMark.ts). Neon
+     pink because it is the one hue no Zotero highlight colour (yellow,
+     red, green, blue, purple, magenta, orange, grey) or search hit
+     (yellow, orange) sits near. Pages are white in both themes, so one
+     value serves both. */
+  --cite-mark: #ff2d95;
   /* Settings → General → UI font size, as a multiple of the 13px the
      sizes below were drawn at (lib/appearance.ts). */
   --font-scale: 1;

@@ -32,6 +32,7 @@ import {
   Spinner,
   TrashIcon,
 } from "./Icons";
+import { openReaderAt } from "./ReaderPane";
 import { WorkTitles } from "./WorkTitles";
 
 /** mm:ss left on the provider's cache window, or null once it's gone.
@@ -93,7 +94,6 @@ function CitePill({
   source: ChatSource;
 }) {
   const items = useStore((s) => s.library.items);
-  const setModal = useStore((s) => s.setModal);
   const cite = parseCiteHref(href);
   if (!cite) return null;
 
@@ -129,20 +129,12 @@ function CitePill({
       {who && <span className="cite-who">{who}</span>}
       <span className="cite-label">{label}</span>
       <button
-        onClick={() =>
-          setModal({
-          kind: "pdfPage",
-          itemKey,
-          page: cite.page,
-          title,
-          quote: cite.quote,
-        })
-        }
-        aria-label={`View page ${cite.page}`}
+        onClick={() => openReaderAt(itemKey, att.key, cite.page, cite.quote)}
+        aria-label={`Show page ${cite.page} in the PDF`}
         title={
           cite.quote
-            ? `View page ${cite.page} here, with the passage highlighted:\n“${cite.quote}”`
-            : `View page ${cite.page} here${title ? ` — ${title}` : ""}`
+            ? `Open the PDF at page ${cite.page}, with the passage highlighted:\n“${cite.quote}”`
+            : `Open the PDF at page ${cite.page}${title ? ` — ${title}` : ""}`
         }
       >
         <EyeIcon size={12} />

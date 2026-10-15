@@ -24,6 +24,7 @@ import { attachAnnotationTaps, draftFromRange, type AnnotationDraft } from "./an
 import { createAnnotationLayer } from "./annotations";
 import { createAnnotationPopover } from "./annotPopover";
 import { createBookmarkPrompt, markBookmarkedPages, type PageBookmark } from "./bookmarks";
+import { createCiteMark } from "./citeMark";
 import { createViewerCommands } from "./commands";
 import { createReadingCrop } from "./crop";
 import { createFoldLayer } from "./folds";
@@ -264,22 +265,20 @@ export function createPdfViewer(container: HTMLElement, opts: PdfViewerOptions =
     goToPage: (n) => goToPage(n),
     onHide: () => tb.thumbnailBtn.classList.remove("active"),
   });
-  const search = createPdfSearch({
-    getPdfDoc: () => pdfDoc,
-    getPages: () => pages,
-    isDestroyed: () => destroyed,
-    reveal: (idx, x, y) => {
-      exitFolded();
-      if (isPaged()) return goToPage(idx + 1);
-      const w = pages[idx]?.wrapper;
-      if (!w) return;
-      const wr = w.getBoundingClientRect();
-      const ar = scrollArea.getBoundingClientRect();
-      const left = scrollArea.scrollLeft + wr.left - ar.left + x * wr.width - scrollArea.clientWidth / 2;
-      const top = scrollArea.scrollTop + wr.top - ar.top + y * wr.height - scrollArea.clientHeight / 3;
-      scrollArea.scrollTo({ left: Math.max(0, left), top: Math.max(0, top), behavior: "smooth" });
-    },
-  });
+  // A search hit or a cited passage: page index, then a point on it (0–1).
+  function revealPoint(idx: number, x: number, y: number): void {
+    exitFolded();
+    if (isPaged()) return goToPage(idx + 1);
+    const w = pages[idx]?.wrapper;
+    if (!w) return;
+    const wr = w.getBoundingClientRect();
+    const ar = scrollArea.getBoundingClientRect();
+    const left = scrollArea.scrollLeft + wr.left - ar.left + x * wr.width - scrollArea.clientWidth / 2;
+    const top = scrollArea.scrollTop + wr.top - ar.top + y * wr.height - scrollArea.clientHeight / 3;
+    scrollArea.scrollTo({ left: Math.max(0, left), top: Math.max(0, top), behavior: "smooth" });
+  }
+  const search = createPdfSearch({ getPdfDoc: () => pdfDoc, getPages: () => pages, isDestroyed: () => destroyed, reveal: revealPoint });
+  const citeMark = createCiteMark({ getPdfDoc: () => pdfDoc, getPages: () => pages, reveal: revealPoint, goToPage: (n) => goToPage(n) });
 
   tb.thumbnailBtn.addEventListener("click", () => {
     tb.thumbnailBtn.classList.toggle("active", thumbs.toggle());
@@ -687,6 +686,8 @@ export function createPdfViewer(container: HTMLElement, opts: PdfViewerOptions =
     searchStep: search.step,
     searchGoTo: search.goTo,
     onSearchChange: search.onChange,
+    /** Mark an AI citation's quoted passage and go to it (citeMark.ts). */
+    showQuote: citeMark.show,
   };
 }
 

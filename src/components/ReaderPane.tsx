@@ -44,14 +44,51 @@ export function showInReader(attKey: string, page?: number, annotationKey?: stri
   return Boolean(page);
 }
 
-/** A page to go to once `attKey` has opened (openReaderAt). */
-let pendingPage: { attKey: string; page: number } | null = null;
+/** A page to go to once `attKey` has opened (openReaderAt), and the
+ *  passage to mark there when an AI citation quoted one. */
+let pendingPage: { attKey: string; page: number; quote?: string } | null = null;
+
+/** Mark an AI citation's passage in `viewer` and go to it, logging how
+ *  the search went. A passage that doesn't appear is otherwise a dead
+ *  end for the person looking at it: the log says whether the words
+ *  were nowhere in the document, whether the pages have any text to
+ *  search, and whether the sweep even reached the far end of a long
+ *  PDF. */
+async function showQuote(viewer: PdfViewer, attKey: string, page: number, quote: string): Promise<void> {
+  const report = await viewer.showQuote(quote, page);
+  if (!report) return;
+  const file = useStore.getState().library.items.find((i) => i.key === attKey)?.data?.filename || attKey;
+  const where = `${report.quoteWords}-word passage in ${file} (${report.pages} pages, cited p.${report.citedPage})`;
+  if (report.foundPage !== null) {
+    appLog(
+      "info",
+      `Highlight: found ${report.exact ? "the whole" : `${report.matchedWords} words of the`} ${where} on page ${report.foundPage}, after ${report.scanned} page(s)`,
+    );
+    return;
+  }
+  const why = report.textError
+    ? `the text layer could not be read — ${report.textError}`
+    : report.textWords === 0
+      ? "no text layer on any page searched — these pages are images"
+      : report.truncated
+        ? `swept ${report.scanned} of ${report.pages} pages before the cap`
+        : `best run anywhere was ${report.bestRun} word(s)${report.bestRunPage ? ` on page ${report.bestRunPage}` : ""}`;
+  // Never pretend: the reader is left on the cited page, unmarked.
+  appLog("warn", `Highlight: no match for the ${where} — ${why}; showing the cited page instead`);
+}
 
 /** Show page `page` (1-based) of `attKey` — in the open viewer, or by
- *  opening it (downloading it first if it isn't on this device). */
-export function openReaderAt(itemKey: string, attKey: string, page: number): void {
+ *  opening it (downloading it first if it isn't on this device). With
+ *  `quote`, the passage decides the page and is marked there. */
+export function openReaderAt(itemKey: string, attKey: string, page: number, quote?: string): void {
+  if (quote?.trim() && active?.attKey === attKey) {
+    // Still loading: the passage is searched once the pages are there.
+    if (active.viewer.getPageCount()) void showQuote(active.viewer, attKey, page, quote);
+    else pendingPage = { attKey, page, quote };
+    return;
+  }
   if (showInReader(attKey, page)) return;
-  pendingPage = { attKey, page };
+  pendingPage = { attKey, page, quote };
   const st = useStore.getState();
   if (st.cachedPdfs[attKey]) st.setReading({ itemKey, attKey });
   else void readItem(itemKey);
@@ -187,7 +224,9 @@ export function ReaderPane() {
         const lib = useStore.getState().library.items;
         viewer.setAnnotations(annotationIndexFor(lib).get(attKey) ?? []);
         if (pendingPage?.attKey === attKey) {
-          viewer.goToPage(pendingPage.page);
+          const { page, quote } = pendingPage;
+          if (quote?.trim()) void showQuote(viewer, attKey, page, quote);
+          else viewer.goToPage(page);
           pendingPage = null;
         }
         setState("ready");

@@ -56,6 +56,31 @@
   box-shadow: 0 0 0 1px rgb(230 110 0 / 0.9);
 }
 
+/* An AI citation's passage (citeMark.ts): over the search hits, in a
+   colour of its own, with a pulse as it arrives so the eye finds it. */
+.pdf-cite-marks {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 2;
+}
+.pdf-cite-mark {
+  position: absolute;
+  background: color-mix(in srgb, var(--cite-mark) 55%, transparent);
+  mix-blend-mode: multiply;
+  border-radius: 1px;
+  animation: pdf-cite-arrive 1.2s ease-out;
+}
+@keyframes pdf-cite-arrive {
+  0%,
+  40% {
+    box-shadow: 0 0 0 3px var(--cite-mark);
+  }
+  100% {
+    box-shadow: 0 0 0 0 transparent;
+  }
+}
+
 /* Fit-width: one column. justify-content must be flex-start here — in a
    column flex, `center` pushes half of an overflowing document above
    the container, where no scrolling can reach it. */

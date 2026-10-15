@@ -408,10 +408,9 @@ the button — since iPadOS shows no `title` tooltips. The viewer is a port of H
 scrolling, fit one / two / three pages, zoom, a thumbnail grid, the
 PDF's own links, Zotero's highlights, underlines and ink painted into
 the pages, and the **folded view**, which collapses the paper to the regions around
-its annotations (when the PDF has red highlights or red ink, those
-alone at first — Hush's "come back to this" colour — with the
-filter button choosing others; highlights made here always fold,
-whatever the filter). Text in the folds can be selected, copied and
+its annotations (all of them, every type and colour, until the
+filter button narrows it — Hush starts on red alone, its "come back to
+this"; highlights made here always fold, whatever the filter). Text in the folds can be selected, copied and
 quoted into the notes; marking it waits for the whole page — which a
 fold's corner button opens in place, one page at a time (opening one
 closes the other, without moving the one opened), and where the full

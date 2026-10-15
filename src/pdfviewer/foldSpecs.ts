@@ -21,18 +21,6 @@ export type Combo = { type: string; color: string; count: number };
 /** The filter's key for an annotation: its type and colour. */
 export const comboKey = (a: Annotation) => `${a.type}:${(a.color || "").toLowerCase()}`;
 
-/** Zotero red is #ff6666; accept the red family without catching
- *  orange (#f19837) or magenta (#e56eee). */
-function isRed(color: string): boolean {
-  const m = /^#?([0-9a-f]{6})$/i.exec((color || "").trim());
-  if (!m) return false;
-  const v = parseInt(m[1], 16);
-  const r = v >> 16;
-  const g = (v >> 8) & 0xff;
-  const b = v & 0xff;
-  return r >= 180 && g < 140 && b < 140;
-}
-
 /** Every type:colour pair present on a page, with how many of each. */
 export function availableCombos(annotations: Annotation[]): Map<string, Combo> {
   const map = new Map<string, Combo>();
@@ -46,17 +34,12 @@ export function availableCombos(annotations: Annotation[]): Map<string, Combo> {
   return map;
 }
 
-/** The filter before anyone changes it: red highlights and red ink
- *  (Hush's "come back to this"), plus what was marked in this viewer,
- *  else everything. */
-export function defaultFilter(combos: Map<string, Combo>, madeHere: Set<string>): Set<string> {
-  const filter = new Set<string>();
-  for (const [key, c] of combos) {
-    if ((c.type === "ink" || c.type === "highlight") && isRed(c.color)) filter.add(key);
-  }
-  for (const key of madeHere) if (combos.has(key)) filter.add(key);
-  if (!filter.size) for (const key of combos.keys()) filter.add(key);
-  return filter;
+/** The filter before anyone changes it: every type and colour there is.
+ *  (Hush starts on red highlights and red ink alone, its "come back to
+ *  this"; here the folded view starts on all the annotations, and the
+ *  filter narrows it.) */
+export function defaultFilter(combos: Map<string, Combo>): Set<string> {
+  return new Set(combos.keys());
 }
 
 /** Vertical extent of an annotation in top-based page units. */

@@ -6,10 +6,10 @@
 // Ported from Hush's src/pdf/pdf-viewer-folds.js.
 //
 // Hush seeds the filter with red highlights and red handwriting, its
-// "come back to this" convention. A library without any red marks would
-// open on an empty view, so here the filter falls back to everything.
-// Marks made in this viewer always fold, whatever the filter: someone
-// who has just highlighted a passage expects to find it there.
+// "come back to this" convention; here it starts on every annotation
+// type and colour, and follows the annotations until it is changed by
+// hand. Marks made in this viewer always fold, whatever the filter:
+// someone who has just highlighted a passage expects to find it there.
 //
 // Scrolling folds has to cost about what scrolling pages does, though a
 // screen of folds touches many more pages. So a fold draws only its own
@@ -114,7 +114,7 @@ export function createFoldLayer(scrollArea: HTMLElement, env: FoldEnv) {
   let rebuildTimer = 0;
 
   function ensureFilter(): Set<string> {
-    filter ??= defaultFilter(availableCombos(env.getAnnotations()), madeHere);
+    filter ??= defaultFilter(availableCombos(env.getAnnotations()));
     return filter;
   }
 

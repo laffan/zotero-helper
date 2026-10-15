@@ -407,9 +407,9 @@ hover, or on a press-and-hold with a finger, which then doesn't press
 the button — since iPadOS shows no `title` tooltips; a button with a
 keyboard shortcut shows the key after its text, dimmed, as currently
 bound (`data-shortcut` on the button, read by `tooltips.ts`). The bar
-is in sections 14px apart — thumbnails, zoom (− and + as a group, the
-zoom or fit to their right), scroll direction, fit, fixed / continuous,
-folding. The viewer is a port of Hush's: horizontal or vertical
+is in sections 14px apart — thumbnails, pages per screen (fit one /
+two / three), scroll direction, fixed / continuous, folding, zoom (−
+and + as a group, the zoom or fit to their right). The viewer is a port of Hush's: horizontal or vertical
 scrolling, fit one / two / three pages, zoom, a thumbnail grid, the
 PDF's own links, Zotero's highlights, underlines and ink painted into
 the pages, and the **folded view**, which collapses the paper to the regions around

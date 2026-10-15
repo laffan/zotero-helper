@@ -88,12 +88,13 @@ export function buildPdfToolbar() {
   const thumbnailBtn = svgBtn("pdf-zoom-btn pdf-thumbnail-btn", "Thumbnail view", THUMBNAIL_ICON, "pdfThumbnails");
 
   // Sections, spaced apart by the bar (pdfviewer.css): the thumbnails;
-  // zoom; scroll direction; fit; fixed / continuous; folding.
+  // pages per screen; scroll direction; fixed / continuous; folding;
+  // zoom.
   toolbar.append(
     thumbnailBtn,
-    zoomWrap,
-    scrollToggleWrap, fitToggleWrap,
+    fitToggleWrap, scrollToggleWrap,
     pageModeWrap, foldWrap,
+    zoomWrap,
     pageIndicator, zoteroLink,
   );
 

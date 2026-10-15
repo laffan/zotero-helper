@@ -10,6 +10,7 @@
 // The bar over a selection (marks and "Add to notes") is selectionBar.ts.
 import { BOOKMARK_ICON, POPOUT_ICON } from "./icons";
 import { getPdfjs } from "./pdfjs";
+import { enableTextSelection } from "./textSelect";
 import type { PageRecord, PDFPageProxy } from "./types";
 
 export interface PageButtonHandlers {
@@ -141,6 +142,7 @@ export async function renderTextLayer(
       container: div,
       viewport: page.getViewport({ scale }),
     }).render();
+    enableTextSelection(div);
   } catch {
     // A page with no usable text (a scan) simply isn't selectable.
     div.remove();

@@ -463,7 +463,13 @@ to continuous, since pages larger than the view have no single place
 to rest. Switching scroll direction keeps the page in view. It adds what note-taking needs: selectable text with
 an *Add to notes* bubble that quotes the passage, inserted at the caret
 with a `zotero://` link to the page (the bookmark button at the top
-right of each page is under "Bookmarks" below). While the
+right of each page is under "Bookmarks" below). A selection follows
+the pointer back as well as forward: pdf.js's own viewer keeps an empty
+`.endOfContent` beside the moving end of the selection, so a pointer over
+the gaps between lines doesn't make WebKit extend it to the end of the
+page; the viewer's bare text layer lacked it, so a drag could only grow
+(`src/pdfviewer/textSelect.ts`, ported from pdf.js's TextLayerBuilder).
+While the
 PDF is open, a faint link icon sits at the left edge of the line being
 written; pressing it heads the line with the page in view —
 `Example note text` becomes
@@ -478,9 +484,10 @@ frame of margin above and below, so the pages are as large as the view
 allows, and the pages of a set sit `SET_GAP` (4px) apart. The scroll
 area's padding is cut to match in `pdfviewer.css` (`.pdf-paged`).
 
-**Trimmed reading.** In any view but the folded one, holding ⌘ (Ctrl elsewhere) with
-the pointer over the pages, alone, for a moment (`HOLD_MS`, so ⌘F, ⌘+ and
-⌘-clicks elsewhere don't set it off) shows the pages whole with the
+**Trimmed reading.** In any view but the folded one, holding Control (⌃,
+on every platform, leaving ⌘ to ⌘-clicks and shortcuts) with
+the pointer over the pages, alone, for a moment (`HOLD_MS`, so a ⌃
+shortcut doesn't set it off) shows the pages whole with the
 current trim drawn over each — what is kept framed, the rest shaded — and
 makes the trim's edges grabbable: each side has a dashed line and a
 grip at its middle, and the side under the pointer (or being dragged)
@@ -489,8 +496,8 @@ turns solid on every page. A finger gets a wider reach than a mouse
 itself starts the adjustment. The hold is read from the key's own
 `keydown` / `keyup` — not the pointer events' modifier flags, which
 iPadOS doesn't report reliably — and "over the pages" from the last
-pointer event anywhere in the window. Since iPadOS can drop ⌘'s key-up
-(after a system ⌘ shortcut or an app switch), any keydown without ⌘, a
+pointer event anywhere in the window. Since iPadOS can drop the key-up
+(after a system shortcut or an app switch), any keydown without ⌃, a
 window blur or the app going to the background ends the hold. Dragging an edge trims that margin off
 every page. Letting go of the key lays the pages out again with the
 trimmed size as their bounds, so the pages fit the view by what is left and
@@ -895,6 +902,18 @@ during it, since a blur mid-touch upsets iPadOS's text input. Taps on
 controls (buttons, links) leave the field be, as they may be acting on
 it, and a drag or scroll (no click) does too.
 
+A field can also keep the focus after it is hidden: fold the right panel
+away (⌘⇧\) with the notes focused, or close a highlight's editor from
+its comment, and WebKit leaves the focus in a field no one can see (the
+spec's focus fixup says it shouldn't). Bare keys then went to the hidden
+notes — the arrows, G, 1–3 seemed dead — while ⌘ shortcuts still worked,
+until closing the PDF unmounted the notes. So the first listener to see
+a key (`rescueKey`, capturing, in `dispatch.ts`) checks whether it is
+aimed at a text field that isn't rendered; if so the field lets go and
+the key is sent again from the page, so not even that key is lost. The
+highlight editor also blurs its comment as it closes, and ink mode's
+width slider lets go when released (a range input is never typing).
+
 Underneath that, iPadOS delivers a hardware key to the page only while
 WebKit's content view is the first responder, and nothing on the page
 can arrange that: wry makes the web view first responder on macOS but
@@ -966,7 +985,7 @@ unfold) and Return opens the folder; in the list they move the selection
 registers its order and scrolling with); in the details panel ← / →
 switch tabs, ↑ / ↓ scroll and Return goes to the notes.
 
-Built in and not rebindable: the viewer's ⌘+ / ⌘- / ⌘0 zoom, holding ⌘
+Built in and not rebindable: the viewer's ⌘+ / ⌘- / ⌘0 zoom, holding ⌃
 for trimmed reading, Enter / ⇧Enter in the PDF search, ink mode's ⌘Z /
 ⇧⌘Z and ⌫ (handled by ink mode itself, outside text fields, so a
 field's own undo keeps ⌘Z), and the notes' ⌘I / ⌘B / ⌘= / ⌘K and `?` —

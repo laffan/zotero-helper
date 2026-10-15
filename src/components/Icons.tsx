@@ -199,6 +199,10 @@ export const FlagIcon = ({ filled = false, ...p }: IconProps & { filled?: boolea
     p,
   );
 
+/** A PDF bookmark (lib/bookmarks.ts). */
+export const BookmarkIcon = ({ filled = false, ...p }: IconProps & { filled?: boolean } = {}) =>
+  svg(<path d="M4 2h8v12l-4-3-4 3z" fill={filled ? "currentColor" : "none"} />, p);
+
 export const TagIcon = (p: IconProps = {}) =>
   svg(
     <>

@@ -60,6 +60,10 @@ src/            React + TypeScript UI (Vite, zustand, MiniSearch)
   lib/ai/       the AI features: toolbar actions (index), the model
                 catalog and its prices (models), gathering works to ask
                 about (context), conversations (chat), export
+  lib/bookmarks.ts
+                the reader's bookmarks: the store, its file (through
+                src-tauri/src/bookmarks.rs), and each as an entry for
+                the Highlights tab
   lib/highlights.ts, lib/notes.ts
                 annotations out of the library cache; NOTES.md load /
                 save / periodic push, the PDF cache
@@ -136,6 +140,7 @@ src-tauri/      Rust core (all networking + state)
   src/ai/          model access, one file per concern (mod = provider
                    dispatch, anthropic, openai, tidy, chat)
   src/chats.rs     the Questions conversations on disk
+  src/bookmarks.rs the reader's bookmarks on disk (bookmarks.json)
   src/capture.rs   desktop capture-browser window (download interception)
   tauri-plugin-capture-view/, tauri-plugin-share-sheet/,
   tauri-plugin-keyboard-focus/
@@ -435,9 +440,9 @@ everything over the pages is unchanged). A mouse wheel notch or a
 trackpad swipe turns one set too, as do the arrow keys; zooming in goes back
 to continuous, since pages larger than the view have no single place
 to rest. Switching scroll direction keeps the page in view. It adds what note-taking needs: selectable text with
-an *Add to notes* bubble that quotes the passage and a pencil on each
-page that cites it, both
-inserted at the caret with a `zotero://` link to the page. While the
+an *Add to notes* bubble that quotes the passage, inserted at the caret
+with a `zotero://` link to the page (the bookmark button at the top
+right of each page is under "Bookmarks" below). While the
 PDF is open, a faint link icon sits at the left edge of the line being
 written; pressing it heads the line with the page in view —
 `Example note text` becomes
@@ -583,12 +588,23 @@ no highlights are left out.
 
 ### AI
 
-The AI features — the toolbar's **AI** menu and **Questions** in the
-sidebar — show only once a service is connected: a key entered in
+The AI features — the toolbar's **AI** menu, **Questions** in the
+sidebar and the right panel's conversations tab — show only once a
+service is connected: a key entered in
 Settings → AI for the service chosen there (`aiConnected` in
 `src/lib/ai/models.ts`). Without one they are hidden, not disabled;
 saved conversations stay on disk and come back with the key, and a
 remembered visit to Questions opens All Items instead.
+
+**The conversations tab.** With a service connected, one entry in the
+right panel gets a fourth tab (the conversation icon, with a count): the
+Questions conversations that include it — asked about it alone, or in a
+selection or folder it was part of (`source.itemKeys`) — newest first,
+with Ask Abstract / Ask Full Paper to start one about it
+(`ItemChats.tsx`). A conversation opens in the tab, in place of the
+list, so it can be read beside the PDF; one started while a PDF is open
+opens there too, rather than moving the hidden library to Questions
+(`confirmAsk`).
 
 **AI Tidy Metadata** — with an API key configured, selected items are
 cleaned up by the model (grounded in a fresh CrossRef record when a DOI
@@ -658,6 +674,30 @@ that entry in Zotero *inside the folder the question was asked from* —
 which is the one that matters for an entry filed in several.
 Conversations are named by the model after the first exchange and live
 in the app's data dir; nothing about them is written to Zotero.
+
+### Bookmarks
+
+Zotero has no bookmarks, so these are the app's own: `bookmarks.json`
+in its data folder (`src-tauri/src/bookmarks.rs`, opaque JSON; the shape
+is `Bookmark` in `src/lib/bookmarks.ts`), never sent to Zotero. The
+button at the top right of each page in the reader (a bookmark; it
+replaced an earlier "cite this page in the notes" pencil) opens a small
+box to name it, filled in with the page ("p. 12") and selected: Enter
+or Add makes it, Escape or a press elsewhere drops it
+(`src/pdfviewer/bookmarks.ts`). A page with a bookmark keeps its button
+showing, filled.
+
+The Highlights tab lists bookmarks among the highlights: each is turned
+into an Annotation-shaped entry (type `bookmark`, a sort index at the
+top of its page, its position the page's top) so reading order, the
+search and filing under the outline's headings all apply unchanged —
+the viewer's painter never sees them. The colour column gains a
+bookmark entry, which filters like a colour (⌘-click to combine). A
+bookmark's row (`BookmarkRow.tsx`) goes to its page on a click — in the
+open PDF, or opening it there (`openReaderAt` in `ReaderPane.tsx`) —
+and offers Rename, Note (a link to the page, into the notes) and Delete
+(a second press confirms). A selection with bookmarks but no highlights
+still gets the Highlights tab.
 
 ### Recent
 

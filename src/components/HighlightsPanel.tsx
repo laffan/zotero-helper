@@ -7,7 +7,10 @@
 //
 // Several selected entries (or one with several PDFs) list under a
 // heading per PDF. Nothing is fetched: annotations arrive with every
-// sync (src/lib/highlights.ts), and ↻ runs an incremental one. While
+// sync (src/lib/highlights.ts), and ↻ runs an incremental one. The
+// PDFs' bookmarks (lib/bookmarks.ts, made in the reader, kept by this
+// app) list among the highlights at the top of their page, with a
+// bookmark entry in the colour column to show only them. While
 // the PDF is open beside the panel, clicking a highlight scrolls the
 // viewer to it. A PDF with an outline (lib/outline.ts) has its
 // highlights filed under the section headings they fall in. The
@@ -15,6 +18,7 @@
 // for it (lib/readerUi.ts); browsing the library, they are the panel's.
 import { useMemo, useRef, useState } from "react";
 import { openInZotero, syncNow } from "../lib/actions";
+import { BOOKMARK_FILTER, bookmarkEntry, isBookmark, useBookmarks, type Bookmark } from "../lib/bookmarks";
 import { attachmentName, itemTitle } from "../lib/collections";
 import {
   annotatableAttachments,
@@ -30,7 +34,8 @@ import { sectionIndexOf, sectionsOf, useOutlines, type Section } from "../lib/ou
 import { usePdfUi, usePdfUiScroll } from "../lib/readerUi";
 import { useStore } from "../lib/store";
 import type { ZItem } from "../lib/types";
-import { CopyIcon, ExternalIcon, QuoteIcon, Refresh, Spinner } from "./Icons";
+import { BookmarkRow } from "./BookmarkRow";
+import { BookmarkIcon, CopyIcon, ExternalIcon, QuoteIcon, Refresh, Spinner } from "./Icons";
 import { showInReader } from "./ReaderPane";
 
 interface Group {
@@ -39,14 +44,19 @@ interface Group {
   list: Annotation[];
 }
 
-/** Every annotated PDF of the given entries, with its annotations. */
-export function highlightGroups(library: ZItem[], items: ZItem[]): Group[] {
+/** Every annotated (or bookmarked) PDF of the given entries, with its
+ *  annotations and bookmarks in reading order. */
+export function highlightGroups(library: ZItem[], items: ZItem[], bookmarks: Bookmark[] = []): Group[] {
   const index = annotationIndexFor(library);
   const out: Group[] = [];
   for (const item of items) {
     for (const att of annotatableAttachments(library, item)) {
-      const list = index.get(att.key);
-      if (list?.length) out.push({ item, att, list });
+      const marks = bookmarks.filter((b) => b.attKey === att.key).map(bookmarkEntry);
+      const annots = index.get(att.key) ?? [];
+      const list = marks.length
+        ? [...marks, ...annots].sort((a, b) => (a.sortIndex < b.sortIndex ? -1 : a.sortIndex > b.sortIndex ? 1 : 0))
+        : annots;
+      if (list.length) out.push({ item, att, list });
     }
   }
   return out;
@@ -91,11 +101,16 @@ export function HighlightsPanel({ items }: { items: ZItem[] }) {
   // Notes belong to one entry, so Note is offered only with one selected.
   const canAdd = items.length === 1;
 
-  const groups = useMemo(() => highlightGroups(library, items), [library, items]);
+  const bookmarks = useBookmarks((s) => s.list);
+  const groups = useMemo(() => highlightGroups(library, items, bookmarks), [library, items, bookmarks]);
   const outlines = useOutlines(groups.map((g) => g.att.key));
   const all = useMemo(() => groups.flatMap((g) => g.list), [groups]);
+  // The colour column's entries: the highlights' colours, then bookmarks.
   const colors = useMemo(() => colorsOf(all), [all]);
-  const active = picked.filter((c) => colors.includes(c));
+  const marks = all.filter(isBookmark).length;
+  const filters = marks ? [...colors, BOOKMARK_FILTER] : colors;
+  const active = picked.filter((c) => filters.includes(c));
+  const filterOf = (a: Annotation) => (isBookmark(a) ? BOOKMARK_FILTER : a.color);
   const pick = (c: string, e: React.MouseEvent) => {
     if (e.metaKey || e.ctrlKey) {
       setPicked(active.includes(c) ? active.filter((x) => x !== c) : [...active, c]);
@@ -107,7 +122,7 @@ export function HighlightsPanel({ items }: { items: ZItem[] }) {
     .map((g) => ({
       ...g,
       list: g.list.filter(
-        (a) => (!active.length || active.includes(a.color)) && matchesQuery(a, q) && (a.text || a.comment),
+        (a) => (!active.length || active.includes(filterOf(a))) && matchesQuery(a, q) && (a.text || a.comment),
       ),
     }))
     .filter((g) => g.list.length);
@@ -146,7 +161,18 @@ export function HighlightsPanel({ items }: { items: ZItem[] }) {
     void openInZotero(g.item.key, g.att.key, undefined, isNaN(page) ? undefined : page, a.key);
   };
 
-  const row = (g: Group, a: Annotation) => (
+  const row = (g: Group, a: Annotation) =>
+    isBookmark(a) ? (
+      <BookmarkRow
+        key={a.key}
+        entry={a}
+        itemKey={g.item.key}
+        marked={<Marked text={a.text} q={q} />}
+        canAdd={canAdd}
+        shown={shownKey === a.key}
+        onShown={() => setShownKey(a.key)}
+      />
+    ) : (
     <div
       className={`hl-row ${g.att.key === openAttKey ? "navigable" : ""} ${
         shownKey === a.key ? "shown" : ""
@@ -232,8 +258,9 @@ export function HighlightsPanel({ items }: { items: ZItem[] }) {
     <div className="hl-panel">
       <div className="hl-head">
         <span className="hl-count">
-          {shown === all.length ? `${all.length}` : `${shown} of ${all.length}`} highlight
-          {all.length === 1 ? "" : "s"}
+          {shown === all.length ? `${all.length - marks}` : `${shown} of ${all.length}`}{" "}
+          {shown === all.length ? (all.length - marks === 1 ? "highlight" : "highlights") : "shown"}
+          {marks > 0 && shown === all.length && ` · ${marks} bookmark${marks === 1 ? "" : "s"}`}
         </span>
         <button
           className="icon-btn"
@@ -253,7 +280,7 @@ export function HighlightsPanel({ items }: { items: ZItem[] }) {
         onChange={(e) => setQuery(e.target.value)}
       />
       <div className="hl-body">
-        {colors.length > 1 && (
+        {filters.length > 1 && (
           <div className="hl-colors">
             <button
               className={`hl-swatch hl-swatch-all ${active.length ? "" : "active"}`}
@@ -269,10 +296,20 @@ export function HighlightsPanel({ items }: { items: ZItem[] }) {
                 title="Only this colour (⌘-click to pick several)"
               />
             ))}
+            {marks > 0 && (
+              <button
+                className={`hl-swatch hl-swatch-bookmark ${active.includes(BOOKMARK_FILTER) ? "active" : ""}`}
+                onClick={(e) => pick(BOOKMARK_FILTER, e)}
+                title="Only bookmarks (⌘-click to add them to colours)"
+                aria-label="Only bookmarks"
+              >
+                <BookmarkIcon size={11} filled />
+              </button>
+            )}
           </div>
         )}
         <div className="hl-list" ref={listRef}>
-          {visible.length === 0 && <div className="meta-empty">No highlights match.</div>}
+          {visible.length === 0 && <div className="meta-empty">Nothing matches.</div>}
           {visible.map((g) => (
             <section key={g.att.key}>
               {groups.length > 1 && (

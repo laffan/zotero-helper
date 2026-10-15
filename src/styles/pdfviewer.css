@@ -147,9 +147,10 @@
   box-shadow: 0 0 0 2px rgb(66 133 244 / 0.14);
 }
 
-/* --- page hover buttons: Zotero (bottom-right), cite in notes (top-right) --- */
+/* --- page hover buttons: Zotero (bottom-right), bookmark (top-right;
+   its marked state and naming box are in pdfviewer-annotate.css) --- */
 .pdf-page-zotero-btn,
-.pdf-page-note-btn {
+.pdf-page-bookmark-btn {
   position: absolute;
   right: 8px;
   width: 28px;
@@ -170,21 +171,21 @@
 .pdf-page-zotero-btn {
   bottom: 8px;
 }
-.pdf-page-note-btn {
+.pdf-page-bookmark-btn {
   top: 8px;
 }
 .pdf-page-zotero-btn.visible,
-.pdf-page-note-btn.visible {
+.pdf-page-bookmark-btn.visible {
   opacity: 1;
   pointer-events: auto;
 }
 .pdf-page-zotero-btn:hover,
-.pdf-page-note-btn:hover {
+.pdf-page-bookmark-btn:hover {
   background: rgb(0 0 0 / 0.75);
 }
-/* Touch screens have no hover: keep the cite button reachable. */
+/* Touch screens have no hover: keep the bookmark button reachable. */
 @media (hover: none) {
-  .pdf-page-note-btn {
+  .pdf-page-bookmark-btn {
     opacity: 0.6;
     pointer-events: auto;
   }
@@ -419,7 +420,7 @@
   pointer-events: none;
 }
 .pdf-crop-editing .pdf-page-zotero-btn,
-.pdf-crop-editing .pdf-page-note-btn {
+.pdf-crop-editing .pdf-page-bookmark-btn {
   display: none;
 }
 .pdf-crop-frame {

@@ -3,9 +3,10 @@
 //
 // The viewer itself is plain DOM (src/pdfviewer/, a port of Hush's), so
 // this component only mounts it, feeds it the cached PDF and the
-// entry's Zotero annotations, and routes what it hands back — a cited
-// page, a selected passage, a shelf highlight — into the notes, and new
-// or edited highlights to Zotero (lib/annotationEdits.ts).
+// entry's Zotero annotations, and routes what it hands back: a selected
+// passage or a highlight into the notes, a page's bookmark to
+// lib/bookmarks.ts, and new or edited highlights to Zotero
+// (lib/annotationEdits.ts).
 import { useEffect, useRef, useState } from "react";
 import { openInZotero } from "../lib/actions";
 import {
@@ -20,7 +21,8 @@ import {
   pdfLink,
   type Annotation,
 } from "../lib/highlights";
-import { insertIntoNotes } from "../lib/notes";
+import { addBookmark, bookmarksOf, useBookmarks } from "../lib/bookmarks";
+import { insertIntoNotes, readItem } from "../lib/notes";
 import { setOutline, setReaderPage, useOutline } from "../lib/outline";
 import { flushSavedPage, lastPage, lastView, savePage } from "../lib/recent";
 import { appLog, useStore } from "../lib/store";
@@ -40,6 +42,19 @@ export function showInReader(attKey: string, page?: number, annotationKey?: stri
   if (annotationKey && active.viewer.showAnnotation(annotationKey)) return true;
   if (page) active.viewer.goToPage(page);
   return Boolean(page);
+}
+
+/** A page to go to once `attKey` has opened (openReaderAt). */
+let pendingPage: { attKey: string; page: number } | null = null;
+
+/** Show page `page` (1-based) of `attKey` — in the open viewer, or by
+ *  opening it (downloading it first if it isn't on this device). */
+export function openReaderAt(itemKey: string, attKey: string, page: number): void {
+  if (showInReader(attKey, page)) return;
+  pendingPage = { attKey, page };
+  const st = useStore.getState();
+  if (st.cachedPdfs[attKey]) st.setReading({ itemKey, attKey });
+  else void readItem(itemKey);
 }
 
 /** A place in the open PDF — an outline entry's: a 0-based page and a
@@ -125,7 +140,8 @@ export function ReaderPane() {
         const cite = (page: number) => `[p. ${page}](${pdfLink(settings(), attKey, page)})`;
         viewer = createPdfViewer(host, {
           onOpenInZotero: (page) => void openInZotero(itemKey, attKey, undefined, page),
-          onCitePage: (page) => addToNotes(cite(page)),
+          onBookmark: (pageIndex, top, name, pageLabel) =>
+            addBookmark({ attKey, itemKey, pageIndex, top, name, pageLabel }),
           onQuote: (text, page) => addToNotes(`> ${text}\n\n— ${cite(page)}`),
           onInsertAnnotation: (a: Annotation) => addToNotes(annotationMarkdown(settings(), a)),
           annotate: {
@@ -168,6 +184,10 @@ export function ReaderPane() {
         if (cancelled) return;
         const lib = useStore.getState().library.items;
         viewer.setAnnotations(annotationIndexFor(lib).get(attKey) ?? []);
+        if (pendingPage?.attKey === attKey) {
+          viewer.goToPage(pendingPage.page);
+          pendingPage = null;
+        }
         setState("ready");
       } catch (e) {
         if (cancelled) return;
@@ -197,6 +217,14 @@ export function ReaderPane() {
     document.addEventListener("visibilitychange", onHide);
     return () => document.removeEventListener("visibilitychange", onHide);
   }, []);
+
+  // The pages with a bookmark show it on their bookmark button.
+  const bookmarks = useBookmarks((s) => s.list);
+  useEffect(() => {
+    if (state === "ready" && attKey) {
+      viewerRef.current?.setBookmarkedPages(bookmarksOf(bookmarks, attKey).map((b) => b.pageIndex));
+    }
+  }, [bookmarks, attKey, state]);
 
   // A sync that brings new or edited highlights repaints them in place.
   useEffect(() => {

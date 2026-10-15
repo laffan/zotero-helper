@@ -152,3 +152,40 @@
 .pdf-selection-bar.quote-only .pdf-selection-bar-sep {
   display: none;
 }
+
+/* --- bookmarks (src/pdfviewer/bookmarks.ts) --- */
+/* A page with a bookmark keeps its button showing, filled, in the
+   accent colour. */
+.pdf-page-bookmark-btn.marked {
+  opacity: 1;
+  pointer-events: auto;
+  background: var(--accent);
+}
+.pdf-page-bookmark-btn.marked svg path {
+  fill: currentColor;
+}
+/* The naming box, under the button. */
+.pdf-bookmark-box {
+  position: absolute;
+  z-index: 30;
+  display: flex;
+  gap: 6px;
+  padding: 6px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--panel);
+  box-shadow: 0 6px 20px rgb(0 0 0 / 0.18);
+}
+.pdf-bookmark-box input {
+  width: 200px;
+  padding: 4px 6px;
+  font-size: calc(13px * var(--font-scale));
+}
+.pdf-bookmark-box button {
+  padding: 4px 10px;
+  border-radius: var(--radius);
+  background: var(--accent);
+  color: #fff;
+  font-size: calc(12px * var(--font-scale));
+  font-weight: 600;
+}

@@ -37,8 +37,9 @@ export type ModalState =
   | { kind: "capture"; jobId: string };
 
 /** The right panel's tabs. "details" is the record for one item and the
- *  summary cards for several. */
-export type MetaTab = "details" | "highlights" | "notes";
+ *  summary cards for several; "chats" is one item's AI conversations,
+ *  shown only with an AI service connected. */
+export type MetaTab = "details" | "highlights" | "notes" | "chats";
 
 /** An open PDF: the viewer replaces the sidebar and item list,
  *  and the right panel holds the notes being written. */

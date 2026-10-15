@@ -3,18 +3,24 @@
 // in Questions — the open conversation.
 //
 // With a selection it has tabs: Details (Summary for several items),
-// Highlights when the selection has any, and Notes, always — with the
-// entry's PDF button (Download / View / Close PDF) at the right end.
+// Highlights when the selection has any (or bookmarks), Notes, always,
+// and — for one entry, with an AI service connected — its AI
+// conversations; the entry's PDF button (Download / View / Close PDF)
+// sits at the right end.
 // While the PDF is open, the panel stays on that entry whatever the
 // selection does — and once it is wider than SPLIT_WIDTH, Highlights
 // and Notes become one tab with the two side by side.
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useBookmarks } from "../lib/bookmarks";
+import { aiConnected } from "../lib/ai/models";
 import { isStandaloneAttachment } from "../lib/collections";
 import { trackPointerDrag } from "../lib/dragGesture";
 import { QUESTIONS, useStore, type MetaTab } from "../lib/store";
 import { AttachmentPanel } from "./AttachmentPanel";
 import { ChatPanel } from "./ChatPanel";
 import { highlightGroups, HighlightsPanel } from "./HighlightsPanel";
+import { ChatIcon } from "./Icons";
+import { ItemChats } from "./ItemChats";
 import { ItemEditor } from "./ItemEditor";
 import { NotesPanel } from "./NotesPanel";
 import { PdfTabButton } from "./PdfTabButton";
@@ -74,16 +80,25 @@ export function MetadataPanel() {
     return items.filter((i) => keys.includes(i.key));
   }, [items, selectedKeys, reading]);
 
+  const bookmarks = useBookmarks((s) => s.list);
+  // Highlights and bookmarks: either gives the selection a Highlights tab.
   const highlightCount = useMemo(
-    () => highlightGroups(items, selected).reduce((n, g) => n + g.list.length, 0),
-    [items, selected],
+    () => highlightGroups(items, selected, bookmarks).reduce((n, g) => n + g.list.length, 0),
+    [items, selected, bookmarks],
   );
 
   const chatMode =
     !reading && collectionKey === QUESTIONS && chats.some((c) => c.id === selectedChatId);
 
+  const aiOn = useStore((s) => aiConnected(s.settings));
+  const chatCount = useStore((s) =>
+    selected.length === 1 ? s.chats.filter((c) => c.source.itemKeys.includes(selected[0].key)).length : 0,
+  );
   // A remembered tab that has nothing to show falls back to Details.
-  const tab: MetaTab = metaTab === "highlights" && highlightCount === 0 ? "details" : metaTab;
+  const tab: MetaTab =
+    (metaTab === "highlights" && highlightCount === 0) || (metaTab === "chats" && !(aiOn && selected.length === 1))
+      ? "details"
+      : metaTab;
   // Highlights beside the notes, under one tab — reading, with room.
   const split = Boolean(reading) && wide && highlightCount > 0;
 
@@ -102,12 +117,13 @@ export function MetadataPanel() {
     content = <div className="meta-empty">Select an item to see its details</div>;
   } else {
     const one = selected.length === 1 ? selected[0] : null;
-    const tabButton = (id: MetaTab, label: string, active = tab === id) => (
+    const tabButton = (id: MetaTab, label: React.ReactNode, active = tab === id, title?: string) => (
       <button
         className={`meta-tab ${active ? "active" : ""}`}
         onClick={() => setMetaTab(id)}
         role="tab"
         aria-selected={active}
+        title={title}
       >
         {label}
       </button>
@@ -123,6 +139,16 @@ export function MetadataPanel() {
             {tabButton("notes", "Notes")}
           </>
         )}
+        {one && aiOn &&
+          tabButton(
+            "chats",
+            <span className="meta-tab-icon">
+              <ChatIcon size={13} />
+              {chatCount > 0 && chatCount}
+            </span>,
+            tab === "chats",
+            "AI conversations about this entry",
+          )}
         {one && <PdfTabButton item={one} />}
       </div>
     );
@@ -144,6 +170,8 @@ export function MetadataPanel() {
       ) : (
         <div className="meta-empty">Select a single item to read its notes</div>
       );
+    } else if (tab === "chats" && one) {
+      content = <ItemChats item={one} />;
     } else if (tab === "highlights") {
       content = <HighlightsPanel items={selected} />;
     } else if (!one) {

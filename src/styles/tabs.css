@@ -221,3 +221,36 @@
   gap: 3px;
   word-break: normal;
 }
+
+/* --- bookmarks among the highlights (BookmarkRow.tsx) --- */
+.hl-swatch-bookmark {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: transparent;
+  color: var(--accent);
+  border-color: color-mix(in srgb, var(--accent) 50%, transparent);
+}
+.hl-row.hl-bookmark {
+  border-left-color: var(--accent);
+}
+.hl-bookmark-name {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+}
+.hl-bookmark-name svg {
+  flex-shrink: 0;
+  color: var(--accent);
+}
+.hl-bookmark-input {
+  flex: 1;
+  min-width: 0;
+  padding: 2px 6px;
+  font-size: inherit;
+  font-weight: 600;
+}
+.hl-actions .link-btn.danger {
+  color: var(--bad);
+}

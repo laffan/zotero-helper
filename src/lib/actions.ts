@@ -4,6 +4,7 @@ import { scheduleTrayClear } from "../components/TaskTray";
 import { itemTitle, REAL_KEY } from "./collections";
 import { loadChats } from "./ai/chat";
 import { startAnnotationSync } from "./annotationEdits";
+import { loadBookmarks } from "./bookmarks";
 import { captureFinished, downloadForJob } from "./importer";
 import { pushNote, refreshCachedPdfs, startNotesSync } from "./notes";
 import { followReaderUi } from "./readerUi";
@@ -86,6 +87,7 @@ export async function bootstrap(): Promise<void> {
   // Conversations are local to this app, so they load whether or not
   // Zotero credentials are in place yet.
   await loadChats();
+  await loadBookmarks();
   await refreshCachedPdfs();
   startNotesSync();
   // Before the library loads, so unsent annotations are laid over it.

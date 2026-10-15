@@ -119,13 +119,16 @@ export async function refillAsk(ask: PendingAsk): Promise<void> {
   }
 }
 
-/** Accept the popup: make the conversation and open it in Questions. */
+/** Accept the popup: make the conversation and open it — in Questions,
+ *  or, with a PDF open (the library out of sight), in the right panel's
+ *  conversations tab, beside the PDF. */
 export function confirmAsk(ask: PendingAsk): void {
   const chat = createChat(ask);
   const store = useStore.getState();
   store.setPendingAsk(null);
   store.setModal(null);
-  store.selectCollection(QUESTIONS);
+  if (store.reading) store.setMetaTab("chats");
+  else store.selectCollection(QUESTIONS);
   store.selectChat(chat.id);
 }
 

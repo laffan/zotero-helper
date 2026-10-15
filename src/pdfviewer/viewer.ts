@@ -23,6 +23,7 @@ import { centerPagePoint, pageFracAtCenter, restoreAnchor, scrollToPagePoint, vi
 import { attachAnnotationTaps, draftFromRange, type AnnotationDraft } from "./annotate";
 import { createAnnotationLayer } from "./annotations";
 import { createAnnotationPopover } from "./annotPopover";
+import { createBookmarkPrompt, markBookmarkedPages } from "./bookmarks";
 import { createViewerCommands } from "./commands";
 import { createReadingCrop } from "./crop";
 import { createFoldLayer } from "./folds";
@@ -49,8 +50,9 @@ const ZOOM_LEVELS = [0.5, 0.75, 1.0, 1.25, 1.5, 2.0];
 export interface PdfViewerOptions {
   /** Open the PDF in Zotero at a page (toolbar link, page pop-out). */
   onOpenInZotero?: (page: number) => void;
-  /** Cite a page in the notes (page hover button). */
-  onCitePage?: (page: number) => void;
+  /** Bookmark a page (its hover button), named as it is made; `top`
+   *  is the page's top in PDF units. */
+  onBookmark?: (pageIndex: number, top: number, name: string, pageLabel?: string) => void;
   /** Quote selected text into the notes. */
   onQuote?: (text: string, page: number) => void;
   /** Send an annotation to the notes (its editor's Add to notes). */
@@ -173,6 +175,9 @@ export function createPdfViewer(container: HTMLElement, opts: PdfViewerOptions =
       return v;
     },
     (v) => opts.onViewChange?.(currentPage(), v),
+  );
+  const bookmarkPrompt = createBookmarkPrompt(root, (idx, name) =>
+    opts.onBookmark?.(idx, pages[idx]?.viewport.height ?? 0, name, pageLabels?.[idx]),
   );
   // The fixed view's trim: adjusting it shows the pages whole, ending
   // the adjustment lays them out trimmed — on the same set.
@@ -529,7 +534,9 @@ export function createPdfViewer(container: HTMLElement, opts: PdfViewerOptions =
     if (destroyed) return;
     pages = createPageRecords(scrollArea, doc.numPages, first.getViewport({ scale: 1 }), {
       onOpenInZotero: opts.onOpenInZotero,
-      onCitePage: opts.onCitePage,
+      onBookmarkPage: opts.onBookmark
+        ? (page, button) => bookmarkPrompt.open(page - 1, button, `p. ${pageLabels?.[page - 1] ?? page}`)
+        : undefined,
     });
     const scale = getEffectiveZoom();
     const state = layoutState();
@@ -608,6 +615,7 @@ export function createPdfViewer(container: HTMLElement, opts: PdfViewerOptions =
     if (resizeTimer) clearTimeout(resizeTimer);
     keys.detach();
     cropper.destroy();
+    bookmarkPrompt.destroy();
     foldLayer.destroy();
     thumbs.destroy();
     renderer.destroy();
@@ -649,6 +657,8 @@ export function createPdfViewer(container: HTMLElement, opts: PdfViewerOptions =
     },
     /** The page in view, 1-based. */
     currentPage: () => currentPage(),
+    /** Fill the bookmark button on these pages (0-based). */
+    setBookmarkedPages: (indices: number[]) => markBookmarkedPages(pages, indices),
     /** A keyboard command (lib/shortcuts/): a mode, a page or fold step. */
     command,
     /** Report a view change still waiting out its pause. */

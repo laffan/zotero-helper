@@ -1,5 +1,6 @@
 mod ai;
 mod annotations;
+mod bookmarks;
 mod capture;
 mod chats;
 mod error;
@@ -636,6 +637,8 @@ pub fn run() {
             ai_count_tokens,
             load_chats,
             save_chats,
+            bookmarks::load_bookmarks,
+            bookmarks::save_bookmarks,
             download_attachment_file,
             hush::list_hush_desks,
             hush::open_in_hush,

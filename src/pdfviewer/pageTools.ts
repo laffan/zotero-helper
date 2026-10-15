@@ -1,21 +1,22 @@
 // What the viewer adds to Hush's for taking notes.
 //
-// - Page hover buttons. Hush puts two in a page's right-hand corners: an
-//   "open in Zotero" pop-out at the bottom and a bookmark at the top.
-//   The pop-out is kept; the bookmark slot becomes "cite this page in
-//   the notes", which is what a bookmark is for when the notes are the
-//   thing being written.
+// - Page hover buttons, as in Hush: an "open in Zotero" pop-out at the
+//   bottom right of a page and a bookmark at the top right. A bookmark
+//   is named as it is made (bookmarks.ts) and kept by the app
+//   (lib/bookmarks.ts) — Zotero has no such thing.
 // - A text layer, so passages can be selected — Hush's viewer has none.
 //   pdf.js lays transparent text over the raster where the words are.
 //
 // The bar over a selection (marks and "Add to notes") is selectionBar.ts.
-import { POPOUT_ICON, PAGE_NOTE_ICON } from "./icons";
+import { BOOKMARK_ICON, POPOUT_ICON } from "./icons";
 import { getPdfjs } from "./pdfjs";
 import type { PageRecord, PDFPageProxy } from "./types";
 
 export interface PageButtonHandlers {
   onOpenInZotero?: (page: number) => void;
-  onCitePage?: (page: number) => void;
+  /** The bookmark button, pressed: its page (1-based) and itself, to
+   *  place the naming box by. */
+  onBookmarkPage?: (page: number, button: HTMLElement) => void;
 }
 
 export function attachPageHoverButtons(
@@ -23,7 +24,7 @@ export function attachPageHoverButtons(
   pageNum: number,
   handlers: PageButtonHandlers,
 ): void {
-  const make = (cls: string, title: string, svg: string, fn: (n: number) => void) => {
+  const make = (cls: string, title: string, svg: string, fn: (n: number, b: HTMLElement) => void) => {
     const b = document.createElement("button");
     b.type = "button";
     b.className = cls;
@@ -31,7 +32,7 @@ export function attachPageHoverButtons(
     b.innerHTML = svg;
     b.addEventListener("click", (e) => {
       e.stopPropagation();
-      fn(pageNum);
+      fn(pageNum, b);
     });
     wrapper.appendChild(b);
     return b;
@@ -39,8 +40,8 @@ export function attachPageHoverButtons(
   const zBtn = handlers.onOpenInZotero
     ? make("pdf-page-zotero-btn", `Open page ${pageNum} in Zotero`, POPOUT_ICON, handlers.onOpenInZotero)
     : null;
-  const nBtn = handlers.onCitePage
-    ? make("pdf-page-note-btn", `Cite page ${pageNum} in the notes`, PAGE_NOTE_ICON, handlers.onCitePage)
+  const nBtn = handlers.onBookmarkPage
+    ? make("pdf-page-bookmark-btn", `Bookmark page ${pageNum}`, BOOKMARK_ICON, handlers.onBookmarkPage)
     : null;
   if (!zBtn && !nBtn) return;
   wrapper.addEventListener("mousemove", (e) => {

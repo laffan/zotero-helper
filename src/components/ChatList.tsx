@@ -30,7 +30,9 @@ function contextLine(chat: Chat): string {
   return `${scope} · ${depth}`;
 }
 
-function ChatRow({ chat, selected }: { chat: Chat; selected: boolean }) {
+/** One conversation; a click opens it. Also the item tab's rows
+ *  (ItemChats). */
+export function ChatRow({ chat, selected }: { chat: Chat; selected: boolean }) {
   const selectChat = useStore((s) => s.selectChat);
   const turns = chat.messages.filter((m) => m.role === "user").length;
 

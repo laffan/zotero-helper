@@ -32,6 +32,11 @@ const IS_IOS =
 const ERASER_BUTTON = 32;
 /** Screen pixels within which a tap selects a line. */
 const SELECT_REACH_PX = 8;
+/** Pen smoothing (see `smooth`): the share of the way to a new sample
+ *  a slow pen moves, and the speed (CSS px per sample) from which a
+ *  sample is taken as it is. */
+const SMOOTH_MIN = 0.45;
+const SMOOTH_SPEED = 12;
 
 export interface InkInputEnv {
   scrollArea: HTMLElement;
@@ -134,6 +139,19 @@ export function attachInkInput(env: InkInputEnv) {
     }
   }
 
+  /** A light touch of smoothing, the same for the line drawn live and
+   *  the one kept: each point goes only part of the way to the pen's
+   *  sample — less of the way the slower the pen moves, so a slow
+   *  stroke loses the hand's tremor while a fast one doesn't trail
+   *  behind the tip (a simple form of the "1€ filter"). */
+  function smooth(gs: Gesture, x: number, y: number): Pt {
+    const n = gs.client.length;
+    const px = gs.client[n - 2];
+    const py = gs.client[n - 1];
+    const a = Math.min(1, SMOOTH_MIN + Math.hypot(x - px, y - py) / SMOOTH_SPEED);
+    return [px + (x - px) * a, py + (y - py) * a];
+  }
+
   function samples(e: PointerEvent): PointerEvent[] {
     if (IS_IOS || typeof e.getCoalescedEvents !== "function") return [e];
     const list = e.getCoalescedEvents();
@@ -155,8 +173,9 @@ export function attachInkInput(env: InkInputEnv) {
     if (e.pointerId !== g.id) return;
     if (g.mode === "pen") {
       for (const s of samples(e)) {
-        g.client.push(s.clientX, s.clientY);
-        live.extend(s.clientX, s.clientY);
+        const [x, y] = smooth(g, s.clientX, s.clientY);
+        g.client.push(x, y);
+        live.extend(x, y);
       }
     } else if (g.mode === "eraser") {
       for (const s of samples(e)) {
@@ -177,6 +196,12 @@ export function attachInkInput(env: InkInputEnv) {
     const gs = g;
     g = null;
     if (gs.mode === "pen") {
+      // The line ends where the pen left the page, not just short of it.
+      const n = gs.client.length;
+      if (n > 2 && Math.hypot(e.clientX - gs.client[n - 2], e.clientY - gs.client[n - 1]) > 0.5) {
+        gs.client.push(e.clientX, e.clientY);
+        live.extend(e.clientX, e.clientY);
+      }
       live.finish();
       const pts: number[] = [];
       for (let i = 0; i + 1 < gs.client.length; i += 2) pts.push(...toPdf(gs, gs.client[i], gs.client[i + 1]));

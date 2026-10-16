@@ -93,13 +93,13 @@ export function buildPdfToolbar() {
 
   // Sections, spaced apart by the bar (pdfviewer.css): the thumbnails;
   // pages per screen; scroll direction; fixed / continuous; folding;
-  // drawing; zoom.
+  // zoom; drawing (ink mode's tools join the bar after it, ink/bar.ts).
   toolbar.append(
     thumbnailBtn,
     fitToggleWrap, scrollToggleWrap,
     pageModeWrap, foldWrap,
-    inkBtn,
     zoomWrap,
+    inkBtn,
     pageIndicator, zoteroLink,
   );
 

@@ -1,6 +1,6 @@
 /* Drawing in the PDF viewer (src/pdfviewer/ink/): the ink over each
    page, the stroke under the pen, the eraser and selection marks, and
-   the ink bar above the bottom bar. */
+   ink mode's tools in the bottom bar and their colour / width popup. */
 
 /* A page's ink: over the raster and its text, never in the way of a
    press (the pen's input is read on the scroll area). */
@@ -64,73 +64,91 @@
   }
 }
 
-/* --- the ink bar: floating over the foot of the pages --- */
-.pdf-ink-bar {
-  position: absolute;
-  left: 50%;
-  bottom: 10px;
-  transform: translateX(-50%);
-  z-index: 20;
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  align-items: center;
-  gap: 8px 14px;
-  width: max-content;
-  max-width: calc(100% - 20px);
-  box-sizing: border-box;
-  padding: 6px 12px;
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  background: var(--panel);
-  box-shadow: 0 3px 14px rgb(0 0 0 / 0.2);
-  font-size: calc(12px * var(--font-scale));
-  color: var(--text);
-  flex-shrink: 0;
-}
-.pdf-ink-colors {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-}
-.pdf-ink-width-wrap {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-}
-.pdf-ink-width {
-  width: 110px;
-  accent-color: var(--accent);
-}
-.pdf-ink-width-label {
-  min-width: 3.4em;
-  font-size: calc(11px * var(--font-scale));
-  color: var(--text-dim);
-  font-variant-numeric: tabular-nums;
-}
-.pdf-ink-bar .pdf-zoom-btn:disabled {
+/* --- ink mode's tools, in the bottom bar after the pen button --- */
+.pdf-ink-tools .pdf-zoom-btn:disabled {
   opacity: 0.35;
+}
+.pdf-ink-tools .pdf-toggle-group .pdf-zoom-btn {
+  border: none;
+  border-radius: 0;
+}
+.pdf-ink-tools .pdf-toggle-group .pdf-zoom-btn:not(:last-child) {
+  border-right: 1px solid rgb(128 128 128 / 0.15);
 }
 .pdf-ink-delete {
   color: var(--bad);
 }
-.pdf-ink-done {
-  font-size: calc(12px * var(--font-scale));
-}
-.pdf-ink-btn.active {
+.pdf-ink-btn.active,
+.pdf-ink-chip.active {
   background: rgb(128 128 128 / 0.22);
   border-color: rgb(128 128 128 / 0.4);
 }
+/* The colour as a dot, the width as a number; the eraser's an outline. */
+.pdf-ink-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 7px;
+}
+.pdf-ink-chip-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 1px rgb(0 0 0 / 0.15);
+}
+.pdf-ink-chip.eraser .pdf-ink-chip-dot {
+  box-shadow: inset 0 0 0 1.5px var(--text-dim);
+}
+.pdf-ink-chip-num {
+  min-width: 1.6em;
+  font-size: calc(11px * var(--font-scale));
+  font-variant-numeric: tabular-nums;
+  text-align: left;
+}
+
+/* The chip's popup: colours over the width slider, above the bar. */
+.pdf-ink-menu {
+  position: absolute;
+  bottom: 8px;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel);
+  box-shadow: 0 3px 14px rgb(0 0 0 / 0.25);
+  font-size: calc(12px * var(--font-scale));
+  color: var(--text);
+}
+.pdf-ink-colors {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.pdf-ink-width-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.pdf-ink-width {
+  flex: 1;
+  min-width: 140px;
+  accent-color: var(--accent);
+}
+.pdf-ink-width-label {
+  min-width: 3.6em;
+  font-size: calc(11px * var(--font-scale));
+  color: var(--text-dim);
+  font-variant-numeric: tabular-nums;
+}
 @media (hover: none) {
-  .pdf-ink-bar {
-    gap: 10px 16px;
-    padding: 7px 12px;
+  .pdf-ink-tools .pdf-toggle-option,
+  .pdf-ink-tools .pdf-zoom-btn {
+    padding: 5px 9px;
   }
-  .pdf-ink-bar .pdf-toggle-option,
-  .pdf-ink-bar .pdf-zoom-btn {
-    padding: 6px 10px;
-  }
-  .pdf-ink-width {
-    width: 150px;
+  .pdf-ink-colors {
+    gap: 10px;
   }
 }

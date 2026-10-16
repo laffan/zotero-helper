@@ -22,9 +22,14 @@ export const MERGE_DISTANCE = 50;
  *  so an annotation that would outgrow it starts a new one. */
 export const MAX_POSITION_CHARS = 60_000;
 
-/** The pen widths Zotero's reader offers (INK_ANNOTATION_WIDTH_STEPS),
- *  for the pen and, as its diameter, the eraser. */
-export const INK_WIDTHS: ReadonlyArray<number> = [
+/** The pen's widths: 0.1–3pt in tenths — the range writing uses, finer
+ *  than Zotero's own steps. (Zotero stores any width; a drawing made in
+ *  Zotero with a wider pen keeps its width here.) */
+export const PEN_WIDTHS: ReadonlyArray<number> = Array.from({ length: 30 }, (_, i) => (i + 1) / 10);
+
+/** The eraser's sizes (its diameter): the steps Zotero's reader offers
+ *  (INK_ANNOTATION_WIDTH_STEPS). */
+export const ERASER_SIZES: ReadonlyArray<number> = [
   0.2, 0.4, 0.6, 0.8, 1, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5, 5.5, 6, 6.5, 7, 7.5, 8, 8.5, 9, 9.5, 10, 10.5,
   11, 11.5, 12, 12.5, 13, 13.5, 14, 14.5, 15, 15.5, 16, 16.5, 17, 17.5, 18, 18.5, 19, 19.5, 20, 20.5, 21,
   21.5, 22, 22.5, 23, 23.5, 24, 24.5, 25,

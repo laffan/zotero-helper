@@ -7,10 +7,10 @@
 // The parts: session.ts holds the drawings and this viewer's changes to
 // them (and writes them once the pen rests), layer.ts draws them on the
 // pages, live.ts draws the stroke still under the pen, input.ts reads
-// the pen, bar.ts is the bar of tools. A Pencil double-tap or squeeze
-// (tauri-plugin-pencil, through lib/pencil.ts) does what the system's
-// Pencil setting says: switch to the eraser and back, or to the last
-// tool used.
+// the pen, bar.ts is its tools in the bottom bar. A Pencil double-tap
+// (tauri-plugin-pencil, through lib/pencil.ts) switches between the
+// pen and the eraser, whatever the system's Pencil setting; a Pencil
+// Pro's squeeze does what that setting says.
 import { annotationPosition, type Annotation } from "../../lib/highlights";
 import type { PageRecord } from "../types";
 import { createInkBar, loadInkPrefs, saveInkPrefs } from "./bar";
@@ -41,8 +41,8 @@ export interface InkWriter {
 }
 
 export interface InkEnv {
-  /** The viewer's body (the host of the overlays and the bar) and its
-   *  pages' scroll area. */
+  /** The viewer's body (the host of the overlays and the colour /
+   *  width popup) and its pages' scroll area. */
   body: HTMLElement;
   scrollArea: HTMLElement;
   /** The bottom bar's pen button. */
@@ -157,7 +157,7 @@ export function createInkTool(env: InkEnv) {
   }
 
   // --- the bar --------------------------------------------------------------
-  const bar = createInkBar({
+  const bar = createInkBar(env.body, {
     tool: (t) => setTool(t),
     color: (c) => {
       if (prefs.tool === "select" && sel) return editSelection((keys) => session.restyle(keys, { color: c }));
@@ -175,6 +175,7 @@ export function createInkTool(env: InkEnv) {
       if (prefs.tool === "eraser") prefs.eraser = w;
       else prefs.width = w;
       if (doneDragging) saveInkPrefs(prefs);
+      syncBar();
     },
     undo: () => undo(),
     redo: () => redo(),
@@ -183,9 +184,9 @@ export function createInkTool(env: InkEnv) {
       sel = null;
       showSelection();
     },
-    close: () => setActive(false),
   });
-  env.body.appendChild(bar.el);
+  // In the bottom bar, right after the pen button.
+  env.button.after(bar.el);
 
   function syncBar(): void {
     const list = prefs.tool === "select" ? selected() : [];
@@ -275,13 +276,16 @@ export function createInkTool(env: InkEnv) {
     }
   }
 
-  /** A Pencil double-tap or squeeze, with the action the system's
-   *  Pencil settings ask for. */
+  /** A Pencil double-tap: the eraser and back, always — the system's
+   *  "switch to last used tool" would do nothing from the pen, and its
+   *  colour palette has no equivalent here. A squeeze follows the
+   *  system's setting. */
   function onPencil(e: Event): void {
-    const action = (e as CustomEvent<{ action?: string }>).detail?.action ?? "switchEraser";
+    const { kind, action } = (e as CustomEvent<{ kind?: string; action?: string }>).detail ?? {};
     if (!active || input.busy()) return;
-    if (action === "switchEraser") setTool(prefs.tool === "eraser" ? previousTool : "eraser");
-    else if (action === "switchPrevious") setTool(previousTool);
+    const back = previousTool === "eraser" ? "pen" : previousTool;
+    if (kind === "tap" || action === "switchEraser") setTool(prefs.tool === "eraser" ? back : "eraser");
+    else if (action === "switchPrevious") setTool(prefs.tool === previousTool ? "pen" : previousTool);
   }
 
   // Changes still waiting are written before the app is put away —
@@ -354,7 +358,7 @@ export function createInkTool(env: InkEnv) {
       input.destroy();
       window.removeEventListener("visibilitychange", onHidden, true);
       window.removeEventListener("pagehide", flushNow);
-      bar.el.remove();
+      bar.destroy();
     },
   };
 }

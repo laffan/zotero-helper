@@ -1,15 +1,16 @@
-// The ink bar: floating over the foot of the pages while ink mode is
-// on — over them, not beside them, so starting to draw doesn't take
-// room from the pages and set off a relayout and re-render of every
-// page in a fit-to-height view. Pen / eraser / select; Zotero's ink colours (its eight, and
-// black); the pen width over Zotero's own range (0.2–25pt) or, with the
-// eraser, the eraser's size; undo and redo; delete for a selection; and
-// Done. With a selection, the colours and the width restyle it.
+// Ink mode's tools, in the viewer's bottom bar right after the pen
+// button that turns them on: pen / eraser / select; one chip for the
+// colour and width — a dot in the colour, the width as a number — that
+// opens a small popup with Zotero's ink colours (its eight, and black)
+// and a width slider (the eraser's size, with the eraser); undo, redo,
+// and delete for a selection. With a selection, the colours and width
+// restyle it. Kept in the bar, not over the pages, so they take no room
+// from what is being written on.
 //
 // The choices are this device's (`localStorage`), like the selection
 // bar's highlight / underline switch.
 import { ANNOTATION_COLORS } from "../../lib/highlights";
-import { DEFAULT_ERASER_SIZE, DEFAULT_PEN_WIDTH, INK_EXTRA_COLORS, INK_WIDTHS } from "./geometry";
+import { DEFAULT_ERASER_SIZE, DEFAULT_PEN_WIDTH, ERASER_SIZES, INK_EXTRA_COLORS, PEN_WIDTHS } from "./geometry";
 import { ERASER_ICON, PEN_ICON, REDO_ICON, SELECT_ICON, TRASH_ICON, UNDO_ICON } from "./icons";
 import type { InkTool } from "./input";
 
@@ -29,8 +30,8 @@ export function loadInkPrefs(): InkPrefs {
     return {
       tool: raw.tool === "eraser" || raw.tool === "select" ? raw.tool : "pen",
       color: typeof raw.color === "string" ? raw.color : d.color,
-      width: INK_WIDTHS.includes(raw.width as number) ? (raw.width as number) : d.width,
-      eraser: INK_WIDTHS.includes(raw.eraser as number) ? (raw.eraser as number) : d.eraser,
+      width: PEN_WIDTHS.includes(raw.width as number) ? (raw.width as number) : d.width,
+      eraser: ERASER_SIZES.includes(raw.eraser as number) ? (raw.eraser as number) : d.eraser,
     };
   } catch {
     return d;
@@ -53,7 +54,6 @@ export interface InkBarHandlers {
   undo: () => void;
   redo: () => void;
   remove: () => void;
-  close: () => void;
 }
 
 export interface InkBarState {
@@ -67,9 +67,19 @@ export interface InkBarState {
   canRedo: boolean;
 }
 
-export function createInkBar(handlers: InkBarHandlers) {
-  const el = document.createElement("div");
-  el.className = "pdf-ink-bar";
+/** The step nearest a width — a drawing made elsewhere may have one
+ *  between (or beyond) the slider's steps. */
+const nearest = (steps: ReadonlyArray<number>, w: number) =>
+  steps.reduce((best, s, i) => (Math.abs(s - w) < Math.abs(steps[best] - w) ? i : best), 0);
+
+/** "2", "0.5", "16.5". */
+const fmt = (w: number) => String(Math.round(w * 100) / 100);
+
+/** `popupHost`: where the colour / width popup goes (the viewer's body,
+ *  which it is placed in above the bar). */
+export function createInkBar(popupHost: HTMLElement, handlers: InkBarHandlers) {
+  const el = document.createElement("span");
+  el.className = "pdf-toolbar-section pdf-ink-tools";
   el.style.display = "none";
 
   const button = (cls: string, title: string, html: string, fn: () => void) => {
@@ -95,6 +105,26 @@ export function createInkBar(handlers: InkBarHandlers) {
   };
   for (const t of Object.keys(tools) as InkTool[]) tools[t].dataset.inkTool = t;
 
+  // The chip: the colour as a dot, the width beside it.
+  const chip = button("pdf-zoom-btn pdf-ink-chip", "Colour and width", "", () => toggleMenu());
+  const dot = document.createElement("span");
+  dot.className = "pdf-ink-chip-dot";
+  const num = document.createElement("span");
+  num.className = "pdf-ink-chip-num";
+  chip.append(dot, num);
+
+  const undo = button("pdf-zoom-btn", "Undo", UNDO_ICON, handlers.undo);
+  undo.dataset.shortcut = "mod+z";
+  const redo = button("pdf-zoom-btn", "Redo", REDO_ICON, handlers.redo);
+  redo.dataset.shortcut = "mod+shift+z";
+  const del = button("pdf-zoom-btn pdf-ink-delete", "Delete the selection", TRASH_ICON, handlers.remove);
+
+  el.append(group("pdf-toggle-group", tools.pen, tools.eraser, tools.select), chip, group("pdf-toggle-group", undo, redo), del);
+
+  // --- the popup: colours over a width slider ------------------------------
+  const menu = document.createElement("div");
+  menu.className = "pdf-ink-menu";
+  menu.style.display = "none";
   const swatches = [...ANNOTATION_COLORS, ...INK_EXTRA_COLORS].map((c) => {
     const s = button("pdf-mark-swatch", "", "", () => handlers.color(c));
     s.style.setProperty("--swatch", c);
@@ -102,64 +132,97 @@ export function createInkBar(handlers: InkBarHandlers) {
     return s;
   });
   const colors = group("pdf-ink-colors", ...swatches);
-
-  // The width as a step index over Zotero's steps, so the slider moves
-  // as Zotero's does (fine at the thin end, half points above).
+  // The slider runs over the steps' indices, so each step is one notch.
   const slider = document.createElement("input");
   slider.type = "range";
   slider.min = "0";
-  slider.max = String(INK_WIDTHS.length - 1);
   slider.step = "1";
   slider.className = "pdf-ink-width";
   const label = document.createElement("span");
   label.className = "pdf-ink-width-label";
-  const step = () => INK_WIDTHS[Number(slider.value)] ?? DEFAULT_PEN_WIDTH;
+  let steps: ReadonlyArray<number> = PEN_WIDTHS;
+  const value = () => steps[Number(slider.value)] ?? steps[0];
   slider.addEventListener("input", () => {
-    label.textContent = `${step()} pt`;
-    handlers.width(step(), false);
+    label.textContent = `${fmt(value())} pt`;
+    handlers.width(value(), false);
   });
   slider.addEventListener("change", () => {
-    handlers.width(step(), true);
+    handlers.width(value(), true);
     // Let go, so the keys are the viewer's again.
     slider.blur();
   });
-  const width = group("pdf-ink-width-wrap", slider, label);
+  menu.append(colors, group("pdf-ink-width-wrap", slider, label));
+  popupHost.appendChild(menu);
 
-  const undo = button("pdf-zoom-btn", "Undo", UNDO_ICON, handlers.undo);
-  undo.dataset.shortcut = "mod+z";
-  const redo = button("pdf-zoom-btn", "Redo", REDO_ICON, handlers.redo);
-  redo.dataset.shortcut = "mod+shift+z";
-  const del = button("pdf-zoom-btn pdf-ink-delete", "Delete the selection", TRASH_ICON, handlers.remove);
-  const done = button("pdf-zoom-btn pdf-ink-done", "Leave ink mode", "Done", handlers.close);
-  done.dataset.shortcut = "pdfInk";
+  let last: InkBarState | null = null;
 
-  el.append(
-    group("pdf-toggle-group", tools.pen, tools.eraser, tools.select),
-    colors,
-    width,
-    group("pdf-toolbar-section", undo, redo, del),
-    done,
-  );
+  function placeMenu(): void {
+    const h = popupHost.getBoundingClientRect();
+    const c = chip.getBoundingClientRect();
+    const left = c.left + c.width / 2 - h.left - menu.offsetWidth / 2;
+    menu.style.left = `${Math.max(8, Math.min(left, h.width - menu.offsetWidth - 8))}px`;
+  }
+  function closeMenu(): void {
+    menu.style.display = "none";
+    chip.classList.remove("active");
+    document.removeEventListener("pointerdown", onOutside, true);
+    document.removeEventListener("keydown", onEscape, true);
+  }
+  function onOutside(e: PointerEvent): void {
+    const t = e.target as Node;
+    if (!menu.contains(t) && !chip.contains(t)) closeMenu();
+  }
+  function onEscape(e: KeyboardEvent): void {
+    if (e.key !== "Escape") return;
+    e.preventDefault();
+    closeMenu();
+  }
+  function toggleMenu(): void {
+    if (menu.style.display !== "none") return closeMenu();
+    menu.style.display = "";
+    chip.classList.add("active");
+    if (last) sync(last);
+    placeMenu();
+    document.addEventListener("pointerdown", onOutside, true);
+    document.addEventListener("keydown", onEscape, true);
+  }
 
   function sync(s: InkBarState): void {
+    last = s;
     for (const t of Object.keys(tools) as InkTool[]) tools[t].classList.toggle("active", s.tool === t);
     const erasing = s.tool === "eraser";
-    // The colours and width apply to the pen, or to what is selected.
-    colors.style.display = erasing || (s.tool === "select" && !s.selected) ? "none" : "";
-    for (const sw of swatches) sw.classList.toggle("active", sw.dataset.color === s.color);
+    // Select with nothing selected has nothing to colour or size.
+    const styling = !(s.tool === "select" && !s.selected);
     const w = erasing ? s.eraser : s.width;
-    width.style.display = s.tool === "select" && !s.selected ? "none" : "";
-    width.title = erasing ? "Eraser size" : "Pen width";
-    if (document.activeElement !== slider) slider.value = String(Math.max(0, INK_WIDTHS.indexOf(w)));
-    label.textContent = `${w} pt`;
+    chip.style.display = styling ? "" : "none";
+    chip.classList.toggle("eraser", erasing);
+    chip.title = erasing ? "Eraser size" : s.selected ? "Colour and width of the selection" : "Pen colour and width";
+    dot.style.background = erasing ? "transparent" : s.color ?? "var(--text-dim)";
+    num.textContent = fmt(w);
+    if (!styling) closeMenu();
+    colors.style.display = erasing ? "none" : "";
+    for (const sw of swatches) sw.classList.toggle("active", sw.dataset.color === s.color);
+    steps = erasing ? ERASER_SIZES : PEN_WIDTHS;
+    slider.max = String(steps.length - 1);
+    if (document.activeElement !== slider) slider.value = String(nearest(steps, w));
+    label.textContent = `${fmt(w)} pt`;
     undo.disabled = !s.canUndo;
     redo.disabled = !s.canRedo;
     del.style.display = s.selected ? "" : "none";
+    if (menu.style.display !== "none") placeMenu();
   }
 
   return {
     el,
     sync,
-    show: (on: boolean) => (el.style.display = on ? "" : "none"),
+    show(on: boolean): void {
+      el.style.display = on ? "" : "none";
+      if (!on) closeMenu();
+    },
+    destroy(): void {
+      closeMenu();
+      el.remove();
+      menu.remove();
+    },
   };
 }

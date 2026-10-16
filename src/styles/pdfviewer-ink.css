@@ -48,21 +48,6 @@
   z-index: 5;
 }
 
-/* In ink mode the Pencil draws everywhere on a page: no text selection,
-   no long-press callout, and the PDF's links don't take the press. */
-.pdf-scroll-area.pdf-ink-active {
-  -webkit-user-select: none;
-  user-select: none;
-  -webkit-touch-callout: none;
-}
-.pdf-ink-active .pdf-link {
-  pointer-events: none;
-}
-@media (hover: hover) {
-  .pdf-ink-active .pdf-page-wrapper {
-    cursor: crosshair;
-  }
-}
 
 /* --- ink mode's tools, in the bottom bar after the pen button --- */
 .pdf-ink-tools .pdf-zoom-btn:disabled {
@@ -144,10 +129,6 @@
   font-variant-numeric: tabular-nums;
 }
 @media (hover: none) {
-  .pdf-ink-tools .pdf-toggle-option,
-  .pdf-ink-tools .pdf-zoom-btn {
-    padding: 5px 9px;
-  }
   .pdf-ink-colors {
     gap: 10px;
   }

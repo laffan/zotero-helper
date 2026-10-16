@@ -1,11 +1,12 @@
 // The pen on the pages: which contacts draw, erase or select, and
 // turning them into page coordinates.
 //
-// The rule is Hush's: the Apple Pencil (and a mouse, on the desktop)
-// draws; a finger never does — it keeps scrolling and zooming the pages
-// natively, so reading and writing need no mode switch beyond the pen
-// itself. `PointerEvent.pointerType` tells them apart reliably in
-// WKWebView. Stopping the Pencil from scrolling or selecting text takes
+// Only the Apple Pencil (a pen, `pointerType` "pen") draws. A finger, a
+// mouse or a trackpad does in ink mode what it does out of it — scroll
+// and zoom the pages, select text and highlight it, tap a highlight or a
+// link — so reading and writing need no mode switch beyond the pen in
+// hand. `PointerEvent.pointerType` tells them apart reliably in
+// WKWebView. Out of ink mode, the Pencil is a finger like any other. Stopping the Pencil from scrolling or selecting text takes
 // its touch events: a non-passive touchstart / touchmove listener
 // cancels only touches whose `touchType` is "stylus", so a finger's
 // scroll stays on the fast path. Those listeners exist only while ink
@@ -90,8 +91,7 @@ export function attachInkInput(env: InkInputEnv) {
   }
 
   function onDown(e: PointerEvent): void {
-    if (!on || e.pointerType === "touch") return;
-    if (e.pointerType === "mouse" && e.button !== 0) return;
+    if (!on || e.pointerType !== "pen") return;
     const target = e.target as Element;
     if (target.closest("button, input, textarea, .pdf-annot-popover, .pdf-selection-bar")) return;
     e.preventDefault();
@@ -162,7 +162,7 @@ export function attachInkInput(env: InkInputEnv) {
     if (!g) {
       // A Pencil hovering (iPad Pro) or a mouse: show where the eraser
       // would land.
-      if (on && e.pointerType !== "touch" && env.tool() === "eraser") {
+      if (on && e.pointerType === "pen" && env.tool() === "eraser") {
         const at = pageBoxAt(e.target as Element);
         const p = at ? env.getPages()[at.pageIndex] : null;
         if (at && p) live.showCursor(e.clientX, e.clientY, env.eraserSize() * (at.box.offsetWidth / p.viewport.width));
@@ -195,6 +195,7 @@ export function attachInkInput(env: InkInputEnv) {
     if (!g || e.pointerId !== g.id) return;
     const gs = g;
     g = null;
+    penUpAt = performance.now();
     if (gs.mode === "pen") {
       // The line ends where the pen left the page, not just short of it.
       const n = gs.client.length;
@@ -212,7 +213,7 @@ export function attachInkInput(env: InkInputEnv) {
       live.clear();
     } else if (gs.mode === "eraser") {
       env.end();
-      if (e.pointerType === "mouse" || e.type === "pointercancel") live.showCursor(null);
+      if (e.type === "pointercancel") live.showCursor(null);
     } else {
       const pt = toPdf(gs, e.clientX, e.clientY);
       if (gs.grabbed) env.drop(pt[0] - gs.start[0], pt[1] - gs.start[1]);
@@ -228,8 +229,20 @@ export function attachInkInput(env: InkInputEnv) {
   }
 
   function onLeave(e: PointerEvent): void {
-    if (!g && e.pointerType !== "touch") live.showCursor(null);
+    if (!g && e.pointerType === "pen") live.showCursor(null);
   }
+
+  /** A pen gesture can end in a click (a desktop pen does; the iPad's
+   *  cancelled touches don't): it isn't a press on the link or the
+   *  highlight under the stroke. */
+  let penUpAt = -Infinity;
+  function onClick(e: MouseEvent): void {
+    if (performance.now() - penUpAt > 400) return;
+    penUpAt = -Infinity;
+    e.preventDefault();
+    e.stopPropagation();
+  }
+  area.addEventListener("click", onClick, true);
 
   /** The Pencil mustn't scroll the pages or start a text selection —
    *  nor, while it is down, may a hand resting on the screen. */
@@ -272,6 +285,7 @@ export function attachInkInput(env: InkInputEnv) {
     area.removeEventListener("pointerup", onUp);
     area.removeEventListener("pointercancel", onUp);
     area.removeEventListener("pointerleave", onLeave);
+    area.removeEventListener("click", onClick, true);
   }
 
   return { setEnabled, destroy, busy: () => g !== null };

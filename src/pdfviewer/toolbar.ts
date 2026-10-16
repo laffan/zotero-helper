@@ -88,7 +88,7 @@ export function buildPdfToolbar() {
   zoteroLink.style.display = "none";
 
   const thumbnailBtn = svgBtn("pdf-zoom-btn pdf-thumbnail-btn", "Thumbnail view", THUMBNAIL_ICON, "pdfThumbnails");
-  // Reading mode: the pages fill the window (the red dot at its top
+  // Reading mode: the pages fill the window (the red ring at its top
   // left, or Escape, brings everything back).
   const readingBtn = svgBtn("pdf-zoom-btn pdf-reading-btn", "Reading mode — the pages fill the screen", READING_ICON, "pdfReadingMode");
   readingBtn.style.display = "none";

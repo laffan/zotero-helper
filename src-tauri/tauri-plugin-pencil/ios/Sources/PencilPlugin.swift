@@ -14,6 +14,16 @@ import WebKit
 // "ignore", or "other" for the palettes and shortcuts the page has no
 // equivalent of), so the Pencil does here what it does everywhere else.
 //
+// Also `hideEditMenu`: the system's text-selection menu (Copy, Look Up,
+// Translate…) comes up over a selection in the PDF and covers the
+// viewer's own bar there, and nothing on the page can stop it — CSS
+// (-webkit-touch-callout) doesn't reach it since iOS 16. So the page
+// asks for it to be dismissed as a selection in the PDF settles
+// (src/lib/pencil.ts): the menu is WebKit's UIEditMenuInteraction on its
+// content view, found among the web view's interactions and dismissed
+// (public API); on iOS 15, UIMenuController's. Selections in the notes
+// keep their menu — the page only asks for the PDF's.
+//
 // Ported from Hush (tauri-plugin-pencil's PencilPlugin.swift), less its
 // status-bar and keyboard-focus duties — this app's keyboard focus is
 // tauri-plugin-keyboard-focus. As there, the interaction is added to
@@ -23,12 +33,36 @@ import WebKit
 
 class PencilPlugin: Plugin {
   private var interaction: UIPencilInteraction?
+  private weak var webView: WKWebView?
 
   @objc public override func load(webview: WKWebView) {
+    webView = webview
     let interaction = UIPencilInteraction()
     interaction.delegate = self
     webview.addInteraction(interaction)
     self.interaction = interaction
+  }
+
+  @objc public func hideEditMenu(_ invoke: Invoke) {
+    DispatchQueue.main.async { [weak self] in self?.dismissEditMenu() }
+    invoke.resolve()
+  }
+
+  private func dismissEditMenu() {
+    if #available(iOS 16.0, *) {
+      guard let web = webView else { return }
+      for case let menu as UIEditMenuInteraction in PencilPlugin.interactions(in: web) {
+        menu.dismissMenu()
+      }
+    } else {
+      UIMenuController.shared.hideMenu()
+    }
+  }
+
+  /// Every interaction on a view and the views under it — WebKit keeps
+  /// its edit menu on the content view inside the web view's scroll view.
+  private static func interactions(in view: UIView) -> [UIInteraction] {
+    view.interactions + view.subviews.flatMap { interactions(in: $0) }
   }
 
   fileprivate func send(_ event: String, _ action: UIPencilPreferredAction) {

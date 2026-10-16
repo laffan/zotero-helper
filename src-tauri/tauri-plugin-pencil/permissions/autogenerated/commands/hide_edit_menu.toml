@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-hide-edit-menu"
+description = "Enables the hide_edit_menu command without any pre-configured scope."
+commands.allow = ["hide_edit_menu"]
+
+[[permission]]
+identifier = "deny-hide-edit-menu"
+description = "Denies the hide_edit_menu command without any pre-configured scope."
+commands.deny = ["hide_edit_menu"]

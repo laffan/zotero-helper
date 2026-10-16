@@ -295,10 +295,22 @@
       "type": "string",
       "oneOf": [
         {
-          "description": "Default permissions: allow JS to subscribe to and unsubscribe from the Pencil's events.\n#### This default permission set includes:\n\n- `allow-register-listener`\n- `allow-remove-listener`",
+          "description": "Enables the hide_edit_menu command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-hide-edit-menu",
+          "markdownDescription": "Enables the hide_edit_menu command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the hide_edit_menu command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-hide-edit-menu",
+          "markdownDescription": "Denies the hide_edit_menu command without any pre-configured scope."
+        },
+        {
+          "description": "Default permissions: allow JS to subscribe to and unsubscribe from the Pencil's events, and to dismiss the system's text-selection menu.\n#### This default permission set includes:\n\n- `allow-register-listener`\n- `allow-remove-listener`\n- `allow-hide-edit-menu`",
           "type": "string",
           "const": "default",
-          "markdownDescription": "Default permissions: allow JS to subscribe to and unsubscribe from the Pencil's events.\n#### This default permission set includes:\n\n- `allow-register-listener`\n- `allow-remove-listener`"
+          "markdownDescription": "Default permissions: allow JS to subscribe to and unsubscribe from the Pencil's events, and to dismiss the system's text-selection menu.\n#### This default permission set includes:\n\n- `allow-register-listener`\n- `allow-remove-listener`\n- `allow-hide-edit-menu`"
         },
         {
           "description": "Allow JS to register a listener for the Pencil's events (tap / squeeze) via addPluginListener().",
@@ -311,6 +323,12 @@
           "type": "string",
           "const": "allow-remove-listener",
           "markdownDescription": "Allow JS to remove a previously registered plugin-event listener."
+        },
+        {
+          "description": "Allow JS to dismiss the system's text-selection menu over a selection in the PDF.",
+          "type": "string",
+          "const": "allow-hide-edit-menu",
+          "markdownDescription": "Allow JS to dismiss the system's text-selection menu over a selection in the PDF."
         }
       ]
     }

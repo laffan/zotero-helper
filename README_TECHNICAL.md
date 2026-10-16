@@ -489,7 +489,7 @@ bottom bar are hidden (`readingmode.css`, under the `reading-mode` class
 App.tsx puts on `.app` while the store's `readingMode` is on), and the
 viewer refits the pages to the room through its own resize handling.
 On the iPad the band kept clear above the app for the status bar and
-window controls goes to the pages too. A small red dot at the top left
+window controls goes to the pages too. A red ring at the top left
 (below that band on the iPad) — or Escape — brings everything back as
 it was (`ReadingModeExit.tsx`). It lasts the session and ends when the
 PDF closes. Ink mode carries on in it: the Pencil writes, its double-tap
@@ -510,10 +510,15 @@ past the edge as a scroll of the pages beneath (the paged view's set
 stays put); the Pencil still writes. Once a pinch settles, the pages in
 view are redrawn at ×1.5–×4 the resolution (`resolutionFor` →
 `refreshResolution` in `render.ts`, the old raster kept up until the new
-one replaces it). Those pages may take up to 16.7 megapixels (4096²,
-WebKit's largest canvas, `MAX_DETAIL_PIXELS`), so a ×2 pinch is drawn at
-×2; every other page keeps the usual cap (8 MP on the iPad), so it costs
-a page or two of memory at a time. The redraw comes after the pinch,
+one replaces it). The one page nearest the view's centre may take up to
+16.7 megapixels (4096², WebKit's largest canvas, `MAX_DETAIL_PIXELS`),
+so a ×2 pinch is drawn at ×2; every other page keeps the usual cap (8 MP
+on the iPad). One page only: WebKit also caps all of a page's canvases
+together (reported at 224–576 MB, by device), and past that a new canvas
+gets no context — pages stopped drawing, and with no raster no text
+layer. Should it happen anyway, the renderer lets go of every page out
+of view and draws the page plainly rather than leave it blank (it asks
+for the canvas's context first, with pdf.js's own attributes). The redraw comes after the pinch,
 never during writing: no page render starts while the Pencil is down
 (`holdRenders` in `render.ts`, which retries every 120ms), since pdf.js
 draws on the main thread, in slices, and would cost the stroke samples.
@@ -645,7 +650,12 @@ the pen's sample, less of the way the slower the pen moves, so a slow
 line loses the hand's tremor and a fast one doesn't trail the tip; the
 line drawn live and the one kept are the same points. Select takes a drawing by a tap on its line, or every drawing
 a dragged box touches; a drag from inside the selection moves it, the
-colours and width restyle it, ⌫ deletes it. The tool, colour and sizes
+colours and width restyle it, ⌫ deletes it. Whatever the tool, a
+finger is the select tool on drawings: one landing on a drawing's line
+(within 16px) or on the selection selects it and drags it, and the bar's
+colours, width and Delete then act on it; a finger anywhere else scrolls
+and selects text as ever (its touch isn't cancelled — `fingerGrabs`
+decides at touchstart and pointerdown alike). The tool, colour and sizes
 are this device's (`localStorage`, `zh-ink`). Only drawings this app may
 edit (`canEditAnnotation`) can be erased, selected or added to.
 
@@ -666,6 +676,29 @@ eraser, whatever Settings → Apple Pencil says (its "last used tool"
 did nothing from the pen); the Pencil Pro's squeeze follows the setting — through `tauri-plugin-pencil` (ported from Hush's: a
 `UIPencilInteraction` on the web view, events `tap` / `squeeze` with the
 preferred action) and `src/lib/pencil.ts`.
+
+A gesture holds a lot while it lasts — every touch cancelled, page
+renders waiting — so it always ends. Its end is heard on the window
+(capturing), not only on the pages: re-rendering a page replaces the
+element a stroke began on, and the pointer-up could otherwise go nowhere
+anyone was listening — which left ink mode cancelling every touch and
+the renderer waiting for the pen for good, the viewer dead until the
+PDF was closed (reading mode, which re-renders every page as it opens,
+made it likely). A pen-down while a gesture is still open ends that one
+first (a pen can't be down twice), and a gesture that has heard nothing
+for 1.5s (`STALE_MS`) stops holding touches and renders without being
+ended, since a Pencil resting mid-stroke may say nothing for a while.
+
+**The system's selection menu.** On the iPad, selecting text in the PDF
+also brings up the system's menu (Copy, Look Up, Translate…), over the
+viewer's own bar, and nothing on the page can stop it — CSS
+(`-webkit-touch-callout`) no longer reaches it. So as a selection in the
+PDF's text layer settles, `src/lib/pencil.ts` asks `tauri-plugin-pencil`
+to dismiss it (`hide_edit_menu`: WebKit's `UIEditMenuInteraction`, found
+among the web view's interactions, `dismissMenu()`; on iOS 15,
+`UIMenuController`), and again 400ms later in case it came up after. It
+may show for a moment before it goes. Selections elsewhere — the notes —
+keep their menu.
 
 Why it keeps up with fast writing:
 - *No page re-render per stroke.* Highlights are painted into the pdf.js

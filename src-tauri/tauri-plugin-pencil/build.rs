@@ -1,7 +1,7 @@
-// No commands: JS only subscribes to the plugin's events ("tap",
-// "squeeze"), which rides the built-in registerListener /
-// removeListener (see permissions).
-const COMMANDS: &[&str] = &[];
+// JS subscribes to the plugin's events ("tap", "squeeze") through the
+// built-in registerListener / removeListener, and calls
+// `hide_edit_menu` (see permissions).
+const COMMANDS: &[&str] = &["hide_edit_menu"];
 
 fn main() {
     tauri_plugin::Builder::new(COMMANDS)

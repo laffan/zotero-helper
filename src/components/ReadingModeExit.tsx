@@ -1,4 +1,4 @@
-// Reading mode's way back: a small red dot at the window's top left
+// Reading mode's way back: a red ring at the window's top left
 // (the only thing on screen besides the pages), and Escape. Reading
 // mode itself is the store's `readingMode` — App.tsx gives the app the
 // `reading-mode` class, and readingmode.css hides the rest.

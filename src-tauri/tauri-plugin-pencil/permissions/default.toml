@@ -10,6 +10,11 @@ identifier = "allow-remove-listener"
 description = "Allow JS to remove a previously registered plugin-event listener."
 commands.allow = ["removeListener"]
 
+[[permission]]
+identifier = "allow-hide-edit-menu"
+description = "Allow JS to dismiss the system's text-selection menu over a selection in the PDF."
+commands.allow = ["hide_edit_menu"]
+
 [default]
-description = "Default permissions: allow JS to subscribe to and unsubscribe from the Pencil's events."
-permissions = ["allow-register-listener", "allow-remove-listener"]
+description = "Default permissions: allow JS to subscribe to and unsubscribe from the Pencil's events, and to dismiss the system's text-selection menu."
+permissions = ["allow-register-listener", "allow-remove-listener", "allow-hide-edit-menu"]

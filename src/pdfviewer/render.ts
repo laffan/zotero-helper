@@ -31,16 +31,26 @@ const IS_IOS =
 
 /** Ceiling on canvas pixels per page. */
 export const MAX_CANVAS_PIXELS = IS_IOS ? 8_000_000 : 16_777_216;
+/** …and for a page magnified in view (magnify.ts): WebKit's largest
+ *  canvas, 4096², so a ×2 pinch is drawn at ×2 — a page or two at once,
+ *  the rest keeping the lower cap. */
+const MAX_DETAIL_PIXELS = 16_777_216;
+/** While the Pencil is down, page renders wait this long and look again. */
+const HOLD_RETRY_MS = 120;
 
 const KEEP_BUDGET_BYTES = IS_IOS ? 192_000_000 : 512_000_000;
 const KEEP_MAX_PAGES = IS_IOS ? 24 : 48;
 /** Page renders at once — the folded view keeps to it too. */
 export const MAX_CONCURRENT_RENDERS = IS_IOS ? 1 : 2;
 
-/** Clamp a render scale so the page stays under MAX_CANVAS_PIXELS. */
-export function capRenderScale(scale: number, viewport1: { width: number; height: number }): number {
+/** Clamp a render scale so the page stays under `max` pixels. */
+export function capRenderScale(
+  scale: number,
+  viewport1: { width: number; height: number },
+  max = MAX_CANVAS_PIXELS,
+): number {
   const px = viewport1.width * viewport1.height * scale * scale;
-  return px > MAX_CANVAS_PIXELS ? scale * Math.sqrt(MAX_CANVAS_PIXELS / px) : scale;
+  return px > max ? scale * Math.sqrt(max / px) : scale;
 }
 
 /** Let a canvas's pixels go now. WebKit otherwise holds them until the
@@ -72,6 +82,9 @@ export interface RendererEnv {
   /** Extra resolution for a page — while the pages are magnified
    *  (magnify.ts), for those in view. */
   resolutionFor?: (idx: number) => number;
+  /** Hold off starting renders (the Pencil is down): a render runs on
+   *  the main thread, in slices, and would cost the stroke samples. */
+  holdRenders?: () => boolean;
   /** Draw into a page's raster before it is shown (annotations). */
   paintPage?: (idx: number, ctx: CanvasRenderingContext2D, viewport: PageViewport) => void;
   /** Link and text layers join the page here. */
@@ -196,7 +209,13 @@ export function createPageRenderer(scrollArea: HTMLElement, env: RendererEnv) {
     });
   }
 
+  let holdTimer = 0;
   function pump(): void {
+    if (queue.length && env.holdRenders?.()) {
+      clearTimeout(holdTimer);
+      holdTimer = window.setTimeout(pump, HOLD_RETRY_MS);
+      return;
+    }
     while (inFlight < MAX_CONCURRENT_RENDERS && queue.length) {
       const idx = queue.shift()!;
       const p = env.getPages()[idx];
@@ -283,7 +302,8 @@ export function createPageRenderer(scrollArea: HTMLElement, env: RendererEnv) {
       const scale = env.getEffectiveZoom();
       const dpr = window.devicePixelRatio || 1;
       const res = env.resolutionFor?.(idx) ?? 1;
-      const viewport = pageViewport(page, p, capRenderScale(scale * dpr * res, p.viewport));
+      const cap = res > 1 ? MAX_DETAIL_PIXELS : MAX_CANVAS_PIXELS;
+      const viewport = pageViewport(page, p, capRenderScale(scale * dpr * res, p.viewport, cap));
 
       canvas = document.createElement("canvas");
       canvas.width = Math.round(viewport.width);
@@ -431,6 +451,7 @@ export function createPageRenderer(scrollArea: HTMLElement, env: RendererEnv) {
   }
 
   function destroy(): void {
+    clearTimeout(holdTimer);
     if (updateRaf) cancelAnimationFrame(updateRaf);
     updateRaf = 0;
     reset();

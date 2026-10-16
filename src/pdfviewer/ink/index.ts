@@ -322,6 +322,8 @@ export function createInkTool(env: InkEnv) {
 
   return {
     isActive: () => active,
+    /** A stroke (or an erase, a drag) is under way. */
+    isDrawing: () => input.busy(),
     setActive,
     /** The PDF's annotations changed; its ink is picked out of them. */
     setAnnotations(list: Annotation[]): void {

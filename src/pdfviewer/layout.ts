@@ -46,8 +46,9 @@ export function applyLayoutClasses(area: HTMLElement, s: LayoutState): void {
   if (s.crop && !s.folded) area.classList.add("pdf-cropped");
 }
 
-/** CSS px per PDF unit for the mode, from page 1's scale-1 viewport —
- *  trimmed by a reading crop, so what is left of a page is what fits. */
+/** CSS px per PDF unit for the mode, from the typical page's scale-1
+ *  viewport (pageSizes.ts) — trimmed by a reading crop, so what is left
+ *  of a page is what fits. */
 export function fitZoom(area: HTMLElement, page1: PageViewport, s: LayoutState): number {
   const first = croppedSize(page1, s.crop);
   const pad = 40;
@@ -74,11 +75,11 @@ export function sizePage(p: PageRecord, scale: number, crop: Crop | null): void 
   cropWrapper(p.wrapper, w, h, crop);
 }
 
-/** The fixed view's spacing, from page 1's (trimmed) size at this
- *  scale: a set is n pages across side by side, one page tall top to
- *  bottom. */
-export function sizePagedGap(area: HTMLElement, pages: PageRecord[], scale: number, s: LayoutState): void {
-  const vp = pages[0] ? croppedSize(pages[0].viewport, s.crop) : null;
+/** The fixed view's spacing, from the typical page's (trimmed) size at
+ *  this scale: a set is n pages across side by side, one page tall top
+ *  to bottom. */
+export function sizePagedGap(area: HTMLElement, typical: PageViewport | null, scale: number, s: LayoutState): void {
+  const vp = typical ? croppedSize(typical, s.crop) : null;
   const horiz = s.layoutMode === "horizontal";
   const n = s.perSet;
   const size = !vp ? 0 : horiz ? n * vp.width * scale + (n - 1) * SET_GAP : vp.height * scale;

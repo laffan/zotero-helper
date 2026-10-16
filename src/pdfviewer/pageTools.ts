@@ -11,7 +11,8 @@
 import { BOOKMARK_ICON, POPOUT_ICON } from "./icons";
 import { getPdfjs } from "./pdfjs";
 import { enableTextSelection } from "./textSelect";
-import type { PageRecord, PDFPageProxy } from "./types";
+import { normalizedViewport } from "./pageSizes";
+import type { PageRecord, PageViewport, PDFPageProxy } from "./types";
 
 export interface PageButtonHandlers {
   onOpenInZotero?: (page: number) => void;
@@ -73,13 +74,15 @@ export function attachPageHoverButtons(
 }
 
 /** One page record per page, each with its wrapper (a placeholder and
- *  the hover buttons) in `scrollArea`. Every page starts at page 1's
- *  size, `viewport`; the others adopt their real size on first render,
- *  so opening a book isn't a serial walk over every page. */
+ *  the hover buttons) in `scrollArea`. Pages whose size is already known
+ *  (`known`, the sampled ones) start at it; every other page starts at
+ *  the typical page's size and adopts its own on first render, so
+ *  opening a book isn't a serial walk over every page. */
 export function createPageRecords(
   scrollArea: HTMLElement,
   count: number,
-  viewport: PageRecord["viewport"],
+  typical: PageViewport,
+  known: Map<number, PageViewport>,
   buttons: PageButtonHandlers,
 ): PageRecord[] {
   const pages: PageRecord[] = [];
@@ -92,10 +95,13 @@ export function createPageRecords(
     wrapper.appendChild(placeholder);
     attachPageHoverButtons(wrapper, i + 1, buttons);
     scrollArea.appendChild(wrapper);
+    const own = known.get(i);
+    const { viewport, norm } = own ? normalizedViewport(own, typical) : { viewport: typical, norm: 1 };
     pages.push({
       wrapper,
       viewport,
-      realViewport: i === 0,
+      norm,
+      realViewport: Boolean(own),
       rendered: false,
       rendering: false,
       canvas: null,
@@ -114,11 +120,11 @@ export function createPageRecords(
 export async function attachTextLayer(p: PageRecord, page: PDFPageProxy): Promise<void> {
   const host = p.contentEl;
   if (!host || !p.renderedZoom) return;
-  await renderTextLayer(host, page, p.renderedZoom, () => p.contentEl === host);
+  await renderTextLayer(host, page, p.renderedZoom * (p.norm ?? 1), () => p.contentEl === host);
 }
 
 /** The text layer itself, over `host` (a page drawn at `scale` CSS px
- *  per PDF unit) — a page's content box, or a fold of the folded view.
+ *  per PDF unit — its `norm` included) — a page's content box, or a fold of the folded view.
  *  `current` says whether `host` still shows this page once pdf.js has
  *  loaded. */
 export async function renderTextLayer(

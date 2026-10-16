@@ -37,6 +37,14 @@
 .pdf-scroll-area:focus {
   outline: none;
 }
+/* Pinched (magnify.ts): a transform over the laid-out pages; one finger
+   pans it, so the browser's own touch handling stands aside. */
+.pdf-scroll-area {
+  transform-origin: 0 0;
+}
+.pdf-scroll-area.pdf-magnified {
+  touch-action: none;
+}
 
 /* Find-in-PDF hits (search.ts), over the page in percentages. */
 .pdf-search-hits {
@@ -307,6 +315,13 @@
   background: var(--panel);
   font-size: calc(12px * var(--font-scale));
   color: var(--text);
+  flex-shrink: 0;
+  /* With ink mode's tools in it, a narrow viewer scrolls the bar rather
+     than squeezing its buttons. */
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.pdf-zoom-toolbar > * {
   flex-shrink: 0;
 }
 .pdf-zoom-btn {

@@ -122,7 +122,10 @@ src/            React + TypeScript UI (Vite, zustand, MiniSearch)
                 annotating: selectionBar (colours over a selection),
                 annotate (selection → Zotero position, tap hit-test),
                 annotPopover (colour / comment / delete);
-                viewerOptions (what the host hands the viewer)
+                viewerOptions (what the host hands the viewer),
+                textSelect (selections that narrow), magnify (the
+                pinch's loupe over the pages), pageSizes (odd-sized
+                pages brought to the typical page's size)
   pdfviewer/ink/
                 drawing (Zotero's pen): index (ink mode, wiring),
                 session (the drawings and this viewer's unwritten
@@ -478,6 +481,46 @@ written; pressing it heads the line with the page in view —
 there). Page pills move the open viewer rather than leaving for
 Zotero.
 
+**Pinch to magnify.** A pinch over the pages magnifies them like a
+loupe, and only them: the app itself never zooms (`index.html`'s
+viewport is `user-scalable=no`, and `main.tsx` cancels WebKit's pinch
+gesture everywhere), and the magnification is a transform on the scroll
+area (`src/pdfviewer/magnify.ts`), so the layout — fit, paged sets, the
+zoom the bar sets — is untouched, and pinching back out (below ×1.06)
+leaves the pages exactly as they were. Up to ×5. While magnified, one
+finger pans the view and coasts when let go, a trackpad's two-finger
+scroll or a wheel pans it, and in the continuous views a pan carries on
+past the edge as a scroll of the pages beneath (the paged view's set
+stays put); the Pencil still writes. Once a pinch settles, the pages in
+view are redrawn at ×1.5–×4 the resolution (`resolutionFor` →
+`refreshResolution` in `render.ts`, the old raster kept up until the new
+one replaces it), within the renderer's per-page pixel cap — on the
+iPad, about ×1.6 for a page fitted to the screen. Any relayout ends the
+magnification (a mode, a zoom step, a resize, a search hit or citation
+being shown, a new PDF), since the code that keeps the place across one
+measures the pages unmagnified. The pinch arrives as WebKit's
+`gesturestart` / `gesturechange` (the iPad and the Mac app; the
+fingers' midpoint from passive touch listeners), or elsewhere as a
+ctrl-wheel (a trackpad pinch), which the reading crop's held ⌃ yields
+to.
+
+**Pages of their own size.** A journal's or JSTOR's cover sheet, a
+scanned insert or a fold-out can be far larger or smaller than the
+pages around it, and the layout used to fit and seed every page from
+page 1 — so a large cover made the whole paper small. As a PDF opens, a
+dozen pages are sampled (the first six and six spread through it) and
+the median by area is the document's typical page, which the fit modes
+fit and every page waits at until it is drawn
+(`src/pdfviewer/pageSizes.ts`). A page whose area is more than 1.6× the
+typical page's, or less than 1/1.6 of it, is scaled to fit the typical
+page's box; a landscape page of the usual paper keeps its own size. The
+scaling is a viewport at the page's own scale (`norm`) treated as its
+scale-1 viewport, so its wrapper, text layer, highlights, ink, links and
+search hits agree unchanged; only what draws it (the raster, the folds'
+strips, the text layers) multiplies `norm` in, through `pageViewport`.
+Bookmarks record the page's top in PDF space (its viewBox), not its
+height.
+
 **The paged view's use of space.** A set is fitted to the whole of
 the viewer but a few pixels (`PAGED_PAD` in `src/pdfviewer/paged.ts`): no
 frame of margin above and below, so the pages are as large as the view
@@ -565,12 +608,20 @@ rounds of Chaikin, points closer than 1pt dropped, 3 decimals); a stroke
 drawn within 10s and 50pt of the last one, with the same colour and
 width, is added to that annotation, so a written word is one annotation;
 the eraser takes out the points inside its circle, splitting a line in
-two, and deletes a drawing it empties. A floating bar over the foot of
-the pages (over them, so starting to draw never relays out the pages)
-holds the pen, eraser and select tools; Zotero's eight colours and
-black; the width over Zotero's range of steps (0.2–25pt; the eraser's
-size, with the eraser); undo / redo (⌘Z / ⇧⌘Z); Delete for a selection;
-and Done. Select takes a drawing by a tap on its line, or every drawing
+two, and deletes a drawing it empties. The pen button is the last in the
+bottom bar; while ink mode is on, its tools follow it in the bar (which
+scrolls sideways rather than squeeze them on a narrow viewer): pen,
+eraser and select; one chip for the colour and width — a dot in the
+colour, the width as a number — which opens a popup with Zotero's eight
+colours and black over a width slider (0.1–3pt in tenths; with the
+eraser, the eraser's size over Zotero's steps, 0.2–25pt); undo / redo
+(⌘Z / ⇧⌘Z); and Delete for a selection. The pen button ends ink mode.
+A drawing made in Zotero with a wider pen keeps its width (the slider
+shows the nearest step). Samples are smoothed a little as they arrive
+(`smooth` in `input.ts`): each drawn point goes only part of the way to
+the pen's sample, less of the way the slower the pen moves, so a slow
+line loses the hand's tremor and a fast one doesn't trail the tip; the
+line drawn live and the one kept are the same points. Select takes a drawing by a tap on its line, or every drawing
 a dragged box touches; a drag from inside the selection moves it, the
 colours and width restyle it, ⌫ deletes it. The tool, colour and sizes
 are this device's (`localStorage`, `zh-ink`). Only drawings this app may
@@ -584,9 +635,9 @@ apart in WKWebView). The Pencil's touches are cancelled
 it is down every touch is, so a resting hand can't move the page. Those
 non-passive touch listeners exist only in ink mode — they make each
 scroll wait on the main thread. A pen's eraser button erases whatever
-tool is on. The Pencil's double-tap (and the Pencil Pro's squeeze) does
-what Settings → Apple Pencil says — switch to the eraser and back, or to
-the last tool — through `tauri-plugin-pencil` (ported from Hush's: a
+tool is on. The Pencil's double-tap switches between the pen and the
+eraser, whatever Settings → Apple Pencil says (its "last used tool"
+did nothing from the pen); the Pencil Pro's squeeze follows the setting — through `tauri-plugin-pencil` (ported from Hush's: a
 `UIPencilInteraction` on the web view, events `tap` / `squeeze` with the
 preferred action) and `src/lib/pencil.ts`.
 
@@ -610,7 +661,7 @@ Why it keeps up with fast writing:
   Hush.
 - *Nothing written while writing.* A change reaches the store and the
   annotation outbox only once the pen has rested 1.2s (or after 15s of
-  unbroken writing, at the next pen-up; and at once on Done, closing the
+  unbroken writing, at the next pen-up; and at once on leaving ink mode, closing the
   PDF, or the app going to the background — ahead of the push that same
   event starts). Store writes re-render React and outbox writes are IPC;
   either, mid-stroke, would cost the stroke samples. Until then the

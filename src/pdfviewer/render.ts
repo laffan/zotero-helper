@@ -16,6 +16,7 @@
 //  - Canvas resolution is capped per page (iOS has hard canvas limits).
 //  - `scheduleSettle()` is the crisp pass after a zoom or resize: in the
 //    meantime existing rasters are only CSS-stretched.
+import { adoptViewport, pageViewport } from "./pageSizes";
 import type { LayoutMode, PageRecord, PageViewport, PDFDocumentProxy, PDFPageProxy } from "./types";
 
 const RENDER_BUFFER = 2; // pages rendered beyond the visible range
@@ -61,11 +62,16 @@ export interface RendererEnv {
   getPages: () => PageRecord[];
   getPdfDoc: () => PDFDocumentProxy | null;
   getEffectiveZoom: () => number;
+  /** The document's typical page (pageSizes.ts). */
+  getTypical: () => PageViewport | null;
   /** Size a page's wrapper at a scale (layout.ts sizePage). */
   sizePage: (p: PageRecord, scale: number) => void;
   getLayoutMode: () => LayoutMode;
   isFolded: () => boolean;
   isDestroyed: () => boolean;
+  /** Extra resolution for a page — while the pages are magnified
+   *  (magnify.ts), for those in view. */
+  resolutionFor?: (idx: number) => number;
   /** Draw into a page's raster before it is shown (annotations). */
   paintPage?: (idx: number, ctx: CanvasRenderingContext2D, viewport: PageViewport) => void;
   /** Link and text layers join the page here. */
@@ -266,26 +272,18 @@ export function createPageRenderer(scrollArea: HTMLElement, env: RendererEnv) {
       const page = await pdfDoc.getPage(idx + 1);
       if (env.isDestroyed() || p.cancelled || pages !== env.getPages()) return;
 
-      // Wrappers are seeded from page 1's size; adopt the real
-      // dimensions the first time the page actually renders.
-      if (!p.realViewport) {
-        const vp1 = page.getViewport({ scale: 1 });
-        p.realViewport = true;
-        if (
-          Math.abs(vp1.width - p.viewport.width) > 0.5 ||
-          Math.abs(vp1.height - p.viewport.height) > 0.5
-        ) {
-          p.viewport = vp1;
-          env.sizePage(p, env.getEffectiveZoom());
-          invalidateGeometry();
-        } else {
-          p.viewport = vp1;
-        }
+      // Wrappers are seeded from the typical page's size; adopt the
+      // real one (brought to the typical size if far from it) the first
+      // time the page actually renders.
+      if (adoptViewport(p, page, env.getTypical())) {
+        env.sizePage(p, env.getEffectiveZoom());
+        invalidateGeometry();
       }
 
       const scale = env.getEffectiveZoom();
       const dpr = window.devicePixelRatio || 1;
-      const viewport = page.getViewport({ scale: capRenderScale(scale * dpr, p.viewport) });
+      const res = env.resolutionFor?.(idx) ?? 1;
+      const viewport = pageViewport(page, p, capRenderScale(scale * dpr * res, p.viewport));
 
       canvas = document.createElement("canvas");
       canvas.width = Math.round(viewport.width);
@@ -320,6 +318,7 @@ export function createPageRenderer(scrollArea: HTMLElement, env: RendererEnv) {
       p.rendered = true;
       stale.delete(idx);
       p.renderedZoom = scale;
+      p.renderedRes = res;
       p.canvas = canvas;
       p.canvasBytes = canvas.width * canvas.height * 4;
       renderedBytes += p.canvasBytes;
@@ -398,6 +397,18 @@ export function createPageRenderer(scrollArea: HTMLElement, env: RendererEnv) {
     scheduleUpdate();
   }
 
+  /** Redraw the pages whose resolution no longer suits the
+   *  magnification — the old raster stays up meanwhile (repaint). */
+  function refreshResolution(): void {
+    if (!env.resolutionFor) return;
+    const pages = env.getPages();
+    const stale: number[] = [];
+    for (let i = 0; i < pages.length; i++) {
+      if (pages[i].rendered && (pages[i].renderedRes ?? 1) !== env.resolutionFor(i)) stale.push(i);
+    }
+    if (stale.length) repaint(stale);
+  }
+
   function clearAll(): void {
     const pages = env.getPages();
     for (let i = 0; i < pages.length; i++) clearPage(i);
@@ -432,6 +443,7 @@ export function createPageRenderer(scrollArea: HTMLElement, env: RendererEnv) {
     clearPage,
     clearAll,
     repaint,
+    refreshResolution,
     reset,
     destroy,
     invalidateGeometry,

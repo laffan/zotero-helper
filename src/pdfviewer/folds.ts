@@ -27,6 +27,7 @@
 import { annotationPosition, type Annotation } from "../lib/highlights";
 import { drawAnnotations } from "./paint";
 import { COLLAPSE_ICON, EXPAND_ICON } from "./icons";
+import { adoptViewport, pageViewport } from "./pageSizes";
 import { renderTextLayer } from "./pageTools";
 import { createFoldFilterPopup } from "./foldFilter";
 import {
@@ -38,7 +39,7 @@ import {
   type FoldSpec,
 } from "./foldSpecs";
 import { capRenderScale, MAX_CONCURRENT_RENDERS, releaseCanvas } from "./render";
-import type { PageRecord, PDFDocumentProxy, PDFPageProxy } from "./types";
+import type { PageRecord, PageViewport, PDFDocumentProxy } from "./types";
 import type { FoldAnchor } from "./viewState";
 
 interface Fold extends FoldSpec {
@@ -68,23 +69,13 @@ const MAX_TEXT_LAYERS = 6;
 /** How long after a fold lets go before its page's pdf.js data does. */
 const RELEASE_DELAY_MS = 1000;
 
-/** Adopt a page's real size; pages are seeded from page 1's until they
- *  are drawn. True when it differed. */
-function adoptRealViewport(p: PageRecord, page: PDFPageProxy): boolean {
-  if (p.realViewport) return false;
-  const vp1 = page.getViewport({ scale: 1 });
-  const differed =
-    Math.abs(vp1.width - p.viewport.width) > 0.5 || Math.abs(vp1.height - p.viewport.height) > 0.5;
-  p.realViewport = true;
-  p.viewport = vp1;
-  return differed;
-}
-
 export interface FoldEnv {
   getPages: () => PageRecord[];
   getPdfDoc: () => PDFDocumentProxy | null;
   getAnnotations: () => Annotation[];
   getEffectiveZoom: () => number;
+  /** The document's typical page (pageSizes.ts). */
+  getTypical: () => PageViewport | null;
   isDestroyed: () => boolean;
   /** Lay selectable text over the folds. */
   selectable?: boolean;
@@ -176,7 +167,7 @@ export function createFoldLayer(scrollArea: HTMLElement, env: FoldEnv) {
   }
 
   /** Learn the real size of every page that folds, all at once. Pages
-   *  start at page 1's size, so a fold on a page of another size (a
+   *  start at the typical page's size, so a fold on a page of another size (a
    *  JSTOR cover makes it every page) is misplaced until its page is
    *  known; learning that one fold at a time, as each draws, meant a
    *  rebuild of the whole view per page. */
@@ -192,7 +183,7 @@ export function createFoldLayer(scrollArea: HTMLElement, env: FoldEnv) {
       todo.map((i) =>
         pdfDoc
           .getPage(i + 1)
-          .then((page) => env.getPages() === pages && adoptRealViewport(pages[i], page))
+          .then((page) => env.getPages() === pages && adoptViewport(pages[i], page, env.getTypical()))
           .catch(() => false),
       ),
     ).then((differed) => {
@@ -403,7 +394,9 @@ export function createFoldLayer(scrollArea: HTMLElement, env: FoldEnv) {
     if (!pdfDoc) return;
     void pdfDoc
       .getPage(f.pageIndex + 1)
-      .then((page) => renderTextLayer(f.inner, page, f.scale, () => f.text && f.wrapper.isConnected))
+      .then((page) =>
+        renderTextLayer(f.inner, page, f.scale * (env.getPages()[f.pageIndex]?.norm ?? 1), () => f.text && f.wrapper.isConnected),
+      )
       .catch(() => (f.text = false));
   }
   const onPointer = (e: PointerEvent) => {
@@ -455,9 +448,9 @@ export function createFoldLayer(scrollArea: HTMLElement, env: FoldEnv) {
       const page = await pdfDoc.getPage(fold.pageIndex + 1);
       if (!enabled || env.isDestroyed() || !fold.wrapper.isConnected) return;
       // A page sizeFoldPages hasn't reached yet: its folds are placed
-      // for page 1's size, so they are rebuilt (once, for all of them).
+      // for the typical page's size, so they are rebuilt (once, for all of them).
       const p = env.getPages()[fold.pageIndex];
-      if (p && adoptRealViewport(p, page)) {
+      if (p && adoptViewport(p, page, env.getTypical())) {
         scheduleRebuild();
         return;
       }
@@ -467,10 +460,10 @@ export function createFoldLayer(scrollArea: HTMLElement, env: FoldEnv) {
       // made scrolling folds slow.
       const full = fold.expanded;
       const dpr = window.devicePixelRatio || 1;
-      const k = capRenderScale(fold.scale * dpr, page.getViewport({ scale: 1 }));
+      const k = capRenderScale(fold.scale * dpr, p?.viewport ?? page.getViewport({ scale: 1 }));
       const top = full ? 0 : fold.top;
       const cssH = full ? fold.pageCssH : fold.foldCssH;
-      const viewport = page.getViewport({ scale: k, offsetY: -Math.round(top * k) });
+      const viewport = pageViewport(page, p, k, -Math.round(top * k));
       const canvas = document.createElement("canvas");
       canvas.width = Math.round(viewport.width);
       canvas.height = Math.max(1, Math.round((cssH / fold.scale) * k));

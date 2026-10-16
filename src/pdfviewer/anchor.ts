@@ -48,6 +48,16 @@ export function scrollToPagePoint(area: HTMLElement, p: PageRecord, top: number)
   area.scrollTo({ top: Math.max(0, target), behavior: "smooth" });
 }
 
+/** Bring a point on a page (fractions of its width and height) into
+ *  view, smoothly: centred across, a third of the way down. */
+export function scrollToPageFraction(area: HTMLElement, wrapper: HTMLElement, x: number, y: number): void {
+  const wr = wrapper.getBoundingClientRect();
+  const ar = area.getBoundingClientRect();
+  const left = area.scrollLeft + wr.left - ar.left + x * wr.width - area.clientWidth / 2;
+  const top = area.scrollTop + wr.top - ar.top + y * wr.height - area.clientHeight / 3;
+  area.scrollTo({ left: Math.max(0, left), top: Math.max(0, top), behavior: "smooth" });
+}
+
 /** Put the point `frac` of the way down page `p` at the centre of the
  *  view (at once). Side by side, the page is centred across instead. */
 export function centerPagePoint(area: HTMLElement, p: PageRecord, frac: number, horiz: boolean): void {

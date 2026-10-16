@@ -201,8 +201,17 @@ export function createReadingCrop(env: CropEnv) {
     // starts the adjustment (and onPointerDown may grab an edge with it).
     if (e.type === "pointerdown" && pointerInside) maybeStart();
   }
+  // ⌃ with the wheel is a pinch (magnify.ts), not a trim — for the rest
+  // of this hold.
+  function onWheel(e: WheelEvent): void {
+    if (!e.ctrlKey || !held) return;
+    window.clearTimeout(holdTimer);
+    holdReady = false;
+    if (editing && !drag) stopEditing();
+  }
   window.addEventListener("keydown", onKeydown);
   window.addEventListener("keyup", onKeyup);
+  window.addEventListener("wheel", onWheel, true);
   window.addEventListener("blur", release);
   document.addEventListener("visibilitychange", release);
   window.addEventListener("pointermove", onWindowPointer, true);
@@ -317,6 +326,7 @@ export function createReadingCrop(env: CropEnv) {
     destroy(): void {
       window.removeEventListener("keydown", onKeydown);
       window.removeEventListener("keyup", onKeyup);
+      window.removeEventListener("wheel", onWheel, true);
       window.removeEventListener("blur", release);
       document.removeEventListener("visibilitychange", release);
       window.removeEventListener("pointermove", onWindowPointer, true);

@@ -19,7 +19,7 @@
 // Highlights tab beside the viewer lists the same annotations).
 import type { Annotation } from "../lib/highlights";
 import { PDFJS_ASSETS } from "../lib/pdfjsAssets";
-import { centerPagePoint, pageFracAtCenter, restoreAnchor, scrollToPagePoint, viewAnchor } from "./anchor";
+import { centerPagePoint, pageFracAtCenter, restoreAnchor, scrollToPageFraction, scrollToPagePoint, viewAnchor } from "./anchor";
 import { attachAnnotationTaps, draftFromRange } from "./annotate";
 import { createAnnotationLayer } from "./annotations";
 import { createAnnotationPopover } from "./annotPopover";
@@ -32,8 +32,10 @@ import { createInkTool } from "./ink";
 import { attachViewerKeys } from "./keys";
 import { applyLayoutClasses, fitZoom, sizePage, sizePagedGap } from "./layout";
 import { createLinkLayerManager } from "./links";
+import { createMagnifier } from "./magnify";
 import { readOutline } from "./outline";
 import { attachTextLayer, createPageRecords } from "./pageTools";
+import { sampleTypicalPage } from "./pageSizes";
 import { changedPages, drawAnnotations } from "./paint";
 import { attachPagedWheel } from "./paged";
 import { getPdfjs } from "./pdfjs";
@@ -43,7 +45,7 @@ import { createSelectionBar } from "./selectionBar";
 import { createThumbnailManager } from "./thumbnails";
 import { buildPdfToolbar, syncToolbar } from "./toolbar";
 import { attachTooltips } from "./tooltips";
-import type { LayoutMode, PageRecord, PDFDocumentProxy } from "./types";
+import type { LayoutMode, PageRecord, PageViewport, PDFDocumentProxy } from "./types";
 import { loadViewPrefs, saveViewPrefs, type FitMode } from "./viewPrefs";
 import type { PdfViewerOptions } from "./viewerOptions";
 import { createViewReporter, initialLayout, type FoldAnchor, type SavedView } from "./viewState";
@@ -80,6 +82,8 @@ export function createPdfViewer(container: HTMLElement, opts: PdfViewerOptions =
   // The PDF's own page labels ("iv", "212"), which Zotero records on an
   // annotation; null when the file has none.
   let pageLabels: string[] | null = null;
+  // The document's typical page, which the layout fits (pageSizes.ts).
+  let typical: PageViewport | null = null;
 
   const root = document.createElement("div");
   root.className = "pdf-viewer";
@@ -90,6 +94,14 @@ export function createPdfViewer(container: HTMLElement, opts: PdfViewerOptions =
   // Focusable, so ← / → page through it once it has been clicked.
   scrollArea.tabIndex = 0;
   body.appendChild(scrollArea);
+  // A pinch magnifies the pages without touching the layout; any
+  // relayout ends it (applyLayoutClass, relayoutPages).
+  const magnifier = createMagnifier({
+    area: scrollArea,
+    host: body,
+    canScroll: () => !isPaged(),
+    onSettle: () => renderer.refreshResolution(),
+  });
 
   const annotLayer = createAnnotationLayer(scrollArea, {
     getPages: () => pages,
@@ -104,6 +116,7 @@ export function createPdfViewer(container: HTMLElement, opts: PdfViewerOptions =
     getPdfDoc: () => pdfDoc,
     getAnnotations: () => annotLayer.getAnnotations(),
     getEffectiveZoom: () => getEffectiveZoom(),
+    getTypical: () => typical,
     isDestroyed: () => destroyed,
     selectable: Boolean(opts.onQuote || opts.annotate),
     onFilterChange: () => viewReporter.changed(),
@@ -118,6 +131,8 @@ export function createPdfViewer(container: HTMLElement, opts: PdfViewerOptions =
     getPages: () => pages,
     getPdfDoc: () => pdfDoc,
     getEffectiveZoom: () => getEffectiveZoom(),
+    getTypical: () => typical,
+    resolutionFor: (idx) => (pages[idx] ? magnifier.resolutionFor(pages[idx].wrapper) : 1),
     sizePage: (p, scale) => sizePage(p, scale, layoutState().crop),
     getLayoutMode: () => layoutMode,
     isFolded: () => folded,
@@ -165,7 +180,8 @@ export function createPdfViewer(container: HTMLElement, opts: PdfViewerOptions =
   );
   let pageMarks: PageBookmark[] = [];
   const bookmarkPrompt = createBookmarkPrompt(root, {
-    create: (idx, name) => opts.onBookmark?.(idx, pages[idx]?.viewport.height ?? 0, name, pageLabels?.[idx]),
+    // The page's top in PDF space (its viewport may be scaled).
+    create: (idx, name) => opts.onBookmark?.(idx, pages[idx]?.viewport.viewBox[3] ?? 0, name, pageLabels?.[idx]),
     rename: (id, name) => opts.onRenameBookmark?.(id, name),
     remove: (id) => opts.onRemoveBookmark?.(id),
   });
@@ -251,14 +267,10 @@ export function createPdfViewer(container: HTMLElement, opts: PdfViewerOptions =
   // A search hit or a cited passage: page index, then a point on it (0–1).
   function revealPoint(idx: number, x: number, y: number): void {
     exitFolded();
+    magnifier.reset();
     if (isPaged()) return goToPage(idx + 1);
     const w = pages[idx]?.wrapper;
-    if (!w) return;
-    const wr = w.getBoundingClientRect();
-    const ar = scrollArea.getBoundingClientRect();
-    const left = scrollArea.scrollLeft + wr.left - ar.left + x * wr.width - scrollArea.clientWidth / 2;
-    const top = scrollArea.scrollTop + wr.top - ar.top + y * wr.height - scrollArea.clientHeight / 3;
-    scrollArea.scrollTo({ left: Math.max(0, left), top: Math.max(0, top), behavior: "smooth" });
+    if (w) scrollToPageFraction(scrollArea, w, x, y);
   }
   const search = createPdfSearch({ getPdfDoc: () => pdfDoc, getPages: () => pages, isDestroyed: () => destroyed, reveal: revealPoint });
   const citeMark = createCiteMark({ getPdfDoc: () => pdfDoc, getPages: () => pages, reveal: revealPoint, goToPage: (n) => goToPage(n) });
@@ -388,8 +400,7 @@ export function createPdfViewer(container: HTMLElement, opts: PdfViewerOptions =
     crop: cropper.effective(),
   });
   function getEffectiveZoom(): number {
-    const first = pages[0];
-    return first && pdfDoc ? fitZoom(scrollArea, first.viewport, layoutState()) : 1;
+    return typical && pages.length && pdfDoc ? fitZoom(scrollArea, typical, layoutState()) : 1;
   }
 
   function updateToolbarState(): void {
@@ -463,6 +474,7 @@ export function createPdfViewer(container: HTMLElement, opts: PdfViewerOptions =
   }
 
   function applyLayoutClass(): void {
+    magnifier.reset();
     applyLayoutClasses(scrollArea, layoutState());
   }
 
@@ -472,6 +484,7 @@ export function createPdfViewer(container: HTMLElement, opts: PdfViewerOptions =
   let relayoutGuard = false;
   function relayoutPages(): void {
     if (relayoutGuard || !pdfDoc || !pages.length) return;
+    magnifier.reset();
     if (folded) {
       foldLayer.refresh();
       return;
@@ -488,7 +501,7 @@ export function createPdfViewer(container: HTMLElement, opts: PdfViewerOptions =
           p.contentEl.style.transform = Math.abs(k - 1) > 0.001 ? `scale(${k})` : "";
         }
       }
-      sizePagedGap(scrollArea, pages, scale, state);
+      sizePagedGap(scrollArea, typical, scale, state);
       cropper.relaidOut();
       if (anchor) restoreAnchor(scrollArea, pages, layoutMode === "horizontal", anchor);
       renderer.invalidateGeometry();
@@ -522,9 +535,12 @@ export function createPdfViewer(container: HTMLElement, opts: PdfViewerOptions =
     if (destroyed) return;
     applyLayoutClass();
 
-    const first = await doc.getPage(1);
+    // The layout fits the typical page, not page 1, which is often a
+    // cover sheet of another size (pageSizes.ts).
+    const sample = await sampleTypicalPage(doc);
     if (destroyed) return;
-    pages = createPageRecords(scrollArea, doc.numPages, first.getViewport({ scale: 1 }), {
+    typical = sample.typical;
+    pages = createPageRecords(scrollArea, doc.numPages, sample.typical, sample.known, {
       onOpenInZotero: opts.onOpenInZotero,
       onBookmarkPage: opts.onBookmark
         ? (page, button) =>
@@ -534,7 +550,7 @@ export function createPdfViewer(container: HTMLElement, opts: PdfViewerOptions =
     const scale = getEffectiveZoom();
     const state = layoutState();
     for (const p of pages) sizePage(p, scale, state.crop);
-    sizePagedGap(scrollArea, pages, scale, state);
+    sizePagedGap(scrollArea, typical, scale, state);
     renderer.update();
     if (folded) foldLayer.enable();
     if (folded) restorePendingFold();
@@ -607,6 +623,7 @@ export function createPdfViewer(container: HTMLElement, opts: PdfViewerOptions =
     resizeObserver.disconnect();
     if (resizeTimer) clearTimeout(resizeTimer);
     keys.detach();
+    magnifier.destroy();
     cropper.destroy();
     bookmarkPrompt.destroy();
     foldLayer.destroy();

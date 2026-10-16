@@ -16,14 +16,20 @@ export interface LinkAnnot {
  *  (sized to the page); its content box comes and goes with rendering. */
 export interface PageRecord {
   wrapper: HTMLDivElement;
-  /** Scale-1 viewport. Seeded from page 1 until the page first renders. */
+  /** Scale-1 viewport. Seeded from the typical page until the page
+   *  first renders; for a page far from the typical size, its own
+   *  viewport scaled by `norm` (pageSizes.ts). */
   viewport: PageViewport;
   realViewport: boolean;
+  /** The scale a page of its own size is drawn at (1 for most). */
+  norm?: number;
   rendered: boolean;
   rendering: boolean;
   cancelled?: boolean;
   canvas: HTMLCanvasElement | null;
   renderedZoom: number | null;
+  /** The extra resolution it was drawn at (a pinch, magnify.ts). */
+  renderedRes?: number;
   renderTask?: RenderTask | null;
   canvasBytes?: number;
   /** Canvas + overlay layers, at paint-time CSS size. */

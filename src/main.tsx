@@ -14,6 +14,12 @@ if (
   document.documentElement.classList.add("ipados");
 }
 
+// The app never zooms as a whole — a pinch over a PDF's pages magnifies
+// just them (pdfviewer/magnify.ts), and anywhere else does nothing.
+// WebKit (the iPad, the Mac app) pinches by its gesture events; the
+// viewport's user-scalable=no covers the rest.
+document.addEventListener("gesturestart", (e) => e.preventDefault());
+
 initAppearance();
 
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(

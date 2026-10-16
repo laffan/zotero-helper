@@ -14,6 +14,7 @@ import { ItemList } from "./components/ItemList";
 import { MetadataPanel } from "./components/MetadataPanel";
 import { PdfRescueModal } from "./components/PdfRescueModal";
 import { ReaderPane } from "./components/ReaderPane";
+import { ReadingModeExit } from "./components/ReadingModeExit";
 import { SendToHushModal } from "./components/SendToHushModal";
 import { SettingsView } from "./components/settings/SettingsView";
 import { Sidebar } from "./components/Sidebar";
@@ -55,6 +56,8 @@ export default function App() {
   const { leftWidth, rightWidth, notesWidth } = useStore();
   const sidebarHidden = useStore((s) => s.sidebarHidden);
   const metaHidden = useStore((s) => s.metaHidden);
+  // Reading mode: the open PDF fills the window (readingmode.css).
+  const readingMode = useStore((s) => s.readingMode && s.reading !== null);
   // The pane the keyboard is moving in, outlined while it is.
   const kbdPane = usePane((s) => (s.shown ? s.pane : undefined));
 
@@ -74,7 +77,8 @@ export default function App() {
 
   return (
     <>
-      <div className="app">
+      <div className={readingMode ? "app reading-mode" : "app"}>
+        {readingMode && <ReadingModeExit />}
         <Toolbar />
         <div
           className="panes"

@@ -133,6 +133,7 @@ export function createPdfViewer(container: HTMLElement, opts: PdfViewerOptions =
     getEffectiveZoom: () => getEffectiveZoom(),
     getTypical: () => typical,
     resolutionFor: (idx) => (pages[idx] ? magnifier.resolutionFor(pages[idx].wrapper) : 1),
+    holdRenders: () => ink.isDrawing(),
     sizePage: (p, scale) => sizePage(p, scale, layoutState().crop),
     getLayoutMode: () => layoutMode,
     isFolded: () => folded,
@@ -241,12 +242,14 @@ export function createPdfViewer(container: HTMLElement, opts: PdfViewerOptions =
     attachAnnotationTaps(scrollArea, {
       getPages: () => pages,
       getAnnotations: () => annotLayer.getAnnotations(),
-      ignore: () => Boolean(selection?.justDismissed()) || ink.isActive(),
+      ignore: () => Boolean(selection?.justDismissed()),
       canEdit: writer.canEdit,
       open: (a, at) => popover.open(a, at),
     });
   }
 
+  if (opts.onReadingMode) tb.readingBtn.style.display = "";
+  tb.readingBtn.addEventListener("click", () => opts.onReadingMode?.());
   if (opts.onOpenInZotero) {
     tb.zoteroLink.style.display = "";
     tb.zoteroLink.href = "#";

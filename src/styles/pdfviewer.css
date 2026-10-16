@@ -401,6 +401,19 @@
   padding: 2px 9px;
   font-size: calc(13px * var(--font-scale));
 }
+/* On a touch screen the bar's buttons are finger-sized — the same for
+   ink mode's tools (pdfviewer-ink.css) and the rest. */
+@media (hover: none) {
+  .pdf-zoom-toolbar .pdf-toggle-option,
+  .pdf-zoom-toolbar .pdf-zoom-btn {
+    padding: 5px 9px;
+  }
+  .pdf-zoom-toolbar .pdf-toggle-option.pdf-zoom-step {
+    padding: 5px 12px;
+    /* As tall as an icon, so − / + line up with the rest. */
+    line-height: 14px;
+  }
+}
 .pdf-zoom-toolbar .pdf-zoom-label {
   min-width: 3.4em;
   text-align: left;

@@ -21,8 +21,8 @@ Windows/Linux desktops too).
   Zotero-compatible highlights and pen drawings (Apple Pencil on iPad; the
   same ink annotations Zotero's reader makes), a folded view of just the
   annotated passages, a paged view of one to three pages at a time (with
-  an adjustable reading crop), search, outlines and page citations into
-  the notes.
+  an adjustable reading crop), a full-screen reading mode, pinch to
+  magnify, search, outlines and page citations into the notes.
 - **AI helpers (optional)** — tidy metadata, extract abstracts, and ask
   questions of abstracts or full papers with page-cited answers, using
   Anthropic or OpenAI models.

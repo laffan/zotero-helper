@@ -1,0 +1,53 @@
+/* Reading mode (store's readingMode; App.tsx): the open PDF fills the
+   window. Everything around the pages is hidden — the app's header, the
+   notes and details panel, the outline, the activity log and the
+   viewer's bottom bar — and the viewer refits the pages to the room
+   (its own resize handling). The red dot is the way back. */
+.app.reading-mode > .toolbar,
+.app.reading-mode > .terminal,
+.app.reading-mode .meta-panel,
+.app.reading-mode .pane-resizer,
+.app.reading-mode .outline-panel,
+.app.reading-mode .drawer-scrim,
+.app.reading-mode .pdf-zoom-toolbar,
+.app.reading-mode .pdf-ink-menu {
+  display: none;
+}
+/* The band kept clear for the iPad's status bar and window controls
+   goes to the pages too. */
+.ipados .app.reading-mode {
+  padding-top: 0;
+}
+
+/* A dot to see, inside a larger target to hit. Below the iPad's status
+   bar and its window's controls (the band .ipados .app keeps clear). */
+.reading-mode-exit {
+  position: fixed;
+  z-index: 60;
+  top: 6px;
+  left: 6px;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+}
+.ipados .reading-mode-exit {
+  top: max(env(safe-area-inset-top), 30px);
+}
+.reading-mode-exit::before {
+  content: "";
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #ff5f57;
+  box-shadow: 0 0 0 0.5px rgb(0 0 0 / 0.25), 0 1px 3px rgb(0 0 0 / 0.25);
+  transition: transform 0.12s;
+}
+.reading-mode-exit:hover::before {
+  transform: scale(1.2);
+}

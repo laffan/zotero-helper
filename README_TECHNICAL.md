@@ -97,7 +97,8 @@ src/            React + TypeScript UI (Vite, zustand, MiniSearch)
                 tauri-plugin-pencil, as a window event for ink mode
   components/   toolbar, sidebar, virtualized item list, metadata panel
                 and its tabs (Highlights, Notes — NotesPrompts is an
-                empty note's reading questions), reader pane, terminal,
+                empty note's reading questions), reader pane (and
+                ReadingModeExit, reading mode's way back), terminal,
                 import/rescue modals
   components/settings/
                 the settings page: SettingsView (section list, the
@@ -427,7 +428,7 @@ hover, or on a press-and-hold with a finger, which then doesn't press
 the button — since iPadOS shows no `title` tooltips; a button with a
 keyboard shortcut shows the key after its text, dimmed, as currently
 bound (`data-shortcut` on the button, read by `tooltips.ts`). The bar
-is in sections 14px apart — thumbnails, pages per screen (fit one /
+is in sections 14px apart — thumbnails and reading mode, pages per screen (fit one /
 two / three), scroll direction, paged / continuous, folding, zoom (−
 and + as a group, the zoom or fit to their right). The viewer is a port of Hush's: horizontal or vertical
 scrolling, fit one / two / three pages, zoom, a thumbnail grid, the
@@ -481,6 +482,21 @@ written; pressing it heads the line with the page in view —
 there). Page pills move the open viewer rather than leaving for
 Zotero.
 
+**Reading mode.** The button beside the thumbnails (R from the
+keyboard) gives the open PDF the whole window: the app's header, the
+notes / details panel, the outline, the activity log and the viewer's
+bottom bar are hidden (`readingmode.css`, under the `reading-mode` class
+App.tsx puts on `.app` while the store's `readingMode` is on), and the
+viewer refits the pages to the room through its own resize handling.
+On the iPad the band kept clear above the app for the status bar and
+window controls goes to the pages too. A small red dot at the top left
+(below that band on the iPad) — or Escape — brings everything back as
+it was (`ReadingModeExit.tsx`). It lasts the session and ends when the
+PDF closes. Ink mode carries on in it: the Pencil writes, its double-tap
+switches to the eraser, ⌘Z undoes; the bar's other tools wait for the
+bar. On a touch screen every button in the bottom bar is finger-sized
+(`hover: none` in `pdfviewer.css`), ink mode's tools and the rest alike.
+
 **Pinch to magnify.** A pinch over the pages magnifies them like a
 loupe, and only them: the app itself never zooms (`index.html`'s
 viewport is `user-scalable=no`, and `main.tsx` cancels WebKit's pinch
@@ -494,8 +510,14 @@ past the edge as a scroll of the pages beneath (the paged view's set
 stays put); the Pencil still writes. Once a pinch settles, the pages in
 view are redrawn at ×1.5–×4 the resolution (`resolutionFor` →
 `refreshResolution` in `render.ts`, the old raster kept up until the new
-one replaces it), within the renderer's per-page pixel cap — on the
-iPad, about ×1.6 for a page fitted to the screen. Any relayout ends the
+one replaces it). Those pages may take up to 16.7 megapixels (4096²,
+WebKit's largest canvas, `MAX_DETAIL_PIXELS`), so a ×2 pinch is drawn at
+×2; every other page keeps the usual cap (8 MP on the iPad), so it costs
+a page or two of memory at a time. The redraw comes after the pinch,
+never during writing: no page render starts while the Pencil is down
+(`holdRenders` in `render.ts`, which retries every 120ms), since pdf.js
+draws on the main thread, in slices, and would cost the stroke samples.
+Any relayout ends the
 magnification (a mode, a zoom step, a resize, a search hit or citation
 being shown, a new PDF), since the code that keeps the place across one
 measures the pages unmagnified. The pinch arrives as WebKit's
@@ -627,10 +649,14 @@ colours and width restyle it, ⌫ deletes it. The tool, colour and sizes
 are this device's (`localStorage`, `zh-ink`). Only drawings this app may
 edit (`canEditAnnotation`) can be erased, selected or added to.
 
-Who draws: the Apple Pencil and a mouse; a finger never does — it keeps
-scrolling and zooming natively, so reading and writing need no mode
-change beyond the pen in hand (`input.ts`; `pointerType` tells them
-apart in WKWebView). The Pencil's touches are cancelled
+Who draws: the Apple Pencil (`pointerType` "pen"), and nothing else. A
+finger, a mouse or a trackpad does in ink mode what it does out of it —
+scrolls and zooms the pages, selects text and highlights it, taps a
+highlight or a link — so reading and writing need no mode change beyond
+the pen in hand (`input.ts`; `pointerType` tells them apart in
+WKWebView); out of ink mode the Pencil is a finger like any other. The
+click a pen gesture can end in (a desktop pen's) is swallowed, so a
+stroke over a link or a highlight doesn't press it. The Pencil's touches are cancelled
 (`touchType === "stylus"`) so it can't scroll or select text, and while
 it is down every touch is, so a resting hand can't move the page. Those
 non-passive touch listeners exist only in ink mode — they make each
@@ -1006,6 +1032,7 @@ doesn't cost the role, so there is nothing to reclaim.
 | PDF viewer | Fit one / two / three pages | 1 / 2 / 3 |
 | PDF viewer | Paged / continuous view | P / C |
 | PDF viewer | Draw (ink mode) on / off | I |
+| PDF viewer | Reading mode on / off (Esc also leaves it) | R |
 | PDF viewer | Next page (next fold, when folded) | → or ↓ |
 | PDF viewer | Previous page (previous fold, when folded) | ← or ↑ |
 

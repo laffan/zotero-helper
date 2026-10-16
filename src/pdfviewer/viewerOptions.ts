@@ -25,6 +25,8 @@ export interface PdfViewerOptions {
   annotate?: AnnotationWriter;
   /** The document's outline, once loaded (empty when it has none). */
   onOutline?: (outline: OutlineEntry[]) => void;
+  /** Reading mode on or off (its bottom-bar button); absent hides it. */
+  onReadingMode?: () => void;
   /** The page in view changed (1-based) — after the start page is
    *  reached, so opening a PDF doesn't report page 1 on the way. */
   onPageChange?: (page: number) => void;

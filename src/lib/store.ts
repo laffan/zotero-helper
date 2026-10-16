@@ -77,6 +77,10 @@ interface UiPrefs {
   metaHidden: boolean;
   /** The open PDF's outline panel, at the reader's left. */
   outlineOpen: boolean;
+  /** Reading mode: the open PDF fills the window — no header, side
+   *  panels or bottom bar (App.tsx, readingmode.css). This session's
+   *  only, and over when the PDF closes. */
+  readingMode: boolean;
   /** Settings → General (lib/appearance.ts). */
   appearance: Appearance;
   /** The UI's base font size, px (13 is the size it was drawn at). */
@@ -201,6 +205,7 @@ interface AppStore extends UiPrefs {
   setSidebarHidden: (b: boolean) => void;
   setMetaHidden: (b: boolean) => void;
   setOutlineOpen: (b: boolean) => void;
+  setReadingMode: (b: boolean) => void;
   setAppearance: (a: Appearance) => void;
   setUiFontSize: (px: number) => void;
   /** Open (or close, with null) a PDF. The right panel comes up on
@@ -249,6 +254,7 @@ export const useStore = create<AppStore>()(
       sidebarHidden: false,
       metaHidden: false,
       outlineOpen: false,
+      readingMode: false,
       appearance: "system" as Appearance,
       uiFontSize: 13,
       uiTasks: [],
@@ -402,6 +408,7 @@ export const useStore = create<AppStore>()(
       setSidebarHidden: (sidebarHidden) => set({ sidebarHidden }),
       setMetaHidden: (metaHidden) => set({ metaHidden }),
       setOutlineOpen: (outlineOpen) => set({ outlineOpen }),
+      setReadingMode: (readingMode) => set({ readingMode }),
       setAppearance: (appearance) => set({ appearance }),
       setUiFontSize: (uiFontSize) => set({ uiFontSize }),
       setReading: (reading, tab = "highlights") => {
@@ -413,7 +420,7 @@ export const useStore = create<AppStore>()(
         set(
           reading
             ? { reading, metaTab: tab, sidebarOpen: false, metaOpen: false }
-            : { reading },
+            : { reading, readingMode: false },
         );
       },
       setCachedPdfs: (list) =>

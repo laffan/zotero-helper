@@ -9,7 +9,7 @@ import type { PdfToolbar } from "./toolbar";
 export type ViewerCommand =
   | "horizontal" | "vertical" | "fit1" | "fit2" | "fit3" | "fixed" | "continuous"
   | "folded" | "foldFilters" | "expandFold" | "thumbnails" | "next" | "prev"
-  | "ink";
+  | "ink" | "readingMode";
 
 interface CommandEnv {
   tb: PdfToolbar;
@@ -91,6 +91,7 @@ export function createViewerCommands(env: CommandEnv) {
       case "expandFold": return expandFold();
       case "thumbnails": return tb.thumbnailBtn.click();
       case "ink": return tb.inkBtn.click();
+      case "readingMode": return tb.readingBtn.click();
       case "next":
       case "prev":
         return env.isFolded() ? stepFold(cmd === "next" ? 1 : -1) : env.stepPage(cmd === "next" ? 1 : -1);

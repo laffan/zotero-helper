@@ -217,6 +217,10 @@ export function ReaderPane() {
             canEdit: (a) => canEditAnnotation(a, settings()),
           },
           onOutline: (o) => setOutline(attKey, o),
+          onReadingMode: () => {
+            const s = useStore.getState();
+            s.setReadingMode(!s.readingMode);
+          },
           // Remembered, so the PDF opens on this page next time.
           onPageChange: (page) => {
             setReaderPage(page);

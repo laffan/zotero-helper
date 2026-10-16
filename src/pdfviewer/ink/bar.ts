@@ -190,7 +190,8 @@ export function createInkBar(popupHost: HTMLElement, handlers: InkBarHandlers) {
   function sync(s: InkBarState): void {
     last = s;
     for (const t of Object.keys(tools) as InkTool[]) tools[t].classList.toggle("active", s.tool === t);
-    const erasing = s.tool === "eraser";
+    // A selection (a finger's, in any tool) is what the chip edits.
+    const erasing = s.tool === "eraser" && !s.selected;
     // Select with nothing selected has nothing to colour or size.
     const styling = !(s.tool === "select" && !s.selected);
     const w = erasing ? s.eraser : s.width;

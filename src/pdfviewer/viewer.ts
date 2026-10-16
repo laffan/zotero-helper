@@ -32,7 +32,7 @@ import { createInkTool } from "./ink";
 import { attachViewerKeys } from "./keys";
 import { applyLayoutClasses, fitZoom, sizePage, sizePagedGap } from "./layout";
 import { createLinkLayerManager } from "./links";
-import { createMagnifier } from "./magnify";
+import { createMagnifier, PLAIN } from "./magnify";
 import { readOutline } from "./outline";
 import { attachTextLayer, createPageRecords } from "./pageTools";
 import { sampleTypicalPage } from "./pageSizes";
@@ -101,6 +101,7 @@ export function createPdfViewer(container: HTMLElement, opts: PdfViewerOptions =
     host: body,
     canScroll: () => !isPaged(),
     onSettle: () => renderer.refreshResolution(),
+    yields: () => ink.isDrawing(),
   });
 
   const annotLayer = createAnnotationLayer(scrollArea, {
@@ -132,7 +133,7 @@ export function createPdfViewer(container: HTMLElement, opts: PdfViewerOptions =
     getPdfDoc: () => pdfDoc,
     getEffectiveZoom: () => getEffectiveZoom(),
     getTypical: () => typical,
-    resolutionFor: (idx) => (pages[idx] ? magnifier.resolutionFor(pages[idx].wrapper) : 1),
+    resolutionFor: (idx) => (pages[idx] ? magnifier.resolutionFor(pages[idx].wrapper) : PLAIN),
     holdRenders: () => ink.isDrawing(),
     sizePage: (p, scale) => sizePage(p, scale, layoutState().crop),
     getLayoutMode: () => layoutMode,

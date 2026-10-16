@@ -16,6 +16,7 @@
 //  - Canvas resolution is capped per page (iOS has hard canvas limits).
 //  - `scheduleSettle()` is the crisp pass after a zoom or resize: in the
 //    meantime existing rasters are only CSS-stretched.
+import { PLAIN, type Resolution } from "./magnify";
 import { adoptViewport, pageViewport } from "./pageSizes";
 import type { LayoutMode, PageRecord, PageViewport, PDFDocumentProxy, PDFPageProxy } from "./types";
 
@@ -31,9 +32,10 @@ const IS_IOS =
 
 /** Ceiling on canvas pixels per page. */
 export const MAX_CANVAS_PIXELS = IS_IOS ? 8_000_000 : 16_777_216;
-/** …and for a page magnified in view (magnify.ts): WebKit's largest
- *  canvas, 4096², so a ×2 pinch is drawn at ×2 — a page or two at once,
- *  the rest keeping the lower cap. */
+/** …and for the one page magnified under the view's centre
+ *  (magnify.ts): WebKit's largest canvas, 4096², so a ×2 pinch is drawn
+ *  at ×2. One page only: WebKit also caps all canvases together (a few
+ *  hundred MB on an iPad), and past it no page draws at all. */
 const MAX_DETAIL_PIXELS = 16_777_216;
 /** While the Pencil is down, page renders wait this long and look again. */
 const HOLD_RETRY_MS = 120;
@@ -61,6 +63,19 @@ export function releaseCanvas(c: HTMLCanvasElement | null | undefined): void {
   if (c) c.width = c.height = 0;
 }
 
+/** The context pdf.js asks a page's canvas for (its default: no
+ *  hardware acceleration) — asked for first, to find a canvas WebKit
+ *  can't back, with the same attributes, as the first ask fixes them. */
+const PDFJS_CONTEXT = { alpha: false, willReadFrequently: true };
+
+function makeCanvas(w: number, h: number): HTMLCanvasElement {
+  const c = document.createElement("canvas");
+  c.width = Math.round(w);
+  c.height = Math.round(h);
+  c.className = "pdf-page-canvas";
+  return c;
+}
+
 function isCancelError(e: unknown): boolean {
   const err = e as { name?: string; message?: string } | null;
   return Boolean(
@@ -81,7 +96,7 @@ export interface RendererEnv {
   isDestroyed: () => boolean;
   /** Extra resolution for a page — while the pages are magnified
    *  (magnify.ts), for those in view. */
-  resolutionFor?: (idx: number) => number;
+  resolutionFor?: (idx: number) => Resolution;
   /** Hold off starting renders (the Pencil is down): a render runs on
    *  the main thread, in slices, and would cost the stroke samples. */
   holdRenders?: () => boolean;
@@ -301,14 +316,23 @@ export function createPageRenderer(scrollArea: HTMLElement, env: RendererEnv) {
 
       const scale = env.getEffectiveZoom();
       const dpr = window.devicePixelRatio || 1;
-      const res = env.resolutionFor?.(idx) ?? 1;
-      const cap = res > 1 ? MAX_DETAIL_PIXELS : MAX_CANVAS_PIXELS;
-      const viewport = pageViewport(page, p, capRenderScale(scale * dpr * res, p.viewport, cap));
-
-      canvas = document.createElement("canvas");
-      canvas.width = Math.round(viewport.width);
-      canvas.height = Math.round(viewport.height);
-      canvas.className = "pdf-page-canvas";
+      let { res, detail } = env.resolutionFor?.(idx) ?? PLAIN;
+      const cap = detail ? MAX_DETAIL_PIXELS : MAX_CANVAS_PIXELS;
+      let viewport = pageViewport(page, p, capRenderScale(scale * dpr * res, p.viewport, cap));
+      canvas = makeCanvas(viewport.width, viewport.height);
+      if (!canvas.getContext("2d", PDFJS_CONTEXT)) {
+        // WebKit's budget for all canvases is spent, and a canvas past
+        // it has no context: let go of every page out of view and draw
+        // this one plainly, rather than leave it blank.
+        console.warn(`Out of canvas memory drawing page ${idx + 1}; letting go of pages out of view`);
+        releaseCanvas(canvas);
+        shed(idx);
+        res = 1;
+        detail = false;
+        viewport = pageViewport(page, p, capRenderScale(scale * dpr, p.viewport));
+        canvas = makeCanvas(viewport.width, viewport.height);
+        if (!canvas.getContext("2d", PDFJS_CONTEXT)) throw new Error(`No canvas memory for page ${idx + 1}`);
+      }
 
       const task = page.render({ canvas, viewport, background: "#ffffff" });
       p.renderTask = task;
@@ -339,6 +363,7 @@ export function createPageRenderer(scrollArea: HTMLElement, env: RendererEnv) {
       stale.delete(idx);
       p.renderedZoom = scale;
       p.renderedRes = res;
+      p.renderedDetail = detail;
       p.canvas = canvas;
       p.canvasBytes = canvas.width * canvas.height * 4;
       renderedBytes += p.canvasBytes;
@@ -355,6 +380,16 @@ export function createPageRenderer(scrollArea: HTMLElement, env: RendererEnv) {
       if (!p.rendered) {
         p.wrapper.querySelector(".pdf-page-placeholder")?.classList.remove("loading");
       }
+    }
+  }
+
+  /** Let go of every page out of view but `keep` — when canvas memory
+   *  has run out. */
+  function shed(keep: number): void {
+    const pages = env.getPages();
+    const [first, last] = lastRange ?? [keep, keep];
+    for (let i = 0; i < pages.length; i++) {
+      if (i !== keep && (i < first || i > last) && (pages[i].rendered || stale.has(i))) clearPage(i);
     }
   }
 
@@ -424,7 +459,9 @@ export function createPageRenderer(scrollArea: HTMLElement, env: RendererEnv) {
     const pages = env.getPages();
     const stale: number[] = [];
     for (let i = 0; i < pages.length; i++) {
-      if (pages[i].rendered && (pages[i].renderedRes ?? 1) !== env.resolutionFor(i)) stale.push(i);
+      if (!pages[i].rendered) continue;
+      const want = env.resolutionFor(i);
+      if ((pages[i].renderedRes ?? 1) !== want.res || Boolean(pages[i].renderedDetail) !== want.detail) stale.push(i);
     }
     if (stale.length) repaint(stale);
   }

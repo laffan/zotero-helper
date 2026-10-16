@@ -5,8 +5,17 @@
 // mouse or a trackpad does in ink mode what it does out of it — scroll
 // and zoom the pages, select text and highlight it, tap a highlight or a
 // link — so reading and writing need no mode switch beyond the pen in
-// hand. `PointerEvent.pointerType` tells them apart reliably in
-// WKWebView. Out of ink mode, the Pencil is a finger like any other. Stopping the Pencil from scrolling or selecting text takes
+// hand; except that a finger landing on a drawing (or on what is
+// selected) is the select tool: it selects that drawing and drags it.
+// `PointerEvent.pointerType` tells them apart reliably in WKWebView. Out
+// of ink mode, the Pencil is a finger like any other.
+//
+// A gesture holds a lot while it lasts — every touch is cancelled, page
+// renders wait — so it must always end. Its end is heard on the window
+// too (a page re-rendered under the pen takes the element it went down
+// on with it), a new pen-down ends one left open, and one that has heard
+// nothing for STALE_MS stops holding anything (it isn't ended: a Pencil
+// resting mid-stroke may say nothing for a while, then carry on). Stopping the Pencil from scrolling or selecting text takes
 // its touch events: a non-passive touchstart / touchmove listener
 // cancels only touches whose `touchType` is "stylus", so a finger's
 // scroll stays on the fast path. Those listeners exist only while ink
@@ -31,8 +40,12 @@ const IS_IOS =
   /iP(ad|hone|od)/.test(navigator.userAgent) || (/Mac/.test(navigator.userAgent) && navigator.maxTouchPoints > 1);
 /** A pen's eraser button (PointerEvent.buttons). */
 const ERASER_BUTTON = 32;
-/** Screen pixels within which a tap selects a line. */
+/** Screen pixels within which a tap selects a line — a finger's reach
+ *  is wider. */
 const SELECT_REACH_PX = 8;
+const FINGER_REACH_PX = 16;
+/** A gesture that has heard nothing for this long has lost its end. */
+const STALE_MS = 1500;
 /** Pen smoothing (see `smooth`): the share of the way to a new sample
  *  a slow pen moves, and the speed (CSS px per sample) from which a
  *  sample is taken as it is. */
@@ -55,6 +68,8 @@ export interface InkInputEnv {
   /** Select: a press at a point; true when it took hold of the
    *  selection (to move it) rather than starting a rectangle. */
   press: (pageIndex: number, at: Pt, reach: number) => boolean;
+  /** Would a press here take hold of a drawing (or the selection)? */
+  grabbable: (pageIndex: number, at: Pt, reach: number) => boolean;
   drag: (dx: number, dy: number) => void;
   drop: (dx: number, dy: number) => void;
   sweep: (pageIndex: number, rect: Rect | null) => void;
@@ -75,12 +90,39 @@ interface Gesture {
   last: Pt | null;
   grabbed: boolean;
   startClient: Pt;
+  /** The latest place, for ending a gesture whose end was lost. */
+  lastClient: Pt;
+  finger: boolean;
 }
 
 export function attachInkInput(env: InkInputEnv) {
   const { scrollArea: area, live } = env;
   let on = false;
   let g: Gesture | null = null;
+  let heardAt = 0;
+  const fresh = () => g !== null && performance.now() - heardAt < STALE_MS;
+
+  /** The page under a client point, as a gesture would see it. */
+  function gestureAt(target: Element | null, x: number, y: number, id: number, mode: InkTool, finger: boolean): Gesture | null {
+    const at = target ? pageBoxAt(target) : null;
+    const p = at ? env.getPages()[at.pageIndex] : null;
+    if (!at || !p) return null;
+    const rect = at.box.getBoundingClientRect();
+    const gs: Gesture = {
+      id, mode, idx: at.pageIndex, p, rect,
+      k: rect.width / p.viewport.width,
+      client: [x, y], start: [0, 0], last: null, grabbed: false,
+      startClient: [x, y], lastClient: [x, y], finger,
+    };
+    gs.start = toPdf(gs, x, y);
+    return gs;
+  }
+
+  /** Would a finger here land on a drawing? */
+  function fingerGrabs(x: number, y: number): Gesture | null {
+    const gs = gestureAt(document.elementFromPoint(x, y), x, y, -1, "select", true);
+    return gs && env.grabbable(gs.idx, gs.start, FINGER_REACH_PX / gs.k) ? gs : null;
+  }
 
   function toPdf(gs: Gesture, cx: number, cy: number): Pt {
     const fx = Math.min(1, Math.max(0, (cx - gs.rect.left) / gs.rect.width));
@@ -91,40 +133,34 @@ export function attachInkInput(env: InkInputEnv) {
   }
 
   function onDown(e: PointerEvent): void {
-    if (!on || e.pointerType !== "pen") return;
+    if (!on) return;
     const target = e.target as Element;
     if (target.closest("button, input, textarea, .pdf-annot-popover, .pdf-selection-bar")) return;
+    // A finger on a drawing selects and drags it; anywhere else it is
+    // left to scroll, select text, tap.
+    if (e.pointerType === "touch") {
+      if (!e.isPrimary || fresh()) return;
+      const gs = fingerGrabs(e.clientX, e.clientY);
+      if (!gs) return;
+      e.preventDefault();
+      e.stopPropagation();
+      abandon();
+      start({ ...gs, id: e.pointerId });
+      g!.grabbed = env.press(gs.idx, gs.start, FINGER_REACH_PX / gs.k);
+      return;
+    }
+    if (e.pointerType !== "pen") return;
     e.preventDefault();
     e.stopPropagation();
-    if (g) return;
-    const at = pageBoxAt(target);
-    const p = at ? env.getPages()[at.pageIndex] : null;
-    if (!at || !p) {
+    // A pen can't be down twice: one still open lost its end.
+    abandon();
+    const mode: InkTool = e.buttons & ERASER_BUTTON ? "eraser" : env.tool();
+    const gs = gestureAt(target, e.clientX, e.clientY, e.pointerId, mode, false);
+    if (!gs) {
       env.pressOutside();
       return;
     }
-    const mode: InkTool = e.buttons & ERASER_BUTTON ? "eraser" : env.tool();
-    const rect = at.box.getBoundingClientRect();
-    const gs: Gesture = {
-      id: e.pointerId,
-      mode,
-      idx: at.pageIndex,
-      p,
-      rect,
-      k: rect.width / p.viewport.width,
-      client: [e.clientX, e.clientY],
-      start: [0, 0],
-      last: null,
-      grabbed: false,
-      startClient: [e.clientX, e.clientY],
-    };
-    gs.start = toPdf(gs, e.clientX, e.clientY);
-    g = gs;
-    try {
-      area.setPointerCapture(e.pointerId);
-    } catch {
-      /* the pointer is already gone */
-    }
+    start(gs);
     if (mode === "pen") {
       env.begin();
       const s = env.penStyle();
@@ -137,6 +173,21 @@ export function attachInkInput(env: InkInputEnv) {
     } else {
       gs.grabbed = env.press(gs.idx, gs.start, SELECT_REACH_PX / gs.k);
     }
+  }
+
+  function start(gs: Gesture): void {
+    g = gs;
+    heardAt = performance.now();
+    try {
+      area.setPointerCapture(gs.id);
+    } catch {
+      /* the pointer is already gone */
+    }
+  }
+
+  /** End a gesture left open — its end was lost — where it last was. */
+  function abandon(): void {
+    if (g) finish(g, g.lastClient[0], g.lastClient[1], true);
   }
 
   /** A light touch of smoothing, the same for the line drawn live and
@@ -171,6 +222,8 @@ export function attachInkInput(env: InkInputEnv) {
       return;
     }
     if (e.pointerId !== g.id) return;
+    heardAt = performance.now();
+    g.lastClient = [e.clientX, e.clientY];
     if (g.mode === "pen") {
       for (const s of samples(e)) {
         const [x, y] = smooth(g, s.clientX, s.clientY);
@@ -192,16 +245,19 @@ export function attachInkInput(env: InkInputEnv) {
   }
 
   function onUp(e: PointerEvent): void {
-    if (!g || e.pointerId !== g.id) return;
-    const gs = g;
+    if (g && e.pointerId === g.id) finish(g, e.clientX, e.clientY, e.type === "pointercancel");
+  }
+
+  function finish(gs: Gesture, ex: number, ey: number, cancelled: boolean): void {
+    if (g !== gs) return;
     g = null;
     penUpAt = performance.now();
     if (gs.mode === "pen") {
       // The line ends where the pen left the page, not just short of it.
       const n = gs.client.length;
-      if (n > 2 && Math.hypot(e.clientX - gs.client[n - 2], e.clientY - gs.client[n - 1]) > 0.5) {
-        gs.client.push(e.clientX, e.clientY);
-        live.extend(e.clientX, e.clientY);
+      if (n > 2 && Math.hypot(ex - gs.client[n - 2], ey - gs.client[n - 1]) > 0.5) {
+        gs.client.push(ex, ey);
+        live.extend(ex, ey);
       }
       live.finish();
       const pts: number[] = [];
@@ -213,13 +269,13 @@ export function attachInkInput(env: InkInputEnv) {
       live.clear();
     } else if (gs.mode === "eraser") {
       env.end();
-      if (e.type === "pointercancel") live.showCursor(null);
+      if (cancelled) live.showCursor(null);
     } else {
-      const pt = toPdf(gs, e.clientX, e.clientY);
+      const pt = toPdf(gs, ex, ey);
       if (gs.grabbed) env.drop(pt[0] - gs.start[0], pt[1] - gs.start[1]);
       else {
         live.showMarquee(null);
-        const tap = Math.hypot(e.clientX - gs.startClient[0], e.clientY - gs.startClient[1]) < 4;
+        const tap = Math.hypot(ex - gs.startClient[0], ey - gs.startClient[1]) < 4;
         env.sweep(gs.idx, tap ? null : [
           Math.min(gs.start[0], pt[0]), Math.min(gs.start[1], pt[1]),
           Math.max(gs.start[0], pt[0]), Math.max(gs.start[1], pt[1]),
@@ -245,11 +301,20 @@ export function attachInkInput(env: InkInputEnv) {
   area.addEventListener("click", onClick, true);
 
   /** The Pencil mustn't scroll the pages or start a text selection —
-   *  nor, while it is down, may a hand resting on the screen. */
+   *  nor, while it is down, may a hand resting on the screen; nor may a
+   *  finger that has landed on a drawing to move it. */
   function onTouch(e: TouchEvent): void {
-    if (g) {
+    if (fresh()) {
       e.preventDefault();
       return;
+    }
+    // Before its pointerdown, perhaps: a finger landing on a drawing.
+    if (e.type === "touchstart" && e.touches.length === 1) {
+      const t = e.touches[0];
+      if (fingerGrabs(t.clientX, t.clientY)) {
+        e.preventDefault();
+        return;
+      }
     }
     for (const t of Array.from(e.changedTouches)) {
       if ((t as Touch & { touchType?: string }).touchType === "stylus") {
@@ -261,8 +326,10 @@ export function attachInkInput(env: InkInputEnv) {
 
   area.addEventListener("pointerdown", onDown, true);
   area.addEventListener("pointermove", onMove);
-  area.addEventListener("pointerup", onUp);
-  area.addEventListener("pointercancel", onUp);
+  // Heard on the window, before anything else: the end of a gesture
+  // must arrive even when the element it began on has gone.
+  window.addEventListener("pointerup", onUp, true);
+  window.addEventListener("pointercancel", onUp, true);
   area.addEventListener("pointerleave", onLeave);
 
   function setEnabled(next: boolean): void {
@@ -282,11 +349,11 @@ export function attachInkInput(env: InkInputEnv) {
     setEnabled(false);
     area.removeEventListener("pointerdown", onDown, true);
     area.removeEventListener("pointermove", onMove);
-    area.removeEventListener("pointerup", onUp);
-    area.removeEventListener("pointercancel", onUp);
+    window.removeEventListener("pointerup", onUp, true);
+    window.removeEventListener("pointercancel", onUp, true);
     area.removeEventListener("pointerleave", onLeave);
     area.removeEventListener("click", onClick, true);
   }
 
-  return { setEnabled, destroy, busy: () => g !== null };
+  return { setEnabled, destroy, busy: fresh };
 }

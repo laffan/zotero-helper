@@ -28,8 +28,10 @@ export interface PageRecord {
   cancelled?: boolean;
   canvas: HTMLCanvasElement | null;
   renderedZoom: number | null;
-  /** The extra resolution it was drawn at (a pinch, magnify.ts). */
+  /** The extra resolution it was drawn at (a pinch, magnify.ts), and
+   *  whether past the usual size cap. */
   renderedRes?: number;
+  renderedDetail?: boolean;
   renderTask?: RenderTask | null;
   canvasBytes?: number;
   /** Canvas + overlay layers, at paint-time CSS size. */

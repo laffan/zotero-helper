@@ -32,6 +32,14 @@ const SNAP_BELOW = 1.06;
 const RES_STEPS = [1, 1.5, 2, 3, 4];
 const SETTLE_MS = 180;
 
+/** How sharp to draw a page: `res` times its usual resolution, and
+ *  whether it may be the one page drawn past the usual size cap. */
+export interface Resolution {
+  res: number;
+  detail: boolean;
+}
+export const PLAIN: Resolution = { res: 1, detail: false };
+
 export interface MagnifyEnv {
   area: HTMLElement;
   /** The box the magnified pages are clipped to. */
@@ -40,6 +48,9 @@ export interface MagnifyEnv {
   canScroll: () => boolean;
   /** The magnification has settled at `scale`: redraw for it. */
   onSettle: (scale: number) => void;
+  /** A finger's press belongs to something else (ink mode's finger on
+   *  a drawing): don't pan with it. */
+  yields?: () => boolean;
 }
 
 export function createMagnifier(env: MagnifyEnv) {
@@ -52,6 +63,7 @@ export function createMagnifier(env: MagnifyEnv) {
   const magnified = () => s > 1;
 
   function apply(): void {
+    focusStale = true;
     area.style.transform = magnified() ? `translate(${tx}px, ${ty}px) scale(${s})` : "";
     area.classList.toggle("pdf-magnified", magnified());
   }
@@ -172,6 +184,7 @@ export function createMagnifier(env: MagnifyEnv) {
     }
   }
   area.addEventListener("wheel", onWheel, { capture: true, passive: false });
+  area.addEventListener("scroll", () => (focusStale = true), { passive: true });
 
   // --- one finger pans, and coasts -----------------------------------------
   let drag: { id: number; x: number; y: number; t: number; vx: number; vy: number } | null = null;
@@ -190,6 +203,10 @@ export function createMagnifier(env: MagnifyEnv) {
   function onPointerMove(e: PointerEvent): void {
     pointer = { x: e.clientX, y: e.clientY };
     if (!drag || e.pointerId !== drag.id || pinch) return;
+    if (env.yields?.()) {
+      drag = null;
+      return;
+    }
     const now = performance.now();
     const dx = e.clientX - drag.x;
     const dy = e.clientY - drag.y;
@@ -240,13 +257,41 @@ export function createMagnifier(env: MagnifyEnv) {
     env.onSettle(1);
   }
 
-  /** The resolution a page should be drawn at: magnified, and in view. */
-  function resolutionFor(wrapper: HTMLElement): number {
-    if (!magnified()) return 1;
+  /** The page nearest the view's centre (the centre itself may fall
+   *  between pages), found once per settled magnification. */
+  let focus: Element | null = null;
+  let focusStale = true;
+  function focusPage(): Element | null {
+    if (!focusStale) return focus;
+    focusStale = false;
+    const h = host.getBoundingClientRect();
+    const cx = (h.left + h.right) / 2;
+    const cy = (h.top + h.bottom) / 2;
+    let best = Infinity;
+    focus = null;
+    for (const w of Array.from(area.children)) {
+      const r = w.getBoundingClientRect();
+      if (r.right < h.left || r.left > h.right || r.bottom < h.top || r.top > h.bottom) continue;
+      const d = Math.hypot(Math.max(r.left - cx, 0, cx - r.right), Math.max(r.top - cy, 0, cy - r.bottom));
+      if (d < best) {
+        best = d;
+        focus = w;
+      }
+    }
+    return focus;
+  }
+
+  /** The resolution a page should be drawn at: more while magnified
+   *  and in view — and the page nearest the view's centre (`detail`)
+   *  may be drawn larger than the rest, the one page that is. Several
+   *  pages that size at once (a full-screen spread) outgrow WebKit's
+   *  budget for all canvases, and pages stop drawing. */
+  function resolutionFor(wrapper: HTMLElement): Resolution {
+    if (!magnified()) return PLAIN;
     const r = wrapper.getBoundingClientRect();
     const h = host.getBoundingClientRect();
-    if (r.right < h.left || r.left > h.right || r.bottom < h.top || r.top > h.bottom) return 1;
-    return RES_STEPS.reduce((best, x) => (x <= s + 0.25 ? x : best), 1);
+    if (r.right < h.left || r.left > h.right || r.bottom < h.top || r.top > h.bottom) return PLAIN;
+    return { res: RES_STEPS.reduce((best, x) => (x <= s + 0.25 ? x : best), 1), detail: focusPage() === wrapper };
   }
 
   return {

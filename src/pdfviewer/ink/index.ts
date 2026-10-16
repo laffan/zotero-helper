@@ -160,13 +160,13 @@ export function createInkTool(env: InkEnv) {
   const bar = createInkBar(env.body, {
     tool: (t) => setTool(t),
     color: (c) => {
-      if (prefs.tool === "select" && sel) return editSelection((keys) => session.restyle(keys, { color: c }));
+      if (sel) return editSelection((keys) => session.restyle(keys, { color: c }));
       prefs.color = c;
       saveInkPrefs(prefs);
       syncBar();
     },
     width: (w, doneDragging) => {
-      if (prefs.tool === "select" && sel) {
+      if (sel) {
         // One restyle when the slider is let go; it is only a preview
         // until then.
         if (doneDragging) editSelection((keys) => session.restyle(keys, { width: w }));
@@ -189,7 +189,9 @@ export function createInkTool(env: InkEnv) {
   env.button.after(bar.el);
 
   function syncBar(): void {
-    const list = prefs.tool === "select" ? selected() : [];
+    // A selection (the select tool's, or a finger's in any tool) is
+    // what the colours and width act on.
+    const list = selected();
     const colors = new Set(list.map((a) => a.color));
     bar.sync({
       tool: prefs.tool,
@@ -228,7 +230,11 @@ export function createInkTool(env: InkEnv) {
     tool: () => prefs.tool,
     penStyle: () => ({ color: inkStrokeColor(prefs.color), width: prefs.width }),
     eraserSize: () => prefs.eraser,
-    begin: () => session.begin(),
+    // Drawing or erasing lets go of a selection a finger made.
+    begin: () => {
+      if (prefs.tool !== "select" && sel) select(0, []);
+      session.begin();
+    },
     end: () => session.end(),
     stroke: (idx, points) => {
       // A stroke too long for one annotation becomes several.
@@ -238,6 +244,7 @@ export function createInkTool(env: InkEnv) {
       }
     },
     erase: (idx, from, to) => session.eraseAlong(idx, from, to, prefs.eraser),
+    grabbable: (idx, [x, y], reach) => selectionHas(idx, x, y) || Boolean(session.hit(idx, x, y, reach)),
     press: (idx, [x, y], reach) => {
       if (selectionHas(idx, x, y)) return true;
       const a = session.hit(idx, x, y, reach);

@@ -6,13 +6,18 @@
 // sort index) as an edit of the same annotation, so its colour, comment
 // and key are kept.
 //
+// While they show, the page's text can't be selected: on the iPad a
+// press held on a handle, or a drag from it over the words, otherwise
+// starts the system's own selection — its magnifier, then its menu —
+// whatever the handle's own touch says.
+//
 // The handles sit in the page's wrapper, placed in percentages of the
 // page from the annotation's own rects, so they stay on the passage
 // through a zoom or a re-render. Where the dragged end lands is found in
 // the text layer (textHit.ts): over the gap between lines it stays
 // where it last was on a line, rather than jumping to the page's end.
 import { annotationPosition, type Annotation } from "../lib/highlights";
-import { textPositionAt, type TextPos } from "./textHit";
+import { textPositionAt, textRects, type TextPos } from "./textHit";
 import type { PageRecord } from "./types";
 
 export interface HandlesEnv {
@@ -108,7 +113,9 @@ export function createHighlightHandles(env: HandlesEnv) {
     const box = pos ? env.pageBox(pos.pageIndex) : null;
     const lines = p ? ends(a, p) : null;
     if (!p || !box || !lines || !box.querySelector(".textLayer")) return hide();
+    if (shown && shown.box !== box) shown.box.classList.remove("pdf-annot-editing");
     shown = { a, box, lines };
+    box.classList.add("pdf-annot-editing");
     place();
   }
 
@@ -120,6 +127,7 @@ export function createHighlightHandles(env: HandlesEnv) {
 
   function hide(): void {
     if (drag) return;
+    shown?.box.classList.remove("pdf-annot-editing");
     shown = null;
     start.remove();
     end.remove();
@@ -144,9 +152,7 @@ export function createHighlightHandles(env: HandlesEnv) {
     if (!shown) return;
     const box = shown.box.getBoundingClientRect();
     preview.replaceChildren();
-    // Lines only: an element the range wholly contains (a layer's
-    // `.endOfContent`) reports its own, page-sized box.
-    const rects = Array.from(range?.getClientRects() ?? []).filter((r) => r.width >= 0.5 && r.height >= 0.5);
+    const rects = (range ? textRects(range) : []).filter((r) => r.width >= 0.5 && r.height >= 0.5);
     const heights = rects.map((r) => r.height).sort((a, b) => a - b);
     const line = heights[Math.floor(heights.length / 2)] ?? 0;
     for (const cr of rects) {

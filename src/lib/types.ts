@@ -240,6 +240,9 @@ export interface ChatUsage {
 export interface ChatMessage {
   role: "user" | "assistant";
   content: string;
+  /** Shown in its place, when what was sent says more than the reader
+   *  needs to see again (an explainer's question: just the passage). */
+  display?: string;
   ts: number;
   /** What the call that produced this reply cost, in USD. */
   costUsd?: number;

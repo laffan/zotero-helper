@@ -37,7 +37,14 @@ const MAX_FLIP_LINES = 5;
 const EDGE_SPANS = 2;
 
 let last: Snap | null = null;
-let ignoreNext = false;
+// The selection the guard put back, until the change it makes arrives
+// (that change is the guard's own, and passes). Only that one: the
+// iPad may leap again first, and that leap is put back too — ignoring
+// whatever change came next once let a second leap stand, leaving the
+// selection at the top of the page.
+let restored: Snap | null = null;
+// This very change was put back (textSelect leaves it alone).
+let revertedNow = false;
 let keyAt = -Infinity;
 let tripleAt = -Infinity;
 
@@ -139,12 +146,14 @@ function onSelectionChange(): void {
     last = null;
     return;
   }
+  revertedNow = false;
   const now = snap(sel, range);
   const prev = last;
   last = now;
-  if (ignoreNext) {
-    ignoreNext = false;
-    return;
+  if (restored) {
+    const echo = same(now.start, restored.start) && same(now.end, restored.end);
+    restored = null;
+    if (echo) return;
   }
   const t = performance.now();
   if (!prev || t - keyAt < 400 || t - tripleAt < 600) return;
@@ -155,12 +164,13 @@ function onSelectionChange(): void {
     suspect = endMoved ? leapt(prev.end, now.end, true) : leapt(prev.start, now.start, false);
   } else if (startMoved && same(prev.anchor, now.anchor)) suspect = flipped(prev, now);
   if (!suspect) return;
-  ignoreNext = true;
+  restored = prev;
+  revertedNow = true;
   last = prev;
   try {
     sel.setBaseAndExtent(prev.anchor[0], prev.anchor[1], prev.focus[0], prev.focus[1]);
   } catch {
-    ignoreNext = false;
+    restored = null;
   }
 }
 
@@ -184,4 +194,4 @@ export function guardSelections(): void {
 
 /** Whether the selection just now was put back (textSelect then leaves
  *  `.endOfContent` where it was). */
-export const justReverted = () => ignoreNext;
+export const justReverted = () => revertedNow;

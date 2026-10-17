@@ -289,7 +289,7 @@ export function ChatPanel({ chat }: { chat: Chat }) {
           <Bubble
             key={i}
             role={m.role}
-            content={m.content}
+            content={m.display ?? m.content}
             source={chat.source}
           />
         ))}

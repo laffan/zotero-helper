@@ -37,7 +37,7 @@ interface Gathered {
 }
 
 /** Metadata header every work gets, whichever depth was asked for. */
-export function heading(item: ZItem, n: number): string {
+function heading(item: ZItem, n: number): string {
   const bits = [
     `## ${n}. ${itemTitle(item)}`,
     `- Authors: ${fullCreatorList(item) || creatorSummary(item) || "unknown"}`,

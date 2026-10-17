@@ -511,7 +511,16 @@ selection made with a finger or the Pencil leaves `.endOfContent`
 where it is: the iPad extends a touch selection by words and keeps
 re-reading where a resting finger is, and with the element moved past
 the moving end after every change, a selection held still crept on
-down the page. The guard catches the gaps for those instead. A
+down the page. The guard catches the gaps for those instead, and there
+are few: on a touch screen each line's box reaches down over the gap
+below it (`pointer: coarse` in `pdfviewer.css`; its text stays put), so
+a finger between two lines is still over a line, and WebKit places the
+end there rather than leaping — a leap the guard put back still showed,
+as a blink. A passage's shape is measured from its text's own boxes
+(`textRects` in `textHit.ts`), never the taller ones. The guard lets
+pass only the change its own putting-back makes; a second leap arriving
+first is put back too (ignoring the next change, whatever it was, once
+let one stand, at the top of the page). A
 page redrawn at the same zoom (a repaint after a sync, a sharper raster
 under a pinch) swaps only its canvas: the text layer — and a selection
 being made in it — stays (`render.ts`).
@@ -665,9 +674,11 @@ extent drawn as it goes; letting go writes the new passage (rects, text
 and sort index) as an edit of the same annotation, so its colour,
 comment and key are kept. Over the gap between lines the dragged end
 stays where it last was on a line (`textHit.ts`,
-`highlightHandles.ts`). A press on a handle cancels its touch, so the
-iPad doesn't take it for a long press on the text beneath and bring
-up its selection menu. ⌘-clicking a line marks the sentence it falls
+`highlightHandles.ts`). While the handles show, that page's text can't
+be selected and a press on a handle cancels its touch, so the iPad
+starts no selection of its own under them — no magnifier, no menu; the
+dragged end is placed from the characters' own boxes, which needs no
+selecting. ⌘-clicking a line marks the sentence it falls
 in, at once, as the bar's switch is set and in the colour last chosen
 there: a sentence runs between two ".", "!" or "?" followed by a space
 and a capital, a digit or an opening quote, so "e.g." and "3.5" don't
@@ -916,21 +927,25 @@ opens there too, rather than moving the hidden library to Questions
 connected, to the right of *Add to notes*) open a small conversation
 about the selected passage, floating over the pages at the bottom
 right — reading mode included — and ask "Can you explain “…”?" at
-once (`lib/ai/explain.ts`, `ExplainChat.tsx`). Follow-ups are typed
-beneath it; × or Escape closes the window, not the conversation. It is
+once: "While reading “[title]” by [authors] from [year], I came across
+the following: “…” Can you explain that a bit?" — of which the window
+shows only the passage (the message's `display`) (`lib/ai/explain.ts`,
+`ExplainChat.tsx`). Follow-ups are typed beneath it; ×, Escape or a
+press outside it closes the window, not the conversation. It is
 an ordinary conversation about the entry, named after its passage,
 saved with the others and listed in the entry's conversations tab and
 in Questions ("Open in panel" carries it on there). Two things differ:
 the backend answers it under its own system prompt, which keeps every
 reply under 100 words (`ai_chat`'s `mode` "explain",
 `src-tauri/src/ai/chat.rs`), and there is no cost popup first, since
-what it sends is small — the work's metadata and abstract and the text
-of the passage's page. Its cache countdown is left out for the same
-reason. The explained passage stays marked in the PDF in a light pink
+what it sends is small — the question, and the text of the passage's
+page as its only material (never the paper). Its cache countdown is
+left out for the same reason. The explained passage stays marked in
+the PDF with a dashed pink outline
 (`--explain-mark`, an overlay like a citation's, `explainMarks.ts`;
 where it is kept as the chat's `passage`), and a tap on it opens its
 explainer again — in reading mode too. Explainers carry a question mark
-rather than the conversation bubble, and are listed apart, under
+(without a circle) rather than the conversation bubble, and are listed apart, under
 Explanations, in the entry's conversations tab and in Questions.
 
 **AI Tidy Metadata** — with an API key configured, selected items are

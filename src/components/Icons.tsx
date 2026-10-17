@@ -271,9 +271,8 @@ export const ChatIcon = (p: IconProps = {}) =>
 export const QuestionIcon = (p: IconProps = {}) =>
   svg(
     <>
-      <circle cx="8" cy="8" r="6.5" />
-      <path d="M6.2 6.2a1.9 1.9 0 0 1 3.7.5c0 1.3-1.9 1.6-1.9 2.8" />
-      <path d="M8 11.6v.1" />
+      <path d="M5.2 5.4a2.9 2.9 0 0 1 5.6 1c0 2-2.8 2.4-2.8 4.4" />
+      <path d="M8 13.6v.1" strokeWidth="1.8" />
     </>,
     p,
   );

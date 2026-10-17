@@ -1,5 +1,5 @@
 // The passages the AI has explained (lib/ai/explain.ts), marked in a
-// light pink (--explain-mark) where they are in the pages, and a tap on
+// dashed pink outline (--explain-mark) where they are in the pages, and a tap on
 // one opens its explainer again — in reading mode too, where there is no
 // sidebar to find it in.
 //

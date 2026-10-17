@@ -18,6 +18,7 @@
 import { ANNOTATION_COLORS } from "../lib/highlights";
 import { rangeText } from "./annotate";
 import { HIGHLIGHT_ICON, SPARKLES_ICON, UNDERLINE_ICON } from "./icons";
+import { textRects } from "./textHit";
 
 export type MarkType = "highlight" | "underline";
 
@@ -63,7 +64,7 @@ function selectionBox(
   area: HTMLElement,
 ): { left: number; top: number; right: number; bottom: number } | null {
   const view = area.getBoundingClientRect();
-  const boxes = Array.from(range.getClientRects()).filter(
+  const boxes = textRects(range).filter(
     (b) => b.width >= 1 && b.height >= 1 && b.bottom > view.top && b.top < view.bottom,
   );
   if (!boxes.length) return null;

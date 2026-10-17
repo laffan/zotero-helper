@@ -8,8 +8,8 @@
 //!
 //! An explainer (the reader's selection bar: "explain this passage") is
 //! the same conversation with another system prompt — short answers
-//! about one passage, grounded in the work's metadata and the page it
-//! is on.
+//! about one passage, its question naming the work, with the text of the
+//! page it is on as the only material.
 
 use super::{estimate_tokens, send, Ask, AskSchema, Provider, Service, Turn, Usage};
 use super::anthropic;
@@ -45,13 +45,13 @@ from the work's own bibliography; if the material carries no [[page N]] markers 
 abstracts-only conversation), do not cite pages at all; and never invent the [[page N]] markers \
 yourself.";
 
-const EXPLAIN_SYSTEM: &str = "You help a scholar reading a work from their Zotero library \
-understand a passage they have selected in it. Below are the work's metadata and abstract and the \
-text of the page the passage is on, as extracted from the PDF (it can carry artifacts — running \
-heads, footnotes, words broken across lines). Explain what the passage means, what its terms refer \
-to and how it fits the argument around it, drawing on the page and on general knowledge, and say \
-when you are going beyond the material. Keep every answer short: under 100 words, plain prose, \
-no headings — follow-up questions included. Your reply is rendered as Markdown.";
+const EXPLAIN_SYSTEM: &str = "You help a scholar understand a passage they came across while \
+reading a work from their Zotero library; their question names the work. Below is the text of the \
+page the passage is on, as extracted from the PDF (it can carry artifacts — running heads, \
+footnotes, words broken across lines). Explain what the passage means, what its terms refer to \
+and how it fits the argument around it, drawing on the page and on general knowledge, and say \
+when you are going beyond the page. Keep every answer short: under 100 words, plain prose, no \
+headings — follow-up questions included. Your reply is rendered as Markdown.";
 
 const TITLE_SYSTEM: &str = "You name conversations. Given the first question and answer of a \
 chat about a set of scholarly works, return JSON {\"title\": \"...\"} with a title of at most six \

@@ -160,10 +160,12 @@ export function createChat(ask: PendingAsk): Chat {
 }
 
 /** Ask the open chat a question. Appends the turn, calls the provider,
- *  appends the reply, and books what it cost. */
+ *  appends the reply, and books what it cost. `display` is what the
+ *  conversation shows of the question, when not the whole of it. */
 export async function sendChatMessage(
   chatId: string,
   question: string,
+  display?: string,
 ): Promise<void> {
   const text = question.trim();
   if (!text) return;
@@ -172,7 +174,7 @@ export async function sendChatMessage(
   const chat = store.chats.find((c) => c.id === chatId);
   if (!chat) return;
 
-  const asked: ChatMessage = { role: "user", content: text, ts: Date.now() };
+  const asked: ChatMessage = { role: "user", content: text, ts: Date.now(), ...(display ? { display } : {}) };
   let working: Chat = {
     ...chat,
     messages: [...chat.messages, asked],

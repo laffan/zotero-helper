@@ -319,6 +319,14 @@
   background: color-mix(in srgb, var(--handle-color) 45%, transparent);
   outline: 1px solid var(--accent);
 }
+/* While a highlight's handles show, its page's text can't be selected,
+   so the iPad's own selection (magnifier, menu) can't start under them. */
+.pdf-annot-editing .textLayer,
+.pdf-annot-editing .textLayer span {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
 /* The editor gets out of the way while a handle is dragged. */
 .pdf-viewer:has(.pdf-handle-dragging) .pdf-annot-popover {
   visibility: hidden;

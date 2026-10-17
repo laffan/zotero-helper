@@ -25,9 +25,9 @@
      (yellow, orange) sits near. Pages are white in both themes, so one
      value serves both. */
   --cite-mark: #ff2d95;
-  /* A passage the AI explained (pdfviewer/explainMarks.ts): a light
-     pink, quieter than a highlight, that stays. */
-  --explain-mark: #ff8cc2;
+  /* A passage the AI explained (pdfviewer/explainMarks.ts): a pink
+     dashed outline, quieter than a highlight, that stays. */
+  --explain-mark: #f06aa8;
   /* Settings → General → UI font size, as a multiple of the 13px the
      sizes below were drawn at (lib/appearance.ts). */
   --font-scale: 1;

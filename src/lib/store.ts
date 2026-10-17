@@ -149,7 +149,7 @@ interface AppStore extends UiPrefs {
   chatBusy: string | null;
   /** The explainer open over the PDF (ExplainChat.tsx): its chat, and
    *  the first question, still to be asked when its chat is new. */
-  explain: { chatId: string; question?: string } | null;
+  explain: { chatId: string; question?: string; display?: string } | null;
   /** A gathered request sitting behind the cost popup. */
   pendingAsk: PendingAsk | null;
   /** True while the works are being read, before the popup appears —
@@ -202,7 +202,7 @@ interface AppStore extends UiPrefs {
   deleteChat: (id: string) => void;
   selectChat: (id: string | null) => void;
   setChatBusy: (id: string | null) => void;
-  setExplain: (e: { chatId: string; question?: string } | null) => void;
+  setExplain: (e: { chatId: string; question?: string; display?: string } | null) => void;
   setPendingAsk: (ask: PendingAsk | null) => void;
   setAskPreparing: (b: boolean) => void;
 

@@ -58,9 +58,25 @@ export function textPositionAt(layer: HTMLElement, x: number, y: number): TextPo
   const node = best.span.firstChild as Text;
   if (x <= best.r.left) return { node, offset: 0 };
   if (x >= best.r.right) return { node, offset: node.length };
-  // Inside the span but the caret missed it: by proportion.
-  const k = (x - best.r.left) / best.r.width;
-  return { node, offset: Math.round(k * node.length) };
+  return { node, offset: offsetAtX(node, x) };
+}
+
+/** The place in a line of text nearest `x`, found from its characters'
+ *  own boxes — which, unlike the caret, works where the text can't be
+ *  selected (highlightHandles.ts turns selecting off under its drag). */
+function offsetAtX(node: Text, x: number): number {
+  const r = document.createRange();
+  let lo = 0;
+  let hi = node.length;
+  while (lo < hi) {
+    const mid = (lo + hi) >> 1;
+    r.setStart(node, mid);
+    r.setEnd(node, mid + 1);
+    const b = r.getBoundingClientRect();
+    if (x > b.left + b.width / 2) lo = mid + 1;
+    else hi = mid;
+  }
+  return lo;
 }
 
 /** A layer's words as one string — a line break counts as a space —
@@ -106,4 +122,26 @@ export function rangeOf(t: ReturnType<typeof layerText>, from: number, to: numbe
   r.setStart(a.node, a.offset);
   r.setEnd(b.node, b.offset);
   return r.collapsed ? null : r;
+}
+
+/** The boxes of the text a range covers, line fragment by fragment.
+ *  `Range.getClientRects()` also returns the whole box of every element
+ *  the range contains — on a touch screen a span's box reaches down into
+ *  the gap below its line (pdfviewer.css), and `.endOfContent` can be
+ *  the size of the page — so a passage's shape is measured from its
+ *  text alone. */
+export function textRects(range: Range): DOMRect[] {
+  const root = range.commonAncestorContainer;
+  if (root instanceof Text) return Array.from(range.getClientRects());
+  const out: DOMRect[] = [];
+  const part = document.createRange();
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+  for (let n = walker.nextNode(); n; n = walker.nextNode()) {
+    if (!range.intersectsNode(n)) continue;
+    part.selectNodeContents(n);
+    if (n === range.startContainer) part.setStart(n, range.startOffset);
+    if (n === range.endContainer) part.setEnd(n, range.endOffset);
+    out.push(...Array.from(part.getClientRects()));
+  }
+  return out;
 }

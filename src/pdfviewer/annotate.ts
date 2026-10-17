@@ -10,6 +10,7 @@
 // counted in pdf.js's text layer, which can differ by a few characters.
 // That only matters for the order of annotations within one page.
 import { annotationPosition, type Annotation } from "../lib/highlights";
+import { textRects } from "./textHit";
 import type { PageRecord } from "./types";
 
 export interface AnnotationDraft {
@@ -108,7 +109,7 @@ export function draftFromRange(
   const wr = wrapper.getBoundingClientRect();
   const k = p.viewport.width / wr.width;
   const boxes: Box[] = [];
-  for (const cr of Array.from(r.getClientRects())) {
+  for (const cr of textRects(r)) {
     const left = Math.max(cr.left, wr.left);
     const right = Math.min(cr.right, wr.right);
     const top = Math.max(cr.top, wr.top);

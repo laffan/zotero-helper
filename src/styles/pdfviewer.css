@@ -80,8 +80,8 @@
   border-radius: 1px;
   animation: pdf-cite-arrive 1.2s ease-out;
 }
-/* Passages the AI explained (explainMarks.ts): a light pink that stays,
-   and a tap on it reopens the explainer. */
+/* Passages the AI explained (explainMarks.ts): a dashed pink outline
+   that stays, and a tap on it reopens the explainer. */
 .pdf-explain-marks {
   position: absolute;
   inset: 0;
@@ -90,9 +90,8 @@
 }
 .pdf-explain-mark {
   position: absolute;
-  background: color-mix(in srgb, var(--explain-mark) 28%, transparent);
-  mix-blend-mode: multiply;
-  border-radius: 1px;
+  outline: 1.5px dashed var(--explain-mark);
+  border-radius: 2px;
 }
 @keyframes pdf-cite-arrive {
   0%,
@@ -282,6 +281,19 @@
 }
 .textLayer .markedContent {
   display: contents;
+}
+/* On a touch screen, each line's box reaches down over the gap below it
+   (its text stays put). A finger dragging a selection between two lines
+   is then still over a line — where WebKit places the selection's end —
+   rather than over nothing, which it resolves to the start or end of the
+   page and the selection leapt there (selectGuard.ts puts those back,
+   but they showed). Measurements of a passage use its text's own boxes
+   (textHit.ts `textRects`), so marks keep their shape. */
+@media (pointer: coarse) {
+  .textLayer > :not(.markedContent),
+  .textLayer .markedContent span:not(.markedContent) {
+    padding-bottom: 0.6em;
+  }
 }
 .textLayer span[role="img"] {
   -webkit-user-select: none;

@@ -24,11 +24,16 @@ export interface PdfViewerOptions {
    *  the passage on its page (PDF rects), to mark it by. */
   onExplain?: (text: string, page: number, place?: { pageIndex: number; rects: number[][] }) => void;
   canExplain?: () => boolean;
+  /** Look up the selected word or phrase (the selection bar's
+   *  magnifier), read in the sentence `context`; resolves with its
+   *  definition. Offered while `canExplain`. */
+  onLookup?: (text: string, page: number, context: string) => Promise<string>;
   /** A tap on a passage explained before (setExplainMarks): its id. */
   onExplainTap?: (id: string) => void;
-  /** A plain tap marks the sentence under it, as a ⌘-click does
-   *  (reading mode's ⌘ button). */
-  commandLatched?: () => boolean;
+  /** The sentence tool (a tap selects a sentence) went on or off. */
+  onSentenceTool?: (on: boolean) => void;
+  /** Ink mode went on or off. */
+  onInkMode?: (on: boolean) => void;
   /** Send an annotation to the notes (its editor's Add to notes). */
   onInsertAnnotation?: (a: Annotation) => void;
   /** Make, change and delete annotations; absent, they are read-only. */

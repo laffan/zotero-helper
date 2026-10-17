@@ -28,6 +28,10 @@
   /* A passage the AI explained (pdfviewer/explainMarks.ts): a pink
      dashed outline, quieter than a highlight, that stays. */
   --explain-mark: #f06aa8;
+  /* Reading mode's notepad (notepad.css): paper and ink, the same in
+     both themes, as the pages are. */
+  --notepad-paper: #fffdf7;
+  --notepad-ink: #1f2430;
   /* Settings → General → UI font size, as a multiple of the 13px the
      sizes below were drawn at (lib/appearance.ts). */
   --font-scale: 1;

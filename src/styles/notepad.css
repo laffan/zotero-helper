@@ -1,0 +1,130 @@
+/* Reading mode's notepad (ReadingNotepad.tsx, src/notepad/): a floating
+   pad over the pages — a header to drag it by, with LINK at its left; a
+   canvas of paper beneath, which the Pencil writes on and a finger pans;
+   a grip at the corner to size it. */
+.notepad {
+  position: fixed;
+  z-index: 65;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--notepad-paper);
+  box-shadow: 0 10px 34px rgb(0 0 0 / 0.28);
+  overflow: hidden;
+  touch-action: none;
+}
+.notepad-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 6px 5px 6px;
+  border-bottom: 1px solid var(--border);
+  background: var(--panel);
+  cursor: grab;
+  -webkit-user-select: none;
+  user-select: none;
+}
+.notepad-title {
+  flex: 1;
+  color: var(--text-dim);
+  font-size: calc(12px * var(--font-scale));
+  font-weight: 600;
+  text-align: center;
+}
+.notepad-link-btn {
+  padding: 3px 9px;
+  border: 2px solid #ff5f57;
+  border-radius: 6px;
+  color: #ff5f57;
+  font-size: calc(11px * var(--font-scale));
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  cursor: grab;
+  touch-action: none;
+}
+.notepad-undo {
+  font-size: calc(15px * var(--font-scale));
+  line-height: 1;
+}
+.notepad-canvas {
+  position: relative;
+  flex: 1;
+  overflow: hidden;
+  cursor: crosshair;
+  touch-action: none;
+}
+.notepad-layer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 0;
+  height: 0;
+}
+.notepad-strokes {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 1px;
+  height: 1px;
+  overflow: visible;
+  fill: none;
+  stroke: var(--notepad-ink);
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  pointer-events: none;
+}
+.notepad-labels {
+  position: absolute;
+  top: 0;
+  left: 0;
+}
+/* Each note's page, small, above it: a tap on the note goes there. */
+.notepad-note-label {
+  position: absolute;
+  color: #9a9488;
+  font-size: calc(10px * var(--font-scale));
+  white-space: nowrap;
+  pointer-events: none;
+}
+/* A link dragged on from the pages: tapped to go, dragged to move. */
+.notepad-link {
+  position: absolute;
+  max-width: 220px;
+  padding: 3px 9px 3px 7px;
+  border: 1px solid #ff5f57;
+  border-left: 4px solid var(--link-color, #ff5f57);
+  border-radius: 6px;
+  background: #fff;
+  color: #b3261e;
+  font-size: calc(12px * var(--font-scale));
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  touch-action: none;
+  cursor: pointer;
+}
+.notepad-link-ghost {
+  position: fixed;
+  z-index: 1000;
+  padding: 3px 9px;
+  border: 2px solid #ff5f57;
+  border-radius: 6px;
+  background: #fff;
+  color: #ff5f57;
+  font-size: calc(11px * var(--font-scale));
+  font-weight: 700;
+  transform: translate(-50%, -130%);
+  pointer-events: none;
+  box-shadow: 0 3px 10px rgb(0 0 0 / 0.25);
+}
+.notepad-grip {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 22px;
+  height: 22px;
+  cursor: nwse-resize;
+  touch-action: none;
+  background: linear-gradient(135deg, transparent 50%, rgb(128 128 128 / 0.35) 50% 58%, transparent 58% 70%, rgb(128 128 128 / 0.35) 70% 78%, transparent 78%);
+}

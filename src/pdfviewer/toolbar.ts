@@ -4,6 +4,7 @@
 import type { LayoutMode } from "./types";
 import type { FitMode } from "./viewPrefs";
 import {
+  CARET_ICON,
   CONTINUOUS_ICON,
   FILTER_ICON,
   FIXED_ICON,
@@ -93,6 +94,10 @@ export function buildPdfToolbar() {
   const readingBtn = svgBtn("pdf-zoom-btn pdf-reading-btn", "Reading mode — the pages fill the screen", READING_ICON, "pdfReadingMode");
   readingBtn.style.display = "none";
 
+  // The sentence tool: a tap selects the sentence under it
+  // (sentenceMark.ts), as a ⌘-click does.
+  const sentenceBtn = svgBtn("pdf-zoom-btn pdf-sentence-btn", "Select sentences — a tap selects the sentence under it", CARET_ICON, "pdfSentence");
+
   // Ink mode: draw with the Pencil (or a mouse), as Zotero's pen does.
   const inkBtn = svgBtn("pdf-zoom-btn pdf-ink-btn", "Draw — the Pencil writes, a finger scrolls", PEN_ICON, "pdfInk");
 
@@ -104,6 +109,7 @@ export function buildPdfToolbar() {
     fitToggleWrap, scrollToggleWrap,
     pageModeWrap, foldWrap,
     zoomWrap,
+    sentenceBtn,
     inkBtn,
     pageIndicator, zoteroLink,
   );
@@ -115,7 +121,7 @@ export function buildPdfToolbar() {
     fitOneBtn, fitTwoBtn, fitThreeBtn, fitToggleWrap,
     pageModeWrap, fixedBtn, continuousBtn,
     foldBtn, foldFilterBtn,
-    pageIndicator, zoteroLink, thumbnailBtn, readingBtn, inkBtn,
+    pageIndicator, zoteroLink, thumbnailBtn, readingBtn, sentenceBtn, inkBtn,
   };
 }
 export type PdfToolbar = ReturnType<typeof buildPdfToolbar>;

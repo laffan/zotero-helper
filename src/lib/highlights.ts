@@ -30,6 +30,10 @@ export interface Annotation {
 export interface AnnotationPosition {
   pageIndex: number;
   rects?: number[][];
+  /** A highlight or underline running onto the next page: its rects
+   *  there (Zotero's reader writes and reads the same; two pages at
+   *  most). */
+  nextPageRects?: number[][];
   /** Ink: its lines, each a run of x, y pairs, drawn `width` wide. */
   paths?: number[][];
   width?: number;
@@ -154,6 +158,21 @@ export function annotationPosition(a: Annotation): AnnotationPosition | null {
   }
   a._parsedPosition = pos;
   return pos;
+}
+
+/** A position's rects on page `pageIndex`: its own page's, or — for a
+ *  passage running onto the next page — that page's. */
+export function rectsOnPage(pos: AnnotationPosition | null, pageIndex: number): number[][] | null {
+  if (!pos) return null;
+  if (pos.pageIndex === pageIndex) return pos.rects ?? null;
+  if (pos.pageIndex + 1 === pageIndex && pos.nextPageRects?.length) return pos.nextPageRects;
+  return null;
+}
+
+/** The pages a position is drawn on. */
+export function pagesOf(pos: AnnotationPosition | null): number[] {
+  if (!pos || typeof pos.pageIndex !== "number") return [];
+  return pos.nextPageRects?.length ? [pos.pageIndex, pos.pageIndex + 1] : [pos.pageIndex];
 }
 
 /** Colours in the order they first appear, for the swatch column. */

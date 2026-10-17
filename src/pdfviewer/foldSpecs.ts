@@ -2,7 +2,7 @@
 // passing the filter, padded by a couple of lines above and below and
 // merged with its neighbours on the page. Pure geometry — the folds
 // themselves (drawing, scrolling, the filter's state) are folds.ts's.
-import { annotationPosition, type Annotation } from "../lib/highlights";
+import { annotationPosition, pagesOf, rectsOnPage, type Annotation } from "../lib/highlights";
 import { pdfPointToViewport } from "./annotations";
 import type { PageRecord, PageViewport } from "./types";
 
@@ -42,10 +42,12 @@ export function defaultFilter(combos: Map<string, Combo>): Set<string> {
   return new Set(combos.keys());
 }
 
-/** Vertical extent of an annotation in top-based page units. */
-export function annotationExtent(annot: Annotation, viewport: PageViewport) {
+/** Vertical extent of an annotation in top-based page units — on page
+ *  `pageIndex` (its own, unless given: a passage may run onto the next). */
+export function annotationExtent(annot: Annotation, viewport: PageViewport, pageIndex?: number) {
   const pos = annotationPosition(annot);
   if (!pos) return null;
+  const onNext = pageIndex !== undefined && pageIndex !== pos.pageIndex;
   let top = Infinity;
   let bottom = -Infinity;
   const take = (x: number, y: number) => {
@@ -53,12 +55,12 @@ export function annotationExtent(annot: Annotation, viewport: PageViewport) {
     top = Math.min(top, vy);
     bottom = Math.max(bottom, vy);
   };
-  for (const r of pos.rects ?? []) {
+  for (const r of (pageIndex === undefined ? pos.rects : rectsOnPage(pos, pageIndex)) ?? []) {
     if (!Array.isArray(r) || r.length < 4) continue;
     take(r[0], r[1]);
     take(r[2], r[3]);
   }
-  for (const path of pos.paths ?? []) {
+  for (const path of onNext ? [] : (pos.paths ?? [])) {
     if (!Array.isArray(path)) continue;
     for (let i = 1; i < path.length; i += 2) take(path[i - 1], path[i]);
   }
@@ -69,8 +71,7 @@ export function annotationExtent(annot: Annotation, viewport: PageViewport) {
 export function foldedPages(annotations: Annotation[], active: Set<string>): Set<number> {
   const out = new Set<number>();
   for (const a of annotations) {
-    const idx = annotationPosition(a)?.pageIndex;
-    if (typeof idx === "number" && active.has(comboKey(a))) out.add(idx);
+    if (active.has(comboKey(a))) for (const idx of pagesOf(annotationPosition(a))) out.add(idx);
   }
   return out;
 }
@@ -80,17 +81,17 @@ export function computeFolds(annotations: Annotation[], pages: PageRecord[], act
   const byPage = new Map<number, { top: number; bottom: number }[]>();
   for (const a of annotations) {
     if (!active.has(comboKey(a))) continue;
-    const pos = annotationPosition(a);
-    const p = pos ? pages[pos.pageIndex] : undefined;
-    if (!pos || !p) continue;
-    const ext = annotationExtent(a, p.viewport);
-    if (!ext) continue;
-    const list = byPage.get(pos.pageIndex) || [];
-    list.push({
-      top: Math.max(0, ext.top - FOLD_PAD),
-      bottom: Math.min(p.viewport.height, ext.bottom + FOLD_PAD),
-    });
-    byPage.set(pos.pageIndex, list);
+    for (const idx of pagesOf(annotationPosition(a))) {
+      const p = pages[idx];
+      const ext = p ? annotationExtent(a, p.viewport, idx) : null;
+      if (!p || !ext) continue;
+      const list = byPage.get(idx) || [];
+      list.push({
+        top: Math.max(0, ext.top - FOLD_PAD),
+        bottom: Math.min(p.viewport.height, ext.bottom + FOLD_PAD),
+      });
+      byPage.set(idx, list);
+    }
   }
   const out: FoldSpec[] = [];
   for (const idx of [...byPage.keys()].sort((a, b) => a - b)) {

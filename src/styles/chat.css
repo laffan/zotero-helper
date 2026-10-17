@@ -634,3 +634,47 @@
   letter-spacing: 0.04em;
   color: var(--text-dim);
 }
+
+/* --- Words (WordList.tsx): looked-up words, with where they were read --- */
+.word-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+}
+.word-row-main {
+  flex: 1;
+  min-width: 0;
+}
+.word-row-word {
+  font-size: calc(14px * var(--font-scale));
+  font-weight: 600;
+}
+.word-row-def {
+  margin: 2px 0 4px;
+  color: var(--text);
+  font-size: calc(13px * var(--font-scale));
+  line-height: 1.45;
+}
+.word-row-source {
+  font-size: calc(11px * var(--font-scale));
+  text-align: left;
+}
+.word-row-delete {
+  opacity: 0;
+}
+.word-row:hover .word-row-delete {
+  opacity: 1;
+}
+@media (hover: none) {
+  .word-row-delete {
+    opacity: 0.6;
+  }
+}
+.word-list-filter {
+  margin-left: auto;
+  width: 180px;
+  padding: 3px 8px;
+  font-size: calc(12px * var(--font-scale));
+}

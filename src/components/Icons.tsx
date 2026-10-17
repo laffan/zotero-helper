@@ -267,6 +267,16 @@ export const ChatIcon = (p: IconProps = {}) =>
     p,
   );
 
+/** Words (lib/words.ts): an open book. */
+export const BookIcon = (p: IconProps = {}) =>
+  svg(
+    <>
+      <path d="M8 4.2C6.6 3 4.4 2.6 1.8 2.8v9.6c2.6-.2 4.8.2 6.2 1.4 1.4-1.2 3.6-1.6 6.2-1.4V2.8C11.6 2.6 9.4 3 8 4.2z" />
+      <path d="M8 4.2v9.6" />
+    </>,
+    p,
+  );
+
 /** An AI explainer of a passage (lib/ai/explain.ts). */
 export const QuestionIcon = (p: IconProps = {}) =>
   svg(

@@ -1,16 +1,23 @@
-// The popover for one annotation: its colour, its comment, "Add to
-// notes" and Delete. It opens on a tap on a highlight or underline in
+// The popover for one annotation: its colour, its comment, the
+// selection bar's three icons — Copy, Add to notes, Look up (with an AI
+// service connected; the definition shows above the popover) — and
+// Delete. It opens on a tap on a highlight or underline in
 // the pages, with handles on the passage to change its extent
 // (highlightHandles.ts, through onOpen / onClose). Changes go out as
 // they are made — a colour at once, the comment after a pause in typing
 // and when the popover closes.
 import { ANNOTATION_COLORS, type Annotation } from "../lib/highlights";
+import { COPY_ICON, LOOKUP_ICON, NOTE_ICON } from "./icons";
+import { createLookupPopup } from "./lookupPopup";
 
 export interface AnnotationEditHandlers {
   update: (key: string, patch: { color?: string; comment?: string }) => void;
   remove: (key: string) => void;
   /** Send the annotation to the notes; absent hides the button. */
   onInsert?: (a: Annotation) => void;
+  /** Look the annotation's text up; shown while `canLookup`. */
+  onLookup?: (a: Annotation) => Promise<string>;
+  canLookup?: () => boolean;
   /** It opened on `a`, and it closed. */
   onOpen?: (a: Annotation) => void;
   onClose?: () => void;
@@ -35,11 +42,19 @@ export function createAnnotationPopover(root: HTMLElement, handlers: AnnotationE
   const footer = document.createElement("div");
   footer.className = "pdf-annot-popover-footer";
   el.appendChild(footer);
-  const insert = document.createElement("button");
-  insert.type = "button";
-  insert.className = "pdf-annot-popover-insert";
-  insert.textContent = "Add to notes";
-  footer.appendChild(insert);
+  const icon = (svg: string, title: string) => {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "pdf-selection-icon";
+    b.title = title;
+    b.innerHTML = svg;
+    footer.appendChild(b);
+    return b;
+  };
+  const copy = icon(COPY_ICON, "Copy");
+  const insert = icon(NOTE_ICON, "Add to notes — a quote with a link back to the page");
+  const lookup = icon(LOOKUP_ICON, "Look up — a short definition");
+  const definition = createLookupPopup(root);
   const del = document.createElement("button");
   del.type = "button";
   del.className = "pdf-annot-popover-delete";
@@ -90,6 +105,14 @@ export function createAnnotationPopover(root: HTMLElement, handlers: AnnotationE
     if (current) handlers.onInsert?.(current);
     close();
   });
+  copy.addEventListener("click", () => {
+    if (current) void navigator.clipboard?.writeText(current.text).catch(() => {});
+    close();
+  });
+  lookup.addEventListener("click", () => {
+    if (!current || !handlers.onLookup) return;
+    definition.show(current.text, handlers.onLookup(current), el.getBoundingClientRect());
+  });
 
   // Delete asks once more before it goes: a second press within a few
   // seconds confirms.
@@ -122,6 +145,9 @@ export function createAnnotationPopover(root: HTMLElement, handlers: AnnotationE
     disarm();
     paintColors();
     insert.style.display = handlers.onInsert && a.text ? "" : "none";
+    copy.style.display = a.text ? "" : "none";
+    lookup.style.display = handlers.onLookup && a.text && handlers.canLookup?.() !== false ? "" : "none";
+    definition.hide();
     el.style.display = "";
     const host = root.getBoundingClientRect();
     const w = el.offsetWidth;
@@ -142,6 +168,7 @@ export function createAnnotationPopover(root: HTMLElement, handlers: AnnotationE
     // every key.
     if (el.contains(document.activeElement)) (document.activeElement as HTMLElement).blur();
     el.style.display = "none";
+    definition.hide();
     handlers.onClose?.();
   }
 
@@ -149,7 +176,7 @@ export function createAnnotationPopover(root: HTMLElement, handlers: AnnotationE
   // which belong to it; so does Escape.
   const onDown = (e: PointerEvent) => {
     const t = e.target as Element;
-    if (current && !el.contains(t) && !t.closest?.(".pdf-annot-handle")) close();
+    if (current && !el.contains(t) && !t.closest?.(".pdf-annot-handle, .pdf-lookup")) close();
   };
   const onKey = (e: KeyboardEvent) => {
     if (current && e.key === "Escape") close();
@@ -177,6 +204,7 @@ export function createAnnotationPopover(root: HTMLElement, handlers: AnnotationE
       document.removeEventListener("pointerdown", onDown, true);
       document.removeEventListener("keydown", onKey);
       el.remove();
+      definition.destroy();
     },
   };
 }

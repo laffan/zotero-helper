@@ -45,6 +45,15 @@ export const HIGHLIGHT_ICON = `<svg viewBox="0 0 16 16" width="14" height="14"><
 
 export const UNDERLINE_ICON = `<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><path d="M4.5 2.5v4.5a3.5 3.5 0 0 0 7 0V2.5"/><path d="M3 14h10"/></svg>`;
 
+/** The sentence tool (sentenceMark.ts): a text caret, an I-beam. */
+export const CARET_ICON = `<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5.5 2.5c1.4 0 2.5.6 2.5 1.8 0-1.2 1.1-1.8 2.5-1.8"/><path d="M8 4.3v7.4"/><path d="M5.5 13.5c1.4 0 2.5-.6 2.5-1.8 0 1.2 1.1 1.8 2.5 1.8"/><path d="M6.4 8h3.2"/></svg>`;
+
+/** The selection bar's copy, notes and look-up icons — the Highlights
+ *  tab's Copy and Note (Icons.tsx), and a magnifier. */
+export const COPY_ICON = `<svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><rect x="5.5" y="5.5" width="9" height="9" rx="1"/><path d="M10.5 5.5v-3a1 1 0 0 0-1-1h-7a1 1 0 0 0-1 1v7a1 1 0 0 0 1 1h3"/></svg>`;
+export const NOTE_ICON = `<svg viewBox="0 0 16 16" width="13" height="13"><path fill="currentColor" d="M6.6 3.2C4.1 4 2.5 6 2.5 8.7V12.8h4.2V8.6H4.6c.1-1.6.9-2.7 2.4-3.4zm6.9 0C11 4 9.4 6 9.4 8.7v4.1h4.2V8.6h-2.1c.1-1.6.9-2.7 2.4-3.4z"/></svg>`;
+export const LOOKUP_ICON = `<svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5L14 14"/></svg>`;
+
 /** The selection bar's AI explainer: the app's AI sparkles (Icons.tsx
  *  `Sparkles`), as a string. */
 export const SPARKLES_ICON = `<svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2l1.2 3.3L12.5 6.5 9.2 7.7 8 11 6.8 7.7 3.5 6.5l3.3-1.2z"/><path d="M13 10.5l.6 1.5 1.5.6-1.5.6-.6 1.5-.6-1.5-1.5-.6 1.5-.6z"/></svg>`;

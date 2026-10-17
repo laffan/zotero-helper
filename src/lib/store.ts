@@ -81,9 +81,13 @@ interface UiPrefs {
    *  panels or bottom bar (App.tsx, readingmode.css). This session's
    *  only, and over when the PDF closes. */
   readingMode: boolean;
-  /** Reading mode's ⌘ button is on: a tap on a line marks its sentence,
-   *  as a ⌘-click does (ReadingModeExit.tsx). Off with reading mode. */
-  commandLatch: boolean;
+  /** The open viewer's sentence tool and ink mode, as it reports them —
+   *  for reading mode's buttons (ReadingModeExit.tsx), which toggle them
+   *  through the viewer's own commands. */
+  sentenceTool: boolean;
+  inkMode: boolean;
+  /** Reading mode's notepad is open (ReadingNotepad.tsx). */
+  notepadOpen: boolean;
   /** Settings → General (lib/appearance.ts). */
   appearance: Appearance;
   /** The UI's base font size, px (13 is the size it was drawn at). */
@@ -213,7 +217,8 @@ interface AppStore extends UiPrefs {
   setMetaHidden: (b: boolean) => void;
   setOutlineOpen: (b: boolean) => void;
   setReadingMode: (b: boolean) => void;
-  setCommandLatch: (b: boolean) => void;
+  setViewerTools: (t: { sentenceTool?: boolean; inkMode?: boolean }) => void;
+  setNotepadOpen: (b: boolean) => void;
   setAppearance: (a: Appearance) => void;
   setUiFontSize: (px: number) => void;
   /** Open (or close, with null) a PDF. The right panel comes up on
@@ -265,7 +270,9 @@ export const useStore = create<AppStore>()(
       metaHidden: false,
       outlineOpen: false,
       readingMode: false,
-      commandLatch: false,
+      sentenceTool: false,
+      inkMode: false,
+      notepadOpen: false,
       appearance: "system" as Appearance,
       uiFontSize: 13,
       uiTasks: [],
@@ -421,8 +428,9 @@ export const useStore = create<AppStore>()(
       setSidebarHidden: (sidebarHidden) => set({ sidebarHidden }),
       setMetaHidden: (metaHidden) => set({ metaHidden }),
       setOutlineOpen: (outlineOpen) => set({ outlineOpen }),
-      setReadingMode: (readingMode) => set(readingMode ? { readingMode } : { readingMode, commandLatch: false }),
-      setCommandLatch: (commandLatch) => set({ commandLatch }),
+      setReadingMode: (readingMode) => set({ readingMode }),
+      setViewerTools: (t) => set(t),
+      setNotepadOpen: (notepadOpen) => set({ notepadOpen }),
       setAppearance: (appearance) => set({ appearance }),
       setUiFontSize: (uiFontSize) => set({ uiFontSize }),
       setReading: (reading, tab = "highlights") => {
@@ -434,7 +442,7 @@ export const useStore = create<AppStore>()(
         set(
           reading
             ? { reading, metaTab: tab, sidebarOpen: false, metaOpen: false }
-            : { reading, readingMode: false, commandLatch: false, explain: null },
+            : { reading, readingMode: false, sentenceTool: false, inkMode: false, explain: null },
         );
       },
       setCachedPdfs: (list) =>

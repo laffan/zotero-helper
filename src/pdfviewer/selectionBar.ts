@@ -1,8 +1,10 @@
 // The small bar over a text selection in the pages: Zotero's eight
 // colours, which highlight (or underline) the passage in that colour,
-// "Add to notes", which quotes it into the notes with a link back to
-// its page, and — with an AI service connected — the AI's sparkles,
-// which open a short conversation explaining the passage.
+// then three icons — Copy (the text), Add to notes (a quote with a link
+// back to its page) and, with an AI service connected, Look up (a
+// definition of at most 50 words, shown over the bar, lookupPopup.ts) —
+// and the AI's sparkles, which open a short conversation explaining the
+// passage.
 //
 // Highlight vs underline is a switch at the bar's left, remembered
 // between selections — the swatches then make whichever it is set to,
@@ -17,7 +19,8 @@
 // been told apart.
 import { ANNOTATION_COLORS } from "../lib/highlights";
 import { rangeText } from "./annotate";
-import { HIGHLIGHT_ICON, SPARKLES_ICON, UNDERLINE_ICON } from "./icons";
+import { COPY_ICON, HIGHLIGHT_ICON, LOOKUP_ICON, NOTE_ICON, SPARKLES_ICON, UNDERLINE_ICON } from "./icons";
+import { createLookupPopup } from "./lookupPopup";
 import { textRects } from "./textHit";
 
 export type MarkType = "highlight" | "underline";
@@ -32,11 +35,11 @@ export interface SelectionBarHandlers {
   /** Ask the AI to explain the passage; shown while `canExplain`. */
   onExplain?: (text: string, page: number, range: Range) => void;
   canExplain?: () => boolean;
+  /** Look the passage up (a definition); shown while `canExplain`. */
+  onLookup?: (text: string, page: number, range: Range) => Promise<string>;
 }
 
 const MODE_KEY = "zh-pdf-mark-type";
-/** The colour last marked with — what a ⌘-click on a sentence uses. */
-const COLOR_KEY = "zh-pdf-mark-color";
 
 function stored(key: string): string | null {
   try {
@@ -90,7 +93,6 @@ export function createSelectionBar(
   root.appendChild(bar);
 
   let mode = storedMode();
-  let lastColor = stored(COLOR_KEY) ?? ANNOTATION_COLORS[0];
   let current: { text: string; page: number; range: Range } | null = null;
   let hideTimer = 0;
   // While the bar is being pressed, and briefly after (see check()).
@@ -131,25 +133,46 @@ export function createSelectionBar(
       s.style.setProperty("--swatch", color);
       s.addEventListener("click", () => {
         if (current) handlers.onAnnotate?.(current.range, mode, color);
-        lastColor = color;
-        store(COLOR_KEY, color);
         window.getSelection()?.removeAllRanges();
         hide();
       });
     }
   }
-  if (modeBtns && handlers.onQuote) {
+  if (modeBtns) {
     const sep = document.createElement("span");
     sep.className = "pdf-selection-bar-sep";
     bar.appendChild(sep);
   }
+  const copy = button("pdf-selection-icon", "Copy");
+  copy.innerHTML = COPY_ICON;
+  copy.addEventListener("click", () => {
+    if (!current) return;
+    const text = current.text;
+    // The Clipboard API, or — where it is refused — the browser's own
+    // copy of the selection, which is still there.
+    navigator.clipboard?.writeText(text).catch(() => document.execCommand("copy"));
+    if (!navigator.clipboard) document.execCommand("copy");
+    window.getSelection()?.removeAllRanges();
+    hide();
+  });
   if (handlers.onQuote) {
-    const quote = button("pdf-selection-quote", "Quote this in the notes, with a link back to the page");
-    quote.textContent = "Add to notes";
+    const quote = button("pdf-selection-icon", "Add to notes — a quote with a link back to the page");
+    quote.innerHTML = NOTE_ICON;
     quote.addEventListener("click", () => {
       if (current) handlers.onQuote?.(current.text, current.page);
       window.getSelection()?.removeAllRanges();
       hide();
+    });
+  }
+  const lookup = handlers.onLookup ? button("pdf-selection-icon", "Look up — a short definition") : null;
+  const definition = createLookupPopup(root);
+  if (lookup) {
+    lookup.innerHTML = LOOKUP_ICON;
+    lookup.addEventListener("click", () => {
+      if (!current) return;
+      const { text, page, range } = current;
+      const answer = handlers.onLookup!(text, page, range);
+      definition.show(text, answer, bar.getBoundingClientRect());
     });
   }
   const explain = handlers.onExplain ? button("pdf-selection-explain", "Ask the AI to explain this passage") : null;
@@ -174,6 +197,7 @@ export function createSelectionBar(
     clearTimeout(hideTimer);
     bar.style.display = "none";
     current = null;
+    definition.hide();
   }
 
   function check(): void {
@@ -199,7 +223,9 @@ export function createSelectionBar(
     const quoteOnly = Boolean(handlers.canAnnotate && !handlers.canAnnotate(range));
     if (quoteOnly && !handlers.onQuote) return hide();
     bar.classList.toggle("quote-only", quoteOnly);
-    if (explain) explain.style.display = handlers.canExplain?.() === false ? "none" : "";
+    const ai = handlers.canExplain?.() !== false;
+    if (explain) explain.style.display = ai ? "" : "none";
+    if (lookup) lookup.style.display = ai ? "" : "none";
     clearTimeout(hideTimer);
     current = { text, page: Number(wrapper.dataset.pageIndex ?? 0) + 1, range: range.cloneRange() };
     const r = selectionBox(range, scrollArea);
@@ -280,14 +306,13 @@ export function createSelectionBar(
     /** Did a tap just dismiss the selection? Its click is then not a
      *  click on whatever lay under it (a highlight, say). */
     justDismissed: () => performance.now() - dismissedAt < 600,
-    /** Mark a passage as the bar is set — its mode, its last colour
-     *  (a ⌘-click on a sentence, sentenceMark.ts). */
-    markAsSet: (range: Range) => handlers.onAnnotate?.(range, mode, lastColor),
+
     destroy(): void {
       clearTimeout(timer);
       clearTimeout(hideTimer);
       document.removeEventListener("selectionchange", schedule);
       bar.remove();
+      definition.destroy();
     },
   };
 }

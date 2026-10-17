@@ -16,6 +16,7 @@ import { aiConnected } from "../lib/ai/models";
 import { isStandaloneAttachment } from "../lib/collections";
 import { trackPointerDrag } from "../lib/dragGesture";
 import { QUESTIONS, useStore, type MetaTab } from "../lib/store";
+import { WORDS } from "../lib/words";
 import { AttachmentPanel } from "./AttachmentPanel";
 import { ChatPanel } from "./ChatPanel";
 import { highlightGroups, HighlightsPanel } from "./HighlightsPanel";
@@ -119,6 +120,8 @@ export function MetadataPanel() {
     ) : (
       <div className="meta-empty">Select a conversation to continue it</div>
     );
+  } else if (!reading && collectionKey === WORDS) {
+    content = <div className="meta-empty">A word's source opens its PDF at the page it was read on</div>;
   } else if (selected.length === 0) {
     content = <div className="meta-empty">Select an item to see its details</div>;
   } else {

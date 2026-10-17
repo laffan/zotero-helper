@@ -58,6 +58,8 @@ export interface InkEnv {
   onStart: () => void;
   /** The pen (or eraser) came down. */
   onPenDown?: () => void;
+  /** Ink mode went on or off. */
+  onActiveChange?: (on: boolean) => void;
 }
 
 const SELECTION_PAD = 3;
@@ -331,6 +333,7 @@ export function createInkTool(env: InkEnv) {
     active = on;
     env.button.classList.toggle("active", on);
     env.scrollArea.classList.toggle("pdf-ink-active", on);
+    env.onActiveChange?.(on);
     bar.show(on);
     input.setEnabled(on);
     if (on) {

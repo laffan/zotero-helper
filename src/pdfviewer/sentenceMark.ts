@@ -1,9 +1,10 @@
-// ⌘-click on a line of the pages: the sentence it falls in is marked
-// at once — highlighted or underlined, as the selection bar's switch is
-// set, in the colour last chosen there. In reading mode, with no
-// keyboard at hand, the ⌘ button under the exit ring latches the same
-// behaviour onto a plain tap (ReadingModeExit.tsx, the host's
-// `latched`).
+// ⌘-click on a line of the pages: the sentence it falls in is
+// selected, and the selection bar comes up over it to mark it in the
+// colour of the reader's choosing (or quote, or explain it). With no
+// keyboard at hand, the sentence tool latches the same onto a plain tap:
+// the caret button in the bottom bar or in reading mode, or S
+// (annotating.ts keeps it). While it is on, a tap on a highlight still
+// opens the highlight's editor; ⌘ always selects.
 //
 // ⌘ is read from its own keydown / keyup, as the reading crop reads ⌃
 // (crop.ts): iPadOS doesn't report modifiers on pointer events
@@ -16,7 +17,7 @@
 // capital, a digit or an opening quote — so "e.g. this" and "3.5" don't
 // end one. Common abbreviations and single initials don't either. It
 // never runs past its page, nor further than MAX_REACH characters
-// either way, so a page with no punctuation can't be marked whole.
+// either way, so a page with no punctuation can't be selected whole.
 import { APPLE } from "../lib/shortcuts/bindings";
 import { indexOf, layerText, rangeOf, textPositionAt } from "./textHit";
 
@@ -80,13 +81,39 @@ export function sentenceAt(target: Element, x: number, y: number): Range | null 
   return to > from ? rangeOf(t, from, to) : null;
 }
 
+/** The sentence a range starts in, as text — where a looked-up word was
+ *  read. */
+export function sentenceAround(range: Range): string {
+  const node = range.startContainer;
+  const layer = (node instanceof Element ? node : node.parentElement)?.closest<HTMLElement>(".textLayer");
+  if (!layer || !(node instanceof Text)) return "";
+  const t = layerText(layer);
+  const at = indexOf(t, { node, offset: range.startOffset });
+  if (at < 0) return "";
+  const [from, to] = sentenceBounds(t.text, at);
+  return t.text.slice(from, to).replace(/\s+/g, " ").trim();
+}
+
 export interface SentenceMarkEnv {
-  /** Mark this sentence (the selection bar's mode and last colour). */
-  mark: (range: Range) => void;
-  /** A plain tap marks too (reading mode's ⌘ button). */
-  latched?: () => boolean;
-  /** Marking is possible here (not a fold's strip, not ink's pen). */
+  /** A plain tap selects too (the sentence tool is on). */
+  latched: () => boolean;
+  /** Is there a highlight of the reader's under this point (a tap on it,
+   *  with the tool on, opens its editor instead)? */
+  onHighlight: (target: Element, x: number, y: number) => boolean;
+  /** Selecting is possible here (not while the reading crop is set). */
   enabled: () => boolean;
+}
+
+/** Select `range`, and again a moment later should the iPad's own tap
+ *  handling clear it as the tap settles. */
+function select(range: Range): void {
+  const sel = window.getSelection();
+  if (!sel) return;
+  sel.removeAllRanges();
+  sel.addRange(range);
+  window.setTimeout(() => {
+    if (sel.isCollapsed && range.toString()) sel.addRange(range);
+  }, 250);
 }
 
 export function attachSentenceMarks(scrollArea: HTMLElement, env: SentenceMarkEnv): () => void {
@@ -105,17 +132,17 @@ export function attachSentenceMarks(scrollArea: HTMLElement, env: SentenceMarkEn
   const onDown = (e: PointerEvent) => (down = { x: e.clientX, y: e.clientY });
   const onClick = (e: MouseEvent) => {
     const command = held || e.metaKey || (!APPLE && e.ctrlKey);
-    if (!(command || env.latched?.()) || !env.enabled()) return;
+    if (!(command || env.latched()) || !env.enabled()) return;
     if (down && Math.hypot(e.clientX - down.x, e.clientY - down.y) > 6) return;
     const target = e.target as Element;
     if (target.closest("a, button, input, textarea")) return;
+    if (!command && env.onHighlight(target, e.clientX, e.clientY)) return;
     const range = sentenceAt(target, e.clientX, e.clientY);
     if (!range) return;
-    // Not a click on the highlight or link beneath, nor a selection.
+    // Not a click on the highlight or link beneath.
     e.preventDefault();
     e.stopPropagation();
-    window.getSelection()?.removeAllRanges();
-    env.mark(range);
+    select(range);
   };
   window.addEventListener("keydown", onKeydown, true);
   window.addEventListener("keyup", onKeyup, true);

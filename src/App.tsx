@@ -14,6 +14,8 @@ import { ItemList } from "./components/ItemList";
 import { MetadataPanel } from "./components/MetadataPanel";
 import { PdfRescueModal } from "./components/PdfRescueModal";
 import { ReaderPane } from "./components/ReaderPane";
+import { WordList } from "./components/WordList";
+import { WORDS } from "./lib/words";
 import { ReadingModeExit } from "./components/ReadingModeExit";
 import { SendToHushModal } from "./components/SendToHushModal";
 import { SettingsView } from "./components/settings/SettingsView";
@@ -100,7 +102,13 @@ export default function App() {
               {!sidebarHidden && <PaneResizer side="left" />}
               {/* Questions is a folder of conversations, so it replaces
                   the item list rather than filtering it. */}
-              {selectedCollection === QUESTIONS ? <ChatList /> : <ItemList />}
+              {selectedCollection === QUESTIONS ? (
+                <ChatList />
+              ) : selectedCollection === WORDS ? (
+                <WordList />
+              ) : (
+                <ItemList />
+              )}
             </>
           )}
           {!metaHidden && <PaneResizer side="right" />}

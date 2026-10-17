@@ -5,6 +5,7 @@ mod capture;
 mod chats;
 mod error;
 mod hush;
+mod notepads;
 mod notes;
 mod pdf;
 mod pdfcache;
@@ -14,6 +15,7 @@ mod share;
 mod state;
 mod storage;
 mod thumbs;
+mod words;
 mod zotero;
 
 pub use error::{Error, Result};
@@ -298,7 +300,7 @@ async fn ai_get_abstract(
 
 /// One turn of a conversation, sent back with every request (the
 /// providers are stateless). `mode` "explain" is the reader's short
-/// explainer of a passage.
+/// explainer of a passage, "define" its look-up of a word.
 #[tauri::command]
 async fn ai_chat(
     app: AppHandle,
@@ -642,6 +644,10 @@ pub fn run() {
             save_chats,
             bookmarks::load_bookmarks,
             bookmarks::save_bookmarks,
+            words::load_words,
+            words::save_words,
+            notepads::load_notepad,
+            notepads::save_notepad,
             download_attachment_file,
             hush::list_hush_desks,
             hush::open_in_hush,

@@ -1,17 +1,17 @@
 // Making and editing marks in the pages, put together: the bar over a
 // text selection (selectionBar.ts), the editor a tap on a highlight
 // opens (annotPopover.ts) with handles on its passage
-// (highlightHandles.ts), the ⌘-click that marks a whole sentence
-// (sentenceMark.ts), and the passages the AI has explained
+// (highlightHandles.ts), the ⌘-click (or the sentence tool) that
+// selects a whole sentence (sentenceMark.ts), and the passages the AI has explained
 // (explainMarks.ts). The viewer hands over its pages and the writer;
 // absent a writer, a selection can only be quoted.
-import type { Annotation } from "../lib/highlights";
-import { attachAnnotationTaps, draftFromRange } from "./annotate";
+import { annotationPosition, type Annotation } from "../lib/highlights";
+import { annotationAtPoint, attachAnnotationTaps, draftFromRange, pageBoxAt } from "./annotate";
 import { createAnnotationPopover } from "./annotPopover";
 import { createExplainMarks } from "./explainMarks";
 import { createHighlightHandles } from "./highlightHandles";
 import { createSelectionBar, type MarkType } from "./selectionBar";
-import { attachSentenceMarks } from "./sentenceMark";
+import { attachSentenceMarks, sentenceAround } from "./sentenceMark";
 import type { PageRecord } from "./types";
 import type { PdfViewerOptions } from "./viewerOptions";
 
@@ -27,6 +27,8 @@ export interface AnnotatingEnv {
   inExpanded: (node: Node) => boolean;
   /** A mark of this kind was made: the folded view keeps showing it. */
   include: (type: string, color: string) => void;
+  /** The bottom bar's sentence tool, which annotating keeps. */
+  sentenceButton: HTMLElement;
 }
 
 export function createAnnotating(env: AnnotatingEnv) {
@@ -54,6 +56,9 @@ export function createAnnotating(env: AnnotatingEnv) {
               }
             : undefined,
           canExplain: opts.canExplain,
+          onLookup: opts.onLookup
+            ? (text, page, range) => opts.onLookup!(text, page, sentenceAround(range) || text)
+            : undefined,
         })
       : null;
 
@@ -70,7 +75,7 @@ export function createAnnotating(env: AnnotatingEnv) {
           const draft = draftFromRange(range, env.getPages(), env.getPageLabels());
           if (!draft || draft.text === a.text) return;
           writer.update(a.key, {
-            position: JSON.stringify({ pageIndex: draft.pageIndex, rects: draft.rects }),
+            position: JSON.stringify({ pageIndex: draft.pageIndex, rects: draft.rects, nextPageRects: draft.nextPageRects }),
             text: draft.text,
             sortIndex: draft.sortIndex,
           });
@@ -87,6 +92,13 @@ export function createAnnotating(env: AnnotatingEnv) {
         },
         remove: writer.remove,
         onInsert: opts.onInsertAnnotation,
+        onLookup: opts.onLookup
+          ? (a) => {
+              const page = (annotationPosition(a)?.pageIndex ?? 0) + 1;
+              return opts.onLookup!(a.text, page, a.text);
+            }
+          : undefined,
+        canLookup: opts.canExplain,
         onOpen: (a) => handles?.show(a),
         onClose: () => handles?.hide(),
       })
@@ -110,14 +122,29 @@ export function createAnnotating(env: AnnotatingEnv) {
     });
   }
 
-  const detachSentences =
-    writer && selection
-      ? attachSentenceMarks(scrollArea, {
-          mark: (range) => selection.markAsSet(range),
-          latched: opts.commandLatched,
-          enabled: () => !scrollArea.classList.contains("pdf-crop-editing"),
-        })
-      : null;
+  // The sentence tool: on, a tap selects the sentence under it.
+  let sentenceTool = false;
+  const setSentenceTool = (on: boolean) => {
+    sentenceTool = on;
+    env.sentenceButton.classList.toggle("active", on);
+    opts.onSentenceTool?.(on);
+  };
+  if (selection) env.sentenceButton.addEventListener("click", () => setSentenceTool(!sentenceTool));
+  else env.sentenceButton.style.display = "none";
+  const detachSentences = selection
+    ? attachSentenceMarks(scrollArea, {
+        latched: () => sentenceTool,
+        onHighlight: (target, x, y) => {
+          const at = pageBoxAt(target);
+          const p = at ? env.getPages()[at.pageIndex] : undefined;
+          if (!at || !p || !writer) return false;
+          const r = at.box.getBoundingClientRect();
+          const a = annotationAtPoint(p, at.pageIndex, (x - r.left) / r.width, (y - r.top) / r.height, env.getAnnotations());
+          return Boolean(a && writer.canEdit(a));
+        },
+        enabled: () => !scrollArea.classList.contains("pdf-crop-editing"),
+      })
+    : null;
 
   return {
     /** The pages scrolled: the editor is placed beside what it edits,

@@ -8,8 +8,9 @@
 //!
 //! An explainer (the reader's selection bar: "explain this passage") is
 //! the same conversation with another system prompt — short answers
-//! about one passage, its question naming the work, with the text of the
-//! page it is on as the only material.
+//! about a passage on its own terms, with no material at all; and a
+//! look-up ("define"), one question and one answer of at most 50 words,
+//! never kept as a conversation.
 
 use super::{estimate_tokens, send, Ask, AskSchema, Provider, Service, Turn, Usage};
 use super::anthropic;
@@ -45,13 +46,16 @@ from the work's own bibliography; if the material carries no [[page N]] markers 
 abstracts-only conversation), do not cite pages at all; and never invent the [[page N]] markers \
 yourself.";
 
-const EXPLAIN_SYSTEM: &str = "You help a scholar understand a passage they came across while \
-reading a work from their Zotero library; their question names the work. Below is the text of the \
-page the passage is on, as extracted from the PDF (it can carry artifacts — running heads, \
-footnotes, words broken across lines). Explain what the passage means, what its terms refer to \
-and how it fits the argument around it, drawing on the page and on general knowledge, and say \
-when you are going beyond the page. Keep every answer short: under 100 words, plain prose, no \
-headings — follow-up questions included. Your reply is rendered as Markdown.";
+const EXPLAIN_SYSTEM: &str = "You explain a concept, term or passage a scholar came across while \
+reading. Explain it on its own terms, as a short encyclopedia entry would: what it is or means, \
+where it comes from and why it matters. Don't guess at the work it came from, its author's aims or \
+what the passage is doing there, unless asked. Keep every answer short: under 100 words, plain \
+prose, no headings — follow-up questions included. Your reply is rendered as Markdown.";
+
+const DEFINE_SYSTEM: &str = "You define words and phrases, as a dictionary does: what it \
+means, in at most 50 words, with the sense most likely in scholarly writing first. Give the \
+definition alone — no preamble, no restating the question, no examples unless one is needed to \
+make the meaning clear. Plain text.";
 
 const TITLE_SYSTEM: &str = "You name conversations. Given the first question and answer of a \
 chat about a set of scholarly works, return JSON {\"title\": \"...\"} with a title of at most six \
@@ -88,26 +92,26 @@ fn service_id(service: Service) -> String {
     }
 }
 
-/// Which conversation a chat is: the Questions kind, or an explainer
-/// (`mode` "explain" from the frontend).
-fn is_explainer(mode: Option<&str>) -> bool {
-    mode == Some("explain")
-}
-
 /// Build the request for a chat turn. `context` is the papers; it is
 /// byte-identical on every turn of a chat, which is what makes the
-/// prefix cache hit.
+/// prefix cache hit. `mode` is the frontend's kind of conversation:
+/// none for Questions, "explain" for an explainer, "define" for a
+/// look-up — whose answers their prompts keep short (the token cap
+/// only stops a runaway one).
 fn chat_ask(context: &str, messages: Vec<Turn>, mode: Option<&str>) -> Ask {
-    let system = if is_explainer(mode) {
-        EXPLAIN_SYSTEM
-    } else {
-        CHAT_SYSTEM
+    let (system, max_tokens) = match mode {
+        Some("explain") => (EXPLAIN_SYSTEM, 1024),
+        Some("define") => (DEFINE_SYSTEM, 400),
+        _ => (CHAT_SYSTEM, 8192),
     };
-    let mut ask = Ask::new(format!("{system}\n\n{context}"), messages);
+    let system = if context.is_empty() {
+        system.to_string()
+    } else {
+        format!("{system}\n\n{context}")
+    };
+    let mut ask = Ask::new(system, messages);
     ask.cache_system = true;
-    // An explainer's answers are kept short by its prompt; this only
-    // stops a runaway one.
-    ask.max_tokens = if is_explainer(mode) { 1024 } else { 8192 };
+    ask.max_tokens = max_tokens;
     ask
 }
 

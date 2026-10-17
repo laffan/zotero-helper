@@ -10,7 +10,7 @@
 // `viewport` is the viewport the canvas was rendered with, so its
 // transform maps PDF user space straight to canvas pixels, honouring a
 // CropBox origin that isn't (0,0) and any /Rotate.
-import { annotationPosition, type Annotation } from "../lib/highlights";
+import { annotationPosition, pagesOf, rectsOnPage, type Annotation } from "../lib/highlights";
 import { inkStrokeColor } from "./ink/geometry";
 import type { PageViewport } from "./types";
 
@@ -43,10 +43,12 @@ export function drawAnnotations(
   for (const a of annotations) {
     if (a.type === "ink" && !withInk) continue;
     const pos = annotationPosition(a);
-    if (!pos || pos.pageIndex !== pageIndex) continue;
+    // A passage may run onto the next page (`nextPageRects`).
+    const rects = rectsOnPage(pos, pageIndex);
+    if (!pos || (pos.pageIndex !== pageIndex && !rects)) continue;
     const color = a.color || (a.type === "ink" ? "#ff0000" : "#ffd400");
     ctx.save();
-    if (a.type === "ink" && pos.paths?.length) {
+    if (a.type === "ink" && pos.paths?.length && pos.pageIndex === pageIndex) {
       // Zotero records the pen width in PDF units beside the paths, and
       // draws ink a shade darker than its colour.
       const width = Number(pos.width) || 1;
@@ -64,8 +66,8 @@ export function drawAnnotations(
         }
         ctx.stroke();
       }
-    } else if (pos.rects?.length) {
-      for (const r of pos.rects) {
+    } else if (rects?.length) {
+      for (const r of rects) {
         if (!Array.isArray(r) || r.length < 4) continue;
         const b = box(viewport, r);
         if (a.type === "underline") {
@@ -104,11 +106,9 @@ export function pageSignatures(annotations: Annotation[], withInk = true): Map<n
   const out = new Map<number, string>();
   for (const a of annotations) {
     if (a.type === "ink" && !withInk) continue;
-    const idx = annotationPosition(a)?.pageIndex;
-    if (typeof idx !== "number") continue;
     const pos = (a._raw.data as Record<string, unknown>).annotationPosition;
     const part = `${a.key}:${a.type}:${a.color}:${typeof pos === "string" ? pos : JSON.stringify(pos)}`;
-    out.set(idx, out.has(idx) ? `${out.get(idx)},${part}` : part);
+    for (const idx of pagesOf(annotationPosition(a))) out.set(idx, out.has(idx) ? `${out.get(idx)},${part}` : part);
   }
   return out;
 }

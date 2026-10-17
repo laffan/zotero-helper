@@ -11,6 +11,7 @@
 import { useEffect, useRef, useState } from "react";
 import { openInZotero } from "../lib/actions";
 import { startExplain } from "../lib/ai/explain";
+import { lookUp } from "../lib/ai/lookup";
 import { aiConnected } from "../lib/ai/models";
 import {
   canEditAnnotation,
@@ -36,6 +37,7 @@ import type { ViewerCommand } from "../pdfviewer/commands";
 import type { SearchOptions, SearchStatus } from "../pdfviewer/search";
 import type { PdfViewer } from "../pdfviewer/viewer";
 import { ExplainChat } from "./ExplainChat";
+import { ReadingNotepad } from "./ReadingNotepad";
 import { Spinner } from "./Icons";
 import { OutlinePanel } from "./OutlinePanel";
 
@@ -117,6 +119,15 @@ export function readerCommand(cmd: ViewerCommand): void {
   active?.viewer.command(cmd);
 }
 
+/** Where the open viewer is, and what is at a client point — for the
+ *  reading-mode notepad (src/notepad/). */
+export function readerPlace() {
+  return active?.viewer.place() ?? null;
+}
+export function readerPlaceAt(x: number, y: number) {
+  return active?.viewer.placeAt(x, y) ?? null;
+}
+
 /** The page the open viewer shows, when it shows `attKey`. */
 export function currentReaderPage(attKey: string): number | null {
   return active?.attKey === attKey ? active.viewer.currentPage() : null;
@@ -168,6 +179,8 @@ export function ReaderPane() {
   const [error, setError] = useState("");
   const outline = useOutline(reading?.attKey);
   const outlineShown = useStore((s) => s.outlineOpen) && Boolean(outline?.length);
+  // Reading mode's notepad, over the pages.
+  const notepad = useStore((s) => s.readingMode && s.notepadOpen) && state === "ready";
 
   const itemKey = reading?.itemKey ?? "";
   const attKey = reading?.attKey ?? null;
@@ -194,17 +207,12 @@ export function ReaderPane() {
           onRenameBookmark: renameBookmark,
           onRemoveBookmark: removeBookmark,
           onQuote: (text, page) => addToNotes(`> ${text}\n\n— ${cite(page)}`),
-          onExplain: (text, page, place) =>
-            void viewer
-              ?.pageText(page)
-              .catch(() => "")
-              .then((words) => startExplain(itemKey, text, page, words, place && { attKey, ...place })),
+          onExplain: (text, page, place) => startExplain(itemKey, text, page, place && { attKey, ...place }),
+          onLookup: (text, page, context) => lookUp(itemKey, attKey, text, page, context),
           onExplainTap: (id) => useStore.getState().setExplain({ chatId: id }),
           canExplain: () => aiConnected(settings()),
-          commandLatched: () => {
-            const s = useStore.getState();
-            return s.readingMode && s.commandLatch;
-          },
+          onSentenceTool: (on) => useStore.getState().setViewerTools({ sentenceTool: on }),
+          onInkMode: (on) => useStore.getState().setViewerTools({ inkMode: on }),
           onInsertAnnotation: (a: Annotation) => addToNotes(annotationMarkdown(settings(), a)),
           annotate: {
             create: (d, type, color) =>
@@ -215,7 +223,11 @@ export function ReaderPane() {
                 text: d.text,
                 pageLabel: d.pageLabel,
                 sortIndex: d.sortIndex,
-                position: { pageIndex: d.pageIndex, rects: d.rects },
+                position: {
+                  pageIndex: d.pageIndex,
+                  rects: d.rects,
+                  ...(d.nextPageRects ? { nextPageRects: d.nextPageRects } : {}),
+                },
               }),
             newKey: newItemKey,
             createInk: (d) =>
@@ -279,6 +291,8 @@ export function ReaderPane() {
     return () => {
       cancelled = true;
       if (active?.viewer === viewer) active = null;
+      // The next viewer starts with its tools off.
+      useStore.getState().setViewerTools({ sentenceTool: false, inkMode: false });
       viewerRef.current = null;
       // Destroying reports the view one last time; then it is written.
       void viewer?.destroy();
@@ -338,6 +352,7 @@ export function ReaderPane() {
         <>
           <div className="reader-host" ref={hostRef} />
           <ExplainChat />
+          {notepad && <ReadingNotepad attKey={attKey} />}
           {state !== "ready" && (
             <div className="reader-status">
               {state === "loading" ? (

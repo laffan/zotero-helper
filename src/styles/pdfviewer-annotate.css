@@ -40,13 +40,47 @@
   background: var(--select);
   color: var(--text);
 }
-.pdf-selection-quote {
-  padding: 3px 7px;
+/* Copy, Add to notes, Look up. */
+.pdf-selection-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 20px;
   border-radius: 4px;
-  background: var(--accent);
-  color: #fff;
-  font-size: calc(10px * var(--font-scale));
+  color: var(--text-dim);
+}
+.pdf-selection-icon:hover {
+  background: var(--select);
+  color: var(--text);
+}
+@media (hover: none) {
+  .pdf-selection-icon {
+    width: 30px;
+    height: 26px;
+  }
+}
+
+/* A look-up's definition (lookupPopup.ts), over the selection bar. */
+.pdf-lookup {
+  position: absolute;
+  z-index: 31;
+  width: min(300px, calc(100% - 16px));
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel);
+  box-shadow: 0 4px 14px rgb(0 0 0 / 0.25);
+  color: var(--text);
+  font-size: calc(12px * var(--font-scale));
+  line-height: 1.45;
+}
+.pdf-lookup-word {
+  margin-bottom: 3px;
   font-weight: 600;
+}
+.pdf-lookup.loading .pdf-lookup-body {
+  color: var(--text-dim);
 }
 
 /* A colour: a dot to highlight with, a bar to underline with. */
@@ -124,13 +158,8 @@
 .pdf-annot-popover-footer {
   display: flex;
   align-items: center;
+  gap: 2px;
   margin-top: 6px;
-}
-.pdf-annot-popover-insert {
-  color: var(--accent);
-}
-.pdf-annot-popover-insert:hover {
-  text-decoration: underline;
 }
 .pdf-annot-popover-delete {
   margin-left: auto;

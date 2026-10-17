@@ -1,7 +1,9 @@
 // Settings → AI: the service, its key and the model every AI feature
-// uses. Edits a draft; SettingsView saves it.
+// uses — a draft, which SettingsView saves — and the reader's prompts
+// (PromptSettings.tsx), which apply at once.
 import { AI_SERVICES, modelsFor } from "../../lib/ai/models";
 import type { AiService } from "../../lib/types";
+import { PromptSettings } from "./PromptSettings";
 import type { DraftProps } from "./SettingsView";
 
 export function AiSettings({ draft, set, setDraft }: DraftProps) {
@@ -29,8 +31,9 @@ export function AiSettings({ draft, set, setDraft }: DraftProps) {
   return (
     <>
       <p className="hint">
-        Used by Tidy Metadata, Get Abstract, and the Questions
-        conversations. Optional — everything else works without it.
+        Used by Tidy Metadata, Get Abstract, the Questions conversations,
+        and the reader's explainer and look-up. Optional — everything else
+        works without it.
       </p>
       <label className="settings-field">
         <span>Service</span>
@@ -68,6 +71,7 @@ export function AiSettings({ draft, set, setDraft }: DraftProps) {
           {model.blurb} — ${model.inputPerMTok}/M in, ${model.outputPerMTok}/M out.
         </p>
       )}
+      <PromptSettings />
     </>
   );
 }

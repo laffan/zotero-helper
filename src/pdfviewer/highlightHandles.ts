@@ -38,8 +38,10 @@ interface Frac {
 
 /** The first and last line of the passage, in fractions of the page. */
 function ends(a: Annotation, p: PageRecord): [Frac, Frac] | null {
-  const rects = annotationPosition(a)?.rects;
-  if (!rects?.length) return null;
+  const pos = annotationPosition(a);
+  const rects = pos?.rects;
+  // A passage running onto the next page has no handles (yet).
+  if (!rects?.length || pos?.nextPageRects?.length) return null;
   const vp = p.viewport;
   const lines = rects.map((r) => {
     const [x1, y1] = vp.convertToViewportPoint(r[0], r[1]);

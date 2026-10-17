@@ -7,10 +7,12 @@ import {
 } from "../lib/collections";
 import { useDragging, useIsDropTarget } from "../lib/dragdrop";
 import { RECENT, useRecent } from "../lib/recent";
+import { useWords, WORDS } from "../lib/words";
 import { appLog, QUESTIONS, useStore } from "../lib/store";
 import { aiConnected } from "../lib/ai/models";
 import { FolderMenu } from "./FolderMenu";
 import {
+  BookIcon,
   ChatIcon,
   ChevronDown,
   ChevronRight,
@@ -155,6 +157,7 @@ export function Sidebar() {
   const chatCount = useStore((s) => s.chats.length);
   const aiOn = useStore((s) => aiConnected(s.settings));
   const recentCount = useRecent((s) => s.opened.length);
+  const wordCount = useWords((s) => s.list.length);
   const flaggedKeys = useStore((s) => s.flaggedFolders);
   const tree = useMemo(() => buildTree(collections), [collections]);
 
@@ -214,10 +217,26 @@ export function Sidebar() {
             {chatCount > 0 && <span className="tree-count">{chatCount}</span>}
           </div>
         )}
+        {/* Words looked up in the PDFs, across every document
+            (lib/words) — with an AI service connected, or once there
+            are any. */}
+        {(aiOn || wordCount > 0) && (
+          <div
+            className={`tree-row ${selectedCollection === WORDS ? "selected" : ""}`}
+            style={{ paddingLeft: 10, marginTop: aiOn ? 0 : 10 }}
+            onClick={() => selectCollection(WORDS)}
+            title="The words looked up in your PDFs, and where"
+          >
+            <span className="tree-toggle-spacer" />
+            <BookIcon size={14} />
+            <span className="tree-name">Words</span>
+            {wordCount > 0 && <span className="tree-count">{wordCount}</span>}
+          </div>
+        )}
         {/* The PDFs opened here lately, the latest first (lib/recent). */}
         <div
           className={`tree-row ${selectedCollection === RECENT ? "selected" : ""}`}
-          style={{ paddingLeft: 10, marginTop: aiOn ? 0 : 10 }}
+          style={{ paddingLeft: 10, marginTop: aiOn || wordCount > 0 ? 0 : 10 }}
           onClick={() => selectCollection(RECENT)}
           title="The last 100 PDFs opened on this device"
         >

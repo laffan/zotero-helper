@@ -23,11 +23,14 @@ Windows/Linux desktops too).
   annotated passages, a paged view of one to three pages at a time (with
   an adjustable reading crop), a full-screen reading mode, pinch to
   magnify, search, outlines and page citations into the notes;
-  ⌘-click marks a whole sentence, and a highlight's ends can be dragged.
+  ⌘-click (or the sentence tool) selects a whole sentence, highlights
+  can run across a page break and their ends can be dragged, and
+  reading mode has a notepad for the Apple Pencil that links back into
+  the pages.
 - **AI helpers (optional)** — tidy metadata, extract abstracts, ask
-  questions of abstracts or full papers with page-cited answers, and
-  have a selected passage explained in a few lines, using Anthropic or
-  OpenAI models.
+  questions of abstracts or full papers with page-cited answers, have a
+  selected passage explained in a few lines or a word defined (kept in
+  Words), with prompts you can edit, using Anthropic or OpenAI models.
 - **Keyboard first** — rebindable shortcuts for moving between panes, the
   list, and the viewer's modes (Settings → Keyboard Shortcuts).
 - **Your look** — light, dark or system appearance and an adjustable UI font

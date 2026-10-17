@@ -239,6 +239,16 @@
   }
 }
 
+/* Only the words can be selected. A selection running from one page
+   onto the next would otherwise take in everything between — the end
+   of one page's raster, its buttons, the next page's — and tint the
+   margins between the pages with it. */
+.pdf-page-wrapper,
+.pdf-fold-wrapper {
+  -webkit-user-select: none;
+  user-select: none;
+}
+
 /* --- text layer (pdf.js), so passages can be selected --- */
 .textLayer {
   color-scheme: only light;
@@ -445,6 +455,7 @@
   text-align: left;
 }
 .pdf-thumbnail-btn.active,
+.pdf-sentence-btn.active,
 .pdf-fold-btn.active {
   background: rgb(128 128 128 / 0.22);
   border-color: rgb(128 128 128 / 0.4);

@@ -60,7 +60,9 @@ src/            React + TypeScript UI (Vite, zustand, MiniSearch)
   lib/ai/       the AI features: toolbar actions (index), the model
                 catalog and its prices (models), gathering works to ask
                 about (context), conversations (chat), the reader's
-                explainer of a passage (explain), export
+                explainer of a passage (explain) and look-up (lookup),
+                their editable prompts (prompts), export
+  lib/words.ts  Words: every word looked up in a PDF, and where
   lib/bookmarks.ts
                 the reader's bookmarks: the store, its file (through
                 src-tauri/src/bookmarks.rs), and each as an entry for
@@ -99,13 +101,16 @@ src/            React + TypeScript UI (Vite, zustand, MiniSearch)
   components/   toolbar, sidebar, virtualized item list, metadata panel
                 and its tabs (Highlights, Notes — NotesPrompts is an
                 empty note's reading questions), reader pane (and
-                ReadingModeExit, reading mode's way back and its ⌘
-                button; ExplainChat, the explainer's window), terminal,
-                import/rescue modals
+                ReadingModeExit, reading mode's way back and its
+                buttons; ExplainChat, the explainer's window;
+                ReadingNotepad, the notepad's window), WordList (Words),
+                terminal, import/rescue modals
+  notepad/      reading mode's notepad: model (notes, links, storage),
+                surface (the canvas: the Pencil writes, a finger pans)
   components/settings/
                 the settings page: SettingsView (section list, the
                 draft and Save) and one component per section —
-                General, Zotero, Cache, AI, Shortcut
+                General, Zotero, Cache, AI (and its Prompts), Shortcut
   pdfviewer/    the PDF viewer beside the notes, ported from Hush (viewer,
                 render, paint (annotations into the rasters),
                 annotations, folds and foldSpecs (the regions that
@@ -122,13 +127,16 @@ src/            React + TypeScript UI (Vite, zustand, MiniSearch)
                 keyboard's viewer commands: modes, page and fold
                 steps), crop (the paged view's trimmed reading),
                 citeMark (an AI citation's passage, marked), explainMarks
-                (the passages the AI explained), and
+                (the passages the AI explained), places (where the
+                reader is, what is at a point — for the notepad), and
                 annotating (the pieces below, put together):
                 selectionBar (colours over a selection),
                 annotate (selection → Zotero position, tap hit-test),
                 annotPopover (colour / comment / delete),
+                lookupPopup (a look-up's definition, over the bar),
                 highlightHandles (a highlight's ends, dragged),
-                sentenceMark (⌘-click marks a sentence), textHit
+                sentenceMark (⌘-click or the sentence tool selects a
+                sentence), textHit
                 (the text under a point);
                 viewerOptions (what the host hands the viewer),
                 textSelect (selections that narrow), selectGuard
@@ -168,6 +176,8 @@ src-tauri/      Rust core (all networking + state)
   src/ai/          model access, one file per concern (mod = provider
                    dispatch, anthropic, openai, tidy, chat)
   src/chats.rs     the Questions conversations on disk
+  src/words.rs     the Words looked up, on disk
+  src/notepads.rs  reading mode's notepads on disk, one per PDF
   src/bookmarks.rs the reader's bookmarks on disk (bookmarks.json)
   src/capture.rs   desktop capture-browser window (download interception)
   tauri-plugin-capture-view/, tauri-plugin-share-sheet/,
@@ -542,10 +552,14 @@ viewer refits the pages to the room through its own resize handling.
 On the iPad the band kept clear above the app for the status bar and
 window controls goes to the pages too. A red × at the top left
 (below that band on the iPad) — or Escape — brings everything back as
-it was (`ReadingModeExit.tsx`). Below it, a red ⌘ of the same size
-stands in for the key without a keyboard: while it is on (shown
-pressed, white on red), a tap on a line marks its sentence as a ⌘-click does (see
-Highlighting); it turns off with reading mode. The bottom bar's page
+it was (`ReadingModeExit.tsx`). Below it, down the left at the same
+size and spacing, a red caret toggles the sentence tool (a tap selects
+the sentence under it — see Highlighting) and a red pen toggles ink
+mode (the Pencil writes, or selects and highlights like a finger); both
+show white on red while on, and are the viewer's own state (its
+`onSentenceTool` / `onInkMode`, reflected in the store), so the bottom
+bar's buttons and the keys agree with them. At the top right, opposite
+the ×, a red rectangle opens the notepad (see below). The bottom bar's page
 indicator ("7 / 13") floats at the bottom centre of the screen, 20px
 up, and a press on it opens the page picker — the thumbnail grid as a
 popup over the pages, the page being read marked and in view, with the
@@ -652,9 +666,10 @@ size, and the renderer rasterises at the resulting scale.
 above the passage (below it only when the passage starts at the top
 of the view), on iPad as on the Mac:
 Zotero's eight colours, a highlight / underline switch beside them
-(remembered between selections), *Add to notes*, and — with an AI
-service connected — the AI's sparkles, which open the explainer (see
-AI). A colour marks
+(remembered between selections), then three icons — Copy (the text),
+Add to notes (a quote with a link to its page; the Highlights tab's two
+icons) and, with an AI service connected, Look up (see AI) — and the
+AI's sparkles, which open the explainer (see AI). A colour marks
 the passage the way Zotero's own reader does — as an annotation
 item, child of the PDF attachment, with the same position, page
 label and sort-index fields — so Zotero desktop, iOS and the web
@@ -665,8 +680,8 @@ dismisses the selection and its bar as the finger lifts (the
 browser alone ignores taps on the unselectable parts of a page, and
 on iPad clears a selection only after its tap gestures settle).
 Tapping a highlight or underline opens a
-small editor: colour, comment, *Add to notes*, and *Delete* (a
-second press confirms) — and puts a handle at each end of the passage,
+small editor: colour, comment, the same Copy / Add to notes / Look up
+icons, and *Delete* (a second press confirms) — and puts a handle at each end of the passage,
 a bar the height of the line with a knob above the start and below the
 end, as the system's selection handles look. Dragging one moves that
 end through the text by words, the other end staying put, with the new
@@ -678,13 +693,22 @@ stays where it last was on a line (`textHit.ts`,
 be selected and a press on a handle cancels its touch, so the iPad
 starts no selection of its own under them — no magnifier, no menu; the
 dragged end is placed from the characters' own boxes, which needs no
-selecting. ⌘-clicking a line marks the sentence it falls
-in, at once, as the bar's switch is set and in the colour last chosen
-there: a sentence runs between two ".", "!" or "?" followed by a space
+selecting. A passage may run from one page onto the next, as in
+Zotero's reader: the next page's part is the position's
+`nextPageRects` (two pages at most; Zotero writes and reads the same),
+painted, folded and tapped on both pages (`rectsOnPage` / `pagesOf` in
+`lib/highlights.ts`); such a highlight has no handles yet. Only the
+words in a page can be selected (the page wrappers are
+`user-select: none`), so a selection crossing pages no longer takes in,
+and tints, the margins between them. ⌘-clicking a line selects the
+sentence it falls in, and the bar comes up over it to mark it in the
+colour of the reader's choosing. The sentence tool does the same for a
+plain tap: the caret in the bottom bar (and in reading mode), or S; while
+it is on, a tap on a highlight still opens its editor. A sentence runs between two ".", "!" or "?" followed by a space
 and a capital, a digit or an opening quote, so "e.g." and "3.5" don't
 end one, nor do common abbreviations or initials; it never runs past
 its page or more than 800 characters either way. ⌘ is read from its
-own key events, as the reading crop reads ⌃ (`sentenceMark.ts`). The
+own key events, as the reading crop reads ⌃ (`sentenceMark.ts`). A
 mark shows at once; the write goes into
 an outbox on the device (`annotations-outbox.json`) and is pushed a
 moment later, every couple of minutes while anything waits, when the
@@ -924,29 +948,53 @@ opens there too, rather than moving the hidden library to Questions
 (`confirmAsk`).
 
 **The explainer.** The selection bar's sparkles (shown with a service
-connected, to the right of *Add to notes*) open a small conversation
-about the selected passage, floating over the pages at the bottom
-right — reading mode included — and ask "Can you explain “…”?" at
-once: "While reading “[title]” by [authors] from [year], I came across
-the following: “…” Can you explain that a bit?" — of which the window
-shows only the passage (the message's `display`) (`lib/ai/explain.ts`,
-`ExplainChat.tsx`). Follow-ups are typed beneath it; ×, Escape or a
-press outside it closes the window, not the conversation. It is
-an ordinary conversation about the entry, named after its passage,
-saved with the others and listed in the entry's conversations tab and
-in Questions ("Open in panel" carries it on there). Two things differ:
-the backend answers it under its own system prompt, which keeps every
-reply under 100 words (`ai_chat`'s `mode` "explain",
-`src-tauri/src/ai/chat.rs`), and there is no cost popup first, since
-what it sends is small — the question, and the text of the passage's
-page as its only material (never the paper). Its cache countdown is
-left out for the same reason. The explained passage stays marked in
-the PDF with a dashed pink outline
-(`--explain-mark`, an overlay like a citation's, `explainMarks.ts`;
-where it is kept as the chat's `passage`), and a tap on it opens its
-explainer again — in reading mode too. Explainers carry a question mark
-(without a circle) rather than the conversation bubble, and are listed apart, under
-Explanations, in the entry's conversations tab and in Questions.
+connected) open a small conversation about the selected passage,
+floating over the pages at the bottom right — reading mode included —
+and ask about it at once, in the words of Settings → AI → Prompts
+("What would the encyclopedia entry for “…” be?" unless changed), of
+which the window shows only the passage (the message's `display`)
+(`lib/ai/explain.ts`, `ExplainChat.tsx`). Follow-ups are typed beneath
+it; ×, Escape or a press outside it closes the window, not the
+conversation. It is an ordinary conversation about the entry, named
+after its passage, saved with the others and listed in the entry's
+conversations tab and in Questions ("Open in panel" carries it on
+there). Two things differ: the backend answers it under its own system
+prompt, which explains the concept on its own terms, as an encyclopedia
+entry would — not what the author is doing with it — in under 100
+words (`ai_chat`'s `mode` "explain", `src-tauri/src/ai/chat.rs`); and
+nothing is sent but the question — no page, no paper — so there is no
+cost popup first, and no cache countdown. The explained passage stays
+marked in the PDF with a dashed pink outline (`--explain-mark`, an
+overlay like a citation's, `explainMarks.ts`; where it is kept as the
+chat's `passage`), and a tap on it opens its explainer again — in
+reading mode too. Explainers carry a question mark rather than the
+conversation bubble, and are listed apart, under Explanations, in the
+entry's conversations tab and in Questions.
+
+**Look up and Words.** The selection bar's magnifier (and the
+highlight editor's) asks for a definition of the selected word or
+phrase — "Define “…”" unless changed in Prompts, with no context at all,
+so the answer is its meaning and nothing about the work — under a
+system prompt that keeps it to at most 50 words (`mode` "define"). The
+answer shows in a small box over the bar (`lookupPopup.ts`), a one-off
+that goes with the selection and is never part of a conversation
+(`lib/ai/lookup.ts`). Each is kept in **Words**, a row between
+Questions and Recent in the sidebar: every word looked up, across all
+documents, alphabetically, with its definition and where it was read —
+its PDF and page, and the sentence it stood in, which its source link
+finds and marks on the way back (`WordList.tsx`, `lib/words.ts`;
+`words.json` in the app's data folder, `src-tauri/src/words.rs`). The
+same word looked up again in the same PDF replaces the one before.
+
+**Prompts.** Settings → AI → Prompts holds the explainer's and the
+look-up's questions as templates — text with tokens in it, shown as
+chips, for what is filled in as it is sent: the selection, and the
+work's title, authors and year (`lib/ai/prompts.ts`,
+`PromptSettings.tsx`). A token is dragged in from the row beneath (a
+pointer drag, which works with a finger on the iPad), or tapped to go in
+at the caret; Reset puts a prompt back. They apply at once, on this
+device (`zotero-helper-prompts` in `localStorage`); the system prompts
+around them stay the backend's.
 
 **AI Tidy Metadata** — with an API key configured, selected items are
 cleaned up by the model (grounded in a fresh CrossRef record when a DOI
@@ -1057,6 +1105,29 @@ and offers Rename, Note (a link to the page, into the notes) and Delete
 (a second press confirms). A selection with bookmarks but no highlights
 still gets the Highlights tab.
 
+### Reading mode's notepad
+
+The red rectangle at the top right of reading mode opens a floating
+notepad for the Apple Pencil (`ReadingNotepad.tsx`, `src/notepad/`):
+its header drags it about and a grip at its corner sizes it (where it
+sits is this device's, `localStorage`). On its paper the Pencil writes
+— a tap is a dot — a finger pans, and a mouse writes with a drag (a Mac
+has no Pencil) while a wheel pans; strokes are SVG paths grown sample
+by sample, as the viewer's ink is, with no React render under the pen
+(`surface.ts`). Strokes written within 10s and 60px of the last are one
+note, which remembers where in the PDF the reader was when it began —
+the page at the view's centre and the height a quarter of the way down
+the view (`placeInView` in `pdfviewer/places.ts`) — and shows that page,
+small, above it; a finger tap (or a click) on a note goes back there.
+LINK, at the header's left, makes a link: pressed and dragged onto the
+pages (with the Pencil, a finger or the mouse), and let go over a
+highlight or a spot on a page (`placeAtPoint`), it puts a link to that
+on the pad — the highlight's first words, or "p. 12" — to be dragged
+where it belongs and tapped to go back there. ↶ undoes the last stroke
+or link. One pad per PDF, kept on this device
+(`notepads/<attKey>.json`, `src-tauri/src/notepads.rs`), written a
+moment after each change; never sent to Zotero.
+
 ### Recent
 
 **Recent** — a row beneath Questions in the sidebar listing the last
@@ -1097,7 +1168,8 @@ iPad's typing.
   library type, and PDF retrieval: the contact email for the
   Unpaywall/CrossRef polite pools and the pause between downloads.
 - **Cache** — what the app keeps on the device (see "Cache" above).
-- **AI** — the service, its key and the model. Until a key is in, the
+- **AI** — the service, its key and the model, and the reader's
+  prompts (Prompts, above; these apply at once). Until a key is in, the
   AI menu and Questions are hidden (see "AI" above).
 - **Keyboard Shortcuts** — every rebindable shortcut, grouped by where
   it works, plus a list of the built-in ones. See below.
@@ -1189,6 +1261,7 @@ doesn't cost the role, so there is nothing to reclaim.
 | PDF viewer | Fit one / two / three pages | 1 / 2 / 3 |
 | PDF viewer | Paged / continuous view | P / C |
 | PDF viewer | Draw (ink mode) on / off | I |
+| PDF viewer | Sentence tool (a tap selects a sentence) on / off | S |
 | PDF viewer | Reading mode on / off (Esc also leaves it) | R |
 | PDF viewer | Next page (next fold, when folded) | → or ↓ |
 | PDF viewer | Previous page (previous fold, when folded) | ← or ↑ |

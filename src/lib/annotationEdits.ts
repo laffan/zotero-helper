@@ -38,7 +38,11 @@ export type NewAnnotation = {
   pageLabel: string;
   sortIndex: string;
 } & (
-  | { type: "highlight" | "underline"; text: string; position: { pageIndex: number; rects: number[][] } }
+  | {
+      type: "highlight" | "underline";
+      text: string;
+      position: { pageIndex: number; rects: number[][]; nextPageRects?: number[][] };
+    }
   | { type: "ink"; key: string; position: { pageIndex: number; width: number; paths: number[][] } }
 );
 

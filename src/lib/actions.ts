@@ -5,6 +5,7 @@ import { itemTitle, REAL_KEY } from "./collections";
 import { loadChats } from "./ai/chat";
 import { startAnnotationSync } from "./annotationEdits";
 import { loadBookmarks } from "./bookmarks";
+import { loadWords } from "./words";
 import { captureFinished, downloadForJob } from "./importer";
 import { pushNote, refreshCachedPdfs, startNotesSync } from "./notes";
 import { listenForPencil } from "./pencil";
@@ -91,6 +92,7 @@ export async function bootstrap(): Promise<void> {
   // Zotero credentials are in place yet.
   await loadChats();
   await loadBookmarks();
+  await loadWords();
   await refreshCachedPdfs();
   startNotesSync();
   // Before the library loads, so unsent annotations are laid over it.

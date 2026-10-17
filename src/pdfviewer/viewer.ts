@@ -36,11 +36,12 @@ import { applyLayoutClasses, fitZoom, sizePage, sizePagedGap } from "./layout";
 import { createLinkLayerManager } from "./links";
 import { createMagnifier, PLAIN } from "./magnify";
 import { readOutline, type OutlineEntry } from "./outline";
-import { attachTextLayer, createPageRecords, pageText } from "./pageTools";
+import { attachTextLayer, createPageRecords } from "./pageTools";
 import { sampleTypicalPage } from "./pageSizes";
 import { changedPages, drawAnnotations } from "./paint";
 import { attachPagedWheel } from "./paged";
 import { getPdfjs } from "./pdfjs";
+import { placeAtPoint, placeInView } from "./places";
 import { createReadingProgress } from "./readingProgress";
 import { createPageRenderer } from "./render";
 import { createPdfSearch } from "./search";
@@ -166,6 +167,7 @@ export function createPdfViewer(container: HTMLElement, opts: PdfViewerOptions =
     writer: opts.annotate,
     onStart: () => exitFolded(),
     onPenDown: () => renderer.yieldToPen(),
+    onActiveChange: (on) => opts.onInkMode?.(on),
   });
   const detachTooltips = attachTooltips(tb.toolbar, root);
   foldLayer.attachFilterUI(tb.foldFilterBtn, root);
@@ -222,6 +224,7 @@ export function createPdfViewer(container: HTMLElement, opts: PdfViewerOptions =
     isFolded: () => folded,
     inExpanded: (node) => foldLayer.inExpanded(node),
     include: (type, color) => foldLayer.include(type, color),
+    sentenceButton: tb.sentenceBtn,
   });
 
   if (opts.onReadingMode) tb.readingBtn.style.display = "";
@@ -683,10 +686,11 @@ export function createPdfViewer(container: HTMLElement, opts: PdfViewerOptions =
     onSearchChange: search.onChange,
     /** Mark an AI citation's quoted passage and go to it (citeMark.ts). */
     showQuote: citeMark.show,
+    /** Where the reader is, and what is at a point (places.ts). */
+    place: () => placeInView(scrollArea, pages, currentPage() - 1),
+    placeAt: (x: number, y: number) => placeAtPoint(pages, annotLayer.getAnnotations(), x, y),
     /** Mark the passages the AI has explained (explainMarks.ts). */
     setExplainMarks: (marks: ExplainMark[]) => annotating.setExplainMarks(marks),
-    /** The words on page `n` (1-based). */
-    pageText: (n: number) => (pdfDoc ? pageText(pdfDoc, n) : Promise.resolve("")),
   };
 }
 

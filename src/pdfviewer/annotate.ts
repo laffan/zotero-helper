@@ -2,20 +2,23 @@
 // highlight or underline, and finding the annotation under a tap.
 //
 // Zotero's position is `{ pageIndex, rects }`, the rects in PDF user
-// space (y up), one per line of text — what paint.ts already draws. Its
+// space (y up), one per line of text — what paint.ts already draws —
+// and `nextPageRects` for a passage running onto the next page. Its
 // sortIndex is `page|offset|top`: the page index, the character offset
 // of the passage on its page, and the distance of its first line from
 // the top of the page in PDF points (zotero/reader's formatSortIndex).
 // Zotero counts characters with its own text extraction; here they are
 // counted in pdf.js's text layer, which can differ by a few characters.
 // That only matters for the order of annotations within one page.
-import { annotationPosition, type Annotation } from "../lib/highlights";
+import { annotationPosition, rectsOnPage, type Annotation } from "../lib/highlights";
 import { textRects } from "./textHit";
 import type { PageRecord } from "./types";
 
 export interface AnnotationDraft {
   pageIndex: number;
   rects: number[][];
+  /** The passage's rects on the next page, when it runs onto it. */
+  nextPageRects?: number[][];
   text: string;
   sortIndex: string;
   pageLabel: string;
@@ -83,30 +86,12 @@ export function pageBoxAt(node: Node | null): { box: HTMLElement; pageIndex: num
   return box && Number.isInteger(pageIndex) ? { box, pageIndex } : null;
 }
 
-/** The draft annotation for `range`, or null when it isn't text in the
- *  pages. A selection running onto a later page is cut at the end of
- *  the page it starts on — a Zotero annotation lives on one page. */
-export function draftFromRange(
-  range: Range,
-  pages: PageRecord[],
-  pageLabels: string[] | null,
-): AnnotationDraft | null {
-  const at = pageBoxAt(range.startContainer);
-  const pageIndex = at?.pageIndex ?? NaN;
-  const wrapper = at?.box;
-  const p = pages[pageIndex];
-  const layer = wrapper?.querySelector<HTMLElement>(".textLayer");
-  if (!wrapper || !p || !layer || !layer.contains(range.startContainer)) return null;
-
-  const r = range.cloneRange();
-  if (!layer.contains(r.endContainer)) r.setEnd(layer, layer.childNodes.length);
-  const text = rangeText(r);
-  if (!text) return null;
-
-  // Screen boxes → scale-1 viewport units → PDF user space. The box is
-  // the page at its displayed size, whatever CSS stretch the content
-  // box is under.
-  const wr = wrapper.getBoundingClientRect();
+/** The rects (PDF user space, one per line) of the text of `r` on the
+ *  page shown as `box`, whose record is `p`. Screen boxes → scale-1
+ *  viewport units → PDF user space; the box is the page at its displayed
+ *  size, whatever CSS stretch the content box is under. */
+function rectsIn(r: Range, box: HTMLElement, p: PageRecord): number[][] {
+  const wr = box.getBoundingClientRect();
   const k = p.viewport.width / wr.width;
   const boxes: Box[] = [];
   for (const cr of textRects(r)) {
@@ -122,12 +107,50 @@ export function draftFromRange(
       bottom: (bottom - wr.top) * k,
     });
   }
-  if (!boxes.length) return null;
-  const rects = mergeLines(boxes).map((b) => {
+  return mergeLines(boxes).map((b) => {
     const [x1, y1] = p.viewport.convertToPdfPoint(b.left, b.bottom);
     const [x2, y2] = p.viewport.convertToPdfPoint(b.right, b.top);
     return [Math.min(x1, x2), Math.min(y1, y2), Math.max(x1, x2), Math.max(y1, y2)].map(round3);
   });
+}
+
+/** The draft annotation for `range`, or null when it isn't text in the
+ *  pages. A selection may run onto the next page, as in Zotero's reader:
+ *  that page's part is `nextPageRects`. One running further is cut at
+ *  the end of the next page — a Zotero annotation spans two at most. */
+export function draftFromRange(
+  range: Range,
+  pages: PageRecord[],
+  pageLabels: string[] | null,
+): AnnotationDraft | null {
+  const at = pageBoxAt(range.startContainer);
+  const pageIndex = at?.pageIndex ?? NaN;
+  const wrapper = at?.box;
+  const p = pages[pageIndex];
+  const layer = wrapper?.querySelector<HTMLElement>(".textLayer");
+  if (!wrapper || !p || !layer || !layer.contains(range.startContainer)) return null;
+
+  const r = range.cloneRange();
+  // The part on the next page, when the selection reaches it (pages
+  // only: a fold opened to its page has no neighbour beside it).
+  let rest: Range | null = null;
+  const next = pages[pageIndex + 1];
+  const nextLayer = wrapper === p.wrapper ? next?.wrapper.querySelector<HTMLElement>(".textLayer") : null;
+  if (!layer.contains(r.endContainer)) {
+    if (nextLayer && range.intersectsNode(nextLayer)) {
+      rest = document.createRange();
+      rest.setStart(nextLayer, 0);
+      if (nextLayer.contains(range.endContainer)) rest.setEnd(range.endContainer, range.endOffset);
+      else rest.setEnd(nextLayer, nextLayer.childNodes.length);
+    }
+    r.setEnd(layer, layer.childNodes.length);
+  }
+  const text = [rangeText(r), rest ? rangeText(rest) : ""].filter(Boolean).join(" ");
+  if (!text) return null;
+
+  const rects = rectsIn(r, wrapper, p);
+  const nextPageRects = rest && next ? rectsIn(rest, next.wrapper, next) : [];
+  if (!rects.length) return null;
 
   const before = document.createRange();
   before.setStart(layer, 0);
@@ -139,6 +162,7 @@ export function draftFromRange(
   return {
     pageIndex,
     rects,
+    ...(nextPageRects.length ? { nextPageRects } : {}),
     text,
     sortIndex: formatSortIndex(pageIndex, offset, top),
     pageLabel: pageLabels?.[pageIndex] || String(pageIndex + 1),
@@ -160,9 +184,9 @@ export function annotationAtPoint(
   let hit: Annotation | null = null;
   for (const a of annotations) {
     if (a.type !== "highlight" && a.type !== "underline") continue;
-    const pos = annotationPosition(a);
-    if (pos?.pageIndex !== pageIndex || !pos.rects) continue;
-    const inside = pos.rects.some(
+    const rects = rectsOnPage(annotationPosition(a), pageIndex);
+    if (!rects) continue;
+    const inside = rects.some(
       (r) =>
         x >= Math.min(r[0], r[2]) - slop &&
         x <= Math.max(r[0], r[2]) + slop &&

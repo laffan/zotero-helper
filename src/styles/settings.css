@@ -297,3 +297,65 @@
   border-radius: 5px;
   color: var(--text-dim);
 }
+
+/* --- Settings → AI → Prompts (PromptSettings.tsx): a line of text with
+   tokens as chips, and the tokens to drag in beneath --- */
+.settings-subhead {
+  margin: 18px 0 4px;
+  font-size: calc(13px * var(--font-scale));
+  font-weight: 600;
+}
+.prompt-field {
+  margin: 12px 0;
+}
+.prompt-field-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 4px;
+  font-size: calc(12px * var(--font-scale));
+  font-weight: 600;
+}
+.prompt-editor {
+  min-height: 1.6em;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg);
+  color: var(--text);
+  font-size: calc(13px * var(--font-scale));
+  line-height: 1.7;
+  outline: none;
+}
+.prompt-editor:focus {
+  border-color: var(--accent);
+}
+.prompt-tokens {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+}
+.prompt-token {
+  display: inline-block;
+  padding: 0 7px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: calc(11px * var(--font-scale));
+  font-weight: 600;
+  line-height: 1.7;
+  -webkit-user-select: none;
+  user-select: none;
+}
+.prompt-tokens .prompt-token {
+  cursor: grab;
+  touch-action: none;
+}
+.prompt-token-ghost {
+  position: fixed;
+  z-index: 1000;
+  transform: translate(-50%, -120%);
+  pointer-events: none;
+  box-shadow: 0 2px 8px rgb(0 0 0 / 0.2);
+}

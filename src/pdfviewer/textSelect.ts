@@ -14,6 +14,11 @@
 // pdf.js's TextLayerBuilder (web/text_layer_builder.js), which the
 // viewer doesn't otherwise use; Firefox and Chromium 148+ don't need it
 // and are left alone, as pdf.js leaves them.
+//
+// That still leaves leaps WebKit makes by itself — the moving end
+// jumping to an end of the page in one step; selectGuard.ts catches
+// those and puts the selection back.
+import { guardSelections, justReverted } from "./selectGuard";
 
 const layers = new Map<HTMLElement, HTMLElement>();
 let listening = false;
@@ -63,6 +68,14 @@ function onSelectionChange(): void {
     else reset(end, layer);
   }
   if (!all.length || selectsNatively(all[0][0])) return;
+  // Put back by the guard (its own change follows), or not changed at
+  // all: `.endOfContent` stays beside the end that was moving.
+  if (justReverted()) return;
+  if (
+    prevRange &&
+    range.compareBoundaryPoints(Range.START_TO_START, prevRange) === 0 &&
+    range.compareBoundaryPoints(Range.END_TO_END, prevRange) === 0
+  ) return;
 
   // Which end is moving: the start when the end stayed put.
   const modifyStart = Boolean(
@@ -94,6 +107,7 @@ function onSelectionChange(): void {
 function listen(): void {
   if (listening) return;
   listening = true;
+  guardSelections();
   document.addEventListener("pointerdown", () => (pointerDown = true));
   document.addEventListener("pointerup", () => {
     pointerDown = false;

@@ -19,10 +19,11 @@
 // Highlights tab beside the viewer lists the same annotations).
 import type { Annotation } from "../lib/highlights";
 import { PDFJS_ASSETS } from "../lib/pdfjsAssets";
-import { centerPagePoint, pageFracAtCenter, restoreAnchor, scrollToPageFraction, scrollToPagePoint, viewAnchor } from "./anchor";
-import { attachAnnotationTaps, draftFromRange } from "./annotate";
+import {
+  centerPagePoint, pageFracAtCenter, restoreAnchor, scrollToPageFraction, scrollToPagePoint, viewAnchor, watchResize,
+} from "./anchor";
+import { createAnnotating } from "./annotating";
 import { createAnnotationLayer } from "./annotations";
-import { createAnnotationPopover } from "./annotPopover";
 import { createBookmarkPrompt, markBookmarkedPages, type PageBookmark } from "./bookmarks";
 import { createCiteMark } from "./citeMark";
 import { createViewerCommands } from "./commands";
@@ -33,15 +34,15 @@ import { attachViewerKeys } from "./keys";
 import { applyLayoutClasses, fitZoom, sizePage, sizePagedGap } from "./layout";
 import { createLinkLayerManager } from "./links";
 import { createMagnifier, PLAIN } from "./magnify";
-import { readOutline } from "./outline";
-import { attachTextLayer, createPageRecords } from "./pageTools";
+import { readOutline, type OutlineEntry } from "./outline";
+import { attachTextLayer, createPageRecords, pageText } from "./pageTools";
 import { sampleTypicalPage } from "./pageSizes";
 import { changedPages, drawAnnotations } from "./paint";
 import { attachPagedWheel } from "./paged";
 import { getPdfjs } from "./pdfjs";
+import { createReadingProgress } from "./readingProgress";
 import { createPageRenderer } from "./render";
 import { createPdfSearch } from "./search";
-import { createSelectionBar } from "./selectionBar";
 import { createThumbnailManager } from "./thumbnails";
 import { buildPdfToolbar, syncToolbar } from "./toolbar";
 import { attachTooltips } from "./tooltips";
@@ -162,6 +163,7 @@ export function createPdfViewer(container: HTMLElement, opts: PdfViewerOptions =
     getPageLabels: () => pageLabels,
     writer: opts.annotate,
     onStart: () => exitFolded(),
+    onPenDown: () => renderer.yieldToPen(),
   });
   const detachTooltips = attachTooltips(tb.toolbar, root);
   foldLayer.attachFilterUI(tb.foldFilterBtn, root);
@@ -208,46 +210,17 @@ export function createPdfViewer(container: HTMLElement, opts: PdfViewerOptions =
   function restorePendingFold(): void {
     if (pendingFoldAt && folded && foldLayer.restoreAnchor(pendingFoldAt)) pendingFoldAt = null;
   }
-  const writer = opts.annotate;
-  const selection =
-    opts.onQuote || writer
-      ? createSelectionBar(scrollArea, root, {
-          onQuote: opts.onQuote,
-          // The folded view shows parts of pages; marks are made on
-          // whole ones, so there a selection can only be quoted — but
-          // on a fold opened to its page, it can be marked.
-          canAnnotate: (range) => !folded || foldLayer.inExpanded(range.startContainer),
-          onAnnotate: writer
-            ? (range, type, color) => {
-                const draft = draftFromRange(range, pages, pageLabels);
-                if (!draft) return;
-                foldLayer.include(type, color);
-                writer.create(draft, type, color);
-              }
-            : undefined,
-        })
-      : null;
-  const popover = writer
-    ? createAnnotationPopover(root, {
-        update: (key, patch) => {
-          const a = annotLayer.getAnnotations().find((x) => x.key === key);
-          if (a && patch.color) foldLayer.include(a.type, patch.color);
-          writer.update(key, patch);
-        },
-        remove: writer.remove,
-        onInsert: opts.onInsertAnnotation,
-      })
-    : null;
-
-  if (popover && writer) {
-    attachAnnotationTaps(scrollArea, {
-      getPages: () => pages,
-      getAnnotations: () => annotLayer.getAnnotations(),
-      ignore: () => Boolean(selection?.justDismissed()),
-      canEdit: writer.canEdit,
-      open: (a, at) => popover.open(a, at),
-    });
-  }
+  const annotating = createAnnotating({
+    scrollArea,
+    root,
+    opts,
+    getPages: () => pages,
+    getPageLabels: () => pageLabels,
+    getAnnotations: () => annotLayer.getAnnotations(),
+    isFolded: () => folded,
+    inExpanded: (node) => foldLayer.inExpanded(node),
+    include: (type, color) => foldLayer.include(type, color),
+  });
 
   if (opts.onReadingMode) tb.readingBtn.style.display = "";
   tb.readingBtn.addEventListener("click", () => opts.onReadingMode?.());
@@ -267,6 +240,17 @@ export function createPdfViewer(container: HTMLElement, opts: PdfViewerOptions =
     getAnnotations: () => annotLayer.getAnnotations(),
     goToPage: (n) => goToPage(n),
     onHide: () => tb.thumbnailBtn.classList.remove("active"),
+  });
+  // Reading mode's page indicator and its page picker.
+  let outline: OutlineEntry[] = [];
+  const progress = createReadingProgress(root, {
+    openPicker: (side) => thumbs.showPicker(currentPage(), side),
+    getOutline: () => outline,
+    currentPage: () => currentPage(),
+    goToEntry: (e) => {
+      thumbs.close();
+      if (e.pageIndex != null) goToPosition(e.pageIndex, e.top);
+    },
   });
   // A search hit or a cited passage: page index, then a point on it (0–1).
   function revealPoint(idx: number, x: number, y: number): void {
@@ -420,12 +404,17 @@ export function createPdfViewer(container: HTMLElement, opts: PdfViewerOptions =
 
   let reportPages = false;
   let reportedPage = 0;
+  // The set the paged view last showed — kept from before a resize
+  // moves the snapping (watchResize, anchor.ts).
+  let shownLead = 1;
   function updatePageIndicator(): void {
     // A fixed set of several pages shows as its range ("7–9 / 13").
     const lead = leadPage();
+    shownLead = lead;
     const last = isPaged() ? Math.min(pages.length, lead + perSet() - 1) : lead;
     const shown = last > lead ? `${lead}–${last}` : String(currentPage());
     tb.pageIndicator.textContent = pages.length ? `${shown} / ${pages.length}` : "";
+    progress.set(tb.pageIndicator.textContent);
     if (!reportPages || !pages.length) return;
     viewReporter.changed();
     const page = currentPage();
@@ -447,9 +436,7 @@ export function createPdfViewer(container: HTMLElement, opts: PdfViewerOptions =
         updatePageIndicator();
       });
     }
-    // The editor is placed beside what it edits; once that has moved
-    // away, close it (but not while its comment is being typed).
-    if (popover?.isOpen() && !root.querySelector(".pdf-annot-popover textarea:focus")) popover.close();
+    annotating.onScroll();
   });
 
   // The page at the start of the view stays there: the anchor
@@ -568,7 +555,11 @@ export function createPdfViewer(container: HTMLElement, opts: PdfViewerOptions =
       reportPages = true;
       updatePageIndicator();
     });
-    void readOutline(doc).then((o) => !destroyed && pdfDoc === doc && opts.onOutline?.(o));
+    void readOutline(doc).then((o) => {
+      if (destroyed || pdfDoc !== doc) return;
+      outline = o;
+      opts.onOutline?.(o);
+    });
     // Ready for ← / →, unless the reader is already typing somewhere
     // (the search field, the notes).
     const focused = document.activeElement;
@@ -604,37 +595,34 @@ export function createPdfViewer(container: HTMLElement, opts: PdfViewerOptions =
   }
 
 
-  let resizeTimer: number | null = null;
-  const resizeObserver = new ResizeObserver(() => {
-    if (!pages.length) return;
-    // A container resize can re-wrap rows, so cached geometry is stale
-    // either way; fit-mode geometry follows behind a short debounce.
-    renderer.invalidateGeometry();
-    renderer.scheduleUpdate();
-    if (layoutMode === "fixed") return;
-    if (resizeTimer) clearTimeout(resizeTimer);
-    resizeTimer = window.setTimeout(() => {
-      resizeTimer = null;
-      relayoutPages();
-    }, 80);
+  const stopWatchingResize = watchResize(scrollArea, {
+    hasPages: () => pages.length > 0,
+    geometryChanged: () => {
+      renderer.invalidateGeometry();
+      renderer.scheduleUpdate();
+    },
+    fitsView: () => layoutMode !== "fixed",
+    relayout: () => relayoutPages(),
+    shownSet: () => shownLead,
+    isPaged,
+    horizontal: () => layoutMode === "horizontal",
+    goToPage: (n) => goToPage(n, false),
   });
-  resizeObserver.observe(scrollArea);
 
   async function destroy(): Promise<void> {
     viewReporter.flush();
     destroyed = true;
     search.onChange(null);
-    resizeObserver.disconnect();
-    if (resizeTimer) clearTimeout(resizeTimer);
+    stopWatchingResize();
     keys.detach();
     magnifier.destroy();
     cropper.destroy();
     bookmarkPrompt.destroy();
     foldLayer.destroy();
     thumbs.destroy();
+    progress.destroy();
     renderer.destroy();
-    selection?.destroy();
-    popover?.destroy();
+    annotating.destroy();
     ink.destroy();
     detachTooltips();
     const doc = pdfDoc;
@@ -659,7 +647,7 @@ export function createPdfViewer(container: HTMLElement, opts: PdfViewerOptions =
     setAnnotations: (list: Annotation[]) => {
       const old = annotLayer.getAnnotations();
       annotLayer.setAnnotations(list);
-      popover?.sync(list);
+      annotating.sync(list);
       ink.setAnnotations(list);
       // The pages' rasters hold everything but ink; the folds' hold ink too.
       const changed = changedPages(old, list, false);
@@ -693,6 +681,8 @@ export function createPdfViewer(container: HTMLElement, opts: PdfViewerOptions =
     onSearchChange: search.onChange,
     /** Mark an AI citation's quoted passage and go to it (citeMark.ts). */
     showQuote: citeMark.show,
+    /** The words on page `n` (1-based). */
+    pageText: (n: number) => (pdfDoc ? pageText(pdfDoc, n) : Promise.resolve("")),
   };
 }
 

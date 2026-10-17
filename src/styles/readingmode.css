@@ -52,3 +52,72 @@
 .reading-mode-exit:hover::before {
   transform: scale(1.15);
 }
+
+/* The ⌘ button (ReadingModeExit.tsx), the ring's size, below it: while
+   it is on, a tap marks the sentence under it as a ⌘-click does. */
+.reading-mode-cmd {
+  position: fixed;
+  z-index: 60;
+  top: 36px;
+  left: 0;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+}
+.ipados .reading-mode-cmd {
+  top: calc(max(env(safe-area-inset-top), 30px) + 30px);
+}
+.reading-mode-cmd::before {
+  content: "⌘";
+  position: absolute;
+  top: 13px;
+  left: 13px;
+  width: 18px;
+  height: 18px;
+  box-sizing: border-box;
+  border: 3px solid #ff5f57;
+  border-radius: 50%;
+  color: #ff5f57;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 12px;
+  text-align: center;
+  transition: transform 0.12s;
+}
+.reading-mode-cmd:hover::before {
+  transform: scale(1.15);
+}
+.reading-mode-cmd.on::before {
+  background: #ff5f57;
+  color: #fff;
+}
+
+/* Where the reader is ("7 / 13"), at the bottom centre — the bottom
+   bar's page indicator, which reading mode hides; a press opens the
+   page picker (readingProgress.ts). Only in reading mode. */
+.pdf-reading-progress {
+  display: none;
+}
+.app.reading-mode .pdf-reading-progress:not([hidden]) {
+  display: block;
+  position: fixed;
+  z-index: 50;
+  bottom: calc(20px + env(safe-area-inset-bottom));
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 4px 12px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--panel);
+  box-shadow: 0 2px 8px rgb(0 0 0 / 0.18);
+  color: var(--text);
+  font-size: calc(12px * var(--font-scale));
+  font-variant-numeric: tabular-nums;
+  opacity: 0.9;
+}
+.app.reading-mode .pdf-reading-progress:hover {
+  opacity: 1;
+}

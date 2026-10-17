@@ -44,3 +44,7 @@ export const COLLAPSE_ICON = `<svg viewBox="0 0 16 16" width="12" height="12" fi
 export const HIGHLIGHT_ICON = `<svg viewBox="0 0 16 16" width="14" height="14"><rect x="1.5" y="3.5" width="13" height="9" rx="1.5" fill="currentColor" opacity="0.3"/><path d="M4.5 8h7" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>`;
 
 export const UNDERLINE_ICON = `<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><path d="M4.5 2.5v4.5a3.5 3.5 0 0 0 7 0V2.5"/><path d="M3 14h10"/></svg>`;
+
+/** The selection bar's AI explainer: the app's AI sparkles (Icons.tsx
+ *  `Sparkles`), as a string. */
+export const SPARKLES_ICON = `<svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2l1.2 3.3L12.5 6.5 9.2 7.7 8 11 6.8 7.7 3.5 6.5l3.3-1.2z"/><path d="M13 10.5l.6 1.5 1.5.6-1.5.6-.6 1.5-.6-1.5-1.5-.6 1.5-.6z"/></svg>`;

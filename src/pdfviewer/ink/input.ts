@@ -141,7 +141,12 @@ export function attachInkInput(env: InkInputEnv) {
     if (e.pointerType === "touch") {
       if (!e.isPrimary || fresh()) return;
       const gs = fingerGrabs(e.clientX, e.clientY);
-      if (!gs) return;
+      if (!gs) {
+        // Left to scroll or select text — or, if it lifts where it
+        // landed, a tap off the drawing, which lets go of it.
+        fingerTap = { id: e.pointerId, x: e.clientX, y: e.clientY, at: performance.now() };
+        return;
+      }
       e.preventDefault();
       e.stopPropagation();
       abandon();
@@ -244,7 +249,14 @@ export function attachInkInput(env: InkInputEnv) {
     }
   }
 
+  let fingerTap: { id: number; x: number; y: number; at: number } | null = null;
   function onUp(e: PointerEvent): void {
+    const tap = fingerTap;
+    if (tap && e.pointerId === tap.id) {
+      fingerTap = null;
+      const still = Math.hypot(e.clientX - tap.x, e.clientY - tap.y) < 8 && performance.now() - tap.at < 400;
+      if (on && still && e.type === "pointerup") env.pressOutside();
+    }
     if (g && e.pointerId === g.id) finish(g, e.clientX, e.clientY, e.type === "pointercancel");
   }
 

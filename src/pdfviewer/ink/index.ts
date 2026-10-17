@@ -38,6 +38,9 @@ export interface InkWriter {
   update: (key: string, patch: { color?: string; position?: string; sortIndex?: string }) => void;
   remove: (key: string) => void;
   canEdit: (a: Annotation) => boolean;
+  /** The pen is writing (down, or just lifted): the host holds back
+   *  work that would land mid-stroke (the annotation push). */
+  writing?: () => void;
 }
 
 export interface InkEnv {
@@ -53,6 +56,8 @@ export interface InkEnv {
   writer?: InkWriter;
   /** Ink mode is starting: the viewer leaves views it can't draw in. */
   onStart: () => void;
+  /** The pen (or eraser) came down. */
+  onPenDown?: () => void;
 }
 
 const SELECTION_PAD = 3;
@@ -80,6 +85,12 @@ function textOffsetNear(p: PageRecord, fx: number, fy: number): number {
   }
   return best;
 }
+
+/** Each annotation's ink, as the layer takes it — kept with the
+ *  annotation object, which the library index reuses while the item is
+ *  unchanged (lib/highlights.ts), so a store write doesn't re-read
+ *  every drawing in the PDF. */
+const inkOf = new WeakMap<Annotation, InkAnn | null>();
 
 export function createInkTool(env: InkEnv) {
   const { writer } = env;
@@ -233,9 +244,14 @@ export function createInkTool(env: InkEnv) {
     // Drawing or erasing lets go of a selection a finger made.
     begin: () => {
       if (prefs.tool !== "select" && sel) select(0, []);
+      writer?.writing?.();
+      env.onPenDown?.();
       session.begin();
     },
-    end: () => session.end(),
+    end: () => {
+      writer?.writing?.();
+      session.end();
+    },
     stroke: (idx, points) => {
       // A stroke too long for one annotation becomes several.
       const path = smoothPath(points);
@@ -295,6 +311,15 @@ export function createInkTool(env: InkEnv) {
     else if (action === "switchPrevious") setTool(prefs.tool === previousTool ? "pen" : previousTool);
   }
 
+  // A drawing a finger picked up stays selected for the bar's colours
+  // and Delete — until the finger turns to the text: a new selection
+  // there lets go of it (a tap off the drawing does too, input.ts).
+  function onSelectionChange(): void {
+    if (!sel || input.busy()) return;
+    const s = document.getSelection();
+    if (s && !s.isCollapsed && s.anchorNode && env.scrollArea.contains(s.anchorNode)) select(0, []);
+  }
+
   // Changes still waiting are written before the app is put away —
   // ahead of the annotation push that the same event starts.
   const flushNow = () => session.flush();
@@ -312,6 +337,7 @@ export function createInkTool(env: InkEnv) {
       live.attach();
       window.addEventListener("keydown", onKey);
       window.addEventListener("zh-pencil", onPencil);
+      document.addEventListener("selectionchange", onSelectionChange);
       syncBar();
     } else {
       select(0, []);
@@ -319,6 +345,7 @@ export function createInkTool(env: InkEnv) {
       live.detach();
       window.removeEventListener("keydown", onKey);
       window.removeEventListener("zh-pencil", onPencil);
+      document.removeEventListener("selectionchange", onSelectionChange);
     }
   }
 
@@ -337,18 +364,25 @@ export function createInkTool(env: InkEnv) {
       const ink: InkAnn[] = [];
       for (const a of list) {
         if (a.type !== "ink") continue;
-        const pos = annotationPosition(a);
-        if (!pos?.paths || typeof pos.pageIndex !== "number") continue;
-        const raw = (a._raw.data as Record<string, unknown>).annotationPosition;
-        ink.push({
-          key: a.key,
-          pageIndex: pos.pageIndex,
-          color: a.color || "#000000",
-          width: Number(pos.width) || 1,
-          paths: pos.paths,
-          pos: typeof raw === "string" ? raw : JSON.stringify(raw),
-          editable: writer ? writer.canEdit(a) : false,
-        });
+        let one = inkOf.get(a);
+        if (one === undefined) {
+          const pos = annotationPosition(a);
+          const raw = (a._raw.data as Record<string, unknown>).annotationPosition;
+          one =
+            pos?.paths && typeof pos.pageIndex === "number"
+              ? {
+                  key: a.key,
+                  pageIndex: pos.pageIndex,
+                  color: a.color || "#000000",
+                  width: Number(pos.width) || 1,
+                  paths: pos.paths,
+                  pos: typeof raw === "string" ? raw : JSON.stringify(raw),
+                  editable: writer ? writer.canEdit(a) : false,
+                }
+              : null;
+          inkOf.set(a, one);
+        }
+        if (one) ink.push(one);
       }
       session.setBase(ink);
       if (sel) showSelection();

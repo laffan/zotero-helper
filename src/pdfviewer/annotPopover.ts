@@ -1,8 +1,9 @@
 // The popover for one annotation: its colour, its comment, "Add to
 // notes" and Delete. It opens on a tap on a highlight or underline in
-// the pages. Changes go out as they
-// are made — a colour at once, the comment after a pause in typing and
-// when the popover closes.
+// the pages, with handles on the passage to change its extent
+// (highlightHandles.ts, through onOpen / onClose). Changes go out as
+// they are made — a colour at once, the comment after a pause in typing
+// and when the popover closes.
 import { ANNOTATION_COLORS, type Annotation } from "../lib/highlights";
 
 export interface AnnotationEditHandlers {
@@ -10,6 +11,9 @@ export interface AnnotationEditHandlers {
   remove: (key: string) => void;
   /** Send the annotation to the notes; absent hides the button. */
   onInsert?: (a: Annotation) => void;
+  /** It opened on `a`, and it closed. */
+  onOpen?: (a: Annotation) => void;
+  onClose?: () => void;
 }
 
 const COMMENT_PAUSE_MS = 700;
@@ -127,6 +131,7 @@ export function createAnnotationPopover(root: HTMLElement, handlers: AnnotationE
     if (top + h > host.height - 8) top = anchor.top - host.top - h - 8;
     el.style.left = `${Math.max(8, Math.min(left, host.width - w - 8))}px`;
     el.style.top = `${Math.max(8, Math.min(top, host.height - h - 8))}px`;
+    handlers.onOpen?.(a);
   }
 
   function close(): void {
@@ -137,11 +142,14 @@ export function createAnnotationPopover(root: HTMLElement, handlers: AnnotationE
     // every key.
     if (el.contains(document.activeElement)) (document.activeElement as HTMLElement).blur();
     el.style.display = "none";
+    handlers.onClose?.();
   }
 
-  // A press anywhere else closes it; so does Escape.
+  // A press anywhere else closes it — but on the passage's handles,
+  // which belong to it; so does Escape.
   const onDown = (e: PointerEvent) => {
-    if (current && !el.contains(e.target as Node)) close();
+    const t = e.target as Element;
+    if (current && !el.contains(t) && !t.closest?.(".pdf-annot-handle")) close();
   };
   const onKey = (e: KeyboardEvent) => {
     if (current && e.key === "Escape") close();
@@ -153,9 +161,13 @@ export function createAnnotationPopover(root: HTMLElement, handlers: AnnotationE
     open,
     close,
     isOpen: () => current !== null,
-    /** Annotations changed (a sync, an edit): close if this one is gone. */
+    /** Annotations changed (a sync, an edit): follow this one's new
+     *  version, or close if it is gone. */
     sync(list: Annotation[]): void {
-      if (current && !list.some((a) => a.key === current!.key)) {
+      if (!current) return;
+      const fresh = list.find((a) => a.key === current!.key);
+      if (fresh) current = fresh;
+      else {
         current = null;
         close();
       }

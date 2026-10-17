@@ -297,15 +297,17 @@ async fn ai_get_abstract(
 // ---------------------------------------------------------------------------
 
 /// One turn of a conversation, sent back with every request (the
-/// providers are stateless).
+/// providers are stateless). `mode` "explain" is the reader's short
+/// explainer of a passage.
 #[tauri::command]
 async fn ai_chat(
     app: AppHandle,
     state: State<'_, AppState>,
     context: String,
     messages: Vec<ai::Turn>,
+    mode: Option<String>,
 ) -> Result<ai::ChatReply> {
-    ai::chat(&app, &state, context, messages).await
+    ai::chat(&app, &state, context, messages, mode).await
 }
 
 /// Name a conversation from its first exchange.

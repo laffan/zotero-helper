@@ -188,6 +188,7 @@ export async function sendChatMessage(
         role: m.role,
         content: m.content,
       })),
+      mode: working.mode ?? null,
     });
     const cost = usageCost(reply.model, reply.usage);
     const answered: ChatMessage = {

@@ -5,15 +5,19 @@
 // this component only mounts it, feeds it the cached PDF and the
 // entry's Zotero annotations, and routes what it hands back: a selected
 // passage or a highlight into the notes, a page's bookmark to
-// lib/bookmarks.ts, and new or edited highlights to Zotero
-// (lib/annotationEdits.ts).
+// lib/bookmarks.ts, new or edited highlights to Zotero
+// (lib/annotationEdits.ts), and a passage to explain to the AI
+// (lib/ai/explain.ts, shown in ExplainChat).
 import { useEffect, useRef, useState } from "react";
 import { openInZotero } from "../lib/actions";
+import { startExplain } from "../lib/ai/explain";
+import { aiConnected } from "../lib/ai/models";
 import {
   canEditAnnotation,
   createAnnotation,
   deleteAnnotation,
   newItemKey,
+  notePenActivity,
   updateAnnotation,
 } from "../lib/annotationEdits";
 import {
@@ -31,6 +35,7 @@ import { invoke } from "../lib/tauri";
 import type { ViewerCommand } from "../pdfviewer/commands";
 import type { SearchOptions, SearchStatus } from "../pdfviewer/search";
 import type { PdfViewer } from "../pdfviewer/viewer";
+import { ExplainChat } from "./ExplainChat";
 import { Spinner } from "./Icons";
 import { OutlinePanel } from "./OutlinePanel";
 
@@ -189,6 +194,16 @@ export function ReaderPane() {
           onRenameBookmark: renameBookmark,
           onRemoveBookmark: removeBookmark,
           onQuote: (text, page) => addToNotes(`> ${text}\n\n— ${cite(page)}`),
+          onExplain: (text, page) =>
+            void viewer
+              ?.pageText(page)
+              .catch(() => "")
+              .then((words) => startExplain(itemKey, text, page, words)),
+          canExplain: () => aiConnected(settings()),
+          commandLatched: () => {
+            const s = useStore.getState();
+            return s.readingMode && s.commandLatch;
+          },
           onInsertAnnotation: (a: Annotation) => addToNotes(annotationMarkdown(settings(), a)),
           annotate: {
             create: (d, type, color) =>
@@ -215,6 +230,7 @@ export function ReaderPane() {
             update: updateAnnotation,
             remove: deleteAnnotation,
             canEdit: (a) => canEditAnnotation(a, settings()),
+            writing: notePenActivity,
           },
           onOutline: (o) => setOutline(attKey, o),
           onReadingMode: () => {
@@ -308,6 +324,7 @@ export function ReaderPane() {
       ) : (
         <>
           <div className="reader-host" ref={hostRef} />
+          <ExplainChat />
           {state !== "ready" && (
             <div className="reader-status">
               {state === "loading" ? (

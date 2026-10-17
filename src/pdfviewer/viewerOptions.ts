@@ -19,6 +19,13 @@ export interface PdfViewerOptions {
   onRemoveBookmark?: (id: string) => void;
   /** Quote selected text into the notes. */
   onQuote?: (text: string, page: number) => void;
+  /** Ask the AI about selected text (the selection bar's sparkles),
+   *  offered while `canExplain` says a service is connected. */
+  onExplain?: (text: string, page: number) => void;
+  canExplain?: () => boolean;
+  /** A plain tap marks the sentence under it, as a ⌘-click does
+   *  (reading mode's ⌘ button). */
+  commandLatched?: () => boolean;
   /** Send an annotation to the notes (its editor's Add to notes). */
   onInsertAnnotation?: (a: Annotation) => void;
   /** Make, change and delete annotations; absent, they are read-only. */
@@ -39,5 +46,10 @@ export interface PdfViewerOptions {
 /** Highlights and underlines (from a text selection) and ink (ink/). */
 export interface AnnotationWriter extends InkWriter {
   create: (draft: AnnotationDraft, type: MarkType, color: string) => void;
-  update: (key: string, patch: { color?: string; comment?: string; position?: string; sortIndex?: string }) => void;
+  /** `text` and `position` together: a highlight's passage moved by
+   *  its handles. */
+  update: (
+    key: string,
+    patch: { color?: string; comment?: string; position?: string; sortIndex?: string; text?: string },
+  ) => void;
 }

@@ -81,6 +81,9 @@ interface UiPrefs {
    *  panels or bottom bar (App.tsx, readingmode.css). This session's
    *  only, and over when the PDF closes. */
   readingMode: boolean;
+  /** Reading mode's ⌘ button is on: a tap on a line marks its sentence,
+   *  as a ⌘-click does (ReadingModeExit.tsx). Off with reading mode. */
+  commandLatch: boolean;
   /** Settings → General (lib/appearance.ts). */
   appearance: Appearance;
   /** The UI's base font size, px (13 is the size it was drawn at). */
@@ -144,6 +147,9 @@ interface AppStore extends UiPrefs {
   selectedChatId: string | null;
   /** Id of the chat waiting on a reply, so its input can lock. */
   chatBusy: string | null;
+  /** The explainer open over the PDF (ExplainChat.tsx): its chat, and
+   *  the first question, still to be asked when its chat is new. */
+  explain: { chatId: string; question?: string } | null;
   /** A gathered request sitting behind the cost popup. */
   pendingAsk: PendingAsk | null;
   /** True while the works are being read, before the popup appears —
@@ -196,6 +202,7 @@ interface AppStore extends UiPrefs {
   deleteChat: (id: string) => void;
   selectChat: (id: string | null) => void;
   setChatBusy: (id: string | null) => void;
+  setExplain: (e: { chatId: string; question?: string } | null) => void;
   setPendingAsk: (ask: PendingAsk | null) => void;
   setAskPreparing: (b: boolean) => void;
 
@@ -206,6 +213,7 @@ interface AppStore extends UiPrefs {
   setMetaHidden: (b: boolean) => void;
   setOutlineOpen: (b: boolean) => void;
   setReadingMode: (b: boolean) => void;
+  setCommandLatch: (b: boolean) => void;
   setAppearance: (a: Appearance) => void;
   setUiFontSize: (px: number) => void;
   /** Open (or close, with null) a PDF. The right panel comes up on
@@ -215,6 +223,8 @@ interface AppStore extends UiPrefs {
   setPdfDownloading: (attKey: string, on: boolean) => void;
 
   upsertItem: (item: ZItem) => void;
+  /** Several at once: one store change, one re-render. */
+  upsertItems: (items: ZItem[]) => void;
   removeItem: (key: string) => void;
   patchItemData: (key: string, patch: Record<string, unknown>) => void;
 
@@ -255,6 +265,7 @@ export const useStore = create<AppStore>()(
       metaHidden: false,
       outlineOpen: false,
       readingMode: false,
+      commandLatch: false,
       appearance: "system" as Appearance,
       uiFontSize: 13,
       uiTasks: [],
@@ -280,6 +291,7 @@ export const useStore = create<AppStore>()(
       chats: [],
       selectedChatId: null,
       chatBusy: null,
+      explain: null,
       pendingAsk: null,
       askPreparing: false,
       reading: null,
@@ -399,6 +411,7 @@ export const useStore = create<AppStore>()(
         })),
       selectChat: (selectedChatId) => set({ selectedChatId, metaOpen: false }),
       setChatBusy: (chatBusy) => set({ chatBusy }),
+      setExplain: (explain) => set({ explain }),
       setPendingAsk: (pendingAsk) => set({ pendingAsk }),
       setAskPreparing: (askPreparing) => set({ askPreparing }),
 
@@ -408,7 +421,8 @@ export const useStore = create<AppStore>()(
       setSidebarHidden: (sidebarHidden) => set({ sidebarHidden }),
       setMetaHidden: (metaHidden) => set({ metaHidden }),
       setOutlineOpen: (outlineOpen) => set({ outlineOpen }),
-      setReadingMode: (readingMode) => set({ readingMode }),
+      setReadingMode: (readingMode) => set(readingMode ? { readingMode } : { readingMode, commandLatch: false }),
+      setCommandLatch: (commandLatch) => set({ commandLatch }),
       setAppearance: (appearance) => set({ appearance }),
       setUiFontSize: (uiFontSize) => set({ uiFontSize }),
       setReading: (reading, tab = "highlights") => {
@@ -420,7 +434,7 @@ export const useStore = create<AppStore>()(
         set(
           reading
             ? { reading, metaTab: tab, sidebarOpen: false, metaOpen: false }
-            : { reading, readingMode: false },
+            : { reading, readingMode: false, commandLatch: false, explain: null },
         );
       },
       setCachedPdfs: (list) =>
@@ -432,12 +446,17 @@ export const useStore = create<AppStore>()(
             : s.pdfsDownloading.filter((k) => k !== attKey),
         })),
 
-      upsertItem: (item) =>
+      upsertItem: (item) => get().upsertItems([item]),
+      upsertItems: (list) =>
         set((s) => {
-          const items = s.library.items.slice();
-          const idx = items.findIndex((i) => i.key === item.key);
-          if (idx >= 0) items[idx] = item;
-          else items.push(item);
+          if (!list.length) return s;
+          const byKey = new Map(list.map((i) => [i.key, i]));
+          const items = s.library.items.map((i) => {
+            const next = byKey.get(i.key);
+            if (next) byKey.delete(i.key);
+            return next ?? i;
+          });
+          items.push(...byKey.values());
           return { library: { ...s.library, items } };
         }),
       removeItem: (key) =>

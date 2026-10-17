@@ -16,6 +16,15 @@
 //  - Canvas resolution is capped per page (iOS has hard canvas limits).
 //  - `scheduleSettle()` is the crisp pass after a zoom or resize: in the
 //    meantime existing rasters are only CSS-stretched.
+//  - A redraw at the same zoom (a repaint after an annotation changed, a
+//    sharper raster under a pinch) swaps only the canvas: the content
+//    box and its text layer stay, so a selection being made in it isn't
+//    lost, and the text isn't laid out again.
+//  - The Pencil comes first. No render starts while it is down; one
+//    under way when it comes down is stopped and started again after
+//    (`yieldToPen`), and the text and link layers of a page that
+//    finished meanwhile wait for it to lift — pdf.js draws and lays out
+//    text on the main thread, which the stroke's samples need.
 import { PLAIN, type Resolution } from "./magnify";
 import { adoptViewport, pageViewport } from "./pageSizes";
 import type { LayoutMode, PageRecord, PageViewport, PDFDocumentProxy, PDFPageProxy } from "./types";
@@ -125,6 +134,8 @@ export function createPageRenderer(scrollArea: HTMLElement, env: RendererEnv) {
   let queue: number[] = [];
   let inFlight = 0;
   const inFlightIdx = new Set<number>();
+  // Renders stopped for the pen, to start again once it lifts.
+  const resume = new Set<number>();
   let lastRange: [number, number] | null = null;
   // Pages still showing a raster that is waiting to be redrawn (see
   // repaint) — uncounted in renderedBytes, so let go of explicitly.
@@ -242,6 +253,7 @@ export function createPageRenderer(scrollArea: HTMLElement, env: RendererEnv) {
         .finally(() => {
           inFlight--;
           inFlightIdx.delete(idx);
+          if (resume.delete(idx) && !queue.includes(idx)) queue.unshift(idx);
           pump();
         });
     }
@@ -305,6 +317,10 @@ export function createPageRenderer(scrollArea: HTMLElement, env: RendererEnv) {
     try {
       const page = await pdfDoc.getPage(idx + 1);
       if (env.isDestroyed() || p.cancelled || pages !== env.getPages()) return;
+      if (env.holdRenders?.()) {
+        resume.add(idx);
+        return;
+      }
 
       // Wrappers are seeded from the typical page's size; adopt the
       // real one (brought to the typical size if far from it) the first
@@ -347,15 +363,25 @@ export function createPageRenderer(scrollArea: HTMLElement, env: RendererEnv) {
       // the whole sandwich together.
       const cssW = Math.round(p.viewport.width * scale);
       const cssH = Math.round(p.viewport.height * scale);
-      const content = document.createElement("div");
-      content.className = "pdf-page-content";
-      content.style.width = `${cssW}px`;
-      content.style.height = `${cssH}px`;
-      content.appendChild(canvas);
-      p.wrapper.querySelector(".pdf-page-placeholder")?.remove();
-      p.contentEl?.remove();
-      releaseCanvas(p.canvas); // a repaint's old raster
-      p.wrapper.insertBefore(content, p.wrapper.firstChild);
+      const old = p.contentEl;
+      const oldCanvas = old?.querySelector<HTMLCanvasElement>(":scope > canvas.pdf-page-canvas");
+      const sameBox = Boolean(old?.isConnected && oldCanvas && p.renderedZoom === scale && p.contentW === cssW);
+      let content: HTMLDivElement;
+      if (sameBox && old && oldCanvas) {
+        content = old;
+        oldCanvas.replaceWith(canvas);
+        releaseCanvas(p.canvas);
+      } else {
+        content = document.createElement("div");
+        content.className = "pdf-page-content";
+        content.style.width = `${cssW}px`;
+        content.style.height = `${cssH}px`;
+        content.appendChild(canvas);
+        p.wrapper.querySelector(".pdf-page-placeholder")?.remove();
+        p.contentEl?.remove();
+        releaseCanvas(p.canvas); // a repaint's old raster
+        p.wrapper.insertBefore(content, p.wrapper.firstChild);
+      }
       p.contentEl = content;
       p.contentW = cssW;
       p.contentH = cssH;
@@ -368,8 +394,8 @@ export function createPageRenderer(scrollArea: HTMLElement, env: RendererEnv) {
       p.canvasBytes = canvas.width * canvas.height * 4;
       renderedBytes += p.canvasBytes;
       const curW = parseFloat(p.wrapper.style.width) || cssW;
-      if (Math.abs(curW - cssW) > 0.5) content.style.transform = `scale(${curW / cssW})`;
-      env.onPageRendered(idx, page);
+      if (!sameBox && Math.abs(curW - cssW) > 0.5) content.style.transform = `scale(${curW / cssW})`;
+      afterPen(() => p.contentEl === content && env.onPageRendered(idx, page));
     } catch (e) {
       if (!isCancelError(e)) console.error(`Failed to render page ${idx + 1}:`, e);
     } finally {
@@ -380,6 +406,34 @@ export function createPageRenderer(scrollArea: HTMLElement, env: RendererEnv) {
       if (!p.rendered) {
         p.wrapper.querySelector(".pdf-page-placeholder")?.classList.remove("loading");
       }
+    }
+  }
+
+  /** Run `fn` now, or once the Pencil has lifted. */
+  function afterPen(fn: () => void): void {
+    if (env.isDestroyed()) return;
+    if (!env.holdRenders?.()) fn();
+    else window.setTimeout(() => afterPen(fn), HOLD_RETRY_MS);
+  }
+
+  /** The Pencil came down: stop the renders under way, to start them
+   *  again once it lifts (a repaint keeps its old raster meanwhile). */
+  function yieldToPen(): void {
+    const pages = env.getPages();
+    for (const idx of inFlightIdx) {
+      const p = pages[idx];
+      if (!p?.renderTask) continue;
+      p.cancelled = true;
+      try {
+        p.renderTask.cancel();
+      } catch {
+        /* already finished */
+      }
+      resume.add(idx);
+    }
+    if (resume.size) {
+      clearTimeout(holdTimer);
+      holdTimer = window.setTimeout(pump, HOLD_RETRY_MS);
     }
   }
 
@@ -396,6 +450,7 @@ export function createPageRenderer(scrollArea: HTMLElement, env: RendererEnv) {
   function clearPage(idx: number): void {
     const p = env.getPages()[idx];
     stale.delete(idx);
+    resume.delete(idx);
     if (!p) return;
     if (p.rendering) {
       p.cancelled = true;
@@ -477,6 +532,7 @@ export function createPageRenderer(scrollArea: HTMLElement, env: RendererEnv) {
   function reset(): void {
     for (const p of env.getPages()) releaseCanvas(p.canvas);
     stale.clear();
+    resume.clear();
     queue = [];
     lastRange = null;
     renderedBytes = 0;
@@ -502,6 +558,7 @@ export function createPageRenderer(scrollArea: HTMLElement, env: RendererEnv) {
     clearAll,
     repaint,
     refreshResolution,
+    yieldToPen,
     reset,
     destroy,
     invalidateGeometry,

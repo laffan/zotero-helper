@@ -89,6 +89,7 @@ export const FIXED_SHORTCUTS: { context: string; keys: string; label: string }[]
   { context: "PDF viewer", keys: "mod+-", label: "Zoom out" },
   { context: "PDF viewer", keys: "mod+0", label: "Back to the default layout" },
   { context: "PDF viewer", keys: "ctrl", label: "Hold over the pages to trim their edges" },
+  { context: "PDF viewer", keys: "mod", label: "Click on a line: highlight its sentence" },
   { context: "PDF search", keys: "enter", label: "Next match (⇧ for the previous)" },
   { context: "Drawing", keys: "mod+z", label: "Undo (⇧ to redo)" },
   { context: "Drawing", keys: "backspace", label: "Delete the selected drawings" },

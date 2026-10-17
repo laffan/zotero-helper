@@ -1,6 +1,8 @@
 // Thumbnail grid over the whole viewer — every page at a glance, with
 // Zotero's annotations painted in. Ported from Hush's
-// src/pdf/pdf-viewer-thumbnails.js.
+// src/pdf/pdf-viewer-thumbnails.js. The same grid is reading mode's
+// page picker (readingProgress.ts): a popup over the pages, the page
+// being read marked and in view, the outline in a column beside it.
 import type { Annotation } from "../lib/highlights";
 import { drawAnnotations } from "./paint";
 import { releaseCanvas } from "./render";
@@ -30,13 +32,43 @@ export function createThumbnailManager(root: HTMLElement, env: ThumbnailEnv) {
     return visible;
   }
 
-  function show(): void {
+  /** The grid as a page picker: `current` (1-based) marked and in view,
+   *  `side` beside the grid. A press on the backdrop or Escape closes it. */
+  function showPicker(current: number, side: HTMLElement | null): void {
+    if (visible) hide();
+    visible = true;
+    show(current, side);
+  }
+
+  const onKey = (e: KeyboardEvent) => {
+    if (e.key !== "Escape" || !visible) return;
+    e.preventDefault();
+    e.stopPropagation();
+    close();
+  };
+  function close(): void {
+    visible = false;
+    hide();
+    env.onHide();
+  }
+
+  function show(current?: number, side?: HTMLElement | null): void {
     const pages = env.getPages();
+    const picker = current !== undefined;
     panel = document.createElement("div");
-    panel.className = "pdf-thumbnail-overlay";
+    panel.className = picker ? "pdf-thumbnail-overlay pdf-thumb-picker" : "pdf-thumbnail-overlay";
     const scroll = document.createElement("div");
     scroll.className = "pdf-thumbnail-scroll";
-    panel.appendChild(scroll);
+    if (picker) {
+      const box = document.createElement("div");
+      box.className = "pdf-thumb-picker-box";
+      if (side) box.appendChild(side);
+      box.appendChild(scroll);
+      panel.appendChild(box);
+      panel.addEventListener("click", (e) => e.target === panel && close());
+      // Before the reading mode's own Escape (ReadingModeExit.tsx).
+      window.addEventListener("keydown", onKey, true);
+    } else panel.appendChild(scroll);
 
     pages.forEach((p, i) => {
       const cell = document.createElement("div");
@@ -51,15 +83,16 @@ export function createThumbnailManager(root: HTMLElement, env: ThumbnailEnv) {
       label.className = "pdf-thumb-label";
       label.textContent = String(i + 1);
       cell.appendChild(label);
+      if (i + 1 === current) cell.classList.add("current");
       cell.addEventListener("click", () => {
         env.goToPage(i + 1);
-        visible = false;
-        hide();
-        env.onHide();
+        close();
       });
       scroll.appendChild(cell);
     });
     root.appendChild(panel);
+    const here = picker ? scroll.children[(current ?? 1) - 1] : null;
+    if (here instanceof HTMLElement) scroll.scrollTop = here.offsetTop - scroll.clientHeight / 2 + here.offsetHeight / 2;
 
     observer = new IntersectionObserver(
       (entries) => {
@@ -96,6 +129,7 @@ export function createThumbnailManager(root: HTMLElement, env: ThumbnailEnv) {
   }
 
   function hide(): void {
+    window.removeEventListener("keydown", onKey, true);
     observer?.disconnect();
     observer = null;
     // Dropped rather than hidden: keeping it would pin every rendered
@@ -134,5 +168,5 @@ export function createThumbnailManager(root: HTMLElement, env: ThumbnailEnv) {
     visible = false;
   }
 
-  return { toggle, destroy };
+  return { toggle, showPicker, close, destroy };
 }

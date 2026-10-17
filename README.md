@@ -22,10 +22,12 @@ Windows/Linux desktops too).
   same ink annotations Zotero's reader makes), a folded view of just the
   annotated passages, a paged view of one to three pages at a time (with
   an adjustable reading crop), a full-screen reading mode, pinch to
-  magnify, search, outlines and page citations into the notes.
-- **AI helpers (optional)** — tidy metadata, extract abstracts, and ask
-  questions of abstracts or full papers with page-cited answers, using
-  Anthropic or OpenAI models.
+  magnify, search, outlines and page citations into the notes;
+  ⌘-click marks a whole sentence, and a highlight's ends can be dragged.
+- **AI helpers (optional)** — tidy metadata, extract abstracts, ask
+  questions of abstracts or full papers with page-cited answers, and
+  have a selected passage explained in a few lines, using Anthropic or
+  OpenAI models.
 - **Keyboard first** — rebindable shortcuts for moving between panes, the
   list, and the viewer's modes (Settings → Keyboard Shortcuts).
 - **Your look** — light, dark or system appearance and an adjustable UI font

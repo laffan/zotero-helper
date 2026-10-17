@@ -59,7 +59,8 @@ src/            React + TypeScript UI (Vite, zustand, MiniSearch)
                 drag-and-drop, PDF-pattern bookkeeping
   lib/ai/       the AI features: toolbar actions (index), the model
                 catalog and its prices (models), gathering works to ask
-                about (context), conversations (chat), export
+                about (context), conversations (chat), the reader's
+                explainer of a passage (explain), export
   lib/bookmarks.ts
                 the reader's bookmarks: the store, its file (through
                 src-tauri/src/bookmarks.rs), and each as an entry for
@@ -98,7 +99,8 @@ src/            React + TypeScript UI (Vite, zustand, MiniSearch)
   components/   toolbar, sidebar, virtualized item list, metadata panel
                 and its tabs (Highlights, Notes — NotesPrompts is an
                 empty note's reading questions), reader pane (and
-                ReadingModeExit, reading mode's way back), terminal,
+                ReadingModeExit, reading mode's way back and its ⌘
+                button; ExplainChat, the explainer's window), terminal,
                 import/rescue modals
   components/settings/
                 the settings page: SettingsView (section list, the
@@ -120,11 +122,18 @@ src/            React + TypeScript UI (Vite, zustand, MiniSearch)
                 keyboard's viewer commands: modes, page and fold
                 steps), crop (the paged view's trimmed reading),
                 citeMark (an AI citation's passage, marked), and
-                annotating: selectionBar (colours over a selection),
+                annotating (the pieces below, put together):
+                selectionBar (colours over a selection),
                 annotate (selection → Zotero position, tap hit-test),
-                annotPopover (colour / comment / delete);
+                annotPopover (colour / comment / delete),
+                highlightHandles (a highlight's ends, dragged),
+                sentenceMark (⌘-click marks a sentence), textHit
+                (the text under a point);
                 viewerOptions (what the host hands the viewer),
-                textSelect (selections that narrow), magnify (the
+                textSelect (selections that narrow), selectGuard
+                (a selection's leap to a page's end, undone),
+                readingProgress (reading mode's page indicator and
+                page picker), magnify (the
                 pinch's loupe over the pages), pageSizes (odd-sized
                 pages brought to the typical page's size)
   pdfviewer/ink/
@@ -470,7 +479,13 @@ however hard the flick (CSS scroll snapping, so the renderer and
 everything over the pages is unchanged). A mouse wheel notch or a
 trackpad swipe turns one set too, as do the arrow keys; zooming in goes back
 to continuous, since pages larger than the view have no single place
-to rest. Switching scroll direction keeps the page in view. It adds what note-taking needs: selectable text with
+to rest. Switching scroll direction keeps the page in view, and a
+resize (reading mode in or out, a panel opening) keeps the set: the
+one shown when it began is put back, centred, once the pages are laid
+out again (`watchResize` in `anchor.ts` — the browser may otherwise
+settle on the neighbouring set, and WebKit may not snap again at all,
+leaving the set off-centre); side by side, the view is never left
+scrolled vertically. It adds what note-taking needs: selectable text with
 an *Add to notes* bubble that quotes the passage, inserted at the caret
 with a `zotero://` link to the page (the bookmark button at the top
 right of each page is under "Bookmarks" below). A selection follows
@@ -479,6 +494,19 @@ the pointer back as well as forward: pdf.js's own viewer keeps an empty
 the gaps between lines doesn't make WebKit extend it to the end of the
 page; the viewer's bare text layer lacked it, so a drag could only grow
 (`src/pdfviewer/textSelect.ts`, ported from pdf.js's TextLayerBuilder).
+WebKit still sometimes makes the moving end leap, in one step, from the
+line under the finger to the very start or end of the page's text —
+selecting the rest of the page, or all before it. `selectGuard.ts`
+compares each change of a selection in the pages with the one before:
+when one end stays put and the other moves more than three lines at
+once to within the first or last two spans of a page, the selection is
+put back as it was, and the next move of the finger carries on from
+there. A real drag reaches a page's end a line or two at a time, and
+crossing from the end of one page onto the next is allowed, so neither
+is caught; keyboard selections and triple clicks are left alone. A
+page redrawn at the same zoom (a repaint after a sync, a sharper raster
+under a pinch) swaps only its canvas: the text layer — and a selection
+being made in it — stays (`render.ts`).
 While the
 PDF is open, a faint link icon sits at the left edge of the line being
 written; pressing it heads the line with the page in view —
@@ -497,7 +525,17 @@ viewer refits the pages to the room through its own resize handling.
 On the iPad the band kept clear above the app for the status bar and
 window controls goes to the pages too. A red ring at the top left
 (below that band on the iPad) — or Escape — brings everything back as
-it was (`ReadingModeExit.tsx`). It lasts the session and ends when the
+it was (`ReadingModeExit.tsx`). Below the ring, a red ⌘ button of the
+same size stands in for the key without a keyboard: while it is on
+(filled), a tap on a line marks its sentence as a ⌘-click does (see
+Highlighting); it turns off with reading mode. The bottom bar's page
+indicator ("7 / 13") floats at the bottom centre of the screen, 20px
+up, and a press on it opens the page picker — the thumbnail grid as a
+popup over the pages, the page being read marked and in view, with the
+PDF's outline (when it has one) as a column at its left, the section
+being read marked; a thumbnail or a heading goes there and closes it,
+as do Escape and a press outside, without leaving reading mode
+(`readingProgress.ts`, `thumbnails.ts`). It lasts the session and ends when the
 PDF closes. Ink mode carries on in it: the Pencil writes, its double-tap
 switches to the eraser, ⌘Z undoes; the bar's other tools wait for the
 bar. On a touch screen every button in the bottom bar is finger-sized
@@ -597,7 +635,9 @@ size, and the renderer rasterises at the resulting scale.
 above the passage (below it only when the passage starts at the top
 of the view), on iPad as on the Mac:
 Zotero's eight colours, a highlight / underline switch beside them
-(remembered between selections), and *Add to notes*. A colour marks
+(remembered between selections), *Add to notes*, and — with an AI
+service connected — the AI's sparkles, which open the explainer (see
+AI). A colour marks
 the passage the way Zotero's own reader does — as an annotation
 item, child of the PDF attachment, with the same position, page
 label and sort-index fields — so Zotero desktop, iOS and the web
@@ -609,7 +649,22 @@ browser alone ignores taps on the unselectable parts of a page, and
 on iPad clears a selection only after its tap gestures settle).
 Tapping a highlight or underline opens a
 small editor: colour, comment, *Add to notes*, and *Delete* (a
-second press confirms). The mark shows at once; the write goes into
+second press confirms) — and puts a handle at each end of the passage,
+a bar the height of the line with a knob above the start and below the
+end, as the system's selection handles look. Dragging one moves that
+end through the text by words, the other end staying put, with the new
+extent drawn as it goes; letting go writes the new passage (rects, text
+and sort index) as an edit of the same annotation, so its colour,
+comment and key are kept. Over the gap between lines the dragged end
+stays where it last was on a line (`textHit.ts`,
+`highlightHandles.ts`). ⌘-clicking a line marks the sentence it falls
+in, at once, as the bar's switch is set and in the colour last chosen
+there: a sentence runs between two ".", "!" or "?" followed by a space
+and a capital, a digit or an opening quote, so "e.g." and "3.5" don't
+end one, nor do common abbreviations or initials; it never runs past
+its page or more than 800 characters either way. ⌘ is read from its
+own key events, as the reading crop reads ⌃ (`sentenceMark.ts`). The
+mark shows at once; the write goes into
 an outbox on the device (`annotations-outbox.json`) and is pushed a
 moment later, every couple of minutes while anything waits, when the
 app goes to the background and when it comes back online — so
@@ -659,7 +714,8 @@ a dragged box touches; a drag from inside the selection moves it, the
 colours and width restyle it, ⌫ deletes it. Whatever the tool, a
 finger is the select tool on drawings: one landing on a drawing's line
 (within 16px) or on the selection selects it and drags it, and the bar's
-colours, width and Delete then act on it; a finger anywhere else scrolls
+colours, width and Delete then act on it, until a tap off it or a new
+text selection lets go of it; a finger anywhere else scrolls
 and selects text as ever (its touch isn't cancelled — `fingerGrabs`
 decides at touchstart and pointerdown alike). The tool, colour and sizes
 are this device's (`localStorage`, `zh-ink`). Only drawings this app may
@@ -725,7 +781,9 @@ Why it keeps up with fast writing:
   (Hush measured it). Coalesced events are used off iOS only, as in
   Hush.
 - *Nothing written while writing.* A change reaches the store and the
-  annotation outbox only once the pen has rested 1.2s (or after 15s of
+  annotation outbox only once the pen has rested 2s — past the pause
+  between two words or two lines, so the write doesn't land on the start
+  of the next stroke (or after 15s of
   unbroken writing, at the next pen-up; and at once on leaving ink mode, closing the
   PDF, or the app going to the background — ahead of the push that same
   event starts). Store writes re-render React and outbox writes are IPC;
@@ -733,6 +791,20 @@ Why it keeps up with fast writing:
   session's changes override the store's copy, so a sync landing
   mid-sentence can't undo it, and the store's echo of a write is
   recognised by its position string and draws nothing.
+- *What a write sets off is small.* The changes of one flush (and the
+  results of one push) reach the store as one update, so React renders
+  once (`upsertItems`, batched in `annotationEdits.ts`). Rebuilding the
+  library's annotation index after it reuses the annotation of every
+  item the write didn't touch (`normalize` in `lib/highlights.ts`), and
+  ink mode keeps each one's parsed drawing with it — so a write no
+  longer re-reads every drawing in the PDF. No push starts within 5s of
+  the pen writing (`notePenActivity`): its results are a store write too.
+- *The pages wait for the pen.* No page render starts while it is down,
+  and one under way when it comes down is stopped and started again
+  once it lifts (`yieldToPen` in `render.ts`); a page that finished
+  meanwhile lays out its text and links only after. pdf.js draws and
+  lays out text on the main thread, in slices that would cost the
+  stroke its samples.
 
 Measured in Chromium (`npm run dev`, the viewer driven with synthetic pen
 events): about 0.01ms of script per pen sample, and under 1ms on average
@@ -829,6 +901,21 @@ Questions (leaving the PDF). A conversation opens in the tab, in place of the
 list, so it can be read beside the PDF; one started while a PDF is open
 opens there too, rather than moving the hidden library to Questions
 (`confirmAsk`).
+
+**The explainer.** The selection bar's sparkles (shown with a service
+connected, to the right of *Add to notes*) open a small conversation
+about the selected passage, floating over the pages at the bottom
+right — reading mode included — and ask "Can you explain “…”?" at
+once (`lib/ai/explain.ts`, `ExplainChat.tsx`). Follow-ups are typed
+beneath it; × or Escape closes the window, not the conversation. It is
+an ordinary conversation about the entry, named after its passage,
+saved with the others and listed in the entry's conversations tab and
+in Questions ("Open in panel" carries it on there). Two things differ:
+the backend answers it under its own system prompt, which keeps every
+reply under 100 words (`ai_chat`'s `mode` "explain",
+`src-tauri/src/ai/chat.rs`), and there is no cost popup first, since
+what it sends is small — the work's metadata and abstract and the text
+of the passage's page.
 
 **AI Tidy Metadata** — with an API key configured, selected items are
 cleaned up by the model (grounded in a fresh CrossRef record when a DOI
@@ -1103,7 +1190,7 @@ registers its order and scrolling with); in the details panel ← / →
 switch tabs, ↑ / ↓ scroll and Return goes to the notes.
 
 Built in and not rebindable: the viewer's ⌘+ / ⌘- / ⌘0 zoom, holding ⌃
-for trimmed reading, Enter / ⇧Enter in the PDF search, ink mode's ⌘Z /
+for trimmed reading, ⌘-click on a line to highlight its sentence, Enter / ⇧Enter in the PDF search, ink mode's ⌘Z /
 ⇧⌘Z and ⌫ (handled by ink mode itself, outside text fields, so a
 field's own undo keeps ⌘Z), and the notes' ⌘I / ⌘B / ⌘= / ⌘K and `?` —
 they're listed at the foot of the settings section (`FIXED_SHORTCUTS`).

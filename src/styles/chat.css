@@ -554,3 +554,67 @@
   margin: 8px 12px 0;
   font-size: calc(12px * var(--font-scale));
 }
+
+/* --- the reader's explainer (ExplainChat.tsx): a small conversation
+   floating over the pages at the bottom right, reading mode included --- */
+.explain-chat {
+  position: fixed;
+  z-index: 70;
+  right: 16px;
+  bottom: calc(16px + env(safe-area-inset-bottom));
+  display: flex;
+  flex-direction: column;
+  width: min(380px, calc(100vw - 32px));
+  max-height: min(480px, 60vh);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg);
+  box-shadow: 0 10px 34px rgb(0 0 0 / 0.28);
+  overflow: hidden;
+}
+.explain-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 8px 7px 11px;
+  border-bottom: 1px solid var(--border);
+  background: var(--panel);
+  color: var(--accent);
+}
+.explain-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text);
+  font-size: calc(12px * var(--font-scale));
+  font-weight: 600;
+}
+.explain-head .link-btn {
+  font-size: calc(11px * var(--font-scale));
+}
+.explain-scroll {
+  min-height: 80px;
+}
+.explain-compose {
+  display: flex;
+  align-items: flex-end;
+  gap: 6px;
+  padding: 8px 10px 4px;
+  border-top: 1px solid var(--border);
+}
+.explain-compose textarea {
+  flex: 1;
+  min-height: 30px;
+  max-height: 90px;
+  resize: none;
+  font: inherit;
+  font-size: calc(13px * var(--font-scale));
+}
+.explain-meter {
+  padding: 0 10px 7px;
+  color: var(--text-dim);
+  font-size: calc(10px * var(--font-scale));
+  text-align: right;
+}

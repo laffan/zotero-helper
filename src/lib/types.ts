@@ -265,6 +265,10 @@ export interface Chat {
   costUsd: number;
   /** When the last request went out — the cache countdown's zero. */
   lastCallMs: number;
+  /** "explain": a short explainer of one passage, started from the
+   *  reader's selection bar (lib/ai/explain.ts) — another system prompt
+   *  on the backend. Absent for Questions conversations. */
+  mode?: "explain";
 }
 
 /** Where a request is being started from. Everything the AI menu needs

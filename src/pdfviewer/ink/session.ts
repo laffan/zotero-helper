@@ -28,8 +28,11 @@ import {
 } from "./geometry";
 import type { InkAnn, InkLayer } from "./layer";
 
-/** How long the pen rests before its changes are written. */
-const FLUSH_IDLE_MS = 1200;
+/** How long the pen rests before its changes are written — long enough
+ *  to be past the pause between two words or two lines, since the
+ *  write re-renders what watches the library and would land on the
+ *  start of the next stroke. */
+const FLUSH_IDLE_MS = 2000;
 /** Writing without a pause doesn't hold changes back longer than this:
  *  past it they are written at the next pen-up. */
 const FLUSH_MAX_MS = 15_000;

@@ -5,6 +5,11 @@
 //! design: they sit at the head of every request as a cacheable prefix,
 //! so the second and later turns re-read them at the cached rate rather
 //! than paying full price for the same 200 pages.
+//!
+//! An explainer (the reader's selection bar: "explain this passage") is
+//! the same conversation with another system prompt — short answers
+//! about one passage, grounded in the work's metadata and the page it
+//! is on.
 
 use super::{estimate_tokens, send, Ask, AskSchema, Provider, Service, Turn, Usage};
 use super::anthropic;
@@ -39,6 +44,14 @@ Rules: use the numbers you actually read, never a guess, and never a printed fol
 from the work's own bibliography; if the material carries no [[page N]] markers (an \
 abstracts-only conversation), do not cite pages at all; and never invent the [[page N]] markers \
 yourself.";
+
+const EXPLAIN_SYSTEM: &str = "You help a scholar reading a work from their Zotero library \
+understand a passage they have selected in it. Below are the work's metadata and abstract and the \
+text of the page the passage is on, as extracted from the PDF (it can carry artifacts — running \
+heads, footnotes, words broken across lines). Explain what the passage means, what its terms refer \
+to and how it fits the argument around it, drawing on the page and on general knowledge, and say \
+when you are going beyond the material. Keep every answer short: under 100 words, plain prose, \
+no headings — follow-up questions included. Your reply is rendered as Markdown.";
 
 const TITLE_SYSTEM: &str = "You name conversations. Given the first question and answer of a \
 chat about a set of scholarly works, return JSON {\"title\": \"...\"} with a title of at most six \
@@ -75,13 +88,26 @@ fn service_id(service: Service) -> String {
     }
 }
 
+/// Which conversation a chat is: the Questions kind, or an explainer
+/// (`mode` "explain" from the frontend).
+fn is_explainer(mode: Option<&str>) -> bool {
+    mode == Some("explain")
+}
+
 /// Build the request for a chat turn. `context` is the papers; it is
 /// byte-identical on every turn of a chat, which is what makes the
 /// prefix cache hit.
-fn chat_ask(context: &str, messages: Vec<Turn>) -> Ask {
-    let mut ask = Ask::new(format!("{CHAT_SYSTEM}\n\n{context}"), messages);
+fn chat_ask(context: &str, messages: Vec<Turn>, mode: Option<&str>) -> Ask {
+    let system = if is_explainer(mode) {
+        EXPLAIN_SYSTEM
+    } else {
+        CHAT_SYSTEM
+    };
+    let mut ask = Ask::new(format!("{system}\n\n{context}"), messages);
     ask.cache_system = true;
-    ask.max_tokens = 8192;
+    // An explainer's answers are kept short by its prompt; this only
+    // stops a runaway one.
+    ask.max_tokens = if is_explainer(mode) { 1024 } else { 8192 };
     ask
 }
 
@@ -90,9 +116,10 @@ pub async fn chat(
     state: &AppState,
     context: String,
     messages: Vec<Turn>,
+    mode: Option<String>,
 ) -> Result<ChatReply> {
     let provider = Provider::resolve(state).await?;
-    let ask = chat_ask(&context, messages);
+    let ask = chat_ask(&context, messages, mode.as_deref());
     log(
         app,
         "info",
@@ -155,7 +182,7 @@ pub async fn count_tokens(
     messages: Vec<Turn>,
 ) -> Result<TokenCount> {
     let provider = Provider::resolve(state).await?;
-    let ask = chat_ask(&context, messages);
+    let ask = chat_ask(&context, messages, None);
     let rough = || {
         estimate_tokens(&ask.system)
             + ask.messages.iter().map(|m| estimate_tokens(&m.content)).sum::<u64>()

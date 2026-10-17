@@ -20,7 +20,7 @@ function started(ms: number): string {
 
 function contextLine(chat: Chat): string {
   const n = chat.source.itemKeys.length;
-  const depth = chat.source.depth === "full" ? "full text" : "abstracts";
+  const depth = chat.mode === "explain" ? "explainer" : chat.source.depth === "full" ? "full text" : "abstracts";
   const scope =
     chat.source.kind === "folder"
       ? `Folder “${chat.source.label}” · ${n} item${n === 1 ? "" : "s"}`

@@ -1,7 +1,8 @@
 // Keeping the reader's place across a relayout. When the pages change
 // size — the outline or the notes opening beside them, a window resize
 // in a fit mode — the old scroll offset points somewhere else; the
-// place is kept instead as a page and a fraction into it.
+// place is kept instead as a page and a fraction into it. The paged
+// view keeps its set (watchResize).
 import type { PageRecord } from "./types";
 
 export interface ViewAnchor {
@@ -72,4 +73,55 @@ export function pageFracAtCenter(area: HTMLElement, p: PageRecord): number {
   const wr = p.wrapper.getBoundingClientRect();
   const ar = area.getBoundingClientRect();
   return wr.height ? Math.max(0, Math.min(1, (ar.top + area.clientHeight / 2 - wr.top) / wr.height)) : 0;
+}
+
+export interface ResizeEnv {
+  hasPages: () => boolean;
+  /** The view's size changed: cached page geometry is stale. */
+  geometryChanged: () => void;
+  /** The pages are fitted to the view, so a resize lays them out again. */
+  fitsView: () => boolean;
+  relayout: () => void;
+  /** The paged view's set on screen (its first page, 1-based). */
+  shownSet: () => number;
+  isPaged: () => boolean;
+  horizontal: () => boolean;
+  goToPage: (n: number) => void;
+}
+
+/** Follow the view's size. A resize (reading mode in or out, a panel
+ *  opening) also moves where the paged view's sets snap: the browser
+ *  may settle on the neighbouring set before the relayout runs, and
+ *  WebKit may not snap again after it at all, leaving the set
+ *  off-centre. So the set shown when the resize began is put back,
+ *  centred, once the pages are relaid — and side by side the view is
+ *  never left scrolled vertically (the pages fit its height). */
+export function watchResize(area: HTMLElement, env: ResizeEnv): () => void {
+  let timer: number | null = null;
+  let lead: number | null = null;
+  const observer = new ResizeObserver(() => {
+    if (!env.hasPages()) return;
+    lead ??= env.shownSet();
+    // A container resize can re-wrap rows, so cached geometry is stale
+    // either way; fit-mode geometry follows behind a short debounce.
+    env.geometryChanged();
+    if (!env.fitsView()) {
+      lead = null;
+      return;
+    }
+    if (timer) clearTimeout(timer);
+    timer = window.setTimeout(() => {
+      timer = null;
+      const set = lead;
+      lead = null;
+      env.relayout();
+      if (env.horizontal() && area.scrollTop) area.scrollTop = 0;
+      if (env.isPaged() && set) env.goToPage(set);
+    }, 80);
+  });
+  observer.observe(area);
+  return () => {
+    observer.disconnect();
+    if (timer) clearTimeout(timer);
+  };
 }

@@ -160,7 +160,7 @@ function CitePill({
  *  you ask, and a comparison of five papers is a table. The question is
  *  left as typed — nobody writes Markdown into a chat box on purpose,
  *  and an underscore in a title shouldn't turn into emphasis. */
-const Bubble = memo(function Bubble({
+export const Bubble = memo(function Bubble({
   role,
   content,
   source,
@@ -264,7 +264,7 @@ export function ChatPanel({ chat }: { chat: Chat }) {
         <div className="chat-head-title">{chat.title}</div>
         <div className="chat-head-sub">
           {n} work{n === 1 ? "" : "s"} ·{" "}
-          {chat.source.depth === "full" ? "full text" : "abstracts"} ·{" "}
+          {chat.mode === "explain" ? "explainer" : chat.source.depth === "full" ? "full text" : "abstracts"} ·{" "}
           {formatTokens(chat.contextTokens)} tokens · {modelLabel(chat.model)}
         </div>
         {chat.source.missing.length > 0 && (

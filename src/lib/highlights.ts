@@ -60,7 +60,20 @@ export function tidyHighlightText(raw: string): string {
     .trim();
 }
 
+// The Annotation made from each item, kept while the item object is
+// the same: the store replaces the library array on every change but
+// keeps every item it didn't touch, so rebuilding the index after one
+// edit makes one new Annotation, not thousands — and the positions
+// already parsed (ink paths can be large) aren't parsed again.
+const normalized = new WeakMap<ZItem, Annotation>();
+
 function normalize(item: ZItem): Annotation {
+  let a = normalized.get(item);
+  if (!a) normalized.set(item, (a = build(item)));
+  return a;
+}
+
+function build(item: ZItem): Annotation {
   const d = item.data as Record<string, unknown>;
   return {
     key: item.key,

@@ -9,6 +9,12 @@
 // Rust outbox (src-tauri/src/annotations.rs), which is pushed a moment
 // after each change, every couple of minutes while anything waits,
 // when the app goes to the background and when it comes back online.
+//
+// Every store write re-renders what watches the library (the
+// Highlights tab, the viewer's annotations), so writes made together —
+// an ink flush of several drawings, a push's results — reach the store
+// as one; and no push starts while the Pencil is writing, since its
+// results would land in the middle of a stroke (`notePenActivity`).
 import type { Annotation } from "./highlights";
 import { forget, holdDeleted, holdItem, holdPatch } from "./pendingAnnotations";
 import { appLog, useStore } from "./store";
@@ -16,6 +22,8 @@ import { invoke, isTauri } from "./tauri";
 import type { Settings, ZItem } from "./types";
 
 const PUSH_DELAY_MS = 1500;
+/** No push while the pen has written within this long. */
+const PEN_QUIET_MS = 5000;
 const PUSH_EVERY_MS = 2 * 60 * 1000;
 // The server's limits (dataserver Zotero_Items).
 const MAX_TEXT = 7500;
@@ -37,9 +45,11 @@ export type NewAnnotation = {
 export interface AnnotationPatch {
   color?: string;
   comment?: string;
-  /** The position as stored (JSON) — an ink drawing moved or erased. */
+  /** The position as stored (JSON) — an ink drawing moved or erased,
+   *  or a highlight's passage changed by its handles (with `text`). */
   position?: string;
   sortIndex?: string;
+  text?: string;
 }
 
 interface OutboxOp {
@@ -111,14 +121,34 @@ function enqueue(op: OutboxOp): void {
   schedulePush();
 }
 
+// Items on their way into the store, written together once the
+// current task is done.
+const queued = new Map<string, ZItem>();
+function upsertSoon(item: ZItem): void {
+  if (!queued.size) {
+    queueMicrotask(() => {
+      const list = [...queued.values()];
+      queued.clear();
+      useStore.getState().upsertItems(list);
+    });
+  }
+  queued.set(item.key, item);
+}
+
 function show(item: ZItem): void {
   bump(item.key);
   holdItem(item);
-  useStore.getState().upsertItem(item);
+  upsertSoon(item);
 }
 
 function itemOf(key: string): ZItem | undefined {
-  return useStore.getState().library.items.find((i) => i.key === key);
+  return queued.get(key) ?? useStore.getState().library.items.find((i) => i.key === key);
+}
+
+let penAt = -Infinity;
+/** The Pencil is writing: pushes wait until it has rested. */
+export function notePenActivity(): void {
+  penAt = performance.now();
 }
 
 /** Create a highlight, underline or ink drawing. Returns its key. */
@@ -153,6 +183,7 @@ export function updateAnnotation(key: string, patch: AnnotationPatch): void {
   if (patch.comment !== undefined) fields.annotationComment = patch.comment;
   if (patch.position !== undefined) fields.annotationPosition = patch.position;
   if (patch.sortIndex !== undefined) fields.annotationSortIndex = patch.sortIndex;
+  if (patch.text !== undefined) fields.annotationText = patch.text.slice(0, MAX_TEXT);
   const changed = Object.keys(fields).filter((f) => item.data[f] !== fields[f]);
   if (!changed.length) return;
   show({ ...item, data: { ...item.data, ...fields } });
@@ -165,6 +196,7 @@ export function deleteAnnotation(key: string): void {
   if (!item) return;
   bump(key);
   holdDeleted(key);
+  queued.delete(key);
   useStore.getState().removeItem(key);
   enqueue({ key, op: "delete", version: item.version });
 }
@@ -175,7 +207,7 @@ function adopt(r: Pushed): void {
     case "created":
       if (r.item) {
         holdItem(r.item, r.item.version);
-        st.upsertItem(r.item);
+        upsertSoon(r.item);
       }
       break;
     case "updated": {
@@ -183,7 +215,7 @@ function adopt(r: Pushed): void {
       if (!item) break;
       const next = { ...item, version: r.version, data: { ...item.data, version: r.version } };
       holdItem(next, r.version);
-      st.upsertItem(next);
+      upsertSoon(next);
       break;
     }
     case "deleted":
@@ -192,10 +224,12 @@ function adopt(r: Pushed): void {
     case "gone":
       // Deleted in Zotero meanwhile; the next sync confirms it.
       holdDeleted(r.key, st.library.version + 1);
+      queued.delete(r.key);
       st.removeItem(r.key);
       break;
     case "rejected":
       forget(r.key);
+      queued.delete(r.key);
       st.removeItem(r.key);
       appLog("error", `Zotero refused the annotation: ${r.message ?? "no reason given"}`);
       break;
@@ -211,9 +245,15 @@ function schedulePush(delay = PUSH_DELAY_MS): void {
   pushTimer = window.setTimeout(() => void pushAnnotations(), delay);
 }
 
-/** Send whatever is waiting. Quietly does nothing offline. */
+/** Send whatever is waiting. Quietly does nothing offline — and waits
+ *  while the Pencil is writing (unless the app is being put away). */
 export async function pushAnnotations(): Promise<void> {
   if (!isTauri || !navigator.onLine) return;
+  const sincePen = performance.now() - penAt;
+  if (sincePen < PEN_QUIET_MS && document.visibilityState !== "hidden") {
+    schedulePush(PEN_QUIET_MS - sincePen + 100);
+    return;
+  }
   if (pushing) {
     pushAgain = true;
     return;

@@ -12,7 +12,7 @@ import { BOOKMARK_ICON, POPOUT_ICON } from "./icons";
 import { getPdfjs } from "./pdfjs";
 import { enableTextSelection } from "./textSelect";
 import { normalizedViewport } from "./pageSizes";
-import type { PageRecord, PageViewport, PDFPageProxy } from "./types";
+import type { PageRecord, PageViewport, PDFDocumentProxy, PDFPageProxy } from "./types";
 
 export interface PageButtonHandlers {
   onOpenInZotero?: (page: number) => void;
@@ -116,10 +116,11 @@ export function createPageRecords(
 
 /** Lay pdf.js's selectable text over a freshly rendered page. It joins
  *  the content box, so it stretches with the raster and is dropped with
- *  it on eviction. */
+ *  it on eviction — and kept when only the raster was redrawn
+ *  (render.ts), so a selection being made in it survives. */
 export async function attachTextLayer(p: PageRecord, page: PDFPageProxy): Promise<void> {
   const host = p.contentEl;
-  if (!host || !p.renderedZoom) return;
+  if (!host || !p.renderedZoom || host.querySelector(":scope > .textLayer")) return;
   await renderTextLayer(host, page, p.renderedZoom * (p.norm ?? 1), () => p.contentEl === host);
 }
 
@@ -153,4 +154,17 @@ export async function renderTextLayer(
     // A page with no usable text (a scan) simply isn't selectable.
     div.remove();
   }
+}
+
+/** The words on page `n` (1-based), as pdf.js extracts them, a line to
+ *  a line — what an AI explainer of a passage is given of its page. */
+export async function pageText(doc: PDFDocumentProxy, n: number): Promise<string> {
+  const page = await doc.getPage(n);
+  const content = await page.getTextContent();
+  let out = "";
+  for (const item of content.items) {
+    if (!("str" in item)) continue;
+    out += item.str + (item.hasEOL ? "\n" : "");
+  }
+  return out.replace(/[ \t]+/g, " ").trim();
 }

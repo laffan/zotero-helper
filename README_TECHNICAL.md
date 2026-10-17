@@ -350,8 +350,14 @@ of the network.
 (fetches only the current collection's changes — the day-to-day option
 for five-digit libraries), *Sync all changes* (incremental via Zotero's
 `?since=` versioning), and *Full refresh*. Local not-yet-uploaded rows
-are never clobbered, and remote deletions are honored. Folder syncs never
-advance the library version, so nothing elsewhere is ever skipped.
+are never clobbered, and remote deletions are honored — an item or
+collection moved to Zotero's trash counts as deleted (the `?since=`
+fetches ask for the trash with `includeTrashed=1` to see it go). A
+folder sync also asks Zotero which keys the folder holds now and looks
+up any cached item that claims the folder but is not among them, so an
+item removed from the folder, trashed, or deleted outright leaves it.
+Folder syncs never advance the library version, so nothing elsewhere is
+ever skipped.
 Initial downloads are **resumable**: every page is retried with backoff
 and journaled to disk, so flaky Wi-Fi or iPad app suspension resumes
 where it stopped instead of restarting, and a catch-up pass afterwards

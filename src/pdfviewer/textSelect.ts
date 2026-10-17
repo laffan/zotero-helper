@@ -18,11 +18,20 @@
 // That still leaves leaps WebKit makes by itself — the moving end
 // jumping to an end of the page in one step; selectGuard.ts catches
 // those and puts the selection back.
+//
+// A selection made with a finger (or the Pencil) is left to the guard
+// alone. The iPad extends a touch selection by words and keeps
+// re-reading where a resting finger is: with `.endOfContent` moved to
+// just past the moving end after each change, every re-reading could
+// land past it again, and a selection held still crept on down the
+// page a word at a time.
 import { guardSelections, justReverted } from "./selectGuard";
 
 const layers = new Map<HTMLElement, HTMLElement>();
 let listening = false;
 let pointerDown = false;
+/** The last press was a finger's or the Pencil's, not a pointer's. */
+let byTouch = false;
 let prevRange: Range | null = null;
 let native: boolean | undefined;
 
@@ -59,6 +68,10 @@ function onSelectionChange(): void {
   const selection = document.getSelection();
   const all = live();
   if (!selection || selection.rangeCount === 0) {
+    prevRange = null;
+    return resetAll();
+  }
+  if (byTouch) {
     prevRange = null;
     return resetAll();
   }
@@ -108,7 +121,10 @@ function listen(): void {
   if (listening) return;
   listening = true;
   guardSelections();
-  document.addEventListener("pointerdown", () => (pointerDown = true));
+  document.addEventListener("pointerdown", (e) => {
+    pointerDown = true;
+    byTouch = e.pointerType === "touch" || e.pointerType === "pen";
+  });
   document.addEventListener("pointerup", () => {
     pointerDown = false;
     resetAll();
@@ -126,7 +142,7 @@ export function enableTextSelection(layer: HTMLElement): void {
   const end = document.createElement("div");
   end.className = "endOfContent";
   layer.append(end);
-  layer.addEventListener("mousedown", () => layer.classList.add("selecting"));
+  layer.addEventListener("mousedown", () => !byTouch && layer.classList.add("selecting"));
   layers.set(layer, end);
   listen();
 }

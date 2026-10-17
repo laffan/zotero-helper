@@ -5,7 +5,7 @@ import { removeChat } from "../lib/ai/chat";
 import { formatTokens, formatUsd, modelLabel } from "../lib/ai/models";
 import { useStore } from "../lib/store";
 import type { Chat } from "../lib/types";
-import { ChatIcon, TrashIcon } from "./Icons";
+import { ChatIcon, QuestionIcon, TrashIcon } from "./Icons";
 import { WorkTitles } from "./WorkTitles";
 
 function started(ms: number): string {
@@ -44,7 +44,7 @@ export function ChatRow({ chat, selected }: { chat: Chat; selected: boolean }) {
     >
       <div className="chat-row-main">
         <div className="chat-row-title">
-          <ChatIcon size={13} />
+          {chat.mode === "explain" ? <QuestionIcon size={13} /> : <ChatIcon size={13} />}
           <span>{chat.title}</span>
         </div>
         <div className="chat-row-context" title={contextLine(chat)}>
@@ -78,6 +78,8 @@ export function ChatRow({ chat, selected }: { chat: Chat; selected: boolean }) {
 export function ChatList() {
   const chats = useStore((s) => s.chats);
   const selectedChatId = useStore((s) => s.selectedChatId);
+  const conversations = chats.filter((c) => c.mode !== "explain");
+  const explanations = chats.filter((c) => c.mode === "explain");
 
   return (
     <section className="item-list chat-list">
@@ -92,9 +94,17 @@ export function ChatList() {
             <strong>Ask Full Papers</strong>.
           </div>
         ) : (
-          chats.map((c) => (
-            <ChatRow key={c.id} chat={c} selected={c.id === selectedChatId} />
-          ))
+          <>
+            {conversations.map((c) => (
+              <ChatRow key={c.id} chat={c} selected={c.id === selectedChatId} />
+            ))}
+            {/* The reader's explainers of single passages are another
+                kind of thing: listed apart, below. */}
+            {explanations.length > 0 && <div className="chat-list-section">Explanations</div>}
+            {explanations.map((c) => (
+              <ChatRow key={c.id} chat={c} selected={c.id === selectedChatId} />
+            ))}
+          </>
         )}
       </div>
       <footer className="list-footer">

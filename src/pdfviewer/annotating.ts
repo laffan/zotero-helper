@@ -1,12 +1,14 @@
 // Making and editing marks in the pages, put together: the bar over a
 // text selection (selectionBar.ts), the editor a tap on a highlight
 // opens (annotPopover.ts) with handles on its passage
-// (highlightHandles.ts), and the ⌘-click that marks a whole sentence
-// (sentenceMark.ts). The viewer hands over its pages and the writer;
+// (highlightHandles.ts), the ⌘-click that marks a whole sentence
+// (sentenceMark.ts), and the passages the AI has explained
+// (explainMarks.ts). The viewer hands over its pages and the writer;
 // absent a writer, a selection can only be quoted.
 import type { Annotation } from "../lib/highlights";
 import { attachAnnotationTaps, draftFromRange } from "./annotate";
 import { createAnnotationPopover } from "./annotPopover";
+import { createExplainMarks } from "./explainMarks";
 import { createHighlightHandles } from "./highlightHandles";
 import { createSelectionBar, type MarkType } from "./selectionBar";
 import { attachSentenceMarks } from "./sentenceMark";
@@ -45,7 +47,12 @@ export function createAnnotating(env: AnnotatingEnv) {
           // on a fold opened to its page, it can be marked.
           canAnnotate: (range) => !env.isFolded() || env.inExpanded(range.startContainer),
           onAnnotate: writer ? mark : undefined,
-          onExplain: opts.onExplain,
+          onExplain: opts.onExplain
+            ? (text, page, range) => {
+                const d = draftFromRange(range, env.getPages(), env.getPageLabels());
+                opts.onExplain?.(text, page, d ? { pageIndex: d.pageIndex, rects: d.rects } : undefined);
+              }
+            : undefined,
           canExplain: opts.canExplain,
         })
       : null;
@@ -85,6 +92,14 @@ export function createAnnotating(env: AnnotatingEnv) {
       })
     : null;
 
+  // Before the highlights' taps, which a tap on an explained passage
+  // goes ahead of.
+  const explained = createExplainMarks(scrollArea, {
+    getPages: env.getPages,
+    open: (id) => opts.onExplainTap?.(id),
+    ignore: () => Boolean(selection?.justDismissed()),
+  });
+
   if (popover && writer) {
     attachAnnotationTaps(scrollArea, {
       getPages: env.getPages,
@@ -111,6 +126,10 @@ export function createAnnotating(env: AnnotatingEnv) {
     onScroll(): void {
       if (popover?.isOpen() && !root.querySelector(".pdf-annot-popover textarea:focus")) popover.close();
     },
+    /** The passages the AI has explained, to mark. */
+    setExplainMarks: explained.set,
+    /** A page was drawn. */
+    pageRendered: explained.pageRendered,
     /** The annotations changed. */
     sync(list: Annotation[]): void {
       popover?.sync(list);

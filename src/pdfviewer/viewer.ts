@@ -26,6 +26,7 @@ import { createAnnotating } from "./annotating";
 import { createAnnotationLayer } from "./annotations";
 import { createBookmarkPrompt, markBookmarkedPages, type PageBookmark } from "./bookmarks";
 import { createCiteMark } from "./citeMark";
+import type { ExplainMark } from "./explainMarks";
 import { createViewerCommands } from "./commands";
 import { createReadingCrop } from "./crop";
 import { createFoldLayer } from "./folds";
@@ -145,6 +146,7 @@ export function createPdfViewer(container: HTMLElement, opts: PdfViewerOptions =
     onPageRendered: (idx, page) => {
       void linkMgr.attach(idx, page);
       ink.pageRendered(idx);
+      annotating.pageRendered(idx);
       if (opts.onQuote || opts.annotate) void attachTextLayer(pages[idx], page);
     },
     onUpdate: () => updatePageIndicator(),
@@ -681,6 +683,8 @@ export function createPdfViewer(container: HTMLElement, opts: PdfViewerOptions =
     onSearchChange: search.onChange,
     /** Mark an AI citation's quoted passage and go to it (citeMark.ts). */
     showQuote: citeMark.show,
+    /** Mark the passages the AI has explained (explainMarks.ts). */
+    setExplainMarks: (marks: ExplainMark[]) => annotating.setExplainMarks(marks),
     /** The words on page `n` (1-based). */
     pageText: (n: number) => (pdfDoc ? pageText(pdfDoc, n) : Promise.resolve("")),
   };

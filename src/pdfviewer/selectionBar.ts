@@ -29,7 +29,7 @@ export interface SelectionBarHandlers {
   /** May this selection be marked? False hides the swatches. */
   canAnnotate?: (range: Range) => boolean;
   /** Ask the AI to explain the passage; shown while `canExplain`. */
-  onExplain?: (text: string, page: number) => void;
+  onExplain?: (text: string, page: number, range: Range) => void;
   canExplain?: () => boolean;
 }
 
@@ -155,7 +155,7 @@ export function createSelectionBar(
   if (explain) {
     explain.innerHTML = SPARKLES_ICON;
     explain.addEventListener("click", () => {
-      if (current) handlers.onExplain?.(current.text, current.page);
+      if (current) handlers.onExplain?.(current.text, current.page, current.range);
       window.getSelection()?.removeAllRanges();
       hide();
     });

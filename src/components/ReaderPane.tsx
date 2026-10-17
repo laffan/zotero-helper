@@ -194,11 +194,12 @@ export function ReaderPane() {
           onRenameBookmark: renameBookmark,
           onRemoveBookmark: removeBookmark,
           onQuote: (text, page) => addToNotes(`> ${text}\n\n— ${cite(page)}`),
-          onExplain: (text, page) =>
+          onExplain: (text, page, place) =>
             void viewer
               ?.pageText(page)
               .catch(() => "")
-              .then((words) => startExplain(itemKey, text, page, words)),
+              .then((words) => startExplain(itemKey, text, page, words, place && { attKey, ...place })),
+          onExplainTap: (id) => useStore.getState().setExplain({ chatId: id }),
           canExplain: () => aiConnected(settings()),
           commandLatched: () => {
             const s = useStore.getState();
@@ -305,6 +306,18 @@ export function ReaderPane() {
       viewerRef.current?.setPageBookmarks(bookmarksOf(bookmarks, attKey));
     }
   }, [bookmarks, attKey, state]);
+
+  // The passages explained in this PDF stay marked; a tap reopens one.
+  const chats = useStore((s) => s.chats);
+  useEffect(() => {
+    if (state !== "ready" || !attKey) return;
+    const marks = chats.flatMap((c) =>
+      c.mode === "explain" && c.passage?.attKey === attKey
+        ? [{ id: c.id, pageIndex: c.passage.pageIndex, rects: c.passage.rects }]
+        : [],
+    );
+    viewerRef.current?.setExplainMarks(marks);
+  }, [chats, attKey, state]);
 
   // A sync that brings new or edited highlights repaints them in place.
   useEffect(() => {

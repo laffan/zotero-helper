@@ -6,7 +6,8 @@
 // under a system prompt that keeps replies under 100 words (`mode`
 // "explain", src-tauri/src/ai/chat.rs), and there is no cost popup
 // first, since what it sends is small: the work's metadata and
-// abstract and the text of the passage's page.
+// abstract and the text of the passage's page. The passage stays marked
+// in the PDF (`passage`), and a tap on it opens the explainer again.
 import { itemTitle } from "../collections";
 import { useStore } from "../store";
 import type { Chat } from "../types";
@@ -14,8 +15,15 @@ import { persistChats } from "./chat";
 import { heading } from "./context";
 
 /** Start an explainer of `text`, on page `page` (1-based) of
- *  `itemKey`'s PDF, whose words are `pageText`. */
-export function startExplain(itemKey: string, text: string, page: number, pageText: string): void {
+ *  `itemKey`'s PDF, whose words are `pageText`; `passage` is where it
+ *  is, to keep it marked. */
+export function startExplain(
+  itemKey: string,
+  text: string,
+  page: number,
+  pageText: string,
+  passage?: Chat["passage"],
+): void {
   const st = useStore.getState();
   const item = st.library.items.find((i) => i.key === itemKey);
   const settings = st.settings;
@@ -28,8 +36,8 @@ export function startExplain(itemKey: string, text: string, page: number, pageTe
     `# Page ${page} of its PDF, where the passage is`,
     pageText || "_No text could be read from this page._",
   ].join("\n\n");
-  const passage = text.replace(/\s+/g, " ").trim();
-  const short = passage.length > 48 ? `${passage.slice(0, 48).trimEnd()}…` : passage;
+  const quoted = text.replace(/\s+/g, " ").trim();
+  const short = quoted.length > 48 ? `${quoted.slice(0, 48).trimEnd()}…` : quoted;
   const service = settings.aiService;
   const chat: Chat = {
     id: `chat-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
@@ -40,6 +48,7 @@ export function startExplain(itemKey: string, text: string, page: number, pageTe
     service,
     model: service === "openai" ? settings.openaiModel : settings.anthropicModel,
     mode: "explain",
+    passage,
     source: {
       kind: "item",
       itemKeys: [itemKey],
@@ -57,5 +66,5 @@ export function startExplain(itemKey: string, text: string, page: number, pageTe
   };
   st.upsertChat(chat);
   void persistChats();
-  st.setExplain({ chatId: chat.id, question: `Can you explain “${passage}”?` });
+  st.setExplain({ chatId: chat.id, question: `Can you explain “${quoted}”?` });
 }

@@ -121,7 +121,8 @@ src/            React + TypeScript UI (Vite, zustand, MiniSearch)
                 shortcuts and the page stepper), commands (the
                 keyboard's viewer commands: modes, page and fold
                 steps), crop (the paged view's trimmed reading),
-                citeMark (an AI citation's passage, marked), and
+                citeMark (an AI citation's passage, marked), explainMarks
+                (the passages the AI explained), and
                 annotating (the pieces below, put together):
                 selectionBar (colours over a selection),
                 annotate (selection → Zotero position, tap hit-test),
@@ -503,7 +504,14 @@ once to within the first or last two spans of a page, the selection is
 put back as it was, and the next move of the finger carries on from
 there. A real drag reaches a page's end a line or two at a time, and
 crossing from the end of one page onto the next is allowed, so neither
-is caught; keyboard selections and triple clicks are left alone. A
+is caught; keyboard selections and triple clicks are left alone. The
+moving end flipping to the far side of where the selection began, more
+than five lines away in one step, is put back the same way. A
+selection made with a finger or the Pencil leaves `.endOfContent`
+where it is: the iPad extends a touch selection by words and keeps
+re-reading where a resting finger is, and with the element moved past
+the moving end after every change, a selection held still crept on
+down the page. The guard catches the gaps for those instead. A
 page redrawn at the same zoom (a repaint after a sync, a sharper raster
 under a pinch) swaps only its canvas: the text layer — and a selection
 being made in it — stays (`render.ts`).
@@ -523,11 +531,11 @@ bottom bar are hidden (`readingmode.css`, under the `reading-mode` class
 App.tsx puts on `.app` while the store's `readingMode` is on), and the
 viewer refits the pages to the room through its own resize handling.
 On the iPad the band kept clear above the app for the status bar and
-window controls goes to the pages too. A red ring at the top left
+window controls goes to the pages too. A red × at the top left
 (below that band on the iPad) — or Escape — brings everything back as
-it was (`ReadingModeExit.tsx`). Below the ring, a red ⌘ button of the
-same size stands in for the key without a keyboard: while it is on
-(filled), a tap on a line marks its sentence as a ⌘-click does (see
+it was (`ReadingModeExit.tsx`). Below it, a red ⌘ of the same size
+stands in for the key without a keyboard: while it is on (shown
+pressed, white on red), a tap on a line marks its sentence as a ⌘-click does (see
 Highlighting); it turns off with reading mode. The bottom bar's page
 indicator ("7 / 13") floats at the bottom centre of the screen, 20px
 up, and a press on it opens the page picker — the thumbnail grid as a
@@ -657,7 +665,9 @@ extent drawn as it goes; letting go writes the new passage (rects, text
 and sort index) as an edit of the same annotation, so its colour,
 comment and key are kept. Over the gap between lines the dragged end
 stays where it last was on a line (`textHit.ts`,
-`highlightHandles.ts`). ⌘-clicking a line marks the sentence it falls
+`highlightHandles.ts`). A press on a handle cancels its touch, so the
+iPad doesn't take it for a long press on the text beneath and bring
+up its selection menu. ⌘-clicking a line marks the sentence it falls
 in, at once, as the bar's switch is set and in the colour last chosen
 there: a sentence runs between two ".", "!" or "?" followed by a space
 and a capital, a digit or an opening quote, so "e.g." and "3.5" don't
@@ -915,7 +925,13 @@ the backend answers it under its own system prompt, which keeps every
 reply under 100 words (`ai_chat`'s `mode` "explain",
 `src-tauri/src/ai/chat.rs`), and there is no cost popup first, since
 what it sends is small — the work's metadata and abstract and the text
-of the passage's page.
+of the passage's page. Its cache countdown is left out for the same
+reason. The explained passage stays marked in the PDF in a light pink
+(`--explain-mark`, an overlay like a citation's, `explainMarks.ts`;
+where it is kept as the chat's `passage`), and a tap on it opens its
+explainer again — in reading mode too. Explainers carry a question mark
+rather than the conversation bubble, and are listed apart, under
+Explanations, in the entry's conversations tab and in Questions.
 
 **AI Tidy Metadata** — with an API key configured, selected items are
 cleaned up by the model (grounded in a fresh CrossRef record when a DOI

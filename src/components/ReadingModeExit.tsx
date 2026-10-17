@@ -1,9 +1,9 @@
-// Reading mode's way back: a red ring at the window's top left
+// Reading mode's way back: a red × at the window's top left
 // (the only thing on screen besides the pages), and Escape. Reading
 // mode itself is the store's `readingMode` — App.tsx gives the app the
 // `reading-mode` class, and readingmode.css hides the rest.
 //
-// Below the ring, a ⌘ button of the same size stands in for the key
+// Below it, a red ⌘ of the same size stands in for the key
 // when no keyboard is attached: while it is on (filled), a tap on a
 // line marks its sentence, as a ⌘-click does (the store's
 // `commandLatch`, read by the viewer's sentenceMark.ts).

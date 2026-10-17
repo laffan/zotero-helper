@@ -10,7 +10,7 @@ import { sendChatMessage } from "../lib/ai/chat";
 import { formatUsd } from "../lib/ai/models";
 import { useStore } from "../lib/store";
 import { Bubble } from "./ChatPanel";
-import { CloseIcon, Sparkles, Spinner } from "./Icons";
+import { CloseIcon, QuestionIcon, Spinner } from "./Icons";
 
 export function ExplainChat() {
   const explain = useStore((s) => s.explain);
@@ -80,7 +80,7 @@ export function ExplainChat() {
   return (
     <div className="explain-chat" role="dialog" aria-label="Explain the passage">
       <div className="explain-head">
-        <Sparkles size={13} />
+        <QuestionIcon size={13} />
         <span className="explain-title" title={chat.title}>
           {chat.title}
         </span>

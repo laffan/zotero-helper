@@ -280,6 +280,9 @@
   background: transparent;
   cursor: ew-resize;
   touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
 }
 .pdf-annot-handle::before {
   content: "";

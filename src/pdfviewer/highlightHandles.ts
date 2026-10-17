@@ -200,6 +200,9 @@ export function createHighlightHandles(env: HandlesEnv) {
   function onUp(e: PointerEvent): void {
     if (!drag || e.pointerId !== drag.id || !shown) return;
     const range = rangeNow();
+    // Nor does a drag leave a selection (and its menu) behind.
+    const sel = window.getSelection();
+    if (sel && !sel.isCollapsed && sel.anchorNode && shown.box.contains(sel.anchorNode)) sel.removeAllRanges();
     drag = null;
     shown.box.classList.remove("pdf-handle-dragging");
     if (range) {
@@ -222,6 +225,10 @@ export function createHighlightHandles(env: HandlesEnv) {
     h.addEventListener("pointercancel", onUp);
     // Not a click on the highlight beneath (its editor stays as it is).
     h.addEventListener("click", (e) => e.stopPropagation());
+    // A press held on a handle is a drag, not the iPad's long press on
+    // the text beneath — which would select a word and bring up the
+    // system's selection menu.
+    h.addEventListener("touchstart", (e) => e.preventDefault(), { passive: false });
   }
 
   return {

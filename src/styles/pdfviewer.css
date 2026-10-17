@@ -80,6 +80,20 @@
   border-radius: 1px;
   animation: pdf-cite-arrive 1.2s ease-out;
 }
+/* Passages the AI explained (explainMarks.ts): a light pink that stays,
+   and a tap on it reopens the explainer. */
+.pdf-explain-marks {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 2;
+}
+.pdf-explain-mark {
+  position: absolute;
+  background: color-mix(in srgb, var(--explain-mark) 28%, transparent);
+  mix-blend-mode: multiply;
+  border-radius: 1px;
+}
 @keyframes pdf-cite-arrive {
   0%,
   40% {

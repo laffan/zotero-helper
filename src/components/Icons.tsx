@@ -267,6 +267,17 @@ export const ChatIcon = (p: IconProps = {}) =>
     p,
   );
 
+/** An AI explainer of a passage (lib/ai/explain.ts). */
+export const QuestionIcon = (p: IconProps = {}) =>
+  svg(
+    <>
+      <circle cx="8" cy="8" r="6.5" />
+      <path d="M6.2 6.2a1.9 1.9 0 0 1 3.7.5c0 1.3-1.9 1.6-1.9 2.8" />
+      <path d="M8 11.6v.1" />
+    </>,
+    p,
+  );
+
 export const ClockIcon = (p: IconProps = {}) =>
   svg(
     <>

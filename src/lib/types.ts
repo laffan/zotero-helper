@@ -269,6 +269,9 @@ export interface Chat {
    *  reader's selection bar (lib/ai/explain.ts) — another system prompt
    *  on the backend. Absent for Questions conversations. */
   mode?: "explain";
+  /** An explainer's passage in its PDF — where it stays marked, a tap
+   *  on it opening the explainer again (pdfviewer/explainMarks.ts). */
+  passage?: { attKey: string; pageIndex: number; rects: number[][] };
 }
 
 /** Where a request is being started from. Everything the AI menu needs

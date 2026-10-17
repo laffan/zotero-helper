@@ -322,7 +322,9 @@ export function ChatPanel({ chat }: { chat: Chat }) {
           <span title="Everything this conversation has cost so far">
             {formatUsd(chat.costUsd)} spent
           </span>
-          <CacheCountdown chat={chat} />
+          {/* An explainer sends a page, not the papers: nothing worth
+              timing the cache for. */}
+          {chat.mode !== "explain" && <CacheCountdown chat={chat} />}
           <button
             className="tool-btn accent chat-send"
             onClick={() => void send()}

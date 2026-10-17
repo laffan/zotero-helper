@@ -12,7 +12,10 @@
 // one before. When one end stays put and the other has moved more than
 // a few lines in a single step, landing within the first or last spans
 // of a page, it is taken for that leap and the selection is put back as
-// it was; the next move of the finger carries on from there. A real
+// it was; the next move of the finger carries on from there. So is the
+// moving end flipping over to the far side of where the selection
+// began, more than five lines away, in one step (the selection
+// suddenly running upwards from its start). A real
 // drag reaches the end of a page a line or two at a time, so it is
 // never caught, and neither is crossing onto the next page from the end
 // of this one. Selections made by the keyboard, by a triple click (the
@@ -27,6 +30,9 @@ interface Snap {
 
 /** Lines a single step may move the end before it is suspect. */
 const MAX_LINES = 3;
+/** …and past the selection's start (dragging back over it, a paragraph
+ *  break can make one step of the finger two lines and a gap). */
+const MAX_FLIP_LINES = 5;
 /** Spans at each end of a page's text that count as its edge. */
 const EDGE_SPANS = 2;
 
@@ -110,6 +116,18 @@ function leapt(before: [Node, number], after: [Node, number], forward: boolean):
   return Math.abs(b.y - a.y) > MAX_LINES * Math.max(a.h, b.h, 4);
 }
 
+/** Did the moving end (the focus) cross to the other side of the fixed
+ *  one (the anchor), far, in one step? */
+function flipped(prev: Snap, now: Snap): boolean {
+  const wasAfter = same(prev.start, prev.anchor);
+  const isAfter = same(now.start, now.anchor);
+  if (wasAfter === isAfter) return false;
+  const a = placeOf(prev.focus);
+  const b = placeOf(now.focus);
+  if (!a || !b) return false;
+  return Math.abs(b.y - a.y) > MAX_FLIP_LINES * Math.max(a.h, b.h, 4);
+}
+
 function onSelectionChange(): void {
   const sel = document.getSelection();
   if (!sel || !sel.rangeCount || sel.isCollapsed || !sel.anchorNode) {
@@ -132,10 +150,10 @@ function onSelectionChange(): void {
   if (!prev || t - keyAt < 400 || t - tripleAt < 600) return;
   const startMoved = !same(prev.start, now.start);
   const endMoved = !same(prev.end, now.end);
-  if (startMoved === endMoved) return;
-  const suspect = endMoved
-    ? leapt(prev.end, now.end, true)
-    : leapt(prev.start, now.start, false);
+  let suspect = false;
+  if (startMoved !== endMoved) {
+    suspect = endMoved ? leapt(prev.end, now.end, true) : leapt(prev.start, now.start, false);
+  } else if (startMoved && same(prev.anchor, now.anchor)) suspect = flipped(prev, now);
   if (!suspect) return;
   ignoreNext = true;
   last = prev;

@@ -20,9 +20,12 @@ export interface PdfViewerOptions {
   /** Quote selected text into the notes. */
   onQuote?: (text: string, page: number) => void;
   /** Ask the AI about selected text (the selection bar's sparkles),
-   *  offered while `canExplain` says a service is connected. */
-  onExplain?: (text: string, page: number) => void;
+   *  offered while `canExplain` says a service is connected; `place` is
+   *  the passage on its page (PDF rects), to mark it by. */
+  onExplain?: (text: string, page: number, place?: { pageIndex: number; rects: number[][] }) => void;
   canExplain?: () => boolean;
+  /** A tap on a passage explained before (setExplainMarks): its id. */
+  onExplainTap?: (id: string) => void;
   /** A plain tap marks the sentence under it, as a ⌘-click does
    *  (reading mode's ⌘ button). */
   commandLatched?: () => boolean;

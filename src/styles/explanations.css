@@ -1,5 +1,5 @@
-/* The reader's explanations (ExplanationList.tsx): boxes open to their
-   answers — the passage asked about as the head, the answer beneath — in
+/* The reader's explanations (ExplanationList.tsx): boxes headed by the
+   passage asked about, a link that unfolds the answer beneath it — in
    the entry's conversations tab and the sidebar's Explanations. */
 .explanation {
   margin: 8px 12px;
@@ -20,9 +20,21 @@
 .explanation-question {
   flex: 1;
   min-width: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+  padding: 0;
+  color: var(--text);
   font-size: calc(13px * var(--font-scale));
   font-weight: 600;
   line-height: 1.4;
+  text-align: left;
+  word-break: normal;
+}
+.explanation-question svg {
+  flex-shrink: 0;
+  align-self: center;
+  color: var(--text-dim);
 }
 .explanation-actions {
   display: flex;
@@ -39,8 +51,6 @@
 }
 .explanation-answer {
   margin-top: 6px;
-  /* Set in a little from the question, so the two read apart. */
-  padding-left: 12px;
   color: var(--text);
   font-size: calc(13px * var(--font-scale));
   line-height: 1.5;
@@ -87,4 +97,8 @@
 }
 .explanation-details-row > :last-child {
   overflow-wrap: anywhere;
+}
+/* Folded, the source sits close under the passage. */
+.explanation:not(.open) .explanation-source {
+  margin-top: 2px;
 }

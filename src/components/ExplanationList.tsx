@@ -1,6 +1,7 @@
 // The reader's explanations (lib/ai/explain.ts), shown as what they are:
 // a question and its answer, not conversations to carry on. Each is a
-// box — the passage asked about as its head, the answer beneath — with
+// box — the passage asked about as its head, a link that unfolds the
+// answer beneath it (folded to begin with) — with
 // an info button that shows the rest (when, which model, what it cost,
 // with or without its context) and a quieter trash can. They are listed
 // in the entry's conversations tab (ItemChats.tsx) and, across every
@@ -16,7 +17,7 @@ import { formatTokens, formatUsd, modelLabel } from "../lib/ai/models";
 import { pdfAttachmentOf } from "../lib/collections";
 import { useStore } from "../lib/store";
 import type { Chat } from "../lib/types";
-import { InfoIcon, TrashIcon } from "./Icons";
+import { ChevronDown, ChevronRight, InfoIcon, TrashIcon } from "./Icons";
 import { openReaderAt } from "./ReaderPane";
 
 /** An explainer, not a conversation of Questions. */
@@ -97,14 +98,24 @@ function SourceLink({ chat }: { chat: Chat }) {
   );
 }
 
-/** One explanation, open: `linked` adds the way back to its passage. */
+/** One explanation, its answer folded until its passage is pressed:
+ *  `linked` adds the way back to the passage in the PDF. */
 export function ExplanationCard({ chat, linked = false }: { chat: Chat; linked?: boolean }) {
   const [info, setInfo] = useState(false);
+  const [open, setOpen] = useState(false);
   const { question, answer } = exchange(chat);
   return (
-    <div className="explanation">
+    <div className={open ? "explanation open" : "explanation"}>
       <div className="explanation-head">
-        <div className="explanation-question">{question}</div>
+        <button
+          className="link-btn explanation-question"
+          onClick={() => setOpen(!open)}
+          aria-expanded={open}
+          title={open ? "Fold the answer" : "Show the answer"}
+        >
+          {open ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
+          <span>{question}</span>
+        </button>
         <div className="explanation-actions">
           <button
             className={info ? "icon-btn explanation-info on" : "icon-btn explanation-info"}
@@ -126,9 +137,11 @@ export function ExplanationCard({ chat, linked = false }: { chat: Chat; linked?:
         </div>
         {info && <Details chat={chat} onClose={() => setInfo(false)} />}
       </div>
-      <div className="explanation-answer chat-md">
-        {answer ? <Markdown remarkPlugins={[remarkGfm]}>{answer}</Markdown> : <em>No answer yet.</em>}
-      </div>
+      {open && (
+        <div className="explanation-answer chat-md">
+          {answer ? <Markdown remarkPlugins={[remarkGfm]}>{answer}</Markdown> : <em>No answer yet.</em>}
+        </div>
+      )}
       {linked && <SourceLink chat={chat} />}
     </div>
   );

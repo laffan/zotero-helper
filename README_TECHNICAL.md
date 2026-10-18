@@ -104,7 +104,7 @@ src/            React + TypeScript UI (Vite, zustand, MiniSearch)
                 ReadingModeExit, reading mode's way back and its
                 buttons; ExplainChat, the explainer's window;
                 NotepadBody, a view of the notepad, and ReadingNotepad,
-                its floating window), WordList (Words),
+                its floating or edge-docked window), WordList (Words),
                 terminal, import/rescue modals
   notepad/      the notepad: model (notes, links, storage, the pad
                 shared between views), surface (the canvas: the Pencil
@@ -1115,9 +1115,20 @@ places, sharing one pad (`notepadFor` / `watchNotepad` in
 `model.ts`, so a change in one view redraws the other): floating over
 the pages in reading mode, opened by the red rectangle at the top right
 (`ReadingNotepad.tsx` — four-fifths of the window's height to begin
-with, its background 80% opaque so the pages show through; the bar's
-empty middle drags it, a dotted circle at its corner sizes it, and where
-it sits and its size are kept on this device); and in the
+with, its background 90% opaque so the pages show through faintly; the
+bar's empty middle drags it, a dotted circle at its corner sizes it).
+Let go with the pointer at the window's left or right edge (a dashed
+outline shows the edge it would take as it nears) and it docks there: a
+full-height column whose width comes out of the pages' room — it sets
+`--notepad-dock-left` / `--notepad-dock-right` on `<html>`, which pad
+`.reader-pane` in reading mode, so the viewer's ResizeObserver lays the
+pages out again (fit modes re-fit; a side-by-side strip, sized by the
+height, just shows less of itself), and move reading mode's buttons,
+the progress pill and the explainer's window in beside it. Its inner
+edge sizes it (up to 60% of the window); its bar pulled 40px from the
+edge floats it again under the pointer. Floating or docked, the one
+tree stays mounted, so undo and the pan live through the change; where
+it sits, its size and the dock are kept on this device. And in the
 notes pane's lower half, from **View Notepad** at the pane's foot
 (`NotesPanel.tsx`) — the bar between the notes and the pad is the
 divider, dragged to share the height, with Hide Notepad at its middle.

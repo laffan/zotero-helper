@@ -26,7 +26,7 @@
   position: fixed;
   z-index: 60;
   top: 10px;
-  left: 10px;
+  left: calc(var(--notepad-dock-left, 0px) + 10px);
   width: 44px;
   height: 44px;
   padding: 0;
@@ -67,7 +67,7 @@
 .reading-mode-tool {
   position: fixed;
   z-index: 60;
-  left: 10px;
+  left: calc(var(--notepad-dock-left, 0px) + 10px);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -115,7 +115,8 @@
   position: fixed;
   z-index: 50;
   bottom: calc(20px + env(safe-area-inset-bottom));
-  left: 50%;
+  /* The middle of the pages, beside a docked notepad. */
+  left: calc(50% + (var(--notepad-dock-left, 0px) - var(--notepad-dock-right, 0px)) / 2);
   transform: translateX(-50%);
   padding: 4px 12px;
   border: 1px solid var(--border);
@@ -137,7 +138,7 @@
   position: fixed;
   z-index: 60;
   top: 10px;
-  right: 10px;
+  right: calc(var(--notepad-dock-right, 0px) + 10px);
   width: 44px;
   height: 44px;
   padding: 0;
@@ -165,4 +166,11 @@
 }
 .reading-mode-notepad.on::before {
   background: #ff5f57;
+}
+
+/* A notepad docked at an edge (ReadingNotepad.tsx) takes its width from
+   the pages' room; the viewer lays them out again in what is left. */
+.app.reading-mode .reader-pane {
+  padding-left: var(--notepad-dock-left, 0px);
+  padding-right: var(--notepad-dock-right, 0px);
 }

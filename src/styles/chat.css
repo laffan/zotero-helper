@@ -560,7 +560,8 @@
 .explain-chat {
   position: fixed;
   z-index: 70;
-  right: 16px;
+  /* Beside a notepad docked at the right (ReadingNotepad.tsx). */
+  right: calc(16px + var(--notepad-dock-right, 0px));
   bottom: calc(16px + env(safe-area-inset-bottom));
   display: flex;
   flex-direction: column;

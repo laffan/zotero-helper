@@ -14,7 +14,7 @@
 .notepad-floating {
   position: fixed;
   z-index: 65;
-  background: color-mix(in srgb, var(--panel) 80%, transparent);
+  background: color-mix(in srgb, var(--panel) 90%, transparent);
   border: 1px solid var(--border);
   border-radius: 10px;
   box-shadow: 0 10px 34px rgb(0 0 0 / 0.28);
@@ -197,6 +197,70 @@
   border: 2px dotted var(--text-dim);
   border-radius: 50%;
   opacity: 0.7;
+}
+
+/* Docked at the window's left or right edge (ReadingNotepad.tsx): a
+   full-height column, the pages laid out beside it (readingmode.css);
+   its inner edge sizes it. */
+.notepad-edge {
+  position: fixed;
+  z-index: 65;
+  top: 0;
+  bottom: 0;
+}
+.ipados .notepad-edge {
+  top: max(env(safe-area-inset-top), 24px);
+}
+.notepad-edge-left {
+  left: 0;
+  border-right: 1px solid var(--border);
+}
+.notepad-edge-right {
+  right: 0;
+  border-left: 1px solid var(--border);
+}
+.notepad-edge-size {
+  position: absolute;
+  z-index: 3;
+  top: 0;
+  bottom: 0;
+  width: 14px;
+  cursor: col-resize;
+  touch-action: none;
+}
+.notepad-edge-left .notepad-edge-size {
+  right: -7px;
+}
+.notepad-edge-right .notepad-edge-size {
+  left: -7px;
+}
+.notepad-edge-size::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 5px;
+  width: 4px;
+  height: 36px;
+  margin-top: -18px;
+  border-radius: 2px;
+  background: var(--text-dim);
+  opacity: 0.35;
+}
+/* Where a floating pad let go now would dock. */
+.notepad-dock-preview {
+  position: fixed;
+  z-index: 64;
+  top: 0;
+  bottom: 0;
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  border: 2px dashed color-mix(in srgb, var(--accent) 55%, transparent);
+  pointer-events: none;
+}
+.notepad-dock-preview-left {
+  left: 0;
+}
+.notepad-dock-preview-right {
+  right: 0;
 }
 
 /* The notes pane's foot (NotesPanel.tsx): View Notepad at its middle; with

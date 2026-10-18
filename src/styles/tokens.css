@@ -28,10 +28,9 @@
   /* A passage the AI explained (pdfviewer/explainMarks.ts): a pink
      dashed outline, quieter than a highlight, that stays. */
   --explain-mark: #f06aa8;
-  /* Reading mode's notepad (notepad.css): paper and ink, the same in
-     both themes, as the pages are. */
-  --notepad-paper: #fffdf7;
-  --notepad-ink: #1f2430;
+  /* The notepad's ink (notepad.css): black on the light theme's panel,
+     white on the dark one's. */
+  --notepad-ink: #000000;
   /* Settings → General → UI font size, as a multiple of the 13px the
      sizes below were drawn at (lib/appearance.ts). */
   --font-scale: 1;
@@ -53,6 +52,7 @@
     --good: #6fae77;
     --warn: #c98f3d;
     --bad: #d05a4e;
+    --notepad-ink: #ffffff;
   }
 }
 :root[data-theme="dark"] {
@@ -70,6 +70,7 @@
   --warn: #c98f3d;
   --bad: #d05a4e;
   color-scheme: dark;
+  --notepad-ink: #ffffff;
 }
 :root[data-theme="light"] {
   color-scheme: light;

@@ -4,7 +4,8 @@
 // - The Apple Pencil's double-tap and squeeze, handed on as a window
 //   event — "zh-pencil", detail `{ kind, action }`, the action being what
 //   Settings → Apple Pencil asks for — which the PDF viewer's ink mode
-//   listens for while it is on.
+//   listens for while it is on, and the notepad. The one the Pencil last
+//   touched takes it (`pencilLastOn`).
 // - The system's text-selection menu (Copy, Look Up, …), dismissed over
 //   a selection in the PDF, where it covers the viewer's own bar. Nothing
 //   on the page can keep it from appearing, so it is dismissed as the
@@ -14,6 +15,23 @@
 // iPad only: elsewhere there is nothing to hear and no such menu.
 import { appLog } from "./store";
 import { invoke, isTauri } from "./tauri";
+
+// Where the Pencil last came down, for whoever hears its double-tap.
+let pencilTarget: Element | null = null;
+if (typeof window !== "undefined") {
+  window.addEventListener(
+    "pointerdown",
+    (e) => {
+      if (e.pointerType === "pen") pencilTarget = e.target as Element;
+    },
+    true,
+  );
+}
+
+/** Did the Pencil last come down inside `el`? */
+export const pencilLastOn = (el: Element): boolean => Boolean(pencilTarget && el.contains(pencilTarget));
+/** …on a notepad (its double-tap is the notepad's, not ink mode's)? */
+export const pencilOnNotepad = (): boolean => Boolean(pencilTarget?.closest?.(".notepad-canvas"));
 
 /** After a selection in the PDF settles: dismiss the menu, and again. */
 const MENU_HIDE_MS = [60, 400];

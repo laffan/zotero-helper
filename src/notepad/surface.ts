@@ -1,24 +1,50 @@
 // The notepad's canvas: the Pencil writes, a finger pans, and a finger
 // tap on a note goes back to where in the PDF the reader was when it was
-// written. Links dragged onto the pad sit on it as chips: dragged to
-// move, tapped to go to their place or highlight. Plain DOM, as the
-// viewer's ink is (src/pdfviewer/ink/) — a stroke is an SVG path that
-// grows sample by sample, with no React render while the pen is down.
+// written. Links dragged onto the pad sit on it as chips — a link icon
+// and the page, or the whole of the highlight's text — dragged to move,
+// tapped to go there. Plain DOM, as the viewer's ink is
+// (src/pdfviewer/ink/): a stroke is an SVG path that grows sample by
+// sample, with no React render while the pen is down.
 //
-// Who does what: the Pencil (`pointerType` "pen") always writes — a tap
-// is a dot. A finger pans, and taps. A mouse (a Mac, no Pencil) writes
-// with a drag and taps with a click; a wheel or trackpad pans. Strokes
-// written within NOTE_JOIN_MS and NOTE_JOIN_PX of the last are one note
-// (model.ts), which remembers the reader's place when it began; each
-// note shows its page, small, above it.
+// Who does what: the Pencil (`pointerType` "pen") writes — a tap is a
+// dot — or, with the eraser on (the Pencil's double-tap, the pad's
+// eraser button, or the eraser end of a pen that has one), takes out
+// every stroke it passes over. A finger pans, and taps. A mouse (a Mac,
+// no Pencil) writes with a drag and taps with a click; a wheel or
+// trackpad pans. Strokes written within NOTE_JOIN_MS and NOTE_JOIN_PX of
+// the last are one note (model.ts), which remembers the reader's place
+// when it began; each note shows its page, small, above it.
+//
+// Several views may show one pad (model.ts shares it): each pans on its
+// own, and `render` redraws one when another has changed the pad.
 import type { PagePlace, PlaceTarget } from "../pdfviewer/places";
-import { linkLabel, newId, NOTE_JOIN_MS, NOTE_JOIN_PX, type Notepad, type NoteLink, type NoteStroke } from "./model";
+import { linkLabel, newId, NOTE_JOIN_MS, NOTE_JOIN_PX, type Note, type Notepad, type NoteLink, type NoteStroke } from "./model";
 
 const SVG_NS = "http://www.w3.org/2000/svg";
 const PEN_WIDTH = 2;
 /** CSS px within which a tap lands on a stroke, and a press is a tap. */
 const HIT_PX = 12;
 const TAP_PX = 6;
+/** The eraser's reach, CSS px. */
+const ERASE_PX = 10;
+/** A pen's eraser button (PointerEvent.buttons). */
+const ERASER_BUTTON = 32;
+
+const LINK_SVG = `<svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6.8 9.2a2.6 2.6 0 0 0 3.7 0l2.2-2.2a2.6 2.6 0 0 0-3.7-3.7l-1 1"/><path d="M9.2 6.8a2.6 2.6 0 0 0-3.7 0L3.3 9a2.6 2.6 0 0 0 3.7 3.7l1-1"/></svg>`;
+
+export type PadTool = "pen" | "eraser";
+
+export interface SurfaceEnv {
+  pad: () => Notepad;
+  /** This view changed the pad: save, tell the others. */
+  changed: () => void;
+  /** Where the reader is now (a new note's place). */
+  place: () => PagePlace | null;
+  /** Go to a note's place, or a link's target. */
+  goTo: (t: PlaceTarget) => void;
+  /** The tool changed (the double-tap, the eraser end). */
+  toolChanged?: (t: PadTool) => void;
+}
 
 /** Keep a pointer's events coming here, if it is still there to keep. */
 function capture(el: Element, id: number): void {
@@ -27,16 +53,6 @@ function capture(el: Element, id: number): void {
   } catch {
     /* the pointer is already gone */
   }
-}
-
-export interface SurfaceEnv {
-  pad: () => Notepad;
-  /** Something changed: save. */
-  changed: () => void;
-  /** Where the reader is now (a new note's place). */
-  place: () => PagePlace | null;
-  /** Go to a note's place, or a link's target. */
-  goTo: (t: PlaceTarget) => void;
 }
 
 /** A smooth path through the points (midpoint quadratics). */
@@ -76,6 +92,17 @@ function distanceTo(pts: number[], x: number, y: number): number {
   return best;
 }
 
+/** Is (x, y) within `reach` of the stroke's line? */
+const touches = (s: NoteStroke, x: number, y: number, reach: number) => {
+  const [x0, y0, x1, y1] = bounds(s.points);
+  if (x < x0 - reach || x > x1 + reach || y < y0 - reach || y > y1 + reach) return false;
+  return distanceTo(s.points, x, y) <= reach;
+};
+
+type Step =
+  | { kind: "stroke" | "link"; id: string }
+  | { kind: "erase"; strokes: NoteStroke[]; notes: Note[] };
+
 export function createSurface(host: HTMLElement, env: SurfaceEnv) {
   const layer = document.createElement("div");
   layer.className = "notepad-layer";
@@ -88,18 +115,17 @@ export function createSurface(host: HTMLElement, env: SurfaceEnv) {
 
   const paths = new Map<string, SVGPathElement>();
   // What undo takes back, last first.
-  const history: { kind: "stroke" | "link"; id: string }[] = [];
+  const history: Step[] = [];
   let last: { at: number; box: [number, number, number, number]; note: string } | null = null;
+  let tool: PadTool = "pen";
+  // This view's own pan, starting where the pad was left.
+  let pan = { ...env.pad().pan };
 
-  const applyPan = () => {
-    const { x, y } = env.pad().pan;
-    layer.style.transform = `translate(${x}px, ${y}px)`;
-  };
+  const applyPan = () => (layer.style.transform = `translate(${pan.x}px, ${pan.y}px)`);
   /** A client point on the canvas. */
   const toCanvas = (cx: number, cy: number): [number, number] => {
     const r = host.getBoundingClientRect();
-    const { x, y } = env.pad().pan;
-    return [cx - r.left - x, cy - r.top - y];
+    return [cx - r.left - pan.x, cy - r.top - pan.y];
   };
 
   function drawStroke(s: NoteStroke): void {
@@ -111,7 +137,7 @@ export function createSurface(host: HTMLElement, env: SurfaceEnv) {
     paths.set(s.id, p);
   }
 
-  /** Each note's page, small, above its first line. */
+  /** Each note's page, small, above its first line; and the links. */
   function drawLabels(): void {
     const pad = env.pad();
     labels.replaceChildren();
@@ -132,12 +158,15 @@ export function createSurface(host: HTMLElement, env: SurfaceEnv) {
   function linkChip(l: NoteLink): HTMLElement {
     const el = document.createElement("button");
     el.type = "button";
-    el.className = "notepad-link";
+    el.className = l.target.kind === "annotation" ? "notepad-link notepad-link-quote" : "notepad-link";
     el.style.left = `${l.x}px`;
     el.style.top = `${l.y}px`;
     if (l.target.kind === "annotation") el.style.setProperty("--link-color", l.target.color || "#ffd400");
-    el.textContent = linkLabel(l.target);
-    el.title = l.target.kind === "annotation" ? `“${l.target.text}”` : `Page ${l.target.pageIndex + 1}`;
+    el.innerHTML = LINK_SVG;
+    const text = document.createElement("span");
+    text.textContent = linkLabel(l.target);
+    el.appendChild(text);
+    el.title = l.target.kind === "annotation" ? `Go to the highlight, p. ${l.target.pageIndex + 1}` : `Go to page ${l.target.pageIndex + 1}`;
     // Dragged to move; tapped to go.
     el.addEventListener("pointerdown", (e) => {
       e.stopPropagation();
@@ -175,9 +204,35 @@ export function createSurface(host: HTMLElement, env: SurfaceEnv) {
     applyPan();
   }
 
+  function setTool(t: PadTool): void {
+    tool = t;
+    host.classList.toggle("erasing", t === "eraser");
+    env.toolChanged?.(t);
+  }
+
+  // --- erasing ----------------------------------------------------------------
+  /** Take out every stroke within reach of a canvas point; the notes
+   *  left with none go too. Gathered into `step` for undo. */
+  function eraseAt(x: number, y: number, step: { strokes: NoteStroke[]; notes: Note[] }): void {
+    const pad = env.pad();
+    const hit = pad.strokes.filter((s) => touches(s, x, y, ERASE_PX));
+    if (!hit.length) return;
+    for (const s of hit) {
+      paths.get(s.id)?.remove();
+      paths.delete(s.id);
+      step.strokes.push(s);
+    }
+    pad.strokes = pad.strokes.filter((s) => !hit.includes(s));
+    const gone = pad.notes.filter((n) => !pad.strokes.some((s) => s.note === n.id));
+    step.notes.push(...gone);
+    pad.notes = pad.notes.filter((n) => !gone.includes(n));
+    drawLabels();
+  }
+
   // --- input ----------------------------------------------------------------
   type Gesture =
     | { kind: "write"; id: number; pts: number[]; path: SVGPathElement; from: [number, number]; mouse: boolean; t0: number }
+    | { kind: "erase"; id: number; step: { strokes: NoteStroke[]; notes: Note[] } }
     | { kind: "pan"; id: number; x: number; y: number; from: [number, number]; t0: number };
   let g: Gesture | null = null;
 
@@ -191,6 +246,11 @@ export function createSurface(host: HTMLElement, env: SurfaceEnv) {
       return;
     }
     const [x, y] = toCanvas(e.clientX, e.clientY);
+    if (tool === "eraser" || e.buttons & ERASER_BUTTON) {
+      g = { kind: "erase", id: e.pointerId, step: { strokes: [], notes: [] } };
+      eraseAt(x, y, g.step);
+      return;
+    }
     const path = document.createElementNS(SVG_NS, "path");
     path.setAttribute("stroke-width", String(PEN_WIDTH));
     svg.appendChild(path);
@@ -201,14 +261,14 @@ export function createSurface(host: HTMLElement, env: SurfaceEnv) {
   function onMove(e: PointerEvent): void {
     if (!g || e.pointerId !== g.id) return;
     if (g.kind === "pan") {
-      const pad = env.pad();
-      pad.pan = { x: pad.pan.x + e.clientX - g.x, y: pad.pan.y + e.clientY - g.y };
+      pan = { x: pan.x + e.clientX - g.x, y: pan.y + e.clientY - g.y };
       g.x = e.clientX;
       g.y = e.clientY;
       applyPan();
       return;
     }
     const [x, y] = toCanvas(e.clientX, e.clientY);
+    if (g.kind === "erase") return eraseAt(x, y, g.step);
     const n = g.pts.length;
     if (Math.hypot(x - g.pts[n - 2], y - g.pts[n - 1]) < 0.8) return;
     g.pts.push(Math.round(x * 10) / 10, Math.round(y * 10) / 10);
@@ -220,10 +280,7 @@ export function createSurface(host: HTMLElement, env: SurfaceEnv) {
     const [x, y] = toCanvas(cx, cy);
     const pad = env.pad();
     for (let i = pad.strokes.length - 1; i >= 0; i--) {
-      const s = pad.strokes[i];
-      const [x0, y0, x1, y1] = bounds(s.points);
-      if (x < x0 - HIT_PX || x > x1 + HIT_PX || y < y0 - HIT_PX || y > y1 + HIT_PX) continue;
-      if (distanceTo(s.points, x, y) <= HIT_PX) return s.note;
+      if (touches(pad.strokes[i], x, y, HIT_PX)) return pad.strokes[i].note;
     }
     return null;
   }
@@ -238,10 +295,21 @@ export function createSurface(host: HTMLElement, env: SurfaceEnv) {
     if (!g || e.pointerId !== g.id) return;
     const done = g;
     g = null;
+    if (done.kind === "erase") {
+      if (done.step.strokes.length) {
+        history.push({ kind: "erase", ...done.step });
+        last = null;
+        env.changed();
+      }
+      return;
+    }
     const tap = Math.hypot(e.clientX - done.from[0], e.clientY - done.from[1]) < TAP_PX && performance.now() - done.t0 < 500;
     if (done.kind === "pan") {
       if (tap) tapOn(e.clientX, e.clientY);
-      else env.changed();
+      else {
+        env.pad().pan = { ...pan };
+        env.changed();
+      }
       return;
     }
     // A click with the mouse is a tap, not a dot.
@@ -291,9 +359,9 @@ export function createSurface(host: HTMLElement, env: SurfaceEnv) {
 
   function onWheel(e: WheelEvent): void {
     e.preventDefault();
-    const pad = env.pad();
-    pad.pan = { x: pad.pan.x - e.deltaX, y: pad.pan.y - e.deltaY };
+    pan = { x: pan.x - e.deltaX, y: pan.y - e.deltaY };
     applyPan();
+    env.pad().pan = { ...pan };
     env.changed();
   }
 
@@ -310,16 +378,18 @@ export function createSurface(host: HTMLElement, env: SurfaceEnv) {
   render();
 
   return {
+    /** Redraw from the pad (another view changed it). */
     render,
-    /** Add a link at the middle of what the pad shows. */
+    tool: () => tool,
+    setTool,
+    /** Add a link at the middle of what this view shows. */
     addLink(target: PlaceTarget): void {
       const pad = env.pad();
-      const { x, y } = pad.pan;
       const shift = (pad.links.length % 5) * 14;
       const link: NoteLink = {
         id: newId("link"),
-        x: Math.round(host.clientWidth / 2 - x - 50 + shift),
-        y: Math.round(host.clientHeight / 2 - y - 12 + shift),
+        x: Math.round(host.clientWidth / 2 - pan.x - 90 + shift),
+        y: Math.round(host.clientHeight / 2 - pan.y - 12 + shift),
         target,
       };
       pad.links.push(link);
@@ -327,24 +397,32 @@ export function createSurface(host: HTMLElement, env: SurfaceEnv) {
       drawLabels();
       env.changed();
     },
-    /** Take back the last stroke or link made since the pad opened. */
+    /** Take back the last stroke, link or erasing made in this view. */
     undo(): void {
       const step = history.pop();
       if (!step) return;
       const pad = env.pad();
       if (step.kind === "link") pad.links = pad.links.filter((l) => l.id !== step.id);
-      else {
+      else if (step.kind === "erase") {
+        pad.strokes.push(...step.strokes);
+        pad.notes.push(...step.notes);
+        for (const s of step.strokes) drawStroke(s);
+      } else {
         pad.strokes = pad.strokes.filter((s) => s.id !== step.id);
         paths.get(step.id)?.remove();
         paths.delete(step.id);
         pad.notes = pad.notes.filter((n) => pad.strokes.some((s) => s.note === n.id));
-        last = null;
       }
+      last = null;
       drawLabels();
       env.changed();
     },
     canUndo: () => history.length > 0,
     destroy(): void {
+      host.removeEventListener("pointerdown", onDown);
+      host.removeEventListener("pointermove", onMove);
+      host.removeEventListener("pointerup", onUp);
+      host.removeEventListener("pointercancel", onUp);
       host.removeEventListener("wheel", onWheel);
       host.removeEventListener("touchstart", stopTouch);
       host.removeEventListener("touchmove", stopTouch);

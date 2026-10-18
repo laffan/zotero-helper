@@ -1,22 +1,13 @@
 // Reading mode's notepad: a floating pad for the Apple Pencil, opened by
-// the red rectangle at the window's top right (ReadingModeExit.tsx). Its
-// header drags it about (the grip at its corner sizes it); the canvas
-// beneath is src/notepad/surface.ts — the Pencil writes, a finger pans,
-// and a finger tap on a note goes back to where the reader was when it
-// was written.
-//
-// LINK, at the header's left, makes a link: press it (with the Pencil,
-// a finger or the mouse), drag onto the pages and let go over a
-// highlight or a spot on a page, and a link to it lands on the pad, to
-// be dragged where it belongs and tapped to go back there. One pad per
-// PDF (src/notepad/model.ts); where the window sits is this device's.
-import { useEffect, useRef, useState } from "react";
+// the red rectangle at the window's top right (ReadingModeExit.tsx) —
+// NotepadBody (its bar and canvas) in a window of its own. The bar's
+// empty middle drags it about; the dotted circle at its corner sizes
+// it; where it sits is this device's. One pad per PDF
+// (src/notepad/model.ts), the same one the notes pane can show.
+import { useEffect, useState } from "react";
 import { useStore } from "../lib/store";
-import { emptyNotepad, flushNotepad, loadNotepad, saveNotepadSoon, type Notepad } from "../notepad/model";
-import { createSurface, type NotepadSurface } from "../notepad/surface";
-import type { PlaceTarget } from "../pdfviewer/places";
 import { CloseIcon } from "./Icons";
-import { goToReaderPosition, readerPlace, readerPlaceAt, showInReader } from "./ReaderPane";
+import { NotepadBody } from "./NotepadBody";
 
 const BOX_KEY = "zh-notepad-box";
 type Box = { left: number; top: number; width: number; height: number };
@@ -67,11 +58,6 @@ function follow(e: React.PointerEvent, move: (dx: number, dy: number, ev: Pointe
 
 export function ReadingNotepad({ attKey }: { attKey: string }) {
   const [box, setBox] = useState(() => clampBox(storedBox()));
-  const [ghost, setGhost] = useState<{ x: number; y: number } | null>(null);
-  const [canUndo, setCanUndo] = useState(false);
-  const hostRef = useRef<HTMLDivElement>(null);
-  const padRef = useRef<Notepad>(emptyNotepad());
-  const surfaceRef = useRef<NotepadSurface | null>(null);
 
   useEffect(() => {
     try {
@@ -81,45 +67,13 @@ export function ReadingNotepad({ attKey }: { attKey: string }) {
     }
   }, [box]);
 
-  // This PDF's pad, then the canvas over it.
-  useEffect(() => {
-    let cancelled = false;
-    let surface: NotepadSurface | null = null;
-    void loadNotepad(attKey).then((pad) => {
-      const host = hostRef.current;
-      if (cancelled || !host) return;
-      padRef.current = pad;
-      surface = createSurface(host, {
-        pad: () => padRef.current,
-        changed: () => {
-          saveNotepadSoon(attKey, padRef.current);
-          setCanUndo(Boolean(surface?.canUndo()));
-        },
-        place: () => readerPlace(),
-        goTo,
-      });
-      surfaceRef.current = surface;
-    });
-    return () => {
-      cancelled = true;
-      surface?.destroy();
-      surfaceRef.current = null;
-      flushNotepad();
-    };
-  }, [attKey]);
-
-  function goTo(t: PlaceTarget): void {
-    if (t.kind === "annotation") showInReader(attKey, t.pageIndex + 1, t.key);
-    else goToReaderPosition(t.pageIndex, t.top);
-  }
-
   const close = () => useStore.getState().setNotepadOpen(false);
 
   return (
-    <div className="notepad" style={{ left: box.left, top: box.top, width: box.width, height: box.height }}>
-      <div
-        className="notepad-head"
-        onPointerDown={(e) => {
+    <div className="notepad notepad-floating" style={{ left: box.left, top: box.top, width: box.width, height: box.height }}>
+      <NotepadBody
+        attKey={attKey}
+        onBarPointerDown={(e) => {
           const start = box;
           follow(
             e,
@@ -127,52 +81,15 @@ export function ReadingNotepad({ attKey }: { attKey: string }) {
             () => {},
           );
         }}
-      >
-        <button
-          type="button"
-          className="notepad-link-btn"
-          title="Drag onto a highlight or a place on the page to link to it"
-          onPointerDown={(e) =>
-            follow(
-              e,
-              (_dx, _dy, ev) => setGhost({ x: ev.clientX, y: ev.clientY }),
-              (ev, moved) => {
-                setGhost(null);
-                if (!moved) return;
-                const target = readerPlaceAt(ev.clientX, ev.clientY);
-                if (target) surfaceRef.current?.addLink(target);
-              },
-            )
-          }
-        >
-          LINK
-        </button>
-        <span className="notepad-title">Notes</span>
-        <button
-          type="button"
-          className="icon-btn notepad-undo"
-          disabled={!canUndo}
-          title="Undo"
-          aria-label="Undo"
-          onPointerDown={(e) => e.stopPropagation()}
-          onClick={() => surfaceRef.current?.undo()}
-        >
-          ↶
-        </button>
-        <button
-          type="button"
-          className="icon-btn"
-          title="Close the notepad"
-          aria-label="Close the notepad"
-          onPointerDown={(e) => e.stopPropagation()}
-          onClick={close}
-        >
-          <CloseIcon size={12} />
-        </button>
-      </div>
-      <div className="notepad-canvas" ref={hostRef} />
+        trailing={
+          <button type="button" className="notepad-tool" title="Close the notepad" aria-label="Close the notepad" onClick={close}>
+            <CloseIcon size={13} />
+          </button>
+        }
+      />
       <div
         className="notepad-grip"
+        title="Drag to size the notepad"
         onPointerDown={(e) => {
           const start = box;
           follow(
@@ -182,11 +99,6 @@ export function ReadingNotepad({ attKey }: { attKey: string }) {
           );
         }}
       />
-      {ghost && (
-        <span className="notepad-link-ghost" style={{ left: ghost.x, top: ghost.y }}>
-          LINK
-        </span>
-      )}
     </div>
   );
 }

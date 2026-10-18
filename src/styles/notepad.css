@@ -1,51 +1,74 @@
-/* Reading mode's notepad (ReadingNotepad.tsx, src/notepad/): a floating
-   pad over the pages — a header to drag it by, with LINK at its left; a
-   canvas of paper beneath, which the Pencil writes on and a finger pans;
-   a grip at the corner to size it. */
+/* The notepad (NotepadBody.tsx, src/notepad/): one continuous surface in
+   the panel's colour — a slim bar of tools (link, eraser, undo) over the
+   canvas, no divider between them — which the Pencil writes on in black
+   (white in the dark theme) and a finger pans. Floating in reading mode
+   (ReadingNotepad.tsx), or docked under the notes (NotesPanel.tsx). */
 .notepad {
-  position: fixed;
-  z-index: 65;
   display: flex;
   flex-direction: column;
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  background: var(--notepad-paper);
-  box-shadow: 0 10px 34px rgb(0 0 0 / 0.28);
+  background: var(--panel);
   overflow: hidden;
   touch-action: none;
 }
-.notepad-head {
+.notepad-floating {
+  position: fixed;
+  z-index: 65;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 10px 34px rgb(0 0 0 / 0.28);
+}
+.notepad-docked {
+  flex: 1;
+  min-height: 0;
+}
+.notepad-bar {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 5px 6px 5px 6px;
-  border-bottom: 1px solid var(--border);
-  background: var(--panel);
-  cursor: grab;
+  gap: 2px;
+  padding: 4px 6px;
   -webkit-user-select: none;
   user-select: none;
 }
-.notepad-title {
+/* The bar's empty middle: what the floating pad is dragged by. */
+.notepad-bar-grab {
   flex: 1;
-  color: var(--text-dim);
-  font-size: calc(12px * var(--font-scale));
-  font-weight: 600;
-  text-align: center;
+  align-self: stretch;
 }
-.notepad-link-btn {
-  padding: 3px 9px;
-  border: 2px solid #ff5f57;
+.notepad-floating .notepad-bar-grab {
+  cursor: grab;
+}
+.notepad-tool {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 28px;
+  padding: 0;
+  border: none;
   border-radius: 6px;
+  background: transparent;
+  color: var(--text-dim);
+}
+.notepad-tool:hover:not(:disabled) {
+  background: var(--select);
+  color: var(--text);
+}
+.notepad-tool.active {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.notepad-tool:disabled {
+  opacity: 0.35;
+}
+/* Link: the icon alone, in the reading-mode red, dragged out. */
+.notepad-link-btn {
   color: #ff5f57;
-  font-size: calc(11px * var(--font-scale));
-  font-weight: 700;
-  letter-spacing: 0.06em;
   cursor: grab;
   touch-action: none;
 }
 .notepad-undo {
-  font-size: calc(15px * var(--font-scale));
-  line-height: 1;
+  color: var(--accent);
+  opacity: 0.8;
 }
 .notepad-canvas {
   position: relative;
@@ -53,6 +76,9 @@
   overflow: hidden;
   cursor: crosshair;
   touch-action: none;
+}
+.notepad-canvas.erasing {
+  cursor: cell;
 }
 .notepad-layer {
   position: absolute;
@@ -82,49 +108,113 @@
 /* Each note's page, small, above it: a tap on the note goes there. */
 .notepad-note-label {
   position: absolute;
-  color: #9a9488;
+  color: var(--text-dim);
   font-size: calc(10px * var(--font-scale));
   white-space: nowrap;
   pointer-events: none;
 }
-/* A link dragged on from the pages: tapped to go, dragged to move. */
+/* A link from the pages: a link icon and the page — or, for a
+   highlight, the whole of its text beside a bar in its colour. Tapped to
+   go, dragged to move. */
 .notepad-link {
   position: absolute;
-  max-width: 220px;
-  padding: 3px 9px 3px 7px;
-  border: 1px solid #ff5f57;
-  border-left: 4px solid var(--link-color, #ff5f57);
+  display: inline-flex;
+  align-items: flex-start;
+  gap: 5px;
+  /* Sized by its text, not the zero-width layer it sits in. */
+  width: max-content;
+  max-width: 260px;
+  padding: 4px 9px 4px 7px;
+  border: none;
   border-radius: 6px;
-  background: #fff;
-  color: #b3261e;
+  background: var(--bg);
+  color: var(--text);
   font-size: calc(12px * var(--font-scale));
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  line-height: 1.4;
+  text-align: left;
   touch-action: none;
   cursor: pointer;
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.14);
 }
-.notepad-link-ghost {
-  position: fixed;
-  z-index: 1000;
-  padding: 3px 9px;
-  border: 2px solid #ff5f57;
-  border-radius: 6px;
-  background: #fff;
+.notepad-link > svg {
+  flex-shrink: 0;
+  margin-top: 2px;
   color: #ff5f57;
-  font-size: calc(11px * var(--font-scale));
-  font-weight: 700;
-  transform: translate(-50%, -130%);
-  pointer-events: none;
-  box-shadow: 0 3px 10px rgb(0 0 0 / 0.25);
 }
+.notepad-link-quote {
+  border-left: 3px solid var(--link-color, #ffd400);
+}
+/* The link being drawn out to the pages: a dashed line from the link
+   icon to the pointer. */
+.notepad-link-line {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  width: 100vw;
+  height: 100vh;
+  pointer-events: none;
+}
+.notepad-link-line line {
+  stroke: #ff5f57;
+  stroke-width: 2;
+  stroke-dasharray: 6 5;
+  stroke-linecap: round;
+}
+.notepad-link-line circle {
+  fill: #ff5f57;
+}
+/* The floating pad's sizing grip: a subtle dotted circle in a target a
+   finger can hit. */
 .notepad-grip {
   position: absolute;
+  z-index: 3;
   right: 0;
   bottom: 0;
-  width: 22px;
-  height: 22px;
+  width: 36px;
+  height: 36px;
   cursor: nwse-resize;
   touch-action: none;
-  background: linear-gradient(135deg, transparent 50%, rgb(128 128 128 / 0.35) 50% 58%, transparent 58% 70%, rgb(128 128 128 / 0.35) 70% 78%, transparent 78%);
+}
+.notepad-grip::after {
+  content: "";
+  position: absolute;
+  right: 9px;
+  bottom: 9px;
+  width: 12px;
+  height: 12px;
+  border: 2px dotted var(--text-dim);
+  border-radius: 50%;
+  opacity: 0.7;
+}
+
+/* The notes pane's foot (NotesPanel.tsx): View Notepad at its middle; with
+   the notepad open, the divider between the notes and it, dragged to
+   share the height. */
+.notes-split-top {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.notes-notepad-bar {
+  display: flex;
+  justify-content: center;
+  padding: 4px;
+  border-top: 1px solid var(--border);
+  background: var(--panel-alt);
+  touch-action: none;
+}
+.notes-notepad-bar.open {
+  cursor: row-resize;
+}
+.notes-notepad-toggle {
+  padding: 2px 12px;
+  border-radius: 999px;
+  color: var(--text-dim);
+  font-size: calc(11px * var(--font-scale));
+  font-weight: 600;
+}
+.notes-notepad-toggle:hover {
+  background: var(--select);
+  color: var(--text);
 }

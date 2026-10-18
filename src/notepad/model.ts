@@ -1,8 +1,9 @@
-// Reading mode's notepad, as kept: one per PDF — the Pencil's strokes on
-// it, grouped into notes (each remembering where in the PDF the reader
-// was when it was written), and the links dragged onto it from the
-// pages. Stored on this device (src-tauri/src/notepads.rs,
-// `notepads/<attKey>.json`), loaded as the pad opens and written a
+// The notepad, as kept: one per PDF — the Pencil's strokes on it,
+// grouped into notes (each remembering where in the PDF the reader was
+// when it was written), and the links dragged onto it from the pages.
+// Stored on this device (src-tauri/src/notepads.rs,
+// `notepads/<attKey>.json`), loaded once and shared by every view of it
+// (reading mode's floating pad, the notes pane's half), and written a
 // moment after each change; never sent to Zotero.
 //
 // Coordinates are the pad's own canvas, in CSS pixels; the pad pans over
@@ -52,7 +53,7 @@ export const NOTE_JOIN_PX = 60;
 
 export const newId = (prefix: string) => `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
 
-export async function loadNotepad(attKey: string): Promise<Notepad> {
+async function loadNotepad(attKey: string): Promise<Notepad> {
   if (!isTauri) return emptyNotepad();
   try {
     const pad = await invoke<Notepad | null>("load_notepad", { attKey });
@@ -63,11 +64,38 @@ export async function loadNotepad(attKey: string): Promise<Notepad> {
   }
 }
 
+// Each PDF's pad, loaded once, and the views showing it.
+const open = new Map<string, { pad: Promise<Notepad>; views: Set<(from: object) => void> }>();
+
+function entry(attKey: string) {
+  let e = open.get(attKey);
+  if (!e) open.set(attKey, (e = { pad: loadNotepad(attKey), views: new Set() }));
+  return e;
+}
+
+/** The PDF's pad — the same object for every view of it. */
+export const notepadFor = (attKey: string): Promise<Notepad> => entry(attKey).pad;
+
+/** Hear of changes another view made (`from` is the view that made
+ *  them). */
+export function watchNotepad(attKey: string, fn: (from: object) => void): () => void {
+  const e = entry(attKey);
+  e.views.add(fn);
+  return () => e.views.delete(fn);
+}
+
+/** A view changed the pad: write it soon, and tell the others. */
+export function notepadChanged(attKey: string, pad: Notepad, from: object): void {
+  saveNotepadSoon(attKey, pad);
+  for (const fn of entry(attKey).views) fn(from);
+}
+
 let saveTimer = 0;
 let pending: { attKey: string; pad: Notepad } | null = null;
 
 /** Write `pad` a moment from now (the last of a burst of changes). */
-export function saveNotepadSoon(attKey: string, pad: Notepad): void {
+function saveNotepadSoon(attKey: string, pad: Notepad): void {
+  if (pending && pending.attKey !== attKey) flushNotepad();
   pending = { attKey, pad };
   window.clearTimeout(saveTimer);
   saveTimer = window.setTimeout(flushNotepad, 600);
@@ -82,9 +110,8 @@ export function flushNotepad(): void {
   invoke("save_notepad", { attKey: p.attKey, notepad: p.pad }).catch((e) => appLog("error", `Saving the notepad failed: ${e}`));
 }
 
-/** A link's label: the page, or the highlight's first words. */
+/** A link's label: the page, or the highlight's text, all of it. */
 export function linkLabel(t: PlaceTarget): string {
   if (t.kind === "place") return `p. ${t.pageIndex + 1}`;
-  const words = t.text.replace(/\s+/g, " ").trim();
-  return words.length > 40 ? `${words.slice(0, 40).trimEnd()}…` : words || `p. ${t.pageIndex + 1}`;
+  return t.text.replace(/\s+/g, " ").trim() || `p. ${t.pageIndex + 1}`;
 }

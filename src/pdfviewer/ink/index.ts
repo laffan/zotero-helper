@@ -12,6 +12,7 @@
 // pen and the eraser, whatever the system's Pencil setting; a Pencil
 // Pro's squeeze does what that setting says.
 import { annotationPosition, type Annotation } from "../../lib/highlights";
+import { pencilOnNotepad } from "../../lib/pencil";
 import type { PageRecord } from "../types";
 import { createInkBar, loadInkPrefs, saveInkPrefs } from "./bar";
 import { inkSortIndex, inkStrokeColor, MAX_POSITION_CHARS, smoothPath, splitLongPath, type Rect } from "./geometry";
@@ -307,7 +308,8 @@ export function createInkTool(env: InkEnv) {
    *  system's setting. */
   function onPencil(e: Event): void {
     const { kind, action } = (e as CustomEvent<{ kind?: string; action?: string }>).detail ?? {};
-    if (!active || input.busy()) return;
+    // The notepad's, when the Pencil was last on it.
+    if (!active || input.busy() || pencilOnNotepad()) return;
     const back = previousTool === "eraser" ? "pen" : previousTool;
     if (kind === "tap" || action === "switchEraser") setTool(prefs.tool === "eraser" ? back : "eraser");
     else if (action === "switchPrevious") setTool(prefs.tool === previousTool ? "pen" : previousTool);

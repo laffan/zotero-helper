@@ -103,10 +103,12 @@ src/            React + TypeScript UI (Vite, zustand, MiniSearch)
                 empty note's reading questions), reader pane (and
                 ReadingModeExit, reading mode's way back and its
                 buttons; ExplainChat, the explainer's window;
-                ReadingNotepad, the notepad's window), WordList (Words),
+                NotepadBody, a view of the notepad, and ReadingNotepad,
+                its floating window), WordList (Words),
                 terminal, import/rescue modals
-  notepad/      reading mode's notepad: model (notes, links, storage),
-                surface (the canvas: the Pencil writes, a finger pans)
+  notepad/      the notepad: model (notes, links, storage, the pad
+                shared between views), surface (the canvas: the Pencil
+                writes, a finger pans)
   components/settings/
                 the settings page: SettingsView (section list, the
                 draft and Save) and one component per section —
@@ -177,7 +179,7 @@ src-tauri/      Rust core (all networking + state)
                    dispatch, anthropic, openai, tidy, chat)
   src/chats.rs     the Questions conversations on disk
   src/words.rs     the Words looked up, on disk
-  src/notepads.rs  reading mode's notepads on disk, one per PDF
+  src/notepads.rs  the notepads on disk, one per PDF
   src/bookmarks.rs the reader's bookmarks on disk (bookmarks.json)
   src/capture.rs   desktop capture-browser window (download interception)
   tauri-plugin-capture-view/, tauri-plugin-share-sheet/,
@@ -559,7 +561,7 @@ mode (the Pencil writes, or selects and highlights like a finger); both
 show white on red while on, and are the viewer's own state (its
 `onSentenceTool` / `onInkMode`, reflected in the store), so the bottom
 bar's buttons and the keys agree with them. At the top right, opposite
-the ×, a red rectangle opens the notepad (see below). The bottom bar's page
+the ×, a red rectangle opens the notepad (see The notepad). The bottom bar's page
 indicator ("7 / 13") floats at the bottom centre of the screen, 20px
 up, and a press on it opens the page picker — the thumbnail grid as a
 popup over the pages, the page being read marked and in view, with the
@@ -1105,26 +1107,41 @@ and offers Rename, Note (a link to the page, into the notes) and Delete
 (a second press confirms). A selection with bookmarks but no highlights
 still gets the Highlights tab.
 
-### Reading mode's notepad
+### The notepad
 
-The red rectangle at the top right of reading mode opens a floating
-notepad for the Apple Pencil (`ReadingNotepad.tsx`, `src/notepad/`):
-its header drags it about and a grip at its corner sizes it (where it
-sits is this device's, `localStorage`). On its paper the Pencil writes
-— a tap is a dot — a finger pans, and a mouse writes with a drag (a Mac
-has no Pencil) while a wheel pans; strokes are SVG paths grown sample
-by sample, as the viewer's ink is, with no React render under the pen
-(`surface.ts`). Strokes written within 10s and 60px of the last are one
-note, which remembers where in the PDF the reader was when it began —
-the page at the view's centre and the height a quarter of the way down
-the view (`placeInView` in `pdfviewer/places.ts`) — and shows that page,
-small, above it; a finger tap (or a click) on a note goes back there.
-LINK, at the header's left, makes a link: pressed and dragged onto the
-pages (with the Pencil, a finger or the mouse), and let go over a
-highlight or a spot on a page (`placeAtPoint`), it puts a link to that
-on the pad — the highlight's first words, or "p. 12" — to be dragged
-where it belongs and tapped to go back there. ↶ undoes the last stroke
-or link. One pad per PDF, kept on this device
+A scratchpad for the Apple Pencil, one per PDF, to be typed up into the
+notes afterwards (`src/notepad/`, `NotepadBody.tsx`). It shows in two
+places, sharing one pad (`notepadFor` / `watchNotepad` in
+`model.ts`, so a change in one view redraws the other): floating over
+the pages in reading mode, opened by the red rectangle at the top right
+(`ReadingNotepad.tsx` — the bar's empty middle drags it, a dotted circle
+at its corner sizes it, and where it sits is this device's); and in the
+notes pane's lower half, from **View Notepad** at the pane's foot
+(`NotesPanel.tsx`) — the bar between the notes and the pad is the
+divider, dragged to share the height, with Hide Notepad at its middle.
+Either way it is one continuous surface in the panel's colour: a slim
+bar of tools over the canvas, the ink black (white in the dark theme,
+`--notepad-ink`).
+
+On the canvas the Pencil writes — a tap is a dot — a finger pans, and a
+mouse writes with a drag (a Mac has no Pencil) while a wheel pans; each
+view pans on its own. Strokes are SVG paths grown sample by sample, as
+the viewer's ink is, with no React render under the pen (`surface.ts`).
+The eraser — the bar's button, a pen's eraser end, or the Pencil's
+double-tap when the Pencil last touched this pad (ink mode takes the
+double-tap otherwise; `pencilLastOn` in `lib/pencil.ts`) — takes out
+every stroke it passes over. Strokes written within 10s and 60px of the
+last are one note, which remembers where in the PDF the reader was when
+it began — the page at the view's centre and the height a quarter of the
+way down the view (`placeInView` in `pdfviewer/places.ts`) — and shows
+that page, small, above it; a finger tap (or a click) on a note goes
+back there. The link icon at the bar's left makes a link: pressed and
+dragged out onto the pages, a dashed line running from it to the
+pointer, and let go over a highlight or a spot on a page
+(`placeAtPoint`), it puts a link on the pad — a link icon and "p. 12",
+or the whole of the highlight's text beside a bar in its colour — to be
+dragged where it belongs and tapped to go back there. Undo takes back
+the last stroke, erasing or link. Kept on this device
 (`notepads/<attKey>.json`, `src-tauri/src/notepads.rs`), written a
 moment after each change; never sent to Zotero.
 

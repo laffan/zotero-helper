@@ -25,8 +25,9 @@
      (yellow, orange) sits near. Pages are white in both themes, so one
      value serves both. */
   --cite-mark: #ff2d95;
-  /* A passage the AI explained (pdfviewer/explainMarks.ts): a pink
-     dashed outline, quieter than a highlight, that stays. */
+  /* A passage the AI explained (pdfviewer/passageMarks.ts): a pink
+     dashed outline, quieter than a highlight, that stays — and a word
+     looked up, a dashed underline in the same pink. */
   --explain-mark: #f06aa8;
   /* The notepad's ink (notepad.css): black on the light theme's panel,
      white on the dark one's. */

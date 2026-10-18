@@ -1,0 +1,88 @@
+/* The reader's explanations (ExplanationList.tsx): boxes open to their
+   answers — the passage asked about as the head, the answer beneath — in
+   the entry's conversations tab and the sidebar's Explanations. */
+.explanation {
+  margin: 8px 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--panel);
+}
+.explanation-list .explanation {
+  max-width: 720px;
+}
+.explanation-head {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+.explanation-question {
+  flex: 1;
+  min-width: 0;
+  font-size: calc(13px * var(--font-scale));
+  font-weight: 600;
+  line-height: 1.4;
+}
+.explanation-actions {
+  display: flex;
+  gap: 2px;
+  margin: -3px -6px 0 0;
+}
+/* Quieter than the rest: the trash can and the info button. */
+.explanation-actions .icon-btn {
+  opacity: 0.45;
+}
+.explanation-actions .icon-btn:hover,
+.explanation-info.on {
+  opacity: 1;
+}
+.explanation-answer {
+  margin-top: 6px;
+  color: var(--text);
+  font-size: calc(13px * var(--font-scale));
+  line-height: 1.5;
+}
+.explanation-answer > :first-child {
+  margin-top: 0;
+}
+.explanation-answer > :last-child {
+  margin-bottom: 0;
+}
+.explanation-source {
+  display: block;
+  margin-top: 8px;
+  color: var(--text-dim);
+  font-size: calc(11px * var(--font-scale));
+  text-align: left;
+}
+
+/* The info button's popup: when, which model, what it cost, the
+   context it was asked with, the work. */
+.explanation-details {
+  position: absolute;
+  z-index: 20;
+  top: 24px;
+  right: -6px;
+  display: grid;
+  gap: 3px;
+  min-width: 220px;
+  max-width: 300px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg);
+  box-shadow: 0 6px 20px rgb(0 0 0 / 0.18);
+  font-size: calc(11px * var(--font-scale));
+}
+.explanation-details-row {
+  display: grid;
+  grid-template-columns: 4.5em 1fr;
+  gap: 8px;
+}
+.explanation-details-row > :first-child {
+  color: var(--text-dim);
+}
+.explanation-details-row > :last-child {
+  overflow-wrap: anywhere;
+}

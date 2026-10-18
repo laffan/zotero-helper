@@ -2,14 +2,17 @@
 // text selection (selectionBar.ts), the editor a tap on a highlight
 // opens (annotPopover.ts) with handles on its passage
 // (highlightHandles.ts), the ⌘-click (or the sentence tool) that
-// selects a whole sentence (sentenceMark.ts), and the passages the AI has explained
-// (explainMarks.ts). The viewer hands over its pages and the writer;
-// absent a writer, a selection can only be quoted.
+// selects a whole sentence (sentenceMark.ts), and the passages the app
+// keeps marked — those the AI has explained, and the words looked up,
+// whose definition a tap shows (passageMarks.ts). The viewer hands over
+// its pages and the writer; absent a writer, a selection can only be
+// quoted.
 import { annotationPosition, type Annotation } from "../lib/highlights";
 import { annotationAtPoint, attachAnnotationTaps, draftFromRange, pageBoxAt } from "./annotate";
 import { createAnnotationPopover } from "./annotPopover";
-import { createExplainMarks } from "./explainMarks";
 import { createHighlightHandles } from "./highlightHandles";
+import { createLookupPopup } from "./lookupPopup";
+import { createPassageMarks, type ExplainMark, type WordMark } from "./passageMarks";
 import { createSelectionBar, type MarkType } from "./selectionBar";
 import { attachSentenceMarks, sentenceAround } from "./sentenceMark";
 import type { PageRecord } from "./types";
@@ -30,6 +33,9 @@ export interface AnnotatingEnv {
   /** The bottom bar's sentence tool, which annotating keeps. */
   sentenceButton: HTMLElement;
 }
+
+/** A word looked up, as the pages mark it: a tap shows `definition`. */
+export type DefinedWord = WordMark & { word: string; definition: string };
 
 export function createAnnotating(env: AnnotatingEnv) {
   const { opts, scrollArea, root } = env;
@@ -57,7 +63,11 @@ export function createAnnotating(env: AnnotatingEnv) {
             : undefined,
           canExplain: opts.canExplain,
           onLookup: opts.onLookup
-            ? (text, page, range) => opts.onLookup!(text, page, sentenceAround(range) || text)
+            ? (text, page, range) => {
+                const d = draftFromRange(range, env.getPages(), env.getPageLabels());
+                const place = d ? { pageIndex: d.pageIndex, rects: d.rects } : undefined;
+                return opts.onLookup!(text, page, sentenceAround(range) || text, place);
+              }
             : undefined,
         })
       : null;
@@ -105,11 +115,35 @@ export function createAnnotating(env: AnnotatingEnv) {
     : null;
 
   // Before the highlights' taps, which a tap on an explained passage
-  // goes ahead of.
-  const explained = createExplainMarks(scrollArea, {
+  // or a word looked up goes ahead of.
+  const ignore = () => Boolean(selection?.justDismissed());
+  const explained = createPassageMarks(scrollArea, {
+    kind: "explain",
     getPages: env.getPages,
     open: (id) => opts.onExplainTap?.(id),
-    ignore: () => Boolean(selection?.justDismissed()),
+    ignore,
+  });
+  // A word's definition, over the word, until the next press elsewhere
+  // or a scroll.
+  let defined: DefinedWord[] = [];
+  const definition = createLookupPopup(root);
+  const onOutside = (e: PointerEvent) => {
+    if (!(e.target as Element).closest?.(".pdf-lookup")) hideDefinition();
+  };
+  function hideDefinition(): void {
+    definition.hide();
+    document.removeEventListener("pointerdown", onOutside, true);
+  }
+  const words = createPassageMarks(scrollArea, {
+    kind: "word",
+    getPages: env.getPages,
+    open: (id, at) => {
+      const w = defined.find((x) => x.id === id);
+      if (!w) return;
+      definition.showKnown(w.word, w.definition, at);
+      document.addEventListener("pointerdown", onOutside, true);
+    },
+    ignore,
   });
 
   if (popover && writer) {
@@ -134,13 +168,16 @@ export function createAnnotating(env: AnnotatingEnv) {
   const detachSentences = selection
     ? attachSentenceMarks(scrollArea, {
         latched: () => sentenceTool,
-        onHighlight: (target, x, y) => {
+        // Text something else has claimed — a highlight or underline
+        // (the reader's or not), an explained passage, a word looked up
+        // — keeps its own tap.
+        claimed: (target, x, y) => {
+          if (explained.at(target, x, y) || words.at(target, x, y)) return true;
           const at = pageBoxAt(target);
           const p = at ? env.getPages()[at.pageIndex] : undefined;
-          if (!at || !p || !writer) return false;
+          if (!at || !p) return false;
           const r = at.box.getBoundingClientRect();
-          const a = annotationAtPoint(p, at.pageIndex, (x - r.left) / r.width, (y - r.top) / r.height, env.getAnnotations());
-          return Boolean(a && writer.canEdit(a));
+          return Boolean(annotationAtPoint(p, at.pageIndex, (x - r.left) / r.width, (y - r.top) / r.height, env.getAnnotations()));
         },
         enabled: () => !scrollArea.classList.contains("pdf-crop-editing"),
       })
@@ -152,11 +189,20 @@ export function createAnnotating(env: AnnotatingEnv) {
      *  comment is being typed). */
     onScroll(): void {
       if (popover?.isOpen() && !root.querySelector(".pdf-annot-popover textarea:focus")) popover.close();
+      hideDefinition();
     },
     /** The passages the AI has explained, to mark. */
-    setExplainMarks: explained.set,
+    setExplainMarks: (marks: ExplainMark[]) => explained.set(marks),
+    /** The words looked up in this PDF, to mark. */
+    setWordMarks(list: DefinedWord[]): void {
+      defined = list;
+      words.set(list);
+    },
     /** A page was drawn. */
-    pageRendered: explained.pageRendered,
+    pageRendered(idx: number): void {
+      explained.pageRendered(idx);
+      words.pageRendered(idx);
+    },
     /** The annotations changed. */
     sync(list: Annotation[]): void {
       popover?.sync(list);
@@ -167,6 +213,8 @@ export function createAnnotating(env: AnnotatingEnv) {
       popover?.destroy();
       handles?.destroy();
       detachSentences?.();
+      hideDefinition();
+      definition.destroy();
     },
   };
 }

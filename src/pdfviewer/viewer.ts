@@ -22,30 +22,30 @@ import { PDFJS_ASSETS } from "../lib/pdfjsAssets";
 import {
   centerPagePoint, pageFracAtCenter, restoreAnchor, scrollToPageFraction, scrollToPagePoint, viewAnchor, watchResize,
 } from "./anchor";
-import { createAnnotating } from "./annotating";
+import { createAnnotating, type DefinedWord } from "./annotating";
 import { createAnnotationLayer } from "./annotations";
+import { attachBookmarkHold } from "./bookmarkHold";
 import { createBookmarkPrompt, markBookmarkedPages, type PageBookmark } from "./bookmarks";
 import { createCiteMark } from "./citeMark";
-import type { ExplainMark } from "./explainMarks";
 import { createViewerCommands } from "./commands";
 import { createReadingCrop } from "./crop";
+import { attachDarkPages } from "./darkPages";
 import { createFoldLayer } from "./folds";
 import { createInkTool } from "./ink";
 import { attachViewerKeys } from "./keys";
 import { applyLayoutClasses, fitZoom, sizePage, sizePagedGap } from "./layout";
 import { createLinkLayerManager } from "./links";
 import { createMagnifier, PLAIN } from "./magnify";
-import { readOutline, type OutlineEntry } from "./outline";
+import { readOutline } from "./outline";
 import { attachTextLayer, createPageRecords } from "./pageTools";
 import { sampleTypicalPage } from "./pageSizes";
 import { changedPages, drawAnnotations } from "./paint";
 import { attachPagedWheel } from "./paged";
 import { getPdfjs } from "./pdfjs";
 import { placeAtPoint, placeInView } from "./places";
-import { createReadingProgress } from "./readingProgress";
+import { createPageFinder } from "./readingProgress";
 import { createPageRenderer } from "./render";
 import { createPdfSearch } from "./search";
-import { createThumbnailManager } from "./thumbnails";
 import { buildPdfToolbar, syncToolbar } from "./toolbar";
 import { attachTooltips } from "./tooltips";
 import type { LayoutMode, PageRecord, PageViewport, PDFDocumentProxy } from "./types";
@@ -193,6 +193,7 @@ export function createPdfViewer(container: HTMLElement, opts: PdfViewerOptions =
     rename: (id, name) => opts.onRenameBookmark?.(id, name),
     remove: (id) => opts.onRemoveBookmark?.(id),
   });
+  const detachBookmarkHold = opts.onBookmark && opts.holdToBookmark ? attachBookmarkHold(scrollArea, opts.holdToBookmark) : null;
   // The reading crop: adjusting it shows the pages whole, ending the
   // adjustment lays them out trimmed — at the same place.
   const cropper = createReadingCrop({
@@ -238,24 +239,16 @@ export function createPdfViewer(container: HTMLElement, opts: PdfViewerOptions =
     });
   }
 
-  const thumbs = createThumbnailManager(body, {
+  // Where the reader is (the bar's indicator, reading mode's pill), and
+  // the thumbnail grid and page picker their presses open.
+  const progress = createPageFinder(body, root, tb.pageIndicator, {
     getPages: () => pages,
     getPdfDoc: () => pdfDoc,
     isDestroyed: () => destroyed,
     getAnnotations: () => annotLayer.getAnnotations(),
     goToPage: (n) => goToPage(n),
-    onHide: () => tb.thumbnailBtn.classList.remove("active"),
-  });
-  // Reading mode's page indicator and its page picker.
-  let outline: OutlineEntry[] = [];
-  const progress = createReadingProgress(root, {
-    openPicker: (side) => thumbs.showPicker(currentPage(), side),
-    getOutline: () => outline,
     currentPage: () => currentPage(),
-    goToEntry: (e) => {
-      thumbs.close();
-      if (e.pageIndex != null) goToPosition(e.pageIndex, e.top);
-    },
+    goToPosition: (idx, top) => goToPosition(idx, top),
   });
   // A search hit or a cited passage: page index, then a point on it (0–1).
   function revealPoint(idx: number, x: number, y: number): void {
@@ -268,9 +261,7 @@ export function createPdfViewer(container: HTMLElement, opts: PdfViewerOptions =
   const search = createPdfSearch({ getPdfDoc: () => pdfDoc, getPages: () => pages, isDestroyed: () => destroyed, reveal: revealPoint });
   const citeMark = createCiteMark({ getPdfDoc: () => pdfDoc, getPages: () => pages, reveal: revealPoint, goToPage: (n) => goToPage(n) });
 
-  tb.thumbnailBtn.addEventListener("click", () => {
-    tb.thumbnailBtn.classList.toggle("active", thumbs.toggle());
-  });
+  attachDarkPages(body, tb.darkBtn);
 
   // --- zoom & modes ---------------------------------------------------------
   // While folded, a zoom step scales the folds in place via a multiplier
@@ -413,13 +404,12 @@ export function createPdfViewer(container: HTMLElement, opts: PdfViewerOptions =
   // moves the snapping (watchResize, anchor.ts).
   let shownLead = 1;
   function updatePageIndicator(): void {
-    // A fixed set of several pages shows as its range ("7–9 / 13").
+    // How far through, and the page — a fixed set of several pages as
+    // its range ("54% | Pg 7–9 of 13").
     const lead = leadPage();
     shownLead = lead;
     const last = isPaged() ? Math.min(pages.length, lead + perSet() - 1) : lead;
-    const shown = last > lead ? `${lead}–${last}` : String(currentPage());
-    tb.pageIndicator.textContent = pages.length ? `${shown} / ${pages.length}` : "";
-    progress.set(tb.pageIndicator.textContent);
+    progress.set(last > lead ? lead : currentPage(), last, pages.length);
     if (!reportPages || !pages.length) return;
     viewReporter.changed();
     const page = currentPage();
@@ -562,7 +552,7 @@ export function createPdfViewer(container: HTMLElement, opts: PdfViewerOptions =
     });
     void readOutline(doc).then((o) => {
       if (destroyed || pdfDoc !== doc) return;
-      outline = o;
+      progress.setOutline(o);
       opts.onOutline?.(o);
     });
     // Ready for ← / →, unless the reader is already typing somewhere
@@ -623,8 +613,8 @@ export function createPdfViewer(container: HTMLElement, opts: PdfViewerOptions =
     magnifier.destroy();
     cropper.destroy();
     bookmarkPrompt.destroy();
+    detachBookmarkHold?.();
     foldLayer.destroy();
-    thumbs.destroy();
     progress.destroy();
     renderer.destroy();
     annotating.destroy();
@@ -670,6 +660,8 @@ export function createPdfViewer(container: HTMLElement, opts: PdfViewerOptions =
     },
     /** A keyboard command (lib/shortcuts/): a mode, a page or fold step. */
     command,
+    /** Ink mode's pen: its colour, and the colours it takes. */
+    inkPen: ink.pen,
     /** Report a view change still waiting out its pause. */
     flushView: () => viewReporter.flush(),
     /** Scroll to an annotation by key; false when it isn't in this PDF. */
@@ -689,8 +681,10 @@ export function createPdfViewer(container: HTMLElement, opts: PdfViewerOptions =
     /** Where the reader is, and what is at a point (places.ts). */
     place: () => placeInView(scrollArea, pages, currentPage() - 1),
     placeAt: (x: number, y: number) => placeAtPoint(pages, annotLayer.getAnnotations(), x, y),
-    /** Mark the passages the AI has explained (explainMarks.ts). */
-    setExplainMarks: (marks: ExplainMark[]) => annotating.setExplainMarks(marks),
+    /** Mark the passages the AI has explained, and the words looked up
+     *  (passageMarks.ts). */
+    setExplainMarks: annotating.setExplainMarks,
+    setWordMarks: (list: DefinedWord[]) => annotating.setWordMarks(list),
   };
 }
 

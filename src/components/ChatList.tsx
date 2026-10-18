@@ -1,10 +1,12 @@
 // The Questions folder's main-area list. One row per conversation:
 // what the model called it, when it started, and what it was about —
 // the three things you need to find a conversation again a week later.
+import { useMemo } from "react";
 import { removeChat } from "../lib/ai/chat";
 import { formatTokens, formatUsd, modelLabel } from "../lib/ai/models";
 import { useStore } from "../lib/store";
 import type { Chat } from "../lib/types";
+import { isExplanation } from "./ExplanationList";
 import { ChatIcon, QuestionIcon, TrashIcon } from "./Icons";
 import { WorkTitles } from "./WorkTitles";
 
@@ -76,10 +78,10 @@ export function ChatRow({ chat, selected }: { chat: Chat; selected: boolean }) {
 }
 
 export function ChatList() {
-  const chats = useStore((s) => s.chats);
+  const all = useStore((s) => s.chats);
   const selectedChatId = useStore((s) => s.selectedChatId);
-  const conversations = chats.filter((c) => c.mode !== "explain");
-  const explanations = chats.filter((c) => c.mode === "explain");
+  // The reader's explanations have a list of their own (ExplanationList).
+  const chats = useMemo(() => all.filter((c) => !isExplanation(c)), [all]);
 
   return (
     <section className="item-list chat-list">
@@ -94,17 +96,7 @@ export function ChatList() {
             <strong>Ask Full Papers</strong>.
           </div>
         ) : (
-          <>
-            {conversations.map((c) => (
-              <ChatRow key={c.id} chat={c} selected={c.id === selectedChatId} />
-            ))}
-            {/* The reader's explainers of single passages are another
-                kind of thing: listed apart, below. */}
-            {explanations.length > 0 && <div className="chat-list-section">Explanations</div>}
-            {explanations.map((c) => (
-              <ChatRow key={c.id} chat={c} selected={c.id === selectedChatId} />
-            ))}
-          </>
+          chats.map((c) => <ChatRow key={c.id} chat={c} selected={c.id === selectedChatId} />)
         )}
       </div>
       <footer className="list-footer">

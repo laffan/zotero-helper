@@ -3,8 +3,9 @@
 // colour of the reader's choosing (or quote, or explain it). With no
 // keyboard at hand, the sentence tool latches the same onto a plain tap:
 // the caret button in the bottom bar or in reading mode, or S
-// (annotating.ts keeps it). While it is on, a tap on a highlight still
-// opens the highlight's editor; ⌘ always selects.
+// (annotating.ts keeps it). While it is on, it selects only text nothing
+// else has claimed: a tap on a highlight, an explained passage or a word
+// looked up still does what it does without the tool; ⌘ always selects.
 //
 // ⌘ is read from its own keydown / keyup, as the reading crop reads ⌃
 // (crop.ts): iPadOS doesn't report modifiers on pointer events
@@ -97,9 +98,9 @@ export function sentenceAround(range: Range): string {
 export interface SentenceMarkEnv {
   /** A plain tap selects too (the sentence tool is on). */
   latched: () => boolean;
-  /** Is there a highlight of the reader's under this point (a tap on it,
-   *  with the tool on, opens its editor instead)? */
-  onHighlight: (target: Element, x: number, y: number) => boolean;
+  /** Has something else claimed the text under this point — a
+   *  highlight, a marked passage — whose own tap goes ahead of the tool? */
+  claimed: (target: Element, x: number, y: number) => boolean;
   /** Selecting is possible here (not while the reading crop is set). */
   enabled: () => boolean;
 }
@@ -136,7 +137,7 @@ export function attachSentenceMarks(scrollArea: HTMLElement, env: SentenceMarkEn
     if (down && Math.hypot(e.clientX - down.x, e.clientY - down.y) > 6) return;
     const target = e.target as Element;
     if (target.closest("a, button, input, textarea")) return;
-    if (!command && env.onHighlight(target, e.clientX, e.clientY)) return;
+    if (!command && env.claimed(target, e.clientX, e.clientY)) return;
     const range = sentenceAt(target, e.clientX, e.clientY);
     if (!range) return;
     // Not a click on the highlight or link beneath.

@@ -4,11 +4,12 @@ import { aiConnected } from "./lib/ai/models";
 import { trackPointerDrag } from "./lib/dragGesture";
 import { installShortcuts } from "./lib/shortcuts/dispatch";
 import { usePane } from "./lib/shortcuts/panes";
-import { QUESTIONS, useStore } from "./lib/store";
+import { EXPLANATIONS, QUESTIONS, useStore } from "./lib/store";
 import { AskCostModal } from "./components/AskCostModal";
 import { CaptureModal } from "./components/CaptureModal";
 import { ChatList } from "./components/ChatList";
 import { DragLayer } from "./components/DragLayer";
+import { ExplanationList } from "./components/ExplanationList";
 import { ImportModal, NewFolderModal } from "./components/ImportModal";
 import { ItemList } from "./components/ItemList";
 import { MetadataPanel } from "./components/MetadataPanel";
@@ -104,6 +105,8 @@ export default function App() {
                   the item list rather than filtering it. */}
               {selectedCollection === QUESTIONS ? (
                 <ChatList />
+              ) : selectedCollection === EXPLANATIONS ? (
+                <ExplanationList />
               ) : selectedCollection === WORDS ? (
                 <WordList />
               ) : (

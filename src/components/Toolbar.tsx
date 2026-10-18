@@ -10,7 +10,7 @@ import { closeReader } from "../lib/notes";
 import { useOutline } from "../lib/outline";
 import { toggleMeta, toggleSidebar } from "../lib/panels";
 import { shortcutHint } from "../lib/shortcuts/bindings";
-import { QUESTIONS, useStore } from "../lib/store";
+import { EXPLANATIONS, QUESTIONS, useStore } from "../lib/store";
 import { WORDS } from "../lib/words";
 import {
   ArrowLeftIcon,
@@ -70,9 +70,10 @@ export function Toolbar() {
     selection: "Selection",
     item: "Item",
   } as const;
-  // Questions is a folder of conversations, not of works; Words, of words.
+  // Questions is a folder of conversations, not of works; Explanations,
+  // of explanations; Words, of words.
   const canAsk =
-    selectedCollection !== QUESTIONS && selectedCollection !== WORDS && askTarget.count > 0 && !askPreparing;
+    ![QUESTIONS, EXPLANATIONS, WORDS].includes(selectedCollection) && askTarget.count > 0 && !askPreparing;
 
   // All Items, Unfiled, Questions and Recent are views, not folders.
   const isRealCollection = REAL_KEY.test(selectedCollection);

@@ -1,0 +1,43 @@
+/* Dark pages (src/pdfviewer/darkPages.ts): the PDF drawn white on
+   black. Only in the dark theme — the bulb that turns it on shows only
+   there, and the class it sets on the viewer's body does nothing in the
+   light theme — so both read variables that only the dark theme
+   defines (the same two selectors as tokens.css). */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --pdf-dark-offer: inline-block;
+    --pdf-dark-filter: invert(1) hue-rotate(180deg);
+    --pdf-dark-paper: #000;
+    --pdf-dark-waiting: #0c0c0c;
+  }
+}
+:root[data-theme="dark"] {
+  --pdf-dark-offer: inline-block;
+  --pdf-dark-filter: invert(1) hue-rotate(180deg);
+  --pdf-dark-paper: #000;
+  --pdf-dark-waiting: #0c0c0c;
+}
+
+.pdf-zoom-btn.pdf-dark-btn {
+  display: var(--pdf-dark-offer, none);
+}
+.pdf-dark-btn.active {
+  background: rgb(128 128 128 / 0.22);
+  border-color: rgb(128 128 128 / 0.4);
+}
+
+/* The rasters (pages and folds) and the ink over them, inverted with
+   their hues kept; the text layer and the app's marks are untouched. */
+.pdf-dark-pages .pdf-page-canvas,
+.pdf-dark-pages .pdf-ink-layer,
+.pdf-dark-pages .pdf-ink-live {
+  filter: var(--pdf-dark-filter, none);
+}
+/* The paper under a page still being drawn. */
+.pdf-dark-pages .pdf-page-wrapper {
+  background: var(--pdf-dark-paper, #fff);
+}
+.pdf-dark-pages .pdf-page-placeholder,
+.pdf-dark-pages .pdf-fold-page {
+  background: var(--pdf-dark-waiting, #f5f5f5);
+}

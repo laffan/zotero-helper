@@ -36,8 +36,9 @@ interface Gathered {
   missing: string[];
 }
 
-/** Metadata header every work gets, whichever depth was asked for. */
-function heading(item: ZItem, n: number): string {
+/** Metadata header every work gets, whichever depth was asked for (and
+ *  an explainer's work, asked with its context — explain.ts). */
+export function heading(item: ZItem, n: number): string {
   const bits = [
     `## ${n}. ${itemTitle(item)}`,
     `- Authors: ${fullCreatorList(item) || creatorSummary(item) || "unknown"}`,

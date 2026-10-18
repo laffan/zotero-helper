@@ -555,7 +555,7 @@
   font-size: calc(12px * var(--font-scale));
 }
 
-/* --- the reader's explainer (ExplainChat.tsx): a small conversation
+/* --- the reader's explainer (ExplainChat.tsx): a passage explained,
    floating over the pages at the bottom right, reading mode included --- */
 .explain-chat {
   position: fixed;
@@ -592,38 +592,49 @@
   font-size: calc(12px * var(--font-scale));
   font-weight: 600;
 }
-.explain-head .link-btn {
-  font-size: calc(11px * var(--font-scale));
-}
 .explain-scroll {
   min-height: 80px;
 }
-.explain-compose {
+/* No Context / Context: what goes with the question, as a segmented
+   switch under the head. */
+.explain-context {
   display: flex;
-  align-items: flex-end;
-  gap: 6px;
-  padding: 8px 10px 4px;
-  border-top: 1px solid var(--border);
+  align-self: flex-start;
+  margin: 8px 11px 0;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  overflow: hidden;
 }
-.explain-compose textarea {
-  flex: 1;
-  min-height: 30px;
-  max-height: 90px;
-  resize: none;
-  font: inherit;
-  font-size: calc(13px * var(--font-scale));
+.explain-context button {
+  padding: 3px 10px;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  color: var(--text-dim);
+  font-size: calc(11px * var(--font-scale));
+}
+.explain-context button + button {
+  border-left: 1px solid var(--border);
+}
+.explain-context button.on {
+  background: var(--accent-soft);
+  color: var(--text);
+  font-weight: 600;
+}
+.explain-context button:disabled:not(.on) {
+  opacity: 0.5;
 }
 .explain-meter {
-  padding: 0 10px 7px;
+  padding: 6px 10px 7px;
+  border-top: 1px solid var(--border);
   color: var(--text-dim);
   font-size: calc(10px * var(--font-scale));
   text-align: right;
 }
 
-/* The reader's explainers, listed apart from the conversations
-   (ItemChats.tsx, ChatList.tsx). */
-.item-chats-section,
-.chat-list-section {
+/* The reader's explanations, listed apart from the conversations
+   (ItemChats.tsx; the boxes themselves are explanations.css). */
+.item-chats-section {
   display: flex;
   align-items: center;
   gap: 5px;

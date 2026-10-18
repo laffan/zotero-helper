@@ -2,7 +2,9 @@
 // box just above the selection bar (below it when there is no room) —
 // "Looking up…" while the AI answers. A one-off: it goes with the bar
 // (the selection dismissed, the pages scrolled), and its word is kept in
-// Words by the host (lib/ai/lookup.ts), not here.
+// Words by the host (lib/ai/lookup.ts), not here. The same box shows a
+// word looked up before over the word itself, when its mark in the
+// pages is tapped (annotating.ts).
 
 export function createLookupPopup(root: HTMLElement) {
   const box = document.createElement("div");
@@ -55,6 +57,11 @@ export function createLookupPopup(root: HTMLElement) {
           box.classList.remove("loading");
           place();
         });
+    },
+    /** Show a definition already known, over `at` (a word marked in
+     *  the pages). */
+    showKnown(text: string, definition: string, at: DOMRect): void {
+      this.show(text, Promise.resolve(definition), at);
     },
     hide(): void {
       token++;

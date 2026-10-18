@@ -11,11 +11,13 @@
 // (tauri-plugin-pencil, through lib/pencil.ts) switches between the
 // pen and the eraser, whatever the system's Pencil setting; a Pencil
 // Pro's squeeze does what that setting says.
-import { annotationPosition, type Annotation } from "../../lib/highlights";
+import { ANNOTATION_COLORS, annotationPosition, type Annotation } from "../../lib/highlights";
 import { pencilOnNotepad } from "../../lib/pencil";
 import type { PageRecord } from "../types";
 import { createInkBar, loadInkPrefs, saveInkPrefs } from "./bar";
-import { inkSortIndex, inkStrokeColor, MAX_POSITION_CHARS, smoothPath, splitLongPath, type Rect } from "./geometry";
+import {
+  INK_EXTRA_COLORS, inkSortIndex, inkStrokeColor, MAX_POSITION_CHARS, smoothPath, splitLongPath, type Rect,
+} from "./geometry";
 import { attachInkInput, type InkTool } from "./input";
 import { createInkLayer, type InkAnn } from "./layer";
 import { createLiveLayer } from "./live";
@@ -360,6 +362,17 @@ export function createInkTool(env: InkEnv) {
   window.addEventListener("pagehide", flushNow);
 
   return {
+    /** The pen's colour and the colours it may take, for reading mode's
+     *  pen flyout — which sets the pen's own colour, not a selection's. */
+    pen: {
+      palette: [...ANNOTATION_COLORS, ...INK_EXTRA_COLORS],
+      color: () => prefs.color,
+      setColor(c: string): void {
+        prefs.color = c;
+        saveInkPrefs(prefs);
+        syncBar();
+      },
+    },
     isActive: () => active,
     /** A stroke (or an erase, a drag) is under way. */
     isDrawing: () => input.busy(),

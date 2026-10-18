@@ -33,6 +33,7 @@ import { setOutline, setReaderPage, useOutline } from "../lib/outline";
 import { flushSavedPage, lastPage, lastView, savePage } from "../lib/recent";
 import { appLog, useStore, type MetaTab } from "../lib/store";
 import { invoke } from "../lib/tauri";
+import { useWords } from "../lib/words";
 import type { ViewerCommand } from "../pdfviewer/commands";
 import type { SearchOptions, SearchStatus } from "../pdfviewer/search";
 import type { PdfViewer } from "../pdfviewer/viewer";
@@ -119,6 +120,12 @@ export function readerCommand(cmd: ViewerCommand): void {
   active?.viewer.command(cmd);
 }
 
+/** The open viewer's pen — its colour and the colours it takes — for
+ *  reading mode's pen flyout. */
+export function readerPen() {
+  return active?.viewer.inkPen ?? null;
+}
+
 /** Where the open viewer is, and what is at a client point — for the
  *  reading-mode notepad (src/notepad/). */
 export function readerPlace() {
@@ -126,6 +133,11 @@ export function readerPlace() {
 }
 export function readerPlaceAt(x: number, y: number) {
   return active?.viewer.placeAt(x, y) ?? null;
+}
+
+/** How many pages `attKey` has, when it is the PDF open. */
+export function readerPageCount(attKey: string | undefined): number | null {
+  return active && active.attKey === attKey ? active.viewer.getPageCount() || null : null;
 }
 
 /** The page the open viewer shows, when it shows `attKey`. */
@@ -204,11 +216,12 @@ export function ReaderPane() {
           onOpenInZotero: (page) => void openInZotero(itemKey, attKey, undefined, page),
           onBookmark: (pageIndex, top, name, pageLabel) =>
             addBookmark({ attKey, itemKey, pageIndex, top, name, pageLabel }),
+          holdToBookmark: () => useStore.getState().readingMode,
           onRenameBookmark: renameBookmark,
           onRemoveBookmark: removeBookmark,
           onQuote: (text, page) => addToNotes(`> ${text}\n\n— ${cite(page)}`),
           onExplain: (text, page, place) => startExplain(itemKey, text, page, place && { attKey, ...place }),
-          onLookup: (text, page, context) => lookUp(itemKey, attKey, text, page, context),
+          onLookup: (text, page, context, place) => lookUp(itemKey, attKey, text, page, context, place),
           onExplainTap: (id) => useStore.getState().setExplain({ chatId: id }),
           canExplain: () => aiConnected(settings()),
           onSentenceTool: (on) => useStore.getState().setViewerTools({ sentenceTool: on }),
@@ -332,6 +345,17 @@ export function ReaderPane() {
     );
     viewerRef.current?.setExplainMarks(marks);
   }, [chats, attKey, state]);
+
+  // The words looked up in this PDF are underlined; a tap shows the
+  // definition.
+  const words = useWords((s) => s.list);
+  useEffect(() => {
+    if (state !== "ready" || !attKey) return;
+    const marks = words.flatMap((w) =>
+      w.attKey === attKey && w.place ? [{ id: w.id, ...w.place, word: w.word, definition: w.definition }] : [],
+    );
+    viewerRef.current?.setWordMarks(marks);
+  }, [words, attKey, state]);
 
   // A sync that brings new or edited highlights repaints them in place.
   useEffect(() => {

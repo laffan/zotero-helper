@@ -7,8 +7,11 @@
 //! than paying full price for the same 200 pages.
 //!
 //! An explainer (the reader's selection bar: "explain this passage") is
-//! the same conversation with another system prompt — short answers
-//! about a passage on its own terms, with no material at all; and a
+//! the same conversation with another system prompt — a short answer
+//! about a passage on its own terms, with no material at all
+//! ("explain"), or, when the reader asks for its context, about the
+//! passage as it is used in its work, with the work's metadata and the
+//! PDF's text around it as the material ("explain-context"); and a
 //! look-up ("define"), one question and one answer of at most 50 words,
 //! never kept as a conversation.
 
@@ -49,8 +52,18 @@ yourself.";
 const EXPLAIN_SYSTEM: &str = "You explain a concept, term or passage a scholar came across while \
 reading. Explain it on its own terms, as a short encyclopedia entry would: what it is or means, \
 where it comes from and why it matters. Don't guess at the work it came from, its author's aims or \
-what the passage is doing there, unless asked. Keep every answer short: under 100 words, plain \
-prose, no headings — follow-up questions included. Your reply is rendered as Markdown.";
+what the passage is doing there, unless asked. Keep the answer short: under 100 words, plain \
+prose, no headings. Your reply is rendered as Markdown.";
+
+const EXPLAIN_CONTEXT_SYSTEM: &str = "You explain a concept, term or passage a scholar came across \
+while reading the work given below: its metadata, the page the passage was selected on, and text \
+extracted from its PDF, broken up by page markers written as [[page 7]] (everything after one \
+comes from that page). Explain what the passage means as it is used in this work — the idea \
+itself, briefly, then what the author does with it here — drawing on the text around the page it \
+was selected on. Ground what you say about the work in the text, and say so plainly when the \
+text doesn't settle a point. Extracted PDF text can carry artifacts (running heads, footnotes, \
+column breaks), so read around them. Keep the answer short: under 120 words, plain prose, no \
+headings, no page citations. Your reply is rendered as Markdown.";
 
 const DEFINE_SYSTEM: &str = "You define words and phrases, as a dictionary does: what it \
 means, in at most 50 words, with the sense most likely in scholarly writing first. Give the \
@@ -95,12 +108,14 @@ fn service_id(service: Service) -> String {
 /// Build the request for a chat turn. `context` is the papers; it is
 /// byte-identical on every turn of a chat, which is what makes the
 /// prefix cache hit. `mode` is the frontend's kind of conversation:
-/// none for Questions, "explain" for an explainer, "define" for a
-/// look-up — whose answers their prompts keep short (the token cap
-/// only stops a runaway one).
+/// none for Questions, "explain" for an explainer ("explain-context"
+/// with its work as the material), "define" for a look-up — whose
+/// answers their prompts keep short (the token cap only stops a runaway
+/// one).
 fn chat_ask(context: &str, messages: Vec<Turn>, mode: Option<&str>) -> Ask {
     let (system, max_tokens) = match mode {
         Some("explain") => (EXPLAIN_SYSTEM, 1024),
+        Some("explain-context") => (EXPLAIN_CONTEXT_SYSTEM, 1024),
         Some("define") => (DEFINE_SYSTEM, 400),
         _ => (CHAT_SYSTEM, 8192),
     };

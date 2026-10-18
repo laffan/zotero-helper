@@ -15,7 +15,7 @@ import { useBookmarks } from "../lib/bookmarks";
 import { aiConnected } from "../lib/ai/models";
 import { isStandaloneAttachment } from "../lib/collections";
 import { trackPointerDrag } from "../lib/dragGesture";
-import { QUESTIONS, useStore, type MetaTab } from "../lib/store";
+import { EXPLANATIONS, QUESTIONS, useStore, type MetaTab } from "../lib/store";
 import { WORDS } from "../lib/words";
 import { AttachmentPanel } from "./AttachmentPanel";
 import { ChatPanel } from "./ChatPanel";
@@ -122,6 +122,8 @@ export function MetadataPanel() {
     );
   } else if (!reading && collectionKey === WORDS) {
     content = <div className="meta-empty">A word's source opens its PDF at the page it was read on</div>;
+  } else if (!reading && collectionKey === EXPLANATIONS) {
+    content = <div className="meta-empty">An explanation's source opens its PDF at the passage</div>;
   } else if (selected.length === 0) {
     content = <div className="meta-empty">Select an item to see its details</div>;
   } else {

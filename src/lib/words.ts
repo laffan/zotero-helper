@@ -1,7 +1,8 @@
 // Words: every word or phrase looked up from the PDF viewer's selection
 // bar (lib/ai/lookup.ts), across every document, with its definition
 // and where it was read — the PDF, the page and the sentence around it,
-// so the list in the sidebar's Words can take the reader back there.
+// so the list in the sidebar's Words can take the reader back there —
+// and where on the page it was, so the pages keep it marked.
 // The app's own: `words.json` in its data folder (src-tauri/src/words.rs),
 // loaded at startup and written a moment after each change.
 import { create } from "zustand";
@@ -21,6 +22,10 @@ export interface WordEntry {
   page: number;
   title: string;
   context: string;
+  /** Where the selection was on its page (PDF rects), to mark the word
+   *  there; absent for one looked up from a highlight's editor, and for
+   *  words kept before the marks. */
+  place?: { pageIndex: number; rects: number[][] };
 }
 
 /** The sidebar's Words, beside Questions and Recent. */

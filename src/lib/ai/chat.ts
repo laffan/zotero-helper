@@ -190,7 +190,9 @@ export async function sendChatMessage(
         role: m.role,
         content: m.content,
       })),
-      mode: working.mode ?? null,
+      // An explainer asked with its context (explain.ts) is answered
+      // about the passage in its work.
+      mode: working.mode === "explain" && working.context ? "explain-context" : (working.mode ?? null),
     });
     const cost = usageCost(reply.model, reply.usage);
     const answered: ChatMessage = {

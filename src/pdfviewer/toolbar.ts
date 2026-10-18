@@ -4,6 +4,7 @@
 import type { LayoutMode } from "./types";
 import type { FitMode } from "./viewPrefs";
 import {
+  BULB_ICON,
   CARET_ICON,
   CONTINUOUS_ICON,
   FILTER_ICON,
@@ -14,7 +15,6 @@ import {
   FOLD_ICON,
   HORIZONTAL_ICON,
   READING_ICON,
-  THUMBNAIL_ICON,
   VERTICAL_ICON,
 } from "./icons";
 import { PEN_ICON } from "./ink/icons";
@@ -49,13 +49,14 @@ export function buildPdfToolbar() {
   const toolbar = document.createElement("div");
   toolbar.className = "pdf-zoom-toolbar";
 
-  // − and + as one group, the zoom (or fit) they set to their right.
+  // − and + as one bordered group, the zoom (or fit) they set between
+  // them.
   const zoomOutBtn = btn("pdf-toggle-option pdf-zoom-step", "−", "Zoom out", "mod+-");
   const zoomInBtn = btn("pdf-toggle-option pdf-zoom-step", "+", "Zoom in", "mod+=");
   const zoomLabel = document.createElement("span");
   zoomLabel.className = "pdf-zoom-label";
   zoomLabel.textContent = "Fit";
-  const zoomWrap = group("pdf-toolbar-section", group("pdf-toggle-group", zoomOutBtn, zoomInBtn), zoomLabel);
+  const zoomWrap = group("pdf-toggle-group pdf-zoom-group", zoomOutBtn, zoomLabel, zoomInBtn);
 
   const scrollHBtn = svgBtn("pdf-toggle-option active", "Horizontal scroll", HORIZONTAL_ICON, "pdfHorizontal");
   const scrollVBtn = svgBtn("pdf-toggle-option", "Vertical scroll", VERTICAL_ICON, "pdfVertical");
@@ -80,15 +81,15 @@ export function buildPdfToolbar() {
   foldFilterBtn.style.display = "none";
   const foldWrap = group("pdf-toolbar-section", foldBtn, foldFilterBtn);
 
-  const pageIndicator = document.createElement("span");
-  pageIndicator.className = "pdf-page-indicator";
+  // How far through, and the page; a press shows every page at a
+  // glance (the thumbnail grid).
+  const pageIndicator = btn("pdf-page-indicator", "", "Thumbnails — every page at a glance", "pdfThumbnails");
 
   const zoteroLink = document.createElement("a");
   zoteroLink.className = "pdf-zotero-link";
   zoteroLink.textContent = "Open in Zotero ↗";
   zoteroLink.style.display = "none";
 
-  const thumbnailBtn = svgBtn("pdf-zoom-btn pdf-thumbnail-btn", "Thumbnail view", THUMBNAIL_ICON, "pdfThumbnails");
   // Reading mode: the pages fill the window (the red ring at its top
   // left, or Escape, brings everything back).
   const readingBtn = svgBtn("pdf-zoom-btn pdf-reading-btn", "Reading mode — the pages fill the screen", READING_ICON, "pdfReadingMode");
@@ -101,11 +102,15 @@ export function buildPdfToolbar() {
   // Ink mode: draw with the Pencil (or a mouse), as Zotero's pen does.
   const inkBtn = svgBtn("pdf-zoom-btn pdf-ink-btn", "Draw — the Pencil writes, a finger scrolls", PEN_ICON, "pdfInk");
 
-  // Sections, spaced apart by the bar (pdfviewer.css): the thumbnails
-  // and reading mode; pages per screen; scroll direction; fixed / continuous; folding;
-  // zoom; drawing (ink mode's tools join the bar after it, ink/bar.ts).
+  // Dark pages (darkPages.ts) — offered only while the app is dark.
+  const darkBtn = svgBtn("pdf-zoom-btn pdf-dark-btn", "Dark pages — white text on black", BULB_ICON);
+
+  // Sections, spaced apart by the bar (pdfviewer.css): reading mode and
+  // dark pages; pages per screen; scroll direction; fixed / continuous;
+  // folding; zoom; drawing (ink mode's tools join the bar after it,
+  // ink/bar.ts); then where the reader is.
   toolbar.append(
-    group("pdf-toolbar-section", thumbnailBtn, readingBtn),
+    group("pdf-toolbar-section", readingBtn, darkBtn),
     fitToggleWrap, scrollToggleWrap,
     pageModeWrap, foldWrap,
     zoomWrap,
@@ -121,7 +126,7 @@ export function buildPdfToolbar() {
     fitOneBtn, fitTwoBtn, fitThreeBtn, fitToggleWrap,
     pageModeWrap, fixedBtn, continuousBtn,
     foldBtn, foldFilterBtn,
-    pageIndicator, zoteroLink, thumbnailBtn, readingBtn, sentenceBtn, inkBtn,
+    pageIndicator, zoteroLink, readingBtn, darkBtn, sentenceBtn, inkBtn,
   };
 }
 export type PdfToolbar = ReturnType<typeof buildPdfToolbar>;

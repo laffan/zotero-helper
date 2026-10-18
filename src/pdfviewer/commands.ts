@@ -89,7 +89,7 @@ export function createViewerCommands(env: CommandEnv) {
         if (!env.isFolded()) tb.foldBtn.click();
         return tb.foldFilterBtn.click();
       case "expandFold": return expandFold();
-      case "thumbnails": return tb.thumbnailBtn.click();
+      case "thumbnails": return tb.pageIndicator.click();
       case "ink": return tb.inkBtn.click();
       case "readingMode": return tb.readingBtn.click();
       case "sentence": return tb.sentenceBtn.click();

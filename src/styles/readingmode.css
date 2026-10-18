@@ -79,8 +79,13 @@
   color: #ff5f57;
   cursor: pointer;
 }
+/* One box for every icon, whatever its glyph's own size, so the
+   filled background is the same square on each. */
 .reading-mode-tool svg {
-  padding: 2px;
+  box-sizing: border-box;
+  width: 28px;
+  height: 28px;
+  padding: 4px;
   border-radius: 6px;
   transition: transform 0.12s, background 0.12s;
 }
@@ -102,6 +107,62 @@
 }
 .ipados .reading-mode-pen {
   top: calc(max(env(safe-area-inset-top), 30px) + 116px);
+}
+/* Held, a button shows no menu of the system's and selects nothing. */
+.reading-mode-tool {
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+/* The colour the pen writes in, a dot at its lower right (ink mode). */
+.reading-mode-pen-dot {
+  position: absolute;
+  right: 6px;
+  bottom: 6px;
+  width: 9px;
+  height: 9px;
+  border: 1.5px solid var(--panel);
+  border-radius: 50%;
+  pointer-events: none;
+}
+/* The pen's colours (ReadingModeExit.tsx `usePenColors`), held open
+   beside it: a row of swatches on a pill. */
+.reading-mode-pen-colors {
+  position: fixed;
+  z-index: 61;
+  top: 125px;
+  left: calc(var(--notepad-dock-left, 0px) + 58px);
+  display: flex;
+  gap: 4px;
+  padding: 5px 8px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--panel);
+  box-shadow: 0 4px 14px rgb(0 0 0 / 0.22);
+}
+.ipados .reading-mode-pen-colors {
+  top: calc(max(env(safe-area-inset-top), 30px) + 119px);
+}
+.reading-mode-pen-color {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 2px solid transparent;
+  border-radius: 50%;
+  background: transparent;
+  cursor: pointer;
+  position: relative;
+}
+.reading-mode-pen-color::before {
+  content: "";
+  position: absolute;
+  inset: 3px;
+  border-radius: 50%;
+  background: var(--swatch);
+  box-shadow: inset 0 0 0 1px rgb(0 0 0 / 0.15);
+}
+.reading-mode-pen-color.on {
+  border-color: var(--text);
 }
 
 /* Where the reader is ("7 / 13"), at the bottom centre — the bottom
@@ -173,4 +234,36 @@
 .app.reading-mode .reader-pane {
   padding-left: var(--notepad-dock-left, 0px);
   padding-right: var(--notepad-dock-right, 0px);
+}
+
+/* Bookmarks: the pages' buttons are hidden — a second's hold on a
+   page's top-right corner opens the bookmark box instead
+   (bookmarkHold.ts), the button coming up and filling as it counts. A
+   bookmarked page still shows its filled button and name. */
+.app.reading-mode .pdf-page-bookmark-btn:not(.marked):not(.pressing),
+.app.reading-mode .pdf-page-bookmark-label:not(.marked) {
+  opacity: 0;
+  pointer-events: none;
+}
+.app.reading-mode .pdf-page-bookmark-btn.pressing {
+  opacity: 1;
+  animation: pdf-bookmark-hold 1s linear forwards;
+}
+@keyframes pdf-bookmark-hold {
+  from {
+    background: rgb(0 0 0 / 0.3);
+    transform: scale(0.8);
+  }
+  to {
+    background: var(--accent);
+    transform: scale(1.15);
+  }
+}
+/* While the corner is held, its page's words can't be selected — the
+   iPad's own long press would select one. */
+.pdf-corner-pressing .textLayer,
+.pdf-corner-pressing .textLayer span {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
 }

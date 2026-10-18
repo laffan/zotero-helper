@@ -273,7 +273,7 @@ export interface Chat {
    *  on the backend. Absent for Questions conversations. */
   mode?: "explain";
   /** An explainer's passage in its PDF — where it stays marked, a tap
-   *  on it opening the explainer again (pdfviewer/explainMarks.ts). */
+   *  on it opening the explainer again (pdfviewer/passageMarks.ts). */
   passage?: { attKey: string; pageIndex: number; rects: number[][] };
 }
 

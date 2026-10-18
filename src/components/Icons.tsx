@@ -287,6 +287,17 @@ export const QuestionIcon = (p: IconProps = {}) =>
     p,
   );
 
+/** More about something (an explanation's details): an i in a circle. */
+export const InfoIcon = (p: IconProps = {}) =>
+  svg(
+    <>
+      <circle cx="8" cy="8" r="6" />
+      <path d="M8 7.3v3.9" />
+      <path d="M8 4.9v.1" strokeWidth="1.8" />
+    </>,
+    p,
+  );
+
 export const ClockIcon = (p: IconProps = {}) =>
   svg(
     <>

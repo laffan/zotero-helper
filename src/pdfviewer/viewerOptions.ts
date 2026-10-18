@@ -15,6 +15,9 @@ export interface PdfViewerOptions {
    *  is the page's top in PDF units. A bookmarked page's button renames
    *  or removes its bookmark instead. */
   onBookmark?: (pageIndex: number, top: number, name: string, pageLabel?: string) => void;
+  /** Does holding a page's top-right corner for a second bookmark it
+   *  (bookmarkHold.ts) — reading mode, where the button is hidden? */
+  holdToBookmark?: () => boolean;
   onRenameBookmark?: (id: string, name: string) => void;
   onRemoveBookmark?: (id: string) => void;
   /** Quote selected text into the notes. */
@@ -26,8 +29,15 @@ export interface PdfViewerOptions {
   canExplain?: () => boolean;
   /** Look up the selected word or phrase (the selection bar's
    *  magnifier), read in the sentence `context`; resolves with its
-   *  definition. Offered while `canExplain`. */
-  onLookup?: (text: string, page: number, context: string) => Promise<string>;
+   *  definition. Offered while `canExplain`. `place` is the selection
+   *  on its page (PDF rects), to mark the word by (setWordMarks); a
+   *  highlight's text, looked up from its editor, has none. */
+  onLookup?: (
+    text: string,
+    page: number,
+    context: string,
+    place?: { pageIndex: number; rects: number[][] },
+  ) => Promise<string>;
   /** A tap on a passage explained before (setExplainMarks): its id. */
   onExplainTap?: (id: string) => void;
   /** The sentence tool (a tap selects a sentence) went on or off. */

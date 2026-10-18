@@ -123,6 +123,9 @@ export interface UiTask {
 /** The sidebar row that holds the conversations. Not a Zotero
  *  collection — chats never leave this machine. */
 export const QUESTIONS = "questions";
+/** The sidebar row that holds the reader's explanations
+ *  (ExplanationList.tsx), apart from the conversations. */
+export const EXPLANATIONS = "explanations";
 
 interface AppStore extends UiPrefs {
   settings: Settings | null;
@@ -132,7 +135,7 @@ interface AppStore extends UiPrefs {
   tidying: boolean;
 
   view: "main" | "settings";
-  selectedCollection: string; // collection key, "all", "unfiled", QUESTIONS or RECENT
+  selectedCollection: string; // collection key, "all", "unfiled", QUESTIONS, EXPLANATIONS, WORDS or RECENT
   selectedKeys: string[];
   searchQuery: string;
   /** Year bounds for the date-range mode — kept apart from the text

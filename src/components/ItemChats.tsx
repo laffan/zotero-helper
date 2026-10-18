@@ -4,7 +4,8 @@
 // it was only part of (a selection or a folder asked about) are listed
 // as links, which open in Questions, the main conversations window.
 // The passages the reader has had explained (lib/ai/explain.ts) are
-// listed apart, under Explanations: a different kind of conversation.
+// listed apart, under Explanations, as boxes open to their answers
+// (ExplanationList.tsx) — a question and its answer, not a conversation.
 // A conversation about the entry opens here, in place of the list (with
 // the way back above it), to be read beside the PDF; one started from
 // here with the PDF open opens here too (confirmAsk), and so does any
@@ -17,6 +18,7 @@ import { QUESTIONS, useStore } from "../lib/store";
 import type { Chat, ZItem } from "../lib/types";
 import { ChatPanel } from "./ChatPanel";
 import { ChatRow } from "./ChatList";
+import { ExplanationCard, isExplanation } from "./ExplanationList";
 import { ArrowLeftIcon, ChatIcon, PdfIcon, QuestionIcon, Sparkles } from "./Icons";
 
 /** A conversation about this entry alone (not a selection or folder). */
@@ -36,8 +38,8 @@ export function ItemChats({ item }: { item: ZItem }) {
   const selectedChatId = useStore((s) => s.selectedChatId);
   const askPreparing = useStore((s) => s.askPreparing);
   const mine = useMemo(() => allChats.filter((c) => isAbout(c, item.key)), [allChats, item.key]);
-  const own = mine.filter((c) => c.mode !== "explain");
-  const explained = mine.filter((c) => c.mode === "explain");
+  const own = mine.filter((c) => !isExplanation(c));
+  const explained = mine.filter(isExplanation);
   const shared = useMemo(
     () => allChats.filter((c) => !isAbout(c, item.key) && c.source.itemKeys.includes(item.key)),
     [allChats, item.key],
@@ -45,7 +47,9 @@ export function ItemChats({ item }: { item: ZItem }) {
   // The open conversation, if it covers this entry: one about it alone,
   // or a wider one whose citation opened this PDF (the conversation
   // stays in front beside the page it cited).
-  const open = allChats.find((c) => c.id === selectedChatId && c.source.itemKeys.includes(item.key));
+  const open = allChats.find(
+    (c) => c.id === selectedChatId && !isExplanation(c) && c.source.itemKeys.includes(item.key),
+  );
 
   if (open) {
     return (
@@ -102,7 +106,7 @@ export function ItemChats({ item }: { item: ZItem }) {
               <QuestionIcon size={11} /> Explanations
             </div>
             {explained.map((c) => (
-              <ChatRow key={c.id} chat={c} selected={false} />
+              <ExplanationCard key={c.id} chat={c} />
             ))}
           </>
         )}

@@ -80,8 +80,10 @@
   border-radius: 1px;
   animation: pdf-cite-arrive 1.2s ease-out;
 }
-/* Passages the AI explained (explainMarks.ts): a dashed pink outline
-   that stays, and a tap on it reopens the explainer. */
+/* Passages the AI explained (passageMarks.ts): a dashed pink outline
+   that stays, and a tap on it reopens the explainer. Words looked up:
+   a dashed pink underline, a tap on it showing the definition. */
+.pdf-word-marks,
 .pdf-explain-marks {
   position: absolute;
   inset: 0;
@@ -92,6 +94,10 @@
   position: absolute;
   outline: 1.5px dashed var(--explain-mark);
   border-radius: 2px;
+}
+.pdf-word-mark {
+  position: absolute;
+  border-bottom: 1.5px dashed var(--explain-mark);
 }
 @keyframes pdf-cite-arrive {
   0%,
@@ -340,8 +346,8 @@
 }
 
 /* --- bottom toolbar --- */
-/* Sections (thumbnails, zoom, scroll, fit, fixed / continuous, folding)
-   sit 14px apart; inside one, its controls are tight. */
+/* Sections (reading mode, scroll, fit, fixed / continuous, folding,
+   zoom, the tools, where the reader is) sit 14px apart; inside one, its controls are tight. */
 .pdf-zoom-toolbar {
   display: flex;
   align-items: center;
@@ -413,8 +419,19 @@
 }
 .pdf-page-indicator {
   margin-left: auto;
+  padding: 2px 6px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
   font-size: calc(11px * var(--font-scale));
+  font-variant-numeric: tabular-nums;
   color: var(--text-dim);
+  white-space: nowrap;
+}
+.pdf-page-indicator:hover,
+.pdf-page-indicator.active {
+  background: rgb(128 128 128 / 0.14);
+  color: var(--text);
 }
 .pdf-zotero-link {
   font-size: calc(11px * var(--font-scale));
@@ -430,12 +447,24 @@
   align-items: center;
   gap: 6px;
 }
-/* − and +, a group of their own: always at full strength (the group's
-   options dim when not the one chosen). */
+/* −, the zoom and +, one bordered group: the steps always at full
+   strength (the group's options dim when not the one chosen), the zoom
+   between them. */
 .pdf-toggle-option.pdf-zoom-step {
   opacity: 1;
   padding: 2px 9px;
   font-size: calc(13px * var(--font-scale));
+}
+.pdf-zoom-group {
+  align-items: stretch;
+}
+.pdf-zoom-group .pdf-zoom-label {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 6px;
+  border-right: 1px solid rgb(128 128 128 / 0.15);
+  font-variant-numeric: tabular-nums;
 }
 /* On a touch screen the bar's buttons are finger-sized — the same for
    ink mode's tools (pdfviewer-ink.css) and the rest. */
@@ -452,9 +481,7 @@
 }
 .pdf-zoom-toolbar .pdf-zoom-label {
   min-width: 3.4em;
-  text-align: left;
 }
-.pdf-thumbnail-btn.active,
 .pdf-sentence-btn.active,
 .pdf-fold-btn.active {
   background: rgb(128 128 128 / 0.22);

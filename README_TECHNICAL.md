@@ -1017,7 +1017,8 @@ but shown as what it is: under Explanations in the entry's
 conversations tab, and in **Explanations**, a row between Questions and
 Words in the sidebar, never among Questions' conversations
 (`ExplanationList.tsx`). Each is a box: the passage as its head, a
-link that unfolds the answer beneath it (folded to begin with), an info button that shows when it was asked, by which
+link that unfolds the answer beneath it (folded to begin with, and
+drawn as a box, background and edge, only while unfolded), an info button that shows when it was asked, by which
 model, what it cost, whether with its context and from which work, and
 a quieter trash can; the sidebar's list, every document's explanations
 newest first, adds under each the work and page, which opens the PDF

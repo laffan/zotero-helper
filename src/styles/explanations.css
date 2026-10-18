@@ -1,11 +1,17 @@
 /* The reader's explanations (ExplanationList.tsx): boxes headed by the
    passage asked about, a link that unfolds the answer beneath it — in
    the entry's conversations tab and the sidebar's Explanations. */
+/* Folded, a box is only its passage (and source); unfolded, it takes
+   its background and edge. The edge is there either way, transparent,
+   so unfolding moves nothing. */
 .explanation {
   margin: 8px 12px;
   padding: 10px 12px;
-  border: 1px solid var(--border);
+  border: 1px solid transparent;
   border-radius: var(--radius);
+}
+.explanation.open {
+  border-color: var(--border);
   background: var(--panel);
 }
 .explanation-list .explanation {

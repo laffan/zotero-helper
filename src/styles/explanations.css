@@ -4,17 +4,23 @@
 /* Folded, a box is only its passage (and source); unfolded, it takes
    its background and edge. The edge is there either way, transparent,
    so unfolding moves nothing. */
+/* Folded ones sit close together, at half an unfolded box's spacing. */
 .explanation {
-  margin: 8px 12px;
-  padding: 10px 12px;
+  margin: 4px 12px;
+  padding: 5px 12px;
   border: 1px solid transparent;
   border-radius: var(--radius);
 }
 .explanation.open {
+  margin: 8px 12px;
+  padding: 10px 12px;
   border-color: var(--border);
   background: var(--panel);
 }
-.explanation-list .explanation {
+/* The main list runs the window's width: the text keeps to a readable
+   measure, the info and delete buttons to the right edge. */
+.explanation-list .explanation-question,
+.explanation-list .explanation-answer {
   max-width: 720px;
 }
 .explanation-head {
@@ -39,13 +45,17 @@
 }
 .explanation-question svg {
   flex-shrink: 0;
-  align-self: center;
+  /* Centred on the first line, however many the passage runs to. */
+  align-self: flex-start;
+  margin-top: calc(0.7em - 5.5px);
   color: var(--text-dim);
 }
 .explanation-actions {
   display: flex;
   gap: 2px;
-  margin: -3px -6px 0 0;
+  /* At the right edge, however short the passage; the buttons (28px)
+     overhang the passage's first line rather than heighten the row. */
+  margin: -5px -6px -5px auto;
 }
 /* Quieter than the rest: the trash can and the info button. */
 .explanation-actions .icon-btn {
@@ -70,6 +80,8 @@
 .explanation-source {
   display: block;
   margin-top: 8px;
+  /* Under the passage's text, past its chevron (11px and the 5px gap). */
+  padding-left: 16px;
   color: var(--text-dim);
   font-size: calc(11px * var(--font-scale));
   text-align: left;

@@ -108,7 +108,7 @@ src/            React + TypeScript UI (Vite, zustand, MiniSearch)
                 terminal, import/rescue modals
   notepad/      the notepad: model (notes, links, storage, the pad
                 shared between views), surface (the canvas: the Pencil
-                writes, a finger pans)
+                writes, a finger pans), minimap (the whole pad, small)
   components/settings/
                 the settings page: SettingsView (section list, the
                 draft and Save) and one component per section —
@@ -1161,9 +1161,21 @@ notes, and each view remembers its own. The link icon at the bar's left makes a 
 dragged out onto the pages, a dashed line running from it to the
 pointer, and let go over a highlight or a spot on a page
 (`placeAtPoint`), it puts a link on the pad — a link icon and "p. 12",
-or the whole of the highlight's text beside a bar in its colour — to be
-dragged where it belongs and tapped to go back there. Undo takes back
-the last stroke, erasing or link. Kept on this device
+or the whole of the highlight's text beside a bar in its colour, its page
+after it at half opacity — to be dragged where it belongs and tapped to
+go back there. A link held (a long press, or a right-click) opens a
+small menu under it with Delete link (`linkMenu` in `surface.ts`). The
+map icon beside the eye shows a minimap, a 60px column down the canvas's
+left (`minimap.ts`; off to begin with, remembered for each view): the
+whole pad small — strokes, and links as bars in their colours — with
+the part in view outlined; a tap or a drag on it brings that part into
+view, going no further than half a view past what it draws. It fits the
+pad's contents and the view together under one SVG transform, so a pan
+moves only the outline and the transform, and the strokes are drawn
+again only when the pad changes (the surface's `watch`). A faint trash
+can at the canvas's lower left clears the pad — strokes, notes and
+links — once "Clear the whole notepad?" is answered. Undo takes back
+the last stroke, erasing, link, deleted link or clearing. Kept on this device
 (`notepads/<attKey>.json`, `src-tauri/src/notepads.rs`), written a
 moment after each change; never sent to Zotero.
 

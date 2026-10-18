@@ -1,8 +1,10 @@
 // The notepad's canvas: the Pencil writes, a finger pans, and a finger
 // tap on a note goes back to where in the PDF the reader was when it was
 // written. Links dragged onto the pad sit on it as chips — a link icon
-// and the page, or the whole of the highlight's text — dragged to move,
-// tapped to go there. Plain DOM, as the viewer's ink is
+// and the page, or the whole of the highlight's text and its page —
+// dragged to move, tapped to go there, held (or right-clicked) for a
+// menu that deletes them. `clear` empties the pad (NotepadBody asks
+// first); undo brings back either. Plain DOM, as the viewer's ink is
 // (src/pdfviewer/ink/): a stroke is an SVG path that grows sample by
 // sample, with no React render while the pen is down.
 //
@@ -24,6 +26,8 @@
 //
 // Several views may show one pad (model.ts shares it): each pans on its
 // own, and `render` redraws one when another has changed the pad.
+// `watch` tells a minimap (minimap.ts) when the view moves or the pad
+// changes.
 import type { PagePlace, PlaceTarget } from "../pdfviewer/places";
 import { linkLabel, newId, type Note, type Notepad, type NoteLink, type NoteStroke } from "./model";
 
@@ -36,8 +40,11 @@ const TAP_PX = 6;
 const ERASE_PX = 10;
 /** A pen's eraser button (PointerEvent.buttons). */
 const ERASER_BUTTON = 32;
+/** How long a press on a link is held for its menu, ms. */
+const HOLD_MS = 550;
 
 const LINK_SVG = `<svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6.8 9.2a2.6 2.6 0 0 0 3.7 0l2.2-2.2a2.6 2.6 0 0 0-3.7-3.7l-1 1"/><path d="M9.2 6.8a2.6 2.6 0 0 0-3.7 0L3.3 9a2.6 2.6 0 0 0 3.7 3.7l1-1"/></svg>`;
+const TRASH_SVG = `<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 4.5h11"/><path d="M6 4.5V3a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v1.5"/><path d="M4 4.5l.7 8.6a1 1 0 0 0 1 .9h4.6a1 1 0 0 0 1-.9l.7-8.6"/></svg>`;
 
 export type PadTool = "pen" | "eraser";
 
@@ -65,7 +72,7 @@ function capture(el: Element, id: number): void {
 }
 
 /** A smooth path through the points (midpoint quadratics). */
-function pathD(pts: number[]): string {
+export function pathD(pts: number[]): string {
   if (pts.length < 2) return "";
   if (pts.length < 4) return `M${pts[0]} ${pts[1]}l0.01 0`;
   let d = `M${pts[0]} ${pts[1]}`;
@@ -110,7 +117,12 @@ const touches = (s: NoteStroke, x: number, y: number, reach: number) => {
 
 type Step =
   | { kind: "stroke" | "link"; id: string }
-  | { kind: "erase"; strokes: NoteStroke[]; notes: Note[] };
+  | { kind: "unlink"; link: NoteLink }
+  | { kind: "erase"; strokes: NoteStroke[]; notes: Note[] }
+  | { kind: "clear"; strokes: NoteStroke[]; notes: Note[]; links: NoteLink[] };
+
+/** What a minimap is told: the view moved, or the pad changed. */
+export type SurfaceChange = "view" | "content";
 
 export function createSurface(host: HTMLElement, env: SurfaceEnv) {
   const layer = document.createElement("div");
@@ -130,11 +142,14 @@ export function createSurface(host: HTMLElement, env: SurfaceEnv) {
   let tool: PadTool = "pen";
   // This view's own pan, starting where the pad was left.
   let pan = { ...env.pad().pan };
+  const watchers = new Set<(what: SurfaceChange) => void>();
+  const tell = (what: SurfaceChange) => watchers.forEach((fn) => fn(what));
 
   // The dot grid behind (notepad.css) moves with the canvas.
   const applyPan = () => {
     layer.style.transform = `translate(${pan.x}px, ${pan.y}px)`;
     host.style.backgroundPosition = `${pan.x}px ${pan.y}px`;
+    tell("view");
   };
   /** A client point on the canvas. */
   const toCanvas = (cx: number, cy: number): [number, number] => {
@@ -167,47 +182,117 @@ export function createSurface(host: HTMLElement, env: SurfaceEnv) {
       labels.appendChild(el);
     }
     for (const l of pad.links) labels.appendChild(linkChip(l));
+    tell("content");
   }
 
   function linkChip(l: NoteLink): HTMLElement {
     const el = document.createElement("button");
     el.type = "button";
     el.className = l.target.kind === "annotation" ? "notepad-link notepad-link-quote" : "notepad-link";
+    el.dataset.link = l.id;
     el.style.left = `${l.x}px`;
     el.style.top = `${l.y}px`;
     if (l.target.kind === "annotation") el.style.setProperty("--link-color", l.target.color || "#ffd400");
     el.innerHTML = LINK_SVG;
     const text = document.createElement("span");
     text.textContent = linkLabel(l.target);
+    // A highlight's page after its text, faintly.
+    if (l.target.kind === "annotation") {
+      const page = document.createElement("span");
+      page.className = "notepad-link-page";
+      page.textContent = ` p. ${l.target.pageIndex + 1}`;
+      text.appendChild(page);
+    }
     el.appendChild(text);
     el.title = l.target.kind === "annotation" ? `Go to the highlight, p. ${l.target.pageIndex + 1}` : `Go to page ${l.target.pageIndex + 1}`;
-    // Dragged to move; tapped to go.
+    // Dragged to move; tapped to go; held, or right-clicked, for its menu.
+    el.addEventListener("contextmenu", (e) => {
+      e.preventDefault();
+      linkMenu(l, el);
+    });
     el.addEventListener("pointerdown", (e) => {
       e.stopPropagation();
       e.preventDefault();
+      if (e.pointerType === "mouse" && e.button !== 0) return;
       const from = { x: e.clientX, y: e.clientY, lx: l.x, ly: l.y };
       let moved = false;
+      let held = false;
+      const hold = window.setTimeout(() => {
+        held = true;
+        linkMenu(l, el);
+      }, HOLD_MS);
       capture(el, e.pointerId);
       const move = (ev: PointerEvent) => {
+        if (held) return;
         moved ||= Math.hypot(ev.clientX - from.x, ev.clientY - from.y) > TAP_PX;
+        if (moved) window.clearTimeout(hold);
         if (!moved) return;
         l.x = from.lx + ev.clientX - from.x;
         l.y = from.ly + ev.clientY - from.y;
         el.style.left = `${l.x}px`;
         el.style.top = `${l.y}px`;
       };
-      const up = () => {
+      const up = (ev: PointerEvent) => {
+        window.clearTimeout(hold);
         el.removeEventListener("pointermove", move);
         el.removeEventListener("pointerup", up);
         el.removeEventListener("pointercancel", up);
+        if (held) return;
         if (moved) env.changed();
-        else env.goTo(l.target);
+        else if (ev.type === "pointerup") env.goTo(l.target);
       };
       el.addEventListener("pointermove", move);
       el.addEventListener("pointerup", up);
       el.addEventListener("pointercancel", up);
     });
     return el;
+  }
+
+  // --- a link's menu ---------------------------------------------------------
+  let menu: { el: HTMLElement; off: () => void } | null = null;
+
+  function closeMenu(): void {
+    menu?.off();
+    menu?.el.remove();
+    menu = null;
+  }
+
+  /** Under the link (above it near the pad's foot): Delete. */
+  function linkMenu(l: NoteLink, chip: HTMLElement): void {
+    closeMenu();
+    const el = document.createElement("div");
+    el.className = "notepad-link-menu";
+    const del = document.createElement("button");
+    del.type = "button";
+    del.innerHTML = `${TRASH_SVG}<span>Delete link</span>`;
+    del.addEventListener("click", () => {
+      closeMenu();
+      deleteLink(l);
+    });
+    el.appendChild(del);
+    // Its own presses aren't the canvas's.
+    el.addEventListener("pointerdown", (e) => e.stopPropagation());
+    host.appendChild(el);
+    const hr = host.getBoundingClientRect();
+    const cr = chip.getBoundingClientRect();
+    const below = cr.bottom - hr.top + 6;
+    el.style.left = `${Math.max(6, Math.min(cr.left - hr.left, host.clientWidth - el.offsetWidth - 6))}px`;
+    el.style.top = `${below + el.offsetHeight > host.clientHeight ? cr.top - hr.top - el.offsetHeight - 6 : below}px`;
+    // Any press elsewhere closes it.
+    const away = (e: PointerEvent) => {
+      if (!el.contains(e.target as Node)) closeMenu();
+    };
+    window.setTimeout(() => window.addEventListener("pointerdown", away, true));
+    menu = { el, off: () => window.removeEventListener("pointerdown", away, true) };
+  }
+
+  function deleteLink(l: NoteLink): void {
+    const pad = env.pad();
+    if (!pad.links.includes(l)) return;
+    pad.links = pad.links.filter((x) => x !== l);
+    history.push({ kind: "unlink", link: l });
+    drawLabels();
+    env.changed();
   }
 
   function render(): void {
@@ -449,7 +534,13 @@ export function createSurface(host: HTMLElement, env: SurfaceEnv) {
       if (!step) return;
       const pad = env.pad();
       if (step.kind === "link") pad.links = pad.links.filter((l) => l.id !== step.id);
-      else if (step.kind === "erase") {
+      else if (step.kind === "unlink") pad.links.push(step.link);
+      else if (step.kind === "clear") {
+        pad.strokes.push(...step.strokes);
+        pad.notes.push(...step.notes);
+        pad.links.push(...step.links);
+        for (const s of step.strokes) drawStroke(s);
+      } else if (step.kind === "erase") {
         pad.strokes.push(...step.strokes);
         pad.notes.push(...step.notes);
         for (const s of step.strokes) drawStroke(s);
@@ -463,7 +554,42 @@ export function createSurface(host: HTMLElement, env: SurfaceEnv) {
       env.changed();
     },
     canUndo: () => history.length > 0,
+    /** Empty the pad: its strokes, notes and links (undo brings them
+     *  back). */
+    clear(): void {
+      const pad = env.pad();
+      if (!pad.strokes.length && !pad.links.length) return;
+      history.push({ kind: "clear", strokes: pad.strokes, notes: pad.notes, links: pad.links });
+      pad.strokes = [];
+      pad.notes = [];
+      pad.links = [];
+      current = null;
+      render();
+      env.changed();
+    },
+    /** For a minimap: the part of the canvas in view; the links' boxes;
+     *  showing a canvas point at the view's centre (`done`: the pan is
+     *  kept, as a finger's is); and hearing of changes. */
+    view: () => ({ x: -pan.x, y: -pan.y, w: host.clientWidth, h: host.clientHeight }),
+    linkBoxes: () =>
+      env.pad().links.map((l) => {
+        const chip = [...labels.children].find((c) => (c as HTMLElement).dataset.link === l.id) as HTMLElement | undefined;
+        const color = l.target.kind === "annotation" ? l.target.color || "#ffd400" : "#ff5f57";
+        return { x: l.x, y: l.y, w: chip?.offsetWidth ?? 120, h: chip?.offsetHeight ?? 24, color };
+      }),
+    panTo(x: number, y: number, done: boolean): void {
+      pan = { x: Math.round(host.clientWidth / 2 - x), y: Math.round(host.clientHeight / 2 - y) };
+      applyPan();
+      if (!done) return;
+      env.pad().pan = { ...pan };
+      env.changed();
+    },
+    watch(fn: (what: SurfaceChange) => void): () => void {
+      watchers.add(fn);
+      return () => watchers.delete(fn);
+    },
     destroy(): void {
+      closeMenu();
       host.removeEventListener("pointerdown", onDown);
       host.removeEventListener("pointermove", onMove);
       host.removeEventListener("pointerup", onUp);

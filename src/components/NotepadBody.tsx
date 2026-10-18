@@ -9,8 +9,12 @@
 // on a page: a link to it lands on the pad. Beside it, the eye: while
 // it is open the pad follows the PDF, panning to the part about each
 // page as the reader turns to it (off by default in the floating pad,
-// on under the notes; remembered for each). Then the eraser (also the
+// on under the notes; remembered for each). Beside that, the map: a
+// minimap of the whole pad down the canvas's left (minimap.ts; off to
+// begin with, remembered for each view). Then the eraser (also the
 // Pencil's double-tap, when the Pencil was last on this pad) and undo.
+// At the canvas's lower left, a faint trash can clears the pad, once
+// confirmed (undo brings it back).
 //
 // Which visit to the page the reader is on is counted here: a stroke
 // joins the note being written only during the same visit
@@ -22,6 +26,7 @@ import { createPortal } from "react-dom";
 import { readerPageNow, useReaderPage } from "../lib/outline";
 import { pencilLastOn } from "../lib/pencil";
 import { flushNotepad, notepadChanged, notepadFor, watchNotepad, type Notepad } from "../notepad/model";
+import { createMinimap } from "../notepad/minimap";
 import { createSurface, type NotepadSurface, type PadTool } from "../notepad/surface";
 import type { PlaceTarget } from "../pdfviewer/places";
 import { goToReaderPosition, readerPlace, readerPlaceAt, showInReader } from "./ReaderPane";
@@ -45,6 +50,20 @@ const EyeIcon = ({ open }: { open: boolean }) => (
     {open ? <circle cx="8" cy="8" r="2" /> : <path d="M2.5 13.5l11-11" />}
   </svg>
 );
+const MapIcon = () => (
+  <svg viewBox="0 0 16 16" width="17" height="17" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" aria-hidden="true">
+    <path d="M1.8 3.8l4-1.6 4.4 1.6 4-1.6v10l-4 1.6-4.4-1.6-4 1.6z" />
+    <path d="M5.8 2.2v10M10.2 3.8v10" />
+  </svg>
+);
+const TrashIcon = () => (
+  <svg viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M2.5 4.5h11" />
+    <path d="M6 4.5V3a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v1.5" />
+    <path d="M4 4.5l.7 8.6a1 1 0 0 0 1 .9h4.6a1 1 0 0 0 1-.9l.7-8.6" />
+    <path d="M6.7 7v4.5M9.3 7v4.5" />
+  </svg>
+);
 /** Undo: an arrow curving back to the left. */
 const UndoIcon = () => (
   <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -65,25 +84,36 @@ export interface NotepadBodyProps {
 }
 
 const followKey = (kind: string) => `zh-notepad-follow-${kind}`;
-function storedFollow(kind: "floating" | "docked"): boolean {
+const mapKey = (kind: string) => `zh-notepad-map-${kind}`;
+/** A view's remembered switch, or `fallback`. */
+function storedFlag(key: string, fallback: boolean): boolean {
   try {
-    const v = localStorage.getItem(followKey(kind));
-    return v === null ? kind === "docked" : v === "1";
+    const v = localStorage.getItem(key);
+    return v === null ? fallback : v === "1";
   } catch {
-    return kind === "docked";
+    return fallback;
   }
 }
+const storedFollow = (kind: "floating" | "docked") => storedFlag(followKey(kind), kind === "docked");
 
-export function NotepadBody({ attKey, kind, onBarPointerDown, trailing }: NotepadBodyProps) {
-  const [follow, setFollowState] = useState(() => storedFollow(kind));
-  const setFollow = (on: boolean) => {
-    setFollowState(on);
+/** A switch kept for each view. */
+function useFlag(key: string, fallback: boolean): [boolean, (on: boolean) => void] {
+  const [on, setOn] = useState(() => storedFlag(key, fallback));
+  const set = (v: boolean) => {
+    setOn(v);
     try {
-      localStorage.setItem(followKey(kind), on ? "1" : "0");
+      localStorage.setItem(key, v ? "1" : "0");
     } catch {
       /* storage unavailable */
     }
   };
+  return [on, set];
+}
+
+export function NotepadBody({ attKey, kind, onBarPointerDown, trailing }: NotepadBodyProps) {
+  const [follow, setFollow] = useFlag(followKey(kind), kind === "docked");
+  const [map, setMap] = useFlag(mapKey(kind), false);
+  const [confirming, setConfirming] = useState(false);
   // The reader's page, and which visit to it this is.
   const page = useReaderPage();
   const visit = useRef(0);
@@ -95,7 +125,11 @@ export function NotepadBody({ attKey, kind, onBarPointerDown, trailing }: Notepa
     if (follow && page > 0) surfaceRef.current?.follow(page - 1);
   }, [follow]);
   const hostRef = useRef<HTMLDivElement>(null);
+  const mapRef = useRef<HTMLDivElement>(null);
   const surfaceRef = useRef<NotepadSurface | null>(null);
+  const padRef = useRef<Notepad | null>(null);
+  // The surface comes once the pad has loaded; the minimap waits for it.
+  const [ready, setReady] = useState(false);
   const [canUndo, setCanUndo] = useState(false);
   const [tool, setTool] = useState<PadTool>("pen");
   const [line, setLine] = useState<{ x1: number; y1: number; x2: number; y2: number } | null>(null);
@@ -125,6 +159,8 @@ export function NotepadBody({ attKey, kind, onBarPointerDown, trailing }: Notepa
         toolChanged: setTool,
       });
       surfaceRef.current = surface;
+      padRef.current = p;
+      setReady(true);
       const at = readerPageNow();
       if (storedFollow(kind) && at > 0) surface.follow(at - 1);
     });
@@ -133,9 +169,28 @@ export function NotepadBody({ attKey, kind, onBarPointerDown, trailing }: Notepa
       unwatch();
       surface?.destroy();
       surfaceRef.current = null;
+      setReady(false);
       flushNotepad();
     };
   }, [attKey]);
+
+  useEffect(() => {
+    const surface = surfaceRef.current;
+    const pad = padRef.current;
+    if (!map || !ready || !surface || !pad || !mapRef.current) return;
+    const minimap = createMinimap(mapRef.current, surface, () => padRef.current ?? pad);
+    return () => minimap.destroy();
+  }, [map, ready]);
+
+  // Clearing, asked first: any press elsewhere drops the question.
+  useEffect(() => {
+    if (!confirming) return;
+    const away = (e: PointerEvent) => {
+      if (!(e.target as Element).closest?.(".notepad-confirm, .notepad-trash")) setConfirming(false);
+    };
+    window.addEventListener("pointerdown", away, true);
+    return () => window.removeEventListener("pointerdown", away, true);
+  }, [confirming]);
 
   // The Pencil's double-tap: the eraser and back, when the Pencil was
   // last on this pad (ink mode's otherwise).
@@ -207,6 +262,16 @@ export function NotepadBody({ attKey, kind, onBarPointerDown, trailing }: Notepa
         >
           <EyeIcon open={follow} />
         </button>
+        <button
+          type="button"
+          className={map ? "notepad-tool active" : "notepad-tool"}
+          title={map ? "Hide the minimap" : "Show a minimap of the whole pad"}
+          aria-label="Minimap"
+          aria-pressed={map}
+          onClick={() => setMap(!map)}
+        >
+          <MapIcon />
+        </button>
         <div className="notepad-bar-grab" onPointerDown={onBarPointerDown} />
         <button
           type="button"
@@ -230,7 +295,37 @@ export function NotepadBody({ attKey, kind, onBarPointerDown, trailing }: Notepa
         </button>
         {trailing}
       </div>
-      <div className="notepad-canvas" ref={hostRef} />
+      <div className={map ? "notepad-main with-map" : "notepad-main"}>
+        {map && <div className="notepad-minimap" ref={mapRef} />}
+        <div className="notepad-canvas" ref={hostRef} />
+        <button
+          type="button"
+          className="notepad-trash"
+          title="Clear the notepad"
+          aria-label="Clear the notepad"
+          onClick={() => setConfirming(!confirming)}
+        >
+          <TrashIcon />
+        </button>
+        {confirming && (
+          <div className="notepad-confirm" role="dialog" aria-label="Clear the notepad">
+            <span>Clear the whole notepad?</span>
+            <button
+              type="button"
+              className="notepad-confirm-clear"
+              onClick={() => {
+                setConfirming(false);
+                surfaceRef.current?.clear();
+              }}
+            >
+              Clear
+            </button>
+            <button type="button" className="notepad-confirm-cancel" onClick={() => setConfirming(false)}>
+              Cancel
+            </button>
+          </div>
+        )}
+      </div>
       {line &&
         createPortal(
           <svg className="notepad-link-line" aria-hidden="true">

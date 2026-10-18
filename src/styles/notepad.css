@@ -72,6 +72,14 @@
   color: var(--accent);
   opacity: 0.8;
 }
+/* Under the bar: the minimap (when shown) and the canvas, side by side;
+   the trash can at the canvas's lower left. */
+.notepad-main {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
 /* A very faint dot grid, moving with the canvas as it pans. */
 .notepad-canvas {
   position: relative;
@@ -153,8 +161,128 @@
   margin-top: 2px;
   color: #ff5f57;
 }
+.notepad-link {
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
 .notepad-link-quote {
   border-left: 3px solid var(--link-color, #ffd400);
+}
+.notepad-link-page {
+  opacity: 0.5;
+  white-space: nowrap;
+}
+/* A link held (or right-clicked): its menu. */
+.notepad-link-menu {
+  position: absolute;
+  z-index: 4;
+  padding: 3px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel);
+  box-shadow: 0 6px 18px rgb(0 0 0 / 0.22);
+}
+.notepad-link-menu button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--bad);
+  font-size: calc(12px * var(--font-scale));
+  white-space: nowrap;
+}
+.notepad-link-menu button:hover {
+  background: var(--select);
+}
+/* The minimap: the whole pad, small, down the left. */
+.notepad-minimap {
+  flex: 0 0 60px;
+  position: relative;
+  overflow: hidden;
+  border-right: 1px solid var(--border);
+  background: color-mix(in srgb, var(--text-dim) 6%, transparent);
+  cursor: pointer;
+  touch-action: none;
+}
+.notepad-minimap-svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+.notepad-minimap-strokes path {
+  fill: none;
+  stroke: var(--notepad-ink);
+  stroke-width: 1;
+  stroke-linecap: round;
+  opacity: 0.75;
+}
+.notepad-minimap-frame {
+  fill: color-mix(in srgb, var(--accent) 10%, transparent);
+  stroke: var(--accent);
+  stroke-width: 1.2;
+}
+/* Clearing the pad: a faint trash can, and the question it asks. */
+.notepad-trash {
+  position: absolute;
+  z-index: 3;
+  left: 6px;
+  bottom: 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-dim);
+  opacity: 0.45;
+}
+.notepad-main.with-map .notepad-trash {
+  left: 66px;
+}
+.notepad-trash:hover {
+  opacity: 1;
+  background: var(--select);
+}
+.notepad-confirm {
+  position: absolute;
+  z-index: 4;
+  left: 6px;
+  bottom: 42px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 6px 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel);
+  box-shadow: 0 6px 18px rgb(0 0 0 / 0.22);
+  font-size: calc(12px * var(--font-scale));
+  white-space: nowrap;
+}
+.notepad-main.with-map .notepad-confirm {
+  left: 66px;
+}
+.notepad-confirm button {
+  padding: 3px 10px;
+  border: none;
+  border-radius: 6px;
+  font-size: calc(12px * var(--font-scale));
+}
+.notepad-confirm-clear {
+  background: var(--bad);
+  color: #fff;
+}
+.notepad-confirm-cancel {
+  background: var(--select);
+  color: var(--text);
 }
 /* The link being drawn out to the pages: a dashed line from the link
    icon to the pointer. */

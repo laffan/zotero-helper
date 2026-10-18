@@ -1017,11 +1017,12 @@ but shown as what it is: under Explanations in the entry's
 conversations tab, and in **Explanations**, a row between Questions and
 Words in the sidebar, never among Questions' conversations
 (`ExplanationList.tsx`). Each is a box: the passage as its head, the
-answer beneath, an info button that shows when it was asked, by which
+answer beneath, set in slightly from it, an info button that shows when it was asked, by which
 model, what it cost, whether with its context and from which work, and
 a quieter trash can; the sidebar's list, every document's explanations
 newest first, adds under each the work and page, which opens the PDF
-there with the passage marked, as Words' source links do. The
+there with the passage marked, as Words' source links do, and a filter
+box at its top that narrows the list by passage, answer or work. The
 explained passage stays marked in the PDF with a dashed pink outline
 (`--explain-mark`, an overlay like a citation's, `passageMarks.ts`;
 where it is kept as the chat's `passage`), and a tap on it opens its

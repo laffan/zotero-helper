@@ -6,7 +6,8 @@
 // in the entry's conversations tab (ItemChats.tsx) and, across every
 // document, in the sidebar's Explanations, where each also links back to
 // its passage — the PDF opened at the page, the passage marked — as
-// Words' entries do.
+// Words' entries do, and a filter box narrows them by passage, answer
+// or work.
 import { useEffect, useMemo, useRef, useState } from "react";
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -133,31 +134,54 @@ export function ExplanationCard({ chat, linked = false }: { chat: Chat; linked?:
   );
 }
 
+/** Does `chat` match the filter `q` (lower case) — in its passage,
+ *  its answer or the work it was read in? */
+function matches(chat: Chat, q: string): boolean {
+  const { question, answer } = exchange(chat);
+  return [question, answer ?? "", chat.source.label].some((t) => t.toLowerCase().includes(q));
+}
+
 /** The sidebar's Explanations: every explanation, newest first. */
 export function ExplanationList() {
   const chats = useStore((s) => s.chats);
+  const [query, setQuery] = useState("");
   const list = useMemo(
     () => chats.filter(isExplanation).sort((a, b) => b.createdMs - a.createdMs),
     [chats],
   );
+  const shown = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return q ? list.filter((c) => matches(c, q)) : list;
+  }, [list, query]);
   return (
     <section className="item-list explanation-list">
       <div className="view-bar">
         <span className="chat-list-heading">Explanations</span>
+        <input
+          className="word-list-filter"
+          type="search"
+          placeholder="Filter explanations…"
+          aria-label="Filter explanations"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+        />
       </div>
       <div className="list-body">
         {list.length === 0 ? (
           <div className="list-empty">
             No explanations yet — select a passage in a PDF and use the sparkles over it.
           </div>
+        ) : shown.length === 0 ? (
+          <div className="list-empty">No explanation matches “{query.trim()}”.</div>
         ) : (
-          list.map((c) => <ExplanationCard key={c.id} chat={c} linked />)
+          shown.map((c) => <ExplanationCard key={c.id} chat={c} linked />)
         )}
       </div>
       <footer className="list-footer">
         <span>
+          {shown.length < list.length && `${shown.length} of `}
           {list.length} explanation{list.length === 1 ? "" : "s"}
-          {list.length > 0 && ` · ${formatUsd(list.reduce((sum, c) => sum + c.costUsd, 0))} spent`}
+          {shown.length > 0 && ` · ${formatUsd(shown.reduce((sum, c) => sum + c.costUsd, 0))} spent`}
         </span>
       </footer>
     </section>

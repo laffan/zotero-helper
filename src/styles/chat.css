@@ -647,7 +647,8 @@
   color: var(--text-dim);
 }
 
-/* --- Words (WordList.tsx): looked-up words, with where they were read --- */
+/* --- Words (WordList.tsx): looked-up words, with where they were read.
+   Its filter box is Explanations' too (ExplanationList.tsx). --- */
 .word-row {
   display: flex;
   align-items: flex-start;

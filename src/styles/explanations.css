@@ -39,6 +39,8 @@
 }
 .explanation-answer {
   margin-top: 6px;
+  /* Set in a little from the question, so the two read apart. */
+  padding-left: 12px;
   color: var(--text);
   font-size: calc(13px * var(--font-scale));
   line-height: 1.5;

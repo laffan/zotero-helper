@@ -10,9 +10,11 @@
   overflow: hidden;
   touch-action: none;
 }
+/* Floating, the pages show faintly through it. */
 .notepad-floating {
   position: fixed;
   z-index: 65;
+  background: color-mix(in srgb, var(--panel) 80%, transparent);
   border: 1px solid var(--border);
   border-radius: 10px;
   box-shadow: 0 10px 34px rgb(0 0 0 / 0.28);
@@ -70,12 +72,22 @@
   color: var(--accent);
   opacity: 0.8;
 }
+/* A very faint dot grid, moving with the canvas as it pans. */
 .notepad-canvas {
   position: relative;
   flex: 1;
   overflow: hidden;
   cursor: crosshair;
   touch-action: none;
+  background-image: radial-gradient(circle, color-mix(in srgb, var(--text-dim) 30%, transparent) 1px, transparent 1.3px);
+  background-size: 20px 20px;
+}
+/* Following the PDF to another page: a short glide. */
+.notepad-canvas.following .notepad-layer {
+  transition: transform 0.35s ease;
+}
+.notepad-canvas.following {
+  transition: background-position 0.35s ease;
 }
 .notepad-canvas.erasing {
   cursor: cell;

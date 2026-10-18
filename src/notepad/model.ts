@@ -22,7 +22,8 @@ export interface NoteStroke {
   note: string;
 }
 
-/** Strokes written together, and where the reader was then. */
+/** Strokes written while the reader stayed on one page, and where the
+ *  reader was when the first was. */
 export interface Note extends PagePlace {
   id: string;
   createdMs: number;
@@ -45,11 +46,6 @@ export interface Notepad {
 }
 
 export const emptyNotepad = (): Notepad => ({ strokes: [], notes: [], links: [], pan: { x: 0, y: 0 } });
-
-/** A stroke written this soon after the last one, and this near it,
- *  belongs to the same note (Zotero's ink merges by the same rule). */
-export const NOTE_JOIN_MS = 10_000;
-export const NOTE_JOIN_PX = 60;
 
 export const newId = (prefix: string) => `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
 

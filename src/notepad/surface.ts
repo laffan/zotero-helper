@@ -11,14 +11,21 @@
 // eraser button, or the eraser end of a pen that has one), takes out
 // every stroke it passes over. A finger pans, and taps. A mouse (a Mac,
 // no Pencil) writes with a drag and taps with a click; a wheel or
-// trackpad pans. Strokes written within NOTE_JOIN_MS and NOTE_JOIN_PX of
-// the last are one note (model.ts), which remembers the reader's place
-// when it began; each note shows its page, small, above it.
+// trackpad pans. Strokes written while the reader stays on one page are
+// one note (model.ts), which remembers the reader's place when it began;
+// turning to another page — even to come straight back — starts the
+// next. Each note shows its page, small, above it.
+//
+// Following the PDF (`follow`, the bar's eye): as the reader turns
+// pages, the pad pans to the part of it about that page — its notes and
+// links, or, for a page with none, where they would fall between those
+// of the pages around it — on the supposition that the pad is written
+// from top to bottom as the PDF is read.
 //
 // Several views may show one pad (model.ts shares it): each pans on its
 // own, and `render` redraws one when another has changed the pad.
 import type { PagePlace, PlaceTarget } from "../pdfviewer/places";
-import { linkLabel, newId, NOTE_JOIN_MS, NOTE_JOIN_PX, type Note, type Notepad, type NoteLink, type NoteStroke } from "./model";
+import { linkLabel, newId, type Note, type Notepad, type NoteLink, type NoteStroke } from "./model";
 
 const SVG_NS = "http://www.w3.org/2000/svg";
 const PEN_WIDTH = 2;
@@ -38,8 +45,10 @@ export interface SurfaceEnv {
   pad: () => Notepad;
   /** This view changed the pad: save, tell the others. */
   changed: () => void;
-  /** Where the reader is now (a new note's place). */
-  place: () => PagePlace | null;
+  /** Where the reader is now (a new note's place), and which visit to
+   *  that page this is: it changes each time the reader turns to
+   *  another page, so a stroke after a return starts a new note. */
+  place: () => (PagePlace & { visit: number }) | null;
   /** Go to a note's place, or a link's target. */
   goTo: (t: PlaceTarget) => void;
   /** The tool changed (the double-tap, the eraser end). */
@@ -116,12 +125,17 @@ export function createSurface(host: HTMLElement, env: SurfaceEnv) {
   const paths = new Map<string, SVGPathElement>();
   // What undo takes back, last first.
   const history: Step[] = [];
-  let last: { at: number; box: [number, number, number, number]; note: string } | null = null;
+  // The note being written: the reader's visit to its page.
+  let current: { note: string; visit: number } | null = null;
   let tool: PadTool = "pen";
   // This view's own pan, starting where the pad was left.
   let pan = { ...env.pad().pan };
 
-  const applyPan = () => (layer.style.transform = `translate(${pan.x}px, ${pan.y}px)`);
+  // The dot grid behind (notepad.css) moves with the canvas.
+  const applyPan = () => {
+    layer.style.transform = `translate(${pan.x}px, ${pan.y}px)`;
+    host.style.backgroundPosition = `${pan.x}px ${pan.y}px`;
+  };
   /** A client point on the canvas. */
   const toCanvas = (cx: number, cy: number): [number, number] => {
     const r = host.getBoundingClientRect();
@@ -298,7 +312,6 @@ export function createSurface(host: HTMLElement, env: SurfaceEnv) {
     if (done.kind === "erase") {
       if (done.step.strokes.length) {
         history.push({ kind: "erase", ...done.step });
-        last = null;
         env.changed();
       }
       return;
@@ -325,36 +338,68 @@ export function createSurface(host: HTMLElement, env: SurfaceEnv) {
     finishStroke(done.pts, done.path);
   }
 
-  /** A finished stroke joins the last note, or begins one here. */
+  /** A finished stroke joins the note being written while the reader is
+   *  still on its page, or begins the next. */
   function finishStroke(pts: number[], path: SVGPathElement): void {
     const pad = env.pad();
-    const box = bounds(pts);
-    const now = Date.now();
-    const near =
-      last &&
-      now - last.at < NOTE_JOIN_MS &&
-      box[0] < last.box[2] + NOTE_JOIN_PX &&
-      box[2] > last.box[0] - NOTE_JOIN_PX &&
-      box[1] < last.box[3] + NOTE_JOIN_PX &&
-      box[3] > last.box[1] - NOTE_JOIN_PX &&
-      pad.notes.some((n) => n.id === last!.note);
-    let note = near ? last!.note : "";
+    const place = env.place();
+    const visit = place?.visit ?? -1;
+    let note = current && current.visit === visit && pad.notes.some((n) => n.id === current!.note) ? current.note : "";
     if (!note) {
-      const place = env.place();
       note = newId("note");
-      pad.notes.push({ id: note, createdMs: now, pageIndex: place?.pageIndex ?? 0, top: place?.top ?? null });
+      pad.notes.push({ id: note, createdMs: Date.now(), pageIndex: place?.pageIndex ?? 0, top: place?.top ?? null });
+      current = { note, visit };
     }
     const stroke: NoteStroke = { id: newId("s"), points: pts, width: PEN_WIDTH, color: "", note };
     pad.strokes.push(stroke);
     paths.set(stroke.id, path);
     history.push({ kind: "stroke", id: stroke.id });
-    last = {
-      at: now,
-      box: near ? [Math.min(box[0], last!.box[0]), Math.min(box[1], last!.box[1]), Math.max(box[2], last!.box[2]), Math.max(box[3], last!.box[3])] : box,
-      note,
-    };
     drawLabels();
     env.changed();
+  }
+
+  // --- following the PDF ----------------------------------------------------
+  /** The part of the pad about page `pageIndex`: the top of its notes
+   *  and links; for a page with none, between those of the pages before
+   *  and after it, as far along as the page is; past the last, just
+   *  under it. Canvas coordinates, or null on an empty pad. */
+  function spotFor(pageIndex: number): { x: number; y: number } | null {
+    const pad = env.pad();
+    const spans: { page: number; x0: number; y0: number; y1: number }[] = [];
+    for (const n of pad.notes) {
+      const pts = pad.strokes.filter((s) => s.note === n.id).flatMap((s) => s.points);
+      if (!pts.length) continue;
+      const [x0, y0, , y1] = bounds(pts);
+      spans.push({ page: n.pageIndex, x0, y0, y1 });
+    }
+    for (const l of pad.links) spans.push({ page: l.target.pageIndex, x0: l.x, y0: l.y, y1: l.y + 24 });
+    if (!spans.length) return null;
+    const here = spans.filter((s) => s.page === pageIndex);
+    if (here.length) return { x: Math.min(...here.map((s) => s.x0)), y: Math.min(...here.map((s) => s.y0)) };
+    const before = spans.filter((s) => s.page < pageIndex);
+    const after = spans.filter((s) => s.page > pageIndex);
+    const a = before.length ? before.reduce((m, s) => (s.page > m.page || (s.page === m.page && s.y1 > m.y1) ? s : m)) : null;
+    const b = after.length ? after.reduce((m, s) => (s.page < m.page || (s.page === m.page && s.y0 < m.y0) ? s : m)) : null;
+    if (a && b) {
+      const t = (pageIndex - a.page) / (b.page - a.page);
+      return { x: Math.min(a.x0, b.x0), y: a.y1 + (b.y0 - a.y1) * t };
+    }
+    return a ? { x: a.x0, y: a.y1 + 20 } : { x: b!.x0, y: b!.y0 };
+  }
+
+  /** Pan, smoothly, to the part of the pad about `pageIndex` — its top a
+   *  little below the pad's top, its left in view. */
+  function follow(pageIndex: number): void {
+    const spot = spotFor(pageIndex);
+    if (!spot || g) return;
+    const margin = 28;
+    const y = margin - spot.y;
+    const x = spot.x + pan.x < 8 || spot.x + pan.x > host.clientWidth - 40 ? margin - spot.x : pan.x;
+    if (Math.abs(y - pan.y) < 2 && Math.abs(x - pan.x) < 2) return;
+    pan = { x, y };
+    host.classList.add("following");
+    applyPan();
+    window.setTimeout(() => host.classList.remove("following"), 400);
   }
 
   function onWheel(e: WheelEvent): void {
@@ -380,6 +425,7 @@ export function createSurface(host: HTMLElement, env: SurfaceEnv) {
   return {
     /** Redraw from the pad (another view changed it). */
     render,
+    follow,
     tool: () => tool,
     setTool,
     /** Add a link at the middle of what this view shows. */
@@ -413,7 +459,6 @@ export function createSurface(host: HTMLElement, env: SurfaceEnv) {
         paths.delete(step.id);
         pad.notes = pad.notes.filter((n) => pad.strokes.some((s) => s.note === n.id));
       }
-      last = null;
       drawLabels();
       env.changed();
     },

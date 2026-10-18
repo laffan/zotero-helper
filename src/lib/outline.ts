@@ -50,6 +50,8 @@ export function setOutline(attKey: string, outline: OutlineEntry[]): void {
 
 export const setReaderPage = (page: number) => readerPage.set(page);
 export const useReaderPage = readerPage.use;
+/** The reader's page now, outside React. */
+export const readerPageNow = () => readerPage.get();
 
 /** The outline of `attKey`, or null while it isn't known. */
 export function useOutline(attKey: string | null | undefined): OutlineEntry[] | null {

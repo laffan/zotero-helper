@@ -1114,14 +1114,16 @@ notes afterwards (`src/notepad/`, `NotepadBody.tsx`). It shows in two
 places, sharing one pad (`notepadFor` / `watchNotepad` in
 `model.ts`, so a change in one view redraws the other): floating over
 the pages in reading mode, opened by the red rectangle at the top right
-(`ReadingNotepad.tsx` — the bar's empty middle drags it, a dotted circle
-at its corner sizes it, and where it sits is this device's); and in the
+(`ReadingNotepad.tsx` — four-fifths of the window's height to begin
+with, its background 80% opaque so the pages show through; the bar's
+empty middle drags it, a dotted circle at its corner sizes it, and where
+it sits and its size are kept on this device); and in the
 notes pane's lower half, from **View Notepad** at the pane's foot
 (`NotesPanel.tsx`) — the bar between the notes and the pad is the
 divider, dragged to share the height, with Hide Notepad at its middle.
 Either way it is one continuous surface in the panel's colour: a slim
-bar of tools over the canvas, the ink black (white in the dark theme,
-`--notepad-ink`).
+bar of tools over the canvas — a very faint dot grid, which pans with
+it — the ink black (white in the dark theme, `--notepad-ink`).
 
 On the canvas the Pencil writes — a tap is a dot — a finger pans, and a
 mouse writes with a drag (a Mac has no Pencil) while a wheel pans; each
@@ -1130,12 +1132,21 @@ the viewer's ink is, with no React render under the pen (`surface.ts`).
 The eraser — the bar's button, a pen's eraser end, or the Pencil's
 double-tap when the Pencil last touched this pad (ink mode takes the
 double-tap otherwise; `pencilLastOn` in `lib/pencil.ts`) — takes out
-every stroke it passes over. Strokes written within 10s and 60px of the
-last are one note, which remembers where in the PDF the reader was when
-it began — the page at the view's centre and the height a quarter of the
-way down the view (`placeInView` in `pdfviewer/places.ts`) — and shows
-that page, small, above it; a finger tap (or a click) on a note goes
-back there. The link icon at the bar's left makes a link: pressed and
+every stroke it passes over. Strokes written while the reader stays on
+one page are one note; turning to another page — even to come straight
+back — starts the next (each view counts the visits to the page in
+view, `NotepadBody.tsx`). A note remembers where in the PDF the reader
+was when it began — the page at the view's centre and the height a
+quarter of the way down the view (`placeInView` in
+`pdfviewer/places.ts`) — and shows that page, small, above it; a finger
+tap (or a click) on a note goes back there. The eye beside the link
+icon makes the pad follow the PDF: as the reader turns pages it glides
+to the part of the pad about the page in view — the top of its notes and
+links, or for a page with none, between those of the pages before and
+after it as far along as the page is, or just under the last
+(`spotFor` in `surface.ts`) — supposing the pad is written top to bottom
+as the PDF is read. It starts off in the floating pad and on under the
+notes, and each view remembers its own. The link icon at the bar's left makes a link: pressed and
 dragged out onto the pages, a dashed line running from it to the
 pointer, and let go over a highlight or a spot on a page
 (`placeAtPoint`), it puts a link on the pad — a link icon and "p. 12",

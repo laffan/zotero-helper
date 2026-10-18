@@ -9,11 +9,19 @@ import { useStore } from "../lib/store";
 import { CloseIcon } from "./Icons";
 import { NotepadBody } from "./NotepadBody";
 
-const BOX_KEY = "zh-notepad-box";
+// Version 2: the default became 80% of the window's height.
+const BOX_KEY = "zh-notepad-box-2";
 type Box = { left: number; top: number; width: number; height: number };
 
 function storedBox(): Box {
-  const fallback = { left: Math.max(16, window.innerWidth - 420), top: 70, width: 380, height: 460 };
+  // At the right, four-fifths of the window's height, centred on it.
+  const height = Math.round(window.innerHeight * 0.8);
+  const fallback = {
+    left: Math.max(16, window.innerWidth - 420),
+    top: Math.round((window.innerHeight - height) / 2),
+    width: 380,
+    height,
+  };
   try {
     const b = JSON.parse(localStorage.getItem(BOX_KEY) ?? "null") as Box | null;
     return b && Number.isFinite(b.left) ? b : fallback;
@@ -73,6 +81,7 @@ export function ReadingNotepad({ attKey }: { attKey: string }) {
     <div className="notepad notepad-floating" style={{ left: box.left, top: box.top, width: box.width, height: box.height }}>
       <NotepadBody
         attKey={attKey}
+        kind="floating"
         onBarPointerDown={(e) => {
           const start = box;
           follow(

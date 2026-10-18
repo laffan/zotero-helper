@@ -6,12 +6,20 @@
 // The toolbar: the link icon at its left makes a link — press it (the
 // Pencil, a finger or the mouse) and drag onto the pages, a dashed line
 // running from it to the pointer, and let go over a highlight or a spot
-// on a page: a link to it lands on the pad. Then the eraser (also the
+// on a page: a link to it lands on the pad. Beside it, the eye: while
+// it is open the pad follows the PDF, panning to the part about each
+// page as the reader turns to it (off by default in the floating pad,
+// on under the notes; remembered for each). Then the eraser (also the
 // Pencil's double-tap, when the Pencil was last on this pad) and undo.
+//
+// Which visit to the page the reader is on is counted here: a stroke
+// joins the note being written only during the same visit
+// (surface.ts).
 // What else the host puts in the bar (a close button) goes at its right;
 // the bar's empty middle is the host's to drag the pad by.
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { readerPageNow, useReaderPage } from "../lib/outline";
 import { pencilLastOn } from "../lib/pencil";
 import { flushNotepad, notepadChanged, notepadFor, watchNotepad, type Notepad } from "../notepad/model";
 import { createSurface, type NotepadSurface, type PadTool } from "../notepad/surface";
@@ -31,6 +39,12 @@ const EraserIcon = () => (
     <path d="M6.2 13.5h7.3" />
   </svg>
 );
+const EyeIcon = ({ open }: { open: boolean }) => (
+  <svg viewBox="0 0 16 16" width="17" height="17" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M1.5 8s2.4-4.5 6.5-4.5S14.5 8 14.5 8 12.1 12.5 8 12.5 1.5 8 1.5 8z" />
+    {open ? <circle cx="8" cy="8" r="2" /> : <path d="M2.5 13.5l11-11" />}
+  </svg>
+);
 /** Undo: an arrow curving back to the left. */
 const UndoIcon = () => (
   <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -41,13 +55,45 @@ const UndoIcon = () => (
 
 export interface NotepadBodyProps {
   attKey: string;
+  /** Which view this is: whether it follows the PDF is kept for each,
+   *  and starts off in the floating pad, on under the notes. */
+  kind: "floating" | "docked";
   /** A press on the bar's empty middle (the host drags the pad by it). */
   onBarPointerDown?: (e: React.PointerEvent) => void;
   /** At the bar's right. */
   trailing?: React.ReactNode;
 }
 
-export function NotepadBody({ attKey, onBarPointerDown, trailing }: NotepadBodyProps) {
+const followKey = (kind: string) => `zh-notepad-follow-${kind}`;
+function storedFollow(kind: "floating" | "docked"): boolean {
+  try {
+    const v = localStorage.getItem(followKey(kind));
+    return v === null ? kind === "docked" : v === "1";
+  } catch {
+    return kind === "docked";
+  }
+}
+
+export function NotepadBody({ attKey, kind, onBarPointerDown, trailing }: NotepadBodyProps) {
+  const [follow, setFollowState] = useState(() => storedFollow(kind));
+  const setFollow = (on: boolean) => {
+    setFollowState(on);
+    try {
+      localStorage.setItem(followKey(kind), on ? "1" : "0");
+    } catch {
+      /* storage unavailable */
+    }
+  };
+  // The reader's page, and which visit to it this is.
+  const page = useReaderPage();
+  const visit = useRef(0);
+  useEffect(() => {
+    visit.current++;
+    if (follow && page > 0) surfaceRef.current?.follow(page - 1);
+  }, [page]);
+  useEffect(() => {
+    if (follow && page > 0) surfaceRef.current?.follow(page - 1);
+  }, [follow]);
   const hostRef = useRef<HTMLDivElement>(null);
   const surfaceRef = useRef<NotepadSurface | null>(null);
   const [canUndo, setCanUndo] = useState(false);
@@ -71,11 +117,16 @@ export function NotepadBody({ attKey, onBarPointerDown, trailing }: NotepadBodyP
           notepadChanged(attKey, pad!, me);
           setCanUndo(Boolean(surface?.canUndo()));
         },
-        place: () => readerPlace(),
+        place: () => {
+          const p = readerPlace();
+          return p && { ...p, visit: visit.current };
+        },
         goTo,
         toolChanged: setTool,
       });
       surfaceRef.current = surface;
+      const at = readerPageNow();
+      if (storedFollow(kind) && at > 0) surface.follow(at - 1);
     });
     return () => {
       cancelled = true;
@@ -145,6 +196,16 @@ export function NotepadBody({ attKey, onBarPointerDown, trailing }: NotepadBodyP
           onPointerDown={startLink}
         >
           <LinkIcon />
+        </button>
+        <button
+          type="button"
+          className={follow ? "notepad-tool active" : "notepad-tool"}
+          title={follow ? "Following the PDF — the pad shows the part about the page in view" : "Follow the PDF as it scrolls"}
+          aria-label="Follow the PDF"
+          aria-pressed={follow}
+          onClick={() => setFollow(!follow)}
+        >
+          <EyeIcon open={follow} />
         </button>
         <div className="notepad-bar-grab" onPointerDown={onBarPointerDown} />
         <button

@@ -137,7 +137,7 @@ export function NotesPanel({ item }: { item: ZItem }) {
       {padKey && <NotepadSplit panelRef={panelRef} split={split} setSplit={setSplit} />}
       {padKey && padOpen && (
         <div className="notepad notepad-docked">
-          <NotepadBody attKey={padKey} />
+          <NotepadBody attKey={padKey} kind="docked" />
         </div>
       )}
     </div>

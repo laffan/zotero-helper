@@ -13,6 +13,9 @@
 // minimap of the whole pad down the canvas's left (minimap.ts; off to
 // begin with, remembered for each view). Then the eraser (also the
 // Pencil's double-tap, when the Pencil was last on this pad) and undo.
+// In the bar's middle, two dots for the pen's colour: the theme's ink
+// (black, white in the dark theme) or red (this device's choice, shared
+// by every view; picking one while erasing goes back to the pen).
 // At the canvas's lower left, a faint trash can clears the pad, once
 // confirmed (undo brings it back).
 //
@@ -27,7 +30,7 @@ import { readerPageNow, useReaderPage } from "../lib/outline";
 import { pencilLastOn } from "../lib/pencil";
 import { flushNotepad, notepadChanged, notepadFor, watchNotepad, type Notepad } from "../notepad/model";
 import { createMinimap } from "../notepad/minimap";
-import { createSurface, type NotepadSurface, type PadTool } from "../notepad/surface";
+import { createSurface, RED_INK, type NotepadSurface, type PadTool } from "../notepad/surface";
 import type { PlaceTarget } from "../pdfviewer/places";
 import { goToReaderPosition, readerPlace, readerPlaceAt, showInReader } from "./ReaderPane";
 
@@ -85,6 +88,19 @@ export interface NotepadBodyProps {
 
 const followKey = (kind: string) => `zh-notepad-follow-${kind}`;
 const mapKey = (kind: string) => `zh-notepad-map-${kind}`;
+const COLOR_KEY = "zh-notepad-pen-color";
+/** The pen's colours: the theme's ink ("") and red. */
+const PEN_COLORS = [
+  { color: "", label: "Ink (black, white in the dark theme)" },
+  { color: RED_INK, label: "Red" },
+];
+function storedColor(): string {
+  try {
+    return localStorage.getItem(COLOR_KEY) === RED_INK ? RED_INK : "";
+  } catch {
+    return "";
+  }
+}
 /** A view's remembered switch, or `fallback`. */
 function storedFlag(key: string, fallback: boolean): boolean {
   try {
@@ -132,6 +148,7 @@ export function NotepadBody({ attKey, kind, onBarPointerDown, trailing }: Notepa
   const [ready, setReady] = useState(false);
   const [canUndo, setCanUndo] = useState(false);
   const [tool, setTool] = useState<PadTool>("pen");
+  const [color, setColor] = useState(storedColor);
   const [line, setLine] = useState<{ x1: number; y1: number; x2: number; y2: number } | null>(null);
 
   // The PDF's pad (shared with any other view of it), then the canvas.
@@ -158,6 +175,7 @@ export function NotepadBody({ attKey, kind, onBarPointerDown, trailing }: Notepa
         goTo,
         toolChanged: setTool,
       });
+      surface.setColor(storedColor());
       surfaceRef.current = surface;
       padRef.current = p;
       setReady(true);
@@ -205,6 +223,19 @@ export function NotepadBody({ attKey, kind, onBarPointerDown, trailing }: Notepa
     window.addEventListener("zh-pencil", onPencil);
     return () => window.removeEventListener("zh-pencil", onPencil);
   }, []);
+
+  /** A colour dot: the pen writes in it from now on. */
+  const pickColor = (c: string) => {
+    setColor(c);
+    try {
+      localStorage.setItem(COLOR_KEY, c);
+    } catch {
+      /* storage unavailable */
+    }
+    const surface = surfaceRef.current;
+    surface?.setColor(c);
+    if (surface?.tool() === "eraser") surface.setTool("pen");
+  };
 
   function goTo(t: PlaceTarget): void {
     if (t.kind === "annotation") showInReader(attKey, t.pageIndex + 1, t.key);
@@ -272,7 +303,24 @@ export function NotepadBody({ attKey, kind, onBarPointerDown, trailing }: Notepa
         >
           <MapIcon />
         </button>
-        <div className="notepad-bar-grab" onPointerDown={onBarPointerDown} />
+        <div className="notepad-bar-grab" onPointerDown={onBarPointerDown}>
+          {/* Its own presses aren't the bar's drag. */}
+          <div className="notepad-colors" role="radiogroup" aria-label="Pen colour" onPointerDown={(e) => e.stopPropagation()}>
+            {PEN_COLORS.map((c) => (
+              <button
+                key={c.color || "ink"}
+                type="button"
+                role="radio"
+                className={c.color === color ? "notepad-color on" : "notepad-color"}
+                style={c.color ? ({ "--swatch": c.color } as React.CSSProperties) : undefined}
+                title={c.label}
+                aria-label={c.label}
+                aria-checked={c.color === color}
+                onClick={() => pickColor(c.color)}
+              />
+            ))}
+          </div>
+        </div>
         <button
           type="button"
           className={tool === "eraser" ? "notepad-tool active" : "notepad-tool"}

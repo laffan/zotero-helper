@@ -52,6 +52,7 @@ export function createMinimap(el: HTMLElement, surface: NotepadSurface, pad: () 
       const p = document.createElementNS(SVG_NS, "path");
       p.setAttribute("d", pathD(s.points));
       p.setAttribute("vector-effect", "non-scaling-stroke");
+      if (s.color) p.style.stroke = s.color;
       strokes.appendChild(p);
       for (let i = 0; i + 1 < s.points.length; i += 2) grow(s.points[i], s.points[i + 1], s.points[i], s.points[i + 1]);
     }

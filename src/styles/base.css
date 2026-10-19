@@ -104,10 +104,13 @@ select:focus {
 /* --- iPadOS 26 windowed mode --- */
 /* Apple's window-control pill overlays the top-left of the content when
    the app is NOT full screen, and safe-area insets only report it when
-   full screen. Keep a 30px floor under the top inset on iPadOS —
-   harmless when full screen, saves the toolbar when windowed. */
-.ipados .app,
-.ipados .settings-view {
+   full screen. Keep a 30px floor under the top inset on iPadOS — except
+   while the window fills the screen and its status bar is hidden
+   (`status-bar-hidden`, from tauri-plugin-status-bar via
+   lib/statusBar.ts): then there is no bar and no controls to keep clear
+   of, and the app has the whole screen. */
+.ipados:not(.status-bar-hidden) .app,
+.ipados:not(.status-bar-hidden) .settings-view {
   padding-top: max(env(safe-area-inset-top), 30px);
 }
 
@@ -160,8 +163,8 @@ select:focus {
   .meta-panel.open {
     transform: translateX(0);
   }
-  .ipados .sidebar,
-  .ipados .meta-panel {
+  .ipados:not(.status-bar-hidden) .sidebar,
+  .ipados:not(.status-bar-hidden) .meta-panel {
     padding-top: max(env(safe-area-inset-top), 30px);
   }
   .drawer-scrim {

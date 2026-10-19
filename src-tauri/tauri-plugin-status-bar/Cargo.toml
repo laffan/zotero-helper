@@ -1,0 +1,14 @@
+[package]
+name = "tauri-plugin-status-bar"
+version = "0.1.0"
+description = "iPadOS: the app full screen — the status bar and home indicator hidden while its window fills the screen"
+edition = "2021"
+rust-version = "1.77"
+links = "tauri-plugin-status-bar"
+
+[build-dependencies]
+tauri-plugin = { version = "2", features = ["build"] }
+
+[dependencies]
+tauri = { version = "2" }
+serde = { version = "1", features = ["derive"] }

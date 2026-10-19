@@ -9,6 +9,7 @@
     "dialog:default",
     "opener:default",
     "capture-view:default",
-    "pencil:default"
+    "pencil:default",
+    "status-bar:default"
   ]
 }

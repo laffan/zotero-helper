@@ -596,6 +596,7 @@ pub fn run() {
         .plugin(tauri_plugin_share_sheet::init())
         .plugin(tauri_plugin_keyboard_focus::init())
         .plugin(tauri_plugin_pencil::init())
+        .plugin(tauri_plugin_status_bar::init())
         .setup(|app| {
             let data_dir = app
                 .path()

@@ -23,6 +23,7 @@ tauri-plugin-capture-view = { path = "tauri-plugin-capture-view" }
 tauri-plugin-share-sheet = { path = "tauri-plugin-share-sheet" }
 tauri-plugin-keyboard-focus = { path = "tauri-plugin-keyboard-focus" }
 tauri-plugin-pencil = { path = "tauri-plugin-pencil" }
+tauri-plugin-status-bar = { path = "tauri-plugin-status-bar" }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 tokio = { version = "1", features = ["time", "sync", "macros"] }

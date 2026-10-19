@@ -31,10 +31,15 @@
   -webkit-user-select: none;
   user-select: none;
 }
-/* The bar's empty middle: what the floating pad is dragged by. */
+/* The bar's empty middle: what the floating pad is dragged by. The pen's
+   colours sit at its centre. */
 .notepad-bar-grab {
   flex: 1;
   align-self: stretch;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
 }
 .notepad-floating .notepad-bar-grab {
   cursor: grab;
@@ -61,6 +66,39 @@
 }
 .notepad-tool:disabled {
   opacity: 0.35;
+}
+/* The pen's colours: two dots, each in a target a finger can hit — the
+   theme's ink and red — the one writing ringed. */
+.notepad-colors {
+  display: flex;
+  gap: 2px;
+  cursor: default;
+}
+.notepad-color {
+  position: relative;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  cursor: pointer;
+  --swatch: var(--notepad-ink);
+}
+.notepad-color::before {
+  content: "";
+  position: absolute;
+  inset: 8px;
+  border-radius: 50%;
+  background: var(--swatch);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--text-dim) 45%, transparent);
+}
+.notepad-color.on::after {
+  content: "";
+  position: absolute;
+  inset: 4px;
+  border: 1.5px solid var(--text);
+  border-radius: 50%;
 }
 /* Link: the icon alone, in the reading-mode red, dragged out. */
 .notepad-link-btn {
@@ -329,14 +367,16 @@
 
 /* Docked at the window's left or right edge (ReadingNotepad.tsx): a
    full-height column, the pages laid out beside it (readingmode.css);
-   its inner edge sizes it. */
+   its inner edge sizes it. Not clipped like the floating pad, so the
+   edge's handle can reach out over the pages. */
 .notepad-edge {
   position: fixed;
   z-index: 65;
   top: 0;
   bottom: 0;
+  overflow: visible;
 }
-.ipados .notepad-edge {
+.ipados:not(.status-bar-hidden) .notepad-edge {
   top: max(env(safe-area-inset-top), 24px);
 }
 .notepad-edge-left {
@@ -347,32 +387,46 @@
   right: 0;
   border-left: 1px solid var(--border);
 }
+/* The handle: a strip astride the edge, down its length below the bar
+   (whose end buttons it would cover), and round its grip at the middle
+   a target a finger can't miss — 44px wide, 120px tall, clear of reading
+   mode's buttons beside the pad at the top. */
 .notepad-edge-size {
   position: absolute;
   z-index: 3;
-  top: 0;
+  top: 36px;
   bottom: 0;
-  width: 14px;
+  width: 16px;
   cursor: col-resize;
   touch-action: none;
 }
 .notepad-edge-left .notepad-edge-size {
-  right: -7px;
+  right: -8px;
 }
 .notepad-edge-right .notepad-edge-size {
-  left: -7px;
+  left: -8px;
 }
+.notepad-edge-size::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: -14px;
+  width: 44px;
+  height: 120px;
+  margin-top: -60px;
+}
+/* The grip: a pill on the edge itself. */
 .notepad-edge-size::after {
   content: "";
   position: absolute;
   top: 50%;
   left: 5px;
-  width: 4px;
-  height: 36px;
-  margin-top: -18px;
-  border-radius: 2px;
+  width: 6px;
+  height: 48px;
+  margin-top: -24px;
+  border-radius: 3px;
   background: var(--text-dim);
-  opacity: 0.35;
+  opacity: 0.45;
 }
 /* Where a floating pad let go now would dock. */
 .notepad-dock-preview {

@@ -98,6 +98,9 @@ src/            React + TypeScript UI (Vite, zustand, MiniSearch)
                 laid over the library until a sync includes them
   lib/pencil.ts the Apple Pencil's double-tap and squeeze, from
                 tauri-plugin-pencil, as a window event for ink mode
+  lib/statusBar.ts
+                asking tauri-plugin-status-bar, at boot, whether the
+                status bar is hidden (the `status-bar-hidden` class)
   components/   toolbar, sidebar, virtualized item list, metadata panel
                 and its tabs (Highlights, Notes — NotesPrompts is an
                 empty note's reading questions), reader pane (and
@@ -190,11 +193,14 @@ src-tauri/      Rust core (all networking + state)
   src/bookmarks.rs the reader's bookmarks on disk (bookmarks.json)
   src/capture.rs   desktop capture-browser window (download interception)
   tauri-plugin-capture-view/, tauri-plugin-share-sheet/,
-  tauri-plugin-keyboard-focus/, tauri-plugin-pencil/
+  tauri-plugin-keyboard-focus/, tauri-plugin-pencil/,
+  tauri-plugin-status-bar/
                    the app's own iOS plugins: the capture browser's
                    WKWebView, the share sheet, handing the web view
-                   the hardware keyboard (first responder), and the
-                   Apple Pencil's double-tap / squeeze
+                   the hardware keyboard (first responder), the
+                   Apple Pencil's double-tap / squeeze, and the app
+                   full screen (the status bar hidden)
+  Info.ios.plist   keys merged into the generated iOS Info.plist
 ```
 
 ### State and where it lives
@@ -224,6 +230,32 @@ build, and `src/lib/pdfjsAssets.ts` hands every `getDocument` call
 their URLs.
 
 ## Features
+
+### Full screen on the iPad
+
+While the app's window fills the screen, the system's status bar is
+hidden and the home indicator fades, and the band the app otherwise
+keeps clear at its top (for the bar and, windowed, the window controls)
+goes to the app (`tauri-plugin-status-bar`, ported from Hush's
+`ChromeControl.swift`). iPadOS gives an app no call that makes its
+window full screen (`UIRequiresFullScreen` is deprecated from iPadOS
+26), so a window the person has made smaller — Split View, Stage
+Manager, iPadOS 26+ windowing — keeps its bar and the band, since that
+is where the system puts the window controls; dragging a window between
+the two re-evaluates (the scene's `effectiveGeometry`, iOS 16+). In full
+screen the window controls live in the hidden bar, so with a trackpad or
+mouse the pointer in the top-left corner (120 × 40pt) shows the bar
+again, over the app rather than pushing it down, until it leaves a
+larger box (280 × 80pt). The bar is hidden through tao's root view
+controller (`setPrefersStatusBarHidden:` — the only lever left under the
+iOS 27 SDK, which needs `UIViewControllerBasedStatusBarAppearance` at
+YES, pinned in `src-tauri/Info.ios.plist`), and a swizzle of the getter
+reaches view controllers presented over the web view. The page hears of
+it as `status-bar-hidden` on `<html>`, set by the native side whenever
+it changes and once more when the page asks at boot
+(`lib/statusBar.ts`); `base.css`, `readingmode.css` and `notepad.css`
+keep the band only under `.ipados:not(.status-bar-hidden)`. Off the iPad
+nothing changes.
 
 ### The library
 
@@ -564,7 +596,8 @@ bottom bar are hidden (`readingmode.css`, under the `reading-mode` class
 App.tsx puts on `.app` while the store's `readingMode` is on), and the
 viewer refits the pages to the room through its own resize handling.
 On the iPad the band kept clear above the app for the status bar and
-window controls goes to the pages too. A red × at the top left
+window controls (when there is one — see Full screen on the iPad) goes
+to the pages too. A red × at the top left
 (below that band on the iPad) — or Escape — brings everything back as
 it was (`ReadingModeExit.tsx`). Below it, down the left at the same
 size and spacing, a red caret toggles the sentence tool (a tap selects
@@ -747,7 +780,12 @@ plain tap: the caret in the bottom bar (and in reading mode), or S. It
 selects only text nothing else has claimed: while it is on, a tap on a
 highlight or underline (editable or not), on an explained passage or on
 a word looked up does what it does without the tool (`claimed` in
-`annotating.ts`); ⌘-click always selects. A sentence runs between two ".", "!" or "?" followed by a space
+`annotating.ts`); ⌘-click always selects. With something in the pages
+already selected, the tool's tap — inside the selection or out — only
+lets go of it, as any tap on the pages does (`selectionBar.ts`); the
+next tap selects, so a stray tap never swaps one sentence for another
+(`down.selected` in `sentenceMark.ts`; a ⌘-click still selects at
+once). A sentence runs between two ".", "!" or "?" followed by a space
 and a capital, a digit or an opening quote, so "e.g." and "3.5" don't
 end one, nor do common abbreviations or initials; it never runs past
 its page or more than 800 characters either way. ⌘ is read from its
@@ -1189,7 +1227,11 @@ full-height column whose width comes out of the pages' room — it sets
 pages out again (fit modes re-fit; a side-by-side strip, sized by the
 height, just shows less of itself), and move reading mode's buttons,
 the progress pill and the explainer's window in beside it. Its inner
-edge sizes it (up to 60% of the window); its bar pulled 40px from the
+edge sizes it (up to 60% of the window): a 16px strip astride the edge,
+below the bar, and round the grip at its middle a 44 × 120px target for
+a finger (the docked pad isn't clipped, so the handle reaches out over
+the pages; at the middle it stays clear of reading mode's buttons beside
+the pad's top). Its bar pulled 40px from the
 edge floats it again under the pointer. Floating or docked, the one
 tree stays mounted, so undo and the pan live through the change; where
 it sits, its size and the dock are kept on this device. And in the
@@ -1198,7 +1240,12 @@ notes pane's lower half, from **View Notepad** at the pane's foot
 divider, dragged to share the height, with Hide Notepad at its middle.
 Either way it is one continuous surface in the panel's colour: a slim
 bar of tools over the canvas — a very faint dot grid, which pans with
-it — the ink black (white in the dark theme, `--notepad-ink`).
+it. In the bar's middle, two dots choose the pen's colour: the ink of
+the theme — black, white in the dark theme (`--notepad-ink`; such a
+stroke is kept with no colour, so it follows the appearance) — or red,
+the reading-mode red (`RED_INK`, `#ff5f57`, kept with the stroke). The
+choice is this device's (`zh-notepad-pen-color`), shared by every view,
+and picking a colour while erasing goes back to the pen.
 
 On the canvas the Pencil writes — a tap is a dot — a finger pans, and a
 mouse writes with a drag (a Mac has no Pencil) while a wheel pans; each

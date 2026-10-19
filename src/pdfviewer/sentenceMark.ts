@@ -6,6 +6,9 @@
 // (annotating.ts keeps it). While it is on, it selects only text nothing
 // else has claimed: a tap on a highlight, an explained passage or a word
 // looked up still does what it does without the tool; ⌘ always selects.
+// A tap of the tool's while something in the pages is selected only
+// lets go of that selection (selectionBar.ts dismisses it): the next tap
+// selects, so a stray tap doesn't swap one sentence for another.
 //
 // ⌘ is read from its own keydown / keyup, as the reading crop reads ⌃
 // (crop.ts): iPadOS doesn't report modifiers on pointer events
@@ -128,13 +131,20 @@ export function attachSentenceMarks(scrollArea: HTMLElement, env: SentenceMarkEn
   };
   const release = () => (held = false);
 
-  // A drag is a selection, not a click on a sentence.
-  let down: { x: number; y: number } | null = null;
-  const onDown = (e: PointerEvent) => (down = { x: e.clientX, y: e.clientY });
+  // A drag is a selection, not a click on a sentence. Whether something
+  // in the pages was selected as the press began: if so, the tool's tap
+  // is the one that deselects.
+  let down: { x: number; y: number; selected: boolean } | null = null;
+  const onDown = (e: PointerEvent) => {
+    const sel = window.getSelection();
+    const selected = Boolean(sel && !sel.isCollapsed && sel.anchorNode && scrollArea.contains(sel.anchorNode));
+    down = { x: e.clientX, y: e.clientY, selected };
+  };
   const onClick = (e: MouseEvent) => {
     const command = held || e.metaKey || (!APPLE && e.ctrlKey);
     if (!(command || env.latched()) || !env.enabled()) return;
     if (down && Math.hypot(e.clientX - down.x, e.clientY - down.y) > 6) return;
+    if (!command && down?.selected) return;
     const target = e.target as Element;
     if (target.closest("a, button, input, textarea")) return;
     if (!command && env.claimed(target, e.clientX, e.clientY)) return;

@@ -8,6 +8,10 @@
 // (src/pdfviewer/ink/): a stroke is an SVG path that grows sample by
 // sample, with no React render while the pen is down.
 //
+// The pen writes in the ink of the theme (`--notepad-ink`, kept as an
+// empty colour, so a stroke follows the appearance) or in red
+// (`RED_INK`); `setColor` picks which, for the strokes after it.
+//
 // Who does what: the Pencil (`pointerType` "pen") writes — a tap is a
 // dot — or, with the eraser on (the Pencil's double-tap, the pad's
 // eraser button, or the eraser end of a pen that has one), takes out
@@ -33,6 +37,8 @@ import { linkLabel, newId, type Note, type Notepad, type NoteLink, type NoteStro
 
 const SVG_NS = "http://www.w3.org/2000/svg";
 const PEN_WIDTH = 2;
+/** The pen's other ink: reading mode's red. */
+export const RED_INK = "#ff5f57";
 /** CSS px within which a tap lands on a stroke, and a press is a tap. */
 const HIT_PX = 12;
 const TAP_PX = 6;
@@ -140,6 +146,8 @@ export function createSurface(host: HTMLElement, env: SurfaceEnv) {
   // The note being written: the reader's visit to its page.
   let current: { note: string; visit: number } | null = null;
   let tool: PadTool = "pen";
+  // The pen's colour: "" is the theme's ink.
+  let color = "";
   // This view's own pan, starting where the pad was left.
   let pan = { ...env.pad().pan };
   const watchers = new Set<(what: SurfaceChange) => void>();
@@ -352,6 +360,7 @@ export function createSurface(host: HTMLElement, env: SurfaceEnv) {
     }
     const path = document.createElementNS(SVG_NS, "path");
     path.setAttribute("stroke-width", String(PEN_WIDTH));
+    if (color) path.style.stroke = color;
     svg.appendChild(path);
     g = { kind: "write", id: e.pointerId, pts: [x, y], path, from: [e.clientX, e.clientY], mouse: e.pointerType === "mouse", t0 };
     path.setAttribute("d", pathD(g.pts));
@@ -435,7 +444,7 @@ export function createSurface(host: HTMLElement, env: SurfaceEnv) {
       pad.notes.push({ id: note, createdMs: Date.now(), pageIndex: place?.pageIndex ?? 0, top: place?.top ?? null });
       current = { note, visit };
     }
-    const stroke: NoteStroke = { id: newId("s"), points: pts, width: PEN_WIDTH, color: "", note };
+    const stroke: NoteStroke = { id: newId("s"), points: pts, width: PEN_WIDTH, color, note };
     pad.strokes.push(stroke);
     paths.set(stroke.id, path);
     history.push({ kind: "stroke", id: stroke.id });
@@ -513,6 +522,10 @@ export function createSurface(host: HTMLElement, env: SurfaceEnv) {
     follow,
     tool: () => tool,
     setTool,
+    /** The pen's colour from now on ("" for the theme's ink). */
+    setColor(c: string): void {
+      color = c;
+    },
     /** Add a link at the middle of what this view shows. */
     addLink(target: PlaceTarget): void {
       const pad = env.pad();

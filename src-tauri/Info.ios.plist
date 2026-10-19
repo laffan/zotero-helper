@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <!--
+    Merged by the Tauri CLI into the generated iOS Info.plist.
+
+    Status bar visibility is decided per view controller
+    (prefersStatusBarHidden), which is how tauri-plugin-status-bar hides
+    it while the window fills the screen. YES is the default, but it is
+    the only route left: apps linked against the iOS 27 SDK get no effect
+    from UIApplication.statusBarHidden, and with this key NO UIKit ignores
+    the view controller as well, leaving no way to hide the bar at all.
+  -->
+  <key>UIViewControllerBasedStatusBarAppearance</key>
+  <true/>
+</dict>
+</plist>

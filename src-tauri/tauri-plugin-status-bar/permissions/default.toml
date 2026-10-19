@@ -1,0 +1,10 @@
+"$schema" = "schemas/schema.json"
+
+[[permission]]
+identifier = "allow-refresh"
+description = "Allow JS to ask whether the status bar is hidden (the answer is the page's `status-bar-hidden` class)."
+commands.allow = ["refresh"]
+
+[default]
+description = "Default permissions: allow JS to ask, as it boots, whether the status bar is hidden."
+permissions = ["allow-refresh"]

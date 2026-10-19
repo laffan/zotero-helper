@@ -26,8 +26,8 @@ Windows/Linux desktops too).
   citations into the notes;
   ⌘-click (or the sentence tool) selects a whole sentence, highlights
   can run across a page break and their ends can be dragged, and
-  reading mode has a notepad for the Apple Pencil that links back into
-  the pages.
+  reading mode has a notepad for the Apple Pencil (in the theme's ink
+  or red) that links back into the pages.
 - **AI helpers (optional)** — tidy metadata, extract abstracts, ask
   questions of abstracts or full papers with page-cited answers, have a
   selected passage explained in a few lines, with or without the work as
@@ -38,6 +38,8 @@ Windows/Linux desktops too).
   list, and the viewer's modes (Settings → Keyboard Shortcuts).
 - **Your look** — light, dark or system appearance and an adjustable UI font
   size (Settings → General).
+- **Full screen on iPad** — the status bar is hidden while the app fills
+  the screen.
 
 The full feature breakdown, architecture and contributor rules are in
 [README_TECHNICAL.md](README_TECHNICAL.md).

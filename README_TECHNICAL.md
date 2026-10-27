@@ -88,7 +88,8 @@ src/            React + TypeScript UI (Vite, zustand, MiniSearch)
                 the typing guard), run (what each action does), panes
                 (Tab between panes; the sidebar cursor; the details
                 panel's tabs), listNav (the item list / icon grid
-                selection from the arrows)
+                selection from the arrows), hoverFocus (the pointer
+                over the pages or the notes moves the focus there)
   lib/appearance.ts, lib/panels.ts
                 Settings → General's theme and UI font size; showing and
                 hiding the side panels (toolbar buttons and shortcuts)
@@ -113,7 +114,9 @@ src/            React + TypeScript UI (Vite, zustand, MiniSearch)
                 terminal, import/rescue modals
   notepad/      the notepad: model (notes, links, storage, the pad
                 shared between views), surface (the canvas: the Pencil
-                writes, a finger pans), minimap (the whole pad, small)
+                writes, a finger pans), geometry (paths, hit tests),
+                links (the links' chips, their sizing and menu), lasso
+                (a long press selects), minimap (the whole pad, small)
   components/settings/
                 the settings page: SettingsView (section list, the
                 draft and Save) and one component per section —
@@ -135,7 +138,8 @@ src/            React + TypeScript UI (Vite, zustand, MiniSearch)
                 steps), crop (the paged view's trimmed reading),
                 citeMark (an AI citation's passage, marked), passageMarks
                 (the passages the AI explained, the words looked up),
-                darkPages (the pages white on black), bookmarkHold
+                darkPages (the pages white on black), pencilFinger
+                (the Pencil out of ink mode, a finger), bookmarkHold
                 (reading mode's hold on a corner), places (where the
                 reader is, what is at a point — for the notepad), and
                 annotating (the pieces below, put together):
@@ -612,8 +616,12 @@ the pen shows the colour it writes in, and holding the pen a moment
 and black, the bottom bar's colour chip, which reading mode hides; a
 colour, a press elsewhere or Escape closes it, and the press that
 opened it doesn't also end ink mode (`usePenColors` in
-`ReadingModeExit.tsx`, through the viewer's `inkPen`). At the top right, opposite
-the ×, a red rectangle opens the notepad (see The notepad). The pages'
+`ReadingModeExit.tsx`, through the viewer's `inkPen`). While ink
+mode's tool is the eraser (the Pencil's double-tap), the pen button
+shows an eraser instead of the pen, and no colour dot (the store's
+`inkTool`, from the viewer's `onInkTool`). At the top right to begin
+with, a red rectangle is the notepad's icon, dragged anywhere, which
+opens it (see The notepad). The pages'
 bookmark buttons are hidden in reading mode (a bookmarked page still
 shows its filled button and name): holding a page's top-right corner
 still for a full second opens the bookmark box for that page instead —
@@ -632,6 +640,15 @@ PDF closes. Ink mode carries on in it: the Pencil writes, its double-tap
 switches to the eraser, ⌘Z undoes; the bar's other tools wait for the
 bar. On a touch screen every button in the bottom bar is finger-sized
 (`hover: none` in `pdfviewer.css`), ink mode's tools and the rest alike.
+Leaving reading mode, the viewer could stay at a shorter height than
+its pane, a gap above the bottom bar until the app went to the
+background and back. The viewer was sized as a percentage of a
+stretched flex item, which WebKit can keep at an old value; it is now
+a flex item itself (`.pdf-viewer`, `flex: 1 1 0`). As a backstop,
+ReaderPane compares the viewer's height with its pane's once the change
+has laid out and again 400ms later, and if they differ sets the height
+outright for a frame (a relayout that keeps the scroll), noting it in
+the activity log at debug level.
 
 **Dark pages.** In the dark theme the bottom bar offers a light bulb
 (off to begin with; the choice is this device's, `zh-pdf-dark`) that
@@ -738,7 +755,8 @@ size, and the renderer rasterises at the resulting scale.
 **Highlighting.** Selecting text in the PDF brings up a small bar
 above the passage (below it only when the passage starts at the top
 of the view), on iPad as on the Mac:
-Zotero's eight colours, a highlight / underline switch beside them
+Zotero's eight colours (5px further apart than the bar's other items,
+for a finger), a highlight / underline switch beside them
 (remembered between selections), then three icons — Copy (the text),
 Add to notes (a quote with a link to its page; the Highlights tab's two
 icons) and, with an AI service connected, Look up (see AI) — and the
@@ -852,7 +870,21 @@ finger, a mouse or a trackpad does in ink mode what it does out of it —
 scrolls and zooms the pages, selects text and highlights it, taps a
 highlight or a link — so reading and writing need no mode change beyond
 the pen in hand (`input.ts`; `pointerType` tells them apart in
-WKWebView); out of ink mode the Pencil is a finger like any other. The
+WKWebView). Out of ink mode the Pencil is a finger — a precise one
+(`pencilFinger.ts`). Left to WebKit it wasn't: it has gestures of its
+own over text, which fought the viewer's handling of touch selections,
+and highlighting with it was erratic. So once the Pencil has been seen
+on the pages (its first touch is WebKit's: nothing can cancel a touch
+already begun), its touches are cancelled there, as ink mode cancels
+them, and what a finger does is done for it from its pointer events: a
+drag scrolls and coasts (a swipe turns a set in the paged view; pinched,
+the magnifier pans, `magnify.ts`); held still for 450ms it selects the
+word under it, and moving on without lifting carries the selection's
+end along letter by letter (`textPositionAt` in `textHit.ts`, so the
+gaps between lines don't throw it); a tap is a click where it landed —
+a highlight, a link, a button, or the end of a selection. The selection
+bar comes up as for any selection. The non-passive touchstart this
+takes is added only once a Pencil has been used. The
 click a pen gesture can end in (a desktop pen's) is swallowed, so a
 stroke over a link or a highlight doesn't press it. The Pencil's touches are cancelled
 (`touchType === "stylus"`) so it can't scroll or select text, and while
@@ -1215,78 +1247,135 @@ A scratchpad for the Apple Pencil, one per PDF, to be typed up into the
 notes afterwards (`src/notepad/`, `NotepadBody.tsx`). It shows in two
 places, sharing one pad (`notepadFor` / `watchNotepad` in
 `model.ts`, so a change in one view redraws the other): floating over
-the pages in reading mode, opened by the red rectangle at the top right
-(`ReadingNotepad.tsx` — four-fifths of the window's height to begin
-with, its background 90% opaque so the pages show through faintly; the
-bar's empty middle drags it, a dotted circle at its corner sizes it).
-Let go with the pointer at the window's left or right edge (a dashed
-outline shows the edge it would take as it nears) and it docks there: a
-full-height column whose width comes out of the pages' room — it sets
-`--notepad-dock-left` / `--notepad-dock-right` on `<html>`, which pad
-`.reader-pane` in reading mode, so the viewer's ResizeObserver lays the
-pages out again (fit modes re-fit; a side-by-side strip, sized by the
-height, just shows less of itself), and move reading mode's buttons,
-the progress pill and the explainer's window in beside it. Its inner
-edge sizes it (up to 60% of the window): a 16px strip astride the edge,
-below the bar, and round the grip at its middle a 44 × 120px target for
-a finger (the docked pad isn't clipped, so the handle reaches out over
-the pages; at the middle it stays clear of reading mode's buttons beside
-the pad's top). Its bar pulled 40px from the
-edge floats it again under the pointer. Floating or docked, the one
-tree stays mounted, so undo and the pan live through the change; where
-it sits, its size and the dock are kept on this device. And in the
-notes pane's lower half, from **View Notepad** at the pane's foot
+the pages in reading mode, and in the notes pane's lower half.
+
+**In reading mode** (`ReadingNotepad.tsx`) the closed pad is an icon, a
+red rectangle at the top right to begin with, which a drag moves
+anywhere (kept on this device, `zh-notepad-icon`). A tap opens the pad
+out of it: the pad grows from the icon's box to its own (`morph`, the
+Web Animations API, 260ms), and closing shrinks it back into the icon;
+while the pad is open the icon is hidden. The pad opens with the corner
+facing away from the window's middle at the icon (its top right for an
+icon at the top right; `cornerOf` / `boxAtIcon`), and closes back into
+that same corner of wherever it has been moved (`iconAtBox`), so the
+icon and the pad keep to one place. Four-fifths of the window's height
+to begin with, its background 90% opaque so the pages show through
+faintly; the bar's empty middle drags it, a dotted circle at its corner
+sizes it. Let go with the pointer at the window's left or right edge (a
+dashed outline shows the edge it would take as it nears) and it docks
+there: a full-height column whose width comes out of the pages' room —
+it sets `--notepad-dock-left` / `--notepad-dock-right` on `<html>`,
+which pad `.reader-pane` in reading mode, so the viewer's
+ResizeObserver lays the pages out again (fit modes re-fit; a
+side-by-side strip, sized by the height, just shows less of itself),
+and move reading mode's buttons, the progress pill and the explainer's
+window in beside it. Its inner edge sizes it (up to 60% of the window):
+a 16px strip astride the edge, below the bar, and round the grip at its
+middle a 44 × 120px target for a finger (the docked pad isn't clipped,
+so the handle reaches out over the pages; at the middle it stays clear
+of reading mode's buttons beside the pad's top). Its bar pulled 40px
+from the edge floats it again under the pointer. Floating or docked,
+the one tree stays mounted, so undo and the pan live through the
+change; where it sits, its size and the dock are kept on this device.
+
+**Auto-shift.** With two pages side by side — "Fit 2 pages", outside
+the folded view, which the viewer reports as the store's `twoUp`
+(`onTwoUp`) — the pad's bar gains a button of arrows pointing left and
+right, on or off (`zh-notepad-autoshift`). On, a press on the pages on
+the pad's half of the window — the Pencil's or a finger's; not on the
+pad itself — slides the pad to the same place on the other half
+(`left` mirrored, a 0.3s slide), so it keeps to the page not being
+worked on. A docked pad changes edges instead, once the press is over,
+since the pages are laid out again.
+
+**Under the notes**, from **View Notepad** at the pane's foot
 (`NotesPanel.tsx`) — the bar between the notes and the pad is the
 divider, dragged to share the height, with Hide Notepad at its middle.
+
 Either way it is one continuous surface in the panel's colour: a slim
 bar of tools over the canvas — a very faint dot grid, which pans with
-it. In the bar's middle, two dots choose the pen's colour: the ink of
-the theme — black, white in the dark theme (`--notepad-ink`; such a
-stroke is kept with no colour, so it follows the appearance) — or red,
-the reading-mode red (`RED_INK`, `#ff5f57`, kept with the stroke). The
-choice is this device's (`zh-notepad-pen-color`), shared by every view,
-and picking a colour while erasing goes back to the pen.
+it. At the bar's left, one switch of three parts says what the Pencil
+does: write in the ink of the theme — black, white in the dark theme
+(`--notepad-ink`; such a stroke is kept with no colour, so it follows
+the appearance) — write in red, the reading-mode red (`RED_INK`,
+`#ff5f57`, kept with the stroke), or erase. The colour is this device's
+(`zh-notepad-pen-color`), shared by every view. Then the quote mark (a
+link onto the pages), the branch (following the PDF), the map, the
+host's own tools (auto-shift), the empty middle, undo, and the host's
+close.
 
 On the canvas the Pencil writes — a tap is a dot — a finger pans, and a
 mouse writes with a drag (a Mac has no Pencil) while a wheel pans; each
 view pans on its own. Strokes are SVG paths grown sample by sample, as
 the viewer's ink is, with no React render under the pen (`surface.ts`).
-The eraser — the bar's button, a pen's eraser end, or the Pencil's
-double-tap when the Pencil last touched this pad (ink mode takes the
-double-tap otherwise; `pencilLastOn` in `lib/pencil.ts`) — takes out
-every stroke it passes over. Strokes written while the reader stays on
-one page are one note; turning to another page — even to come straight
-back — starts the next (each view counts the visits to the page in
-view, `NotepadBody.tsx`). A note remembers where in the PDF the reader
-was when it began — the page at the view's centre and the height a
-quarter of the way down the view (`placeInView` in
-`pdfviewer/places.ts`) — and shows that page, small, above it; a finger
-tap (or a click) on a note goes back there. The eye beside the link
-icon makes the pad follow the PDF: as the reader turns pages it glides
-to the part of the pad about the page in view — the top of its notes and
-links, or for a page with none, between those of the pages before and
-after it as far along as the page is, or just under the last
-(`spotFor` in `surface.ts`) — supposing the pad is written top to bottom
-as the PDF is read. It starts off in the floating pad and on under the
-notes, and each view remembers its own. The link icon at the bar's left makes a link: pressed and
-dragged out onto the pages, a dashed line running from it to the
-pointer, and let go over a highlight or a spot on a page
-(`placeAtPoint`), it puts a link on the pad — a link icon and "p. 12",
-or the whole of the highlight's text beside a bar in its colour, its page
-after it at half opacity — to be dragged where it belongs and tapped to
-go back there. A link held (a long press, or a right-click) opens a
-small menu under it with Delete link (`linkMenu` in `surface.ts`). The
-map icon beside the eye shows a minimap, a 60px column down the canvas's
-left (`minimap.ts`; off to begin with, remembered for each view): the
-whole pad small — strokes, and links as bars in their colours — with
-the part in view outlined; a tap or a drag on it brings that part into
-view, going no further than half a view past what it draws. It fits the
-pad's contents and the view together under one SVG transform, so a pan
-moves only the outline and the transform, and the strokes are drawn
-again only when the pad changes (the surface's `watch`). A faint trash
-can at the canvas's lower left clears the pad — strokes, notes and
-links — once "Clear the whole notepad?" is answered. Undo takes back
-the last stroke, erasing, link, deleted link or clearing. Kept on this device
+The eraser — the switch's third part, a pen's eraser end, or the
+Pencil's double-tap when the Pencil last touched this pad (ink mode
+takes the double-tap otherwise; `pencilLastOn` in `lib/pencil.ts`) —
+takes out every stroke it passes over; the switch always shows it. A
+gesture on the canvas always ends: its end is heard on the window,
+whatever element it reaches; a pen coming down while one is still open
+ends that one first, as does any press once the open one has heard
+nothing for 1.5s; a Pencil counts whether or not it is the primary
+pointer (a resting palm can make it secondary); and a press on the pad
+lets go of a text selection in the pages, which WebKit could otherwise
+take the press to end. (Before, a lost pointer-up left the pad deaf to
+the Pencil, and the eraser, switched on by a stray double-tap, showed
+only as a faint tint on its button — picking a colour went back to the
+pen, which is why that seemed to bring the pen back.)
+
+**Selecting, as Hush selects** (`lasso.ts`): the Pencil, a finger or
+the mouse held still where it came down for 500ms turns that press
+into a lasso — the stroke begun is dropped, and the loop is drawn on
+from there, dashed. Let go, it selects the strokes with any point
+inside it and the links whose middle is. The selection is framed, with
+Delete above the frame; a drag that starts inside the frame moves it
+(any pointer), ⌫ deletes it, Escape lets go, and so does a tap on it
+or a press anywhere else — the Pencil then writes at once. The lasso
+is borrowed for the one press: there is no select tool to switch back
+from.
+
+Strokes written while the reader stays on one page are one note;
+turning to another page — even to come straight back — starts the next
+(each view counts the visits to the page in view, `NotepadBody.tsx`).
+A note remembers where in the PDF the reader was when it began — the
+page at the view's centre and the height a quarter of the way down the
+view (`placeInView` in `pdfviewer/places.ts`) — and shows that page,
+small, above it; a finger tap (or a click) on a note goes back there.
+The branch icon (two dots joined by a stepped line) makes the pad
+follow the PDF: as the reader turns pages it glides to the part of the
+pad about the page in view — the top of its notes and links, or for a
+page with none, between those of the pages before and after it as far
+along as the page is, or just under the last (`spotFor` in
+`surface.ts`) — supposing the pad is written top to bottom as the PDF
+is read. It starts off in the floating pad and on under the notes, and
+each view remembers its own.
+
+The quote mark makes a link (`links.ts`): pressed and dragged out onto
+the pages, a dashed line running from it to the pointer, and let go
+over a highlight or a spot on a page (`placeAtPoint`), it puts a link on
+the pad — a link icon and "p. 12", or the whole of the highlight's text
+beside a bar in its colour, its page after it at half opacity — to be
+dragged where it belongs and tapped to go back there. A highlight's
+quote is sized by a small dotted circle at its lower right (the
+floating pad's grip, smaller): its width and height are kept with the
+link (`w`, `h`), the text wrapping to the width and clipped at the
+height. A link held (a long press, or a right-click) opens a small menu
+under it with Delete. The menus' buttons act on the release of a press
+(`onPress`): the canvas cancels its touches so a finger pans, and that
+cancelled the click a tap on them would have ended in — Delete did
+nothing on the iPad.
+
+The map icon shows a minimap, a 60px column down the canvas's left
+(`minimap.ts`; off to begin with, remembered for each view): the whole
+pad small — strokes, and links as bars in their colours — with the part
+in view outlined; a tap or a drag on it brings that part into view,
+going no further than half a view past what it draws. It fits the pad's
+contents and the view together under one SVG transform, so a pan moves
+only the outline and the transform, and the strokes are drawn again
+only when the pad changes (the surface's `watch`). A faint trash can at
+the canvas's lower left clears the pad — strokes, notes and links —
+once "Clear the whole notepad?" is answered. Undo takes back the last
+stroke, erasing, link, move, deletion or clearing. Kept on this device
 (`notepads/<attKey>.json`, `src-tauri/src/notepads.rs`), written a
 moment after each change; never sent to Zotero.
 
@@ -1369,6 +1458,19 @@ text field blurs it, as a click does on the desktop (`noteTapStart` /
 during it, since a blur mid-touch upsets iPadOS's text input. Taps on
 controls (buttons, links) leave the field be, as they may be acting on
 it, and a drag or scroll (no click) does too.
+
+With a PDF open beside its notes (not in reading mode), the mouse or
+trackpad pointer decides between the two (`hoverFocus.ts`): coming over
+the pages it lets go of the notes editor and focuses the pages, and
+coming over the notes editor it focuses it, the caret where it was.
+Before, going from highlighting to writing and back took two clicks
+each way on the iPad — the first only moved the focus (WebKit's text
+interaction stays with a focused editor, so a drag on the pages
+selected nothing). Only the notes editor is let go of, so a highlight's
+comment or the search field keep the focus they were given; the
+pointer doesn't take the focus into the notes out of another field, nor
+while text in the pages is selected (that would end the selection), nor
+during a drag.
 
 A field can also keep the focus after it is hidden: fold the right panel
 away (⌘⇧\) with the notes focused, or close a highlight's editor from

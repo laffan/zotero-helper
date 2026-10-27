@@ -19,6 +19,16 @@
   border-radius: 10px;
   box-shadow: 0 10px 34px rgb(0 0 0 / 0.28);
 }
+/* Grown out of its icon and shrunk back into it (ReadingNotepad.tsx
+   `morph`): scaled from its top left. */
+.notepad-floating,
+.notepad-edge {
+  transform-origin: 0 0;
+}
+/* Auto-shift sends it to the other side of the window: a short slide. */
+.notepad-floating.shifting {
+  transition: left 0.3s ease, top 0.3s ease;
+}
 .notepad-docked {
   flex: 1;
   min-height: 0;
@@ -31,15 +41,11 @@
   -webkit-user-select: none;
   user-select: none;
 }
-/* The bar's empty middle: what the floating pad is dragged by. The pen's
-   colours sit at its centre. */
+/* The bar's empty middle: what the floating pad is dragged by. */
 .notepad-bar-grab {
   flex: 1;
   align-self: stretch;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 0;
+  min-width: 12px;
 }
 .notepad-floating .notepad-bar-grab {
   cursor: grab;
@@ -67,40 +73,42 @@
 .notepad-tool:disabled {
   opacity: 0.35;
 }
-/* The pen's colours: two dots, each in a target a finger can hit — the
-   theme's ink and red — the one writing ringed. */
-.notepad-colors {
-  display: flex;
-  gap: 2px;
-  cursor: default;
+/* What the Pencil does: one switch of three parts at the bar's left —
+   ink, red, the eraser — the part in force filled. */
+.notepad-modes {
+  display: inline-flex;
+  flex-shrink: 0;
+  margin-right: 4px;
+  padding: 2px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--text-dim) 14%, transparent);
 }
-.notepad-color {
-  position: relative;
-  width: 28px;
-  height: 28px;
+.notepad-mode {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 26px;
   padding: 0;
   border: none;
-  border-radius: 50%;
+  border-radius: 6px;
   background: transparent;
+  color: var(--text-dim);
   cursor: pointer;
-  --swatch: var(--notepad-ink);
 }
-.notepad-color::before {
-  content: "";
-  position: absolute;
-  inset: 8px;
+.notepad-mode.on {
+  background: var(--panel);
+  color: var(--text);
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.18);
+}
+.notepad-mode-dot {
+  width: 12px;
+  height: 12px;
   border-radius: 50%;
-  background: var(--swatch);
+  background: var(--swatch, var(--notepad-ink));
   box-shadow: 0 0 0 1px color-mix(in srgb, var(--text-dim) 45%, transparent);
 }
-.notepad-color.on::after {
-  content: "";
-  position: absolute;
-  inset: 4px;
-  border: 1.5px solid var(--text);
-  border-radius: 50%;
-}
-/* Link: the icon alone, in the reading-mode red, dragged out. */
+/* Quote: the icon alone, in the reading-mode red, dragged out. */
 .notepad-link-btn {
   color: #ff5f57;
   cursor: grab;
@@ -211,6 +219,73 @@
   opacity: 0.5;
   white-space: nowrap;
 }
+/* A quote sized by hand: its text wraps to the width and is clipped at
+   the height. */
+.notepad-link.sized {
+  max-width: none;
+  overflow: hidden;
+}
+.notepad-link-text {
+  min-width: 0;
+}
+/* The quote's grip: the floating pad's dotted circle, smaller, at its
+   lower right — in a target a finger can hit. */
+.notepad-link-size {
+  position: absolute;
+  right: -6px;
+  bottom: -6px;
+  width: 22px;
+  height: 22px;
+  cursor: nwse-resize;
+  touch-action: none;
+}
+.notepad-link.sized .notepad-link-size {
+  right: 0;
+  bottom: 0;
+}
+.notepad-link-size::after {
+  content: "";
+  position: absolute;
+  right: 7px;
+  bottom: 7px;
+  width: 7px;
+  height: 7px;
+  border: 1.5px dotted var(--text-dim);
+  border-radius: 50%;
+  opacity: 0.7;
+}
+.notepad-link.sized .notepad-link-size::after {
+  right: 3px;
+  bottom: 3px;
+}
+
+/* The lasso being drawn (a long press, lasso.ts), and what it selected:
+   framed, with Delete above the frame. A press inside the frame drags
+   the selection; the canvas hears it, so the frame takes none. */
+.notepad-strokes .notepad-lasso {
+  fill: color-mix(in srgb, var(--accent) 8%, transparent);
+  stroke: var(--accent);
+  stroke-width: 1.5;
+  stroke-dasharray: 4 4;
+}
+.notepad-selection {
+  position: absolute;
+  border: 1.5px dashed var(--accent);
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--accent) 6%, transparent);
+  pointer-events: none;
+}
+.notepad-selection-menu {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 0;
+  padding: 3px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel);
+  box-shadow: 0 6px 18px rgb(0 0 0 / 0.22);
+  pointer-events: auto;
+}
 /* A link held (or right-clicked): its menu. */
 .notepad-link-menu {
   position: absolute;
@@ -221,7 +296,8 @@
   background: var(--panel);
   box-shadow: 0 6px 18px rgb(0 0 0 / 0.22);
 }
-.notepad-link-menu button {
+.notepad-link-menu button,
+.notepad-selection-menu button {
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -233,7 +309,8 @@
   font-size: calc(12px * var(--font-scale));
   white-space: nowrap;
 }
-.notepad-link-menu button:hover {
+.notepad-link-menu button:hover,
+.notepad-selection-menu button:hover {
   background: var(--select);
 }
 /* The minimap: the whole pad, small, down the left. */

@@ -194,22 +194,22 @@
   opacity: 1;
 }
 
-/* The notepad's button (ReadingNotepad.tsx): a red rectangle, the ×'s
-   size, at the top right opposite it; filled while the pad is open. */
+/* The notepad's icon (ReadingNotepad.tsx): a red rectangle, the ×'s
+   size, at the top right to begin with and dragged anywhere — placed
+   inline. Hidden while the pad is open; the pad grows out of it. */
 .reading-mode-notepad {
   position: fixed;
   z-index: 60;
-  top: 10px;
-  right: calc(var(--notepad-dock-right, 0px) + 10px);
   width: 44px;
   height: 44px;
   padding: 0;
   border: none;
   background: transparent;
-  cursor: pointer;
-}
-.ipados:not(.status-bar-hidden) .reading-mode-notepad {
-  top: calc(max(env(safe-area-inset-top), 30px) + 4px);
+  cursor: grab;
+  touch-action: none;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
 }
 .reading-mode-notepad::before {
   content: "";
@@ -221,13 +221,10 @@
   box-sizing: border-box;
   border: 3px solid #ff5f57;
   border-radius: 3px;
-  transition: transform 0.12s, background 0.12s;
+  transition: transform 0.12s;
 }
 .reading-mode-notepad:hover::before {
   transform: scale(1.15);
-}
-.reading-mode-notepad.on::before {
-  background: #ff5f57;
 }
 
 /* A notepad docked at an edge (ReadingNotepad.tsx) takes its width from

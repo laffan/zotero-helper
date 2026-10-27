@@ -191,8 +191,8 @@ export function ReaderPane() {
   const [error, setError] = useState("");
   const outline = useOutline(reading?.attKey);
   const outlineShown = useStore((s) => s.outlineOpen) && Boolean(outline?.length);
-  // Reading mode's notepad, over the pages.
-  const notepad = useStore((s) => s.readingMode && s.notepadOpen) && state === "ready";
+  // Reading mode's notepad over the pages, or its icon.
+  const notepad = useStore((s) => s.readingMode) && state === "ready";
 
   const itemKey = reading?.itemKey ?? "";
   const attKey = reading?.attKey ?? null;
@@ -226,6 +226,8 @@ export function ReaderPane() {
           canExplain: () => aiConnected(settings()),
           onSentenceTool: (on) => useStore.getState().setViewerTools({ sentenceTool: on }),
           onInkMode: (on) => useStore.getState().setViewerTools({ inkMode: on }),
+          onInkTool: (tool) => useStore.getState().setViewerTools({ inkTool: tool }),
+          onTwoUp: (on) => useStore.getState().twoUp !== on && useStore.getState().setViewerTools({ twoUp: on }),
           onInsertAnnotation: (a: Annotation) => addToNotes(annotationMarkdown(settings(), a)),
           annotate: {
             create: (d, type, color) =>
@@ -305,7 +307,7 @@ export function ReaderPane() {
       cancelled = true;
       if (active?.viewer === viewer) active = null;
       // The next viewer starts with its tools off.
-      useStore.getState().setViewerTools({ sentenceTool: false, inkMode: false });
+      useStore.getState().setViewerTools({ sentenceTool: false, inkMode: false, twoUp: false });
       viewerRef.current = null;
       // Destroying reports the view one last time; then it is written.
       void viewer?.destroy();
@@ -324,6 +326,30 @@ export function ReaderPane() {
     document.addEventListener("visibilitychange", onHide);
     return () => document.removeEventListener("visibilitychange", onHide);
   }, []);
+
+  // Reading mode in or out: should WebKit leave the viewer at its old
+  // height (a gap above the bottom bar, gone only once the app went to
+  // the background and back), its height is set outright for a frame —
+  // a relayout that keeps the scroll — checked once the change has laid
+  // out, and again later.
+  const readingMode = useStore((s) => s.readingMode);
+  useEffect(() => {
+    const host = hostRef.current;
+    if (!host) return;
+    const check = () => {
+      const viewer = host.firstElementChild as HTMLElement | null;
+      if (!viewer || Math.abs(viewer.offsetHeight - host.clientHeight) < 2) return;
+      appLog("debug", `Reader: the viewer was ${viewer.offsetHeight}px in a ${host.clientHeight}px pane; laid out again`);
+      viewer.style.height = `${host.clientHeight}px`;
+      requestAnimationFrame(() => (viewer.style.height = ""));
+    };
+    let raf = requestAnimationFrame(() => (raf = requestAnimationFrame(check)));
+    const later = window.setTimeout(check, 400);
+    return () => {
+      cancelAnimationFrame(raf);
+      window.clearTimeout(later);
+    };
+  }, [readingMode]);
 
   // The pages with a bookmark show it (and its name) at their bookmark
   // button.

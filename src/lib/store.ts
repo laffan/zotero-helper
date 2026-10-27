@@ -86,6 +86,11 @@ interface UiPrefs {
    *  through the viewer's own commands. */
   sentenceTool: boolean;
   inkMode: boolean;
+  /** Ink mode's tool, which reading mode's pen button shows. */
+  inkTool: "pen" | "eraser" | "select";
+  /** The viewer shows two pages side by side ("Fit 2 pages"), when the
+   *  notepad may move aside on its own (ReadingNotepad.tsx). */
+  twoUp: boolean;
   /** Reading mode's notepad is open (ReadingNotepad.tsx). */
   notepadOpen: boolean;
   /** Settings → General (lib/appearance.ts). */
@@ -220,7 +225,12 @@ interface AppStore extends UiPrefs {
   setMetaHidden: (b: boolean) => void;
   setOutlineOpen: (b: boolean) => void;
   setReadingMode: (b: boolean) => void;
-  setViewerTools: (t: { sentenceTool?: boolean; inkMode?: boolean }) => void;
+  setViewerTools: (t: {
+    sentenceTool?: boolean;
+    inkMode?: boolean;
+    inkTool?: "pen" | "eraser" | "select";
+    twoUp?: boolean;
+  }) => void;
   setNotepadOpen: (b: boolean) => void;
   setAppearance: (a: Appearance) => void;
   setUiFontSize: (px: number) => void;
@@ -275,6 +285,8 @@ export const useStore = create<AppStore>()(
       readingMode: false,
       sentenceTool: false,
       inkMode: false,
+      inkTool: "pen",
+      twoUp: false,
       notepadOpen: false,
       appearance: "system" as Appearance,
       uiFontSize: 13,

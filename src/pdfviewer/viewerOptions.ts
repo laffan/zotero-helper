@@ -44,6 +44,11 @@ export interface PdfViewerOptions {
   onSentenceTool?: (on: boolean) => void;
   /** Ink mode went on or off. */
   onInkMode?: (on: boolean) => void;
+  /** Whether two pages show side by side ("Fit 2 pages", outside the
+   *  folded view), reported as the layout changes. */
+  onTwoUp?: (on: boolean) => void;
+  /** Ink mode's tool: the pen, the eraser or select. */
+  onInkTool?: (tool: "pen" | "eraser" | "select") => void;
   /** Send an annotation to the notes (its editor's Add to notes). */
   onInsertAnnotation?: (a: Annotation) => void;
   /** Make, change and delete annotations; absent, they are read-only. */

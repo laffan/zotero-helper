@@ -92,6 +92,11 @@
   background: var(--swatch);
   flex-shrink: 0;
 }
+/* The colours 5px further apart than the bar's own gap, so a finger
+   picks the one it means. */
+.pdf-mark-swatch + .pdf-mark-swatch {
+  margin-left: 5px;
+}
 .pdf-mark-swatch:hover {
   transform: scale(1.12);
 }

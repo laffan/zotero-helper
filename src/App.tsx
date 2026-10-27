@@ -3,6 +3,7 @@ import { bootstrap } from "./lib/actions";
 import { aiConnected } from "./lib/ai/models";
 import { trackPointerDrag } from "./lib/dragGesture";
 import { installShortcuts } from "./lib/shortcuts/dispatch";
+import { installHoverFocus } from "./lib/shortcuts/hoverFocus";
 import { usePane } from "./lib/shortcuts/panes";
 import { EXPLANATIONS, QUESTIONS, useStore } from "./lib/store";
 import { AskCostModal } from "./components/AskCostModal";
@@ -67,6 +68,7 @@ export default function App() {
   useEffect(() => {
     void bootstrap();
     installShortcuts();
+    installHoverFocus();
   }, []);
 
   // Questions is an AI feature: with no service connected it isn't in

@@ -8,8 +8,9 @@
 // the viewer reports). With ink mode on, holding the pen a moment
 // (HOLD_MS) opens a flyout of the pen's colours beside it — the bottom
 // bar's colour chip, which reading mode hides — and a dot on the pen
-// shows the colour it writes in. At the top right, opposite the ×, a red rectangle
-// opens the notepad (ReadingNotepad.tsx). Reading mode itself is the
+// shows the colour it writes in; while ink mode's tool is the eraser
+// (the Pencil's double-tap), the pen button shows an eraser. The
+// notepad's icon is ReadingNotepad.tsx's. Reading mode itself is the
 // store's `readingMode`
 // — App.tsx gives the app the `reading-mode` class, and readingmode.css
 // hides the rest.
@@ -27,6 +28,13 @@ const CARET = (
     <path d="M6.4 8h3.2" />
   </svg>
 );
+const ERASER = (
+  <svg viewBox="0 0 16 16" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M6.2 13.5L2.4 9.7a1 1 0 0 1 0-1.4l5.9-5.9a1 1 0 0 1 1.4 0l3.8 3.8a1 1 0 0 1 0 1.4l-6 5.9z" />
+    <path d="M5 7.1l4.9 4.9" />
+    <path d="M6.2 13.5h7.3" />
+  </svg>
+);
 const PEN = (
   <svg viewBox="0 0 16 16" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
     <path d="M11.2 2.3l2.5 2.5L5.6 12.9l-3.3.8.8-3.3z" />
@@ -38,7 +46,7 @@ export function ReadingModeExit() {
   const leave = () => useStore.getState().setReadingMode(false);
   const sentenceTool = useStore((s) => s.sentenceTool);
   const inkMode = useStore((s) => s.inkMode);
-  const notepadOpen = useStore((s) => s.notepadOpen);
+  const erasing = useStore((s) => s.inkMode && s.inkTool === "eraser");
   const pen = usePenColors(inkMode);
 
   useEffect(() => {
@@ -74,14 +82,14 @@ export function ReadingModeExit() {
       <button
         type="button"
         className={inkMode ? "reading-mode-tool reading-mode-pen on" : "reading-mode-tool reading-mode-pen"}
-        title={inkMode ? "The Pencil writes — hold for its colour" : "The Pencil selects and highlights"}
+        title={erasing ? "The Pencil erases (double-tap it to write)" : inkMode ? "The Pencil writes — hold for its colour" : "The Pencil selects and highlights"}
         aria-label="Pen"
         aria-pressed={inkMode}
         aria-haspopup={inkMode ? "menu" : undefined}
         {...pen.holdProps}
       >
-        {PEN}
-        {inkMode && pen.color && <span className="reading-mode-pen-dot" style={{ background: pen.color }} />}
+        {erasing ? ERASER : PEN}
+        {inkMode && !erasing && pen.color && <span className="reading-mode-pen-dot" style={{ background: pen.color }} />}
       </button>
       {pen.open && (
         <div className="reading-mode-pen-colors" role="menu" aria-label="Pen colour" ref={pen.menuRef}>
@@ -99,14 +107,6 @@ export function ReadingModeExit() {
           ))}
         </div>
       )}
-      <button
-        type="button"
-        className={notepadOpen ? "reading-mode-notepad on" : "reading-mode-notepad"}
-        title={notepadOpen ? "Close the notepad" : "Open the notepad — write with the Pencil"}
-        aria-label="Notepad"
-        aria-pressed={notepadOpen}
-        onClick={() => useStore.getState().setNotepadOpen(!notepadOpen)}
-      />
     </>
   );
 }

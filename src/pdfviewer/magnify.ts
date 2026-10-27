@@ -195,7 +195,9 @@ export function createMagnifier(env: MagnifyEnv) {
   }
   function onPointerDown(e: PointerEvent): void {
     pointer = { x: e.clientX, y: e.clientY };
-    if (!magnified() || e.pointerType !== "touch") return;
+    // The Pencil pans too, out of ink mode (pencilFinger.ts).
+    const finger = e.pointerType === "touch" || (e.pointerType === "pen" && !area.classList.contains("pdf-ink-active"));
+    if (!magnified() || !finger) return;
     stopCoast();
     // A second finger is the pinch's.
     drag = drag ? null : { id: e.pointerId, x: e.clientX, y: e.clientY, t: performance.now(), vx: 0, vy: 0 };

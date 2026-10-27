@@ -42,6 +42,7 @@ import { sampleTypicalPage } from "./pageSizes";
 import { changedPages, drawAnnotations } from "./paint";
 import { attachPagedWheel } from "./paged";
 import { getPdfjs } from "./pdfjs";
+import { attachPencilFinger } from "./pencilFinger";
 import { placeAtPoint, placeInView } from "./places";
 import { createPageFinder } from "./readingProgress";
 import { createPageRenderer } from "./render";
@@ -168,6 +169,7 @@ export function createPdfViewer(container: HTMLElement, opts: PdfViewerOptions =
     onStart: () => exitFolded(),
     onPenDown: () => renderer.yieldToPen(),
     onActiveChange: (on) => opts.onInkMode?.(on),
+    onToolChange: (t) => opts.onInkTool?.(t),
   });
   const detachTooltips = attachTooltips(tb.toolbar, root);
   foldLayer.attachFilterUI(tb.foldFilterBtn, root);
@@ -376,6 +378,7 @@ export function createPdfViewer(container: HTMLElement, opts: PdfViewerOptions =
     goToPage: (n) => goToPage(n),
   });
   attachPagedWheel(scrollArea, isPaged, keys.stepPage);
+  attachPencilFinger(scrollArea, keys.stepPage);
   const command = createViewerCommands({ tb, scrollArea, isFolded: () => folded, stepPage: keys.stepPage });
 
   /** The modes, as layout.ts reads them. */
@@ -389,6 +392,7 @@ export function createPdfViewer(container: HTMLElement, opts: PdfViewerOptions =
 
   function updateToolbarState(): void {
     syncToolbar(tb, { layoutMode, fitMode, folded, paged: isPaged(), foldedZoom, zoom: getEffectiveZoom });
+    opts.onTwoUp?.(!folded && fitMode === "fit-2" && (layoutMode === "vertical" || isPaged()));
     if (!folded && pdfDoc) saveViewPrefs({ layoutMode, fitMode, fixedZoom, paged });
     viewReporter.changed();
   }

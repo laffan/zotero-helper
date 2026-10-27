@@ -1,11 +1,13 @@
 /* PDF viewer (beside the notes) — pages, toolbar, links, text layer. Ported
    from Hush's styles/pdf-viewer.css; thumbnails and the folded view are
    in pdfviewer-panels.css. */
+/* Sized by the reader's flex row, not a percentage of it (WebKit could
+   keep that at its old value leaving reading mode). */
 .pdf-viewer {
   display: flex;
+  flex: 1 1 0;
   flex-direction: column;
-  width: 100%;
-  height: 100%;
+  min-width: 0;
   overflow: hidden;
   background: var(--bg);
   position: relative;

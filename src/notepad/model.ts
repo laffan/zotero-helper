@@ -34,6 +34,10 @@ export interface NoteLink {
   /** Its place on the canvas (top left). */
   x: number;
   y: number;
+  /** Its size, once dragged by its grip (a highlight's quote); unset,
+   *  it is sized by its text. */
+  w?: number;
+  h?: number;
   target: PlaceTarget;
 }
 

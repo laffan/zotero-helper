@@ -3,19 +3,20 @@
 // (ReadingNotepad.tsx) and the notes pane's lower half (NotesPanel.tsx)
 // are both this, sharing one pad.
 //
-// The toolbar: the link icon at its left makes a link — press it (the
-// Pencil, a finger or the mouse) and drag onto the pages, a dashed line
-// running from it to the pointer, and let go over a highlight or a spot
-// on a page: a link to it lands on the pad. Beside it, the eye: while
-// it is open the pad follows the PDF, panning to the part about each
-// page as the reader turns to it (off by default in the floating pad,
-// on under the notes; remembered for each). Beside that, the map: a
-// minimap of the whole pad down the canvas's left (minimap.ts; off to
-// begin with, remembered for each view). Then the eraser (also the
-// Pencil's double-tap, when the Pencil was last on this pad) and undo.
-// In the bar's middle, two dots for the pen's colour: the theme's ink
-// (black, white in the dark theme) or red (this device's choice, shared
-// by every view; picking one while erasing goes back to the pen).
+// The toolbar, from its left: what the Pencil does, one switch of three
+// parts — write in the theme's ink (black, white in the dark theme),
+// write in red, or erase (the eraser is also the Pencil's double-tap,
+// when the Pencil was last on this pad, and the switch shows it); the
+// colour is this device's choice, shared by every view. Then the quote
+// mark makes a link — press it (the Pencil, a finger or the mouse) and
+// drag onto the pages, a dashed line running from it to the pointer,
+// and let go over a highlight or a spot on a page: a link to it lands
+// on the pad. Beside it, the branch: while it is on the pad follows the
+// PDF, panning to the part about each page as the reader turns to it
+// (off by default in the floating pad, on under the notes; remembered
+// for each). Beside that, the map: a minimap of the whole pad down the
+// canvas's left (minimap.ts; off to begin with, remembered for each
+// view). The host's own tools follow (`tools`); undo is at the right.
 // At the canvas's lower left, a faint trash can clears the pad, once
 // confirmed (undo brings it back).
 //
@@ -34,10 +35,11 @@ import { createSurface, RED_INK, type NotepadSurface, type PadTool } from "../no
 import type { PlaceTarget } from "../pdfviewer/places";
 import { goToReaderPosition, readerPlace, readerPlaceAt, showInReader } from "./ReaderPane";
 
-const LinkIcon = () => (
-  <svg viewBox="0 0 16 16" width="17" height="17" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-    <path d="M6.8 9.2a2.6 2.6 0 0 0 3.7 0l2.2-2.2a2.6 2.6 0 0 0-3.7-3.7l-1 1" />
-    <path d="M9.2 6.8a2.6 2.6 0 0 0-3.7 0L3.3 9a2.6 2.6 0 0 0 3.7 3.7l1-1" />
+/** A quotation mark: drag it out to quote a highlight. */
+const QuoteIcon = () => (
+  <svg viewBox="0 0 16 16" width="17" height="17" fill="currentColor" aria-hidden="true">
+    <path d="M2.5 9.6c0-3 1.4-5.2 4-6.3l.6 1.1C5.6 5.1 4.8 6.2 4.7 7.4h.7c1 0 1.8.8 1.8 1.9v1.5c0 1-.8 1.9-1.8 1.9H4.3c-1 0-1.8-.8-1.8-1.9z" />
+    <path d="M8.8 9.6c0-3 1.4-5.2 4-6.3l.6 1.1c-1.5.7-2.3 1.8-2.4 3h.7c1 0 1.8.8 1.8 1.9v1.5c0 1-.8 1.9-1.8 1.9h-1.1c-1 0-1.8-.8-1.8-1.9z" />
   </svg>
 );
 const EraserIcon = () => (
@@ -47,10 +49,13 @@ const EraserIcon = () => (
     <path d="M6.2 13.5h7.3" />
   </svg>
 );
-const EyeIcon = ({ open }: { open: boolean }) => (
+/** Two dots joined by a stepped line, as a branch is drawn: the pad
+ *  linked to the PDF. */
+const BranchIcon = () => (
   <svg viewBox="0 0 16 16" width="17" height="17" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-    <path d="M1.5 8s2.4-4.5 6.5-4.5S14.5 8 14.5 8 12.1 12.5 8 12.5 1.5 8 1.5 8z" />
-    {open ? <circle cx="8" cy="8" r="2" /> : <path d="M2.5 13.5l11-11" />}
+    <circle cx="4" cy="3.8" r="1.9" />
+    <circle cx="12" cy="12.2" r="1.9" />
+    <path d="M4 5.7V8h8v2.3" />
   </svg>
 );
 const MapIcon = () => (
@@ -82,6 +87,8 @@ export interface NotepadBodyProps {
   kind: "floating" | "docked";
   /** A press on the bar's empty middle (the host drags the pad by it). */
   onBarPointerDown?: (e: React.PointerEvent) => void;
+  /** The host's own tools, after the bar's. */
+  tools?: React.ReactNode;
   /** At the bar's right. */
   trailing?: React.ReactNode;
 }
@@ -91,8 +98,8 @@ const mapKey = (kind: string) => `zh-notepad-map-${kind}`;
 const COLOR_KEY = "zh-notepad-pen-color";
 /** The pen's colours: the theme's ink ("") and red. */
 const PEN_COLORS = [
-  { color: "", label: "Ink (black, white in the dark theme)" },
-  { color: RED_INK, label: "Red" },
+  { color: "", label: "Write in ink (black, white in the dark theme)" },
+  { color: RED_INK, label: "Write in red" },
 ];
 function storedColor(): string {
   try {
@@ -126,7 +133,7 @@ function useFlag(key: string, fallback: boolean): [boolean, (on: boolean) => voi
   return [on, set];
 }
 
-export function NotepadBody({ attKey, kind, onBarPointerDown, trailing }: NotepadBodyProps) {
+export function NotepadBody({ attKey, kind, onBarPointerDown, tools, trailing }: NotepadBodyProps) {
   const [follow, setFollow] = useFlag(followKey(kind), kind === "docked");
   const [map, setMap] = useFlag(mapKey(kind), false);
   const [confirming, setConfirming] = useState(false);
@@ -274,14 +281,44 @@ export function NotepadBody({ attKey, kind, onBarPointerDown, trailing }: Notepa
   return (
     <>
       <div className="notepad-bar">
+        <div className="notepad-modes" role="radiogroup" aria-label="What the Pencil does">
+          {PEN_COLORS.map((c) => {
+            const on = tool === "pen" && c.color === color;
+            return (
+              <button
+                key={c.color || "ink"}
+                type="button"
+                role="radio"
+                className={on ? "notepad-mode on" : "notepad-mode"}
+                title={c.label}
+                aria-label={c.label}
+                aria-checked={on}
+                onClick={() => pickColor(c.color)}
+              >
+                <span className="notepad-mode-dot" style={c.color ? ({ "--swatch": c.color } as React.CSSProperties) : undefined} />
+              </button>
+            );
+          })}
+          <button
+            type="button"
+            role="radio"
+            className={tool === "eraser" ? "notepad-mode on" : "notepad-mode"}
+            title="Erase (the Pencil's double-tap)"
+            aria-label="Erase"
+            aria-checked={tool === "eraser"}
+            onClick={() => surfaceRef.current?.setTool("eraser")}
+          >
+            <EraserIcon />
+          </button>
+        </div>
         <button
           type="button"
           className="notepad-tool notepad-link-btn"
-          title="Link — drag onto a highlight or a place on the page"
-          aria-label="Link to a place in the PDF"
+          title="Quote — drag onto a highlight or a place on the page"
+          aria-label="Link to a highlight or a place in the PDF"
           onPointerDown={startLink}
         >
-          <LinkIcon />
+          <QuoteIcon />
         </button>
         <button
           type="button"
@@ -291,7 +328,7 @@ export function NotepadBody({ attKey, kind, onBarPointerDown, trailing }: Notepa
           aria-pressed={follow}
           onClick={() => setFollow(!follow)}
         >
-          <EyeIcon open={follow} />
+          <BranchIcon />
         </button>
         <button
           type="button"
@@ -303,34 +340,8 @@ export function NotepadBody({ attKey, kind, onBarPointerDown, trailing }: Notepa
         >
           <MapIcon />
         </button>
-        <div className="notepad-bar-grab" onPointerDown={onBarPointerDown}>
-          {/* Its own presses aren't the bar's drag. */}
-          <div className="notepad-colors" role="radiogroup" aria-label="Pen colour" onPointerDown={(e) => e.stopPropagation()}>
-            {PEN_COLORS.map((c) => (
-              <button
-                key={c.color || "ink"}
-                type="button"
-                role="radio"
-                className={c.color === color ? "notepad-color on" : "notepad-color"}
-                style={c.color ? ({ "--swatch": c.color } as React.CSSProperties) : undefined}
-                title={c.label}
-                aria-label={c.label}
-                aria-checked={c.color === color}
-                onClick={() => pickColor(c.color)}
-              />
-            ))}
-          </div>
-        </div>
-        <button
-          type="button"
-          className={tool === "eraser" ? "notepad-tool active" : "notepad-tool"}
-          title="Eraser (the Pencil's double-tap)"
-          aria-label="Eraser"
-          aria-pressed={tool === "eraser"}
-          onClick={() => surfaceRef.current?.setTool(tool === "eraser" ? "pen" : "eraser")}
-        >
-          <EraserIcon />
-        </button>
+        {tools}
+        <div className="notepad-bar-grab" onPointerDown={onBarPointerDown} />
         <button
           type="button"
           className="notepad-tool notepad-undo"

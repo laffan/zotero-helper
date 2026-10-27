@@ -10,7 +10,8 @@
 // together, so the outline never leaves it; a tap on the map's empty
 // part below takes the view no further than half its height past that.
 import type { Notepad } from "./model";
-import { pathD, type NotepadSurface, type SurfaceChange } from "./surface";
+import { pathD } from "./geometry";
+import type { NotepadSurface, SurfaceChange } from "./surface";
 
 const SVG_NS = "http://www.w3.org/2000/svg";
 /** Room around the drawing, px. */

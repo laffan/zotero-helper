@@ -8,14 +8,17 @@
 // the viewer reports). With ink mode on, holding the pen a moment
 // (HOLD_MS) opens a flyout of the pen's colours beside it — the bottom
 // bar's colour chip, which reading mode hides — and a dot on the pen
-// shows the colour it writes in; while ink mode's tool is the eraser
-// (the Pencil's double-tap), the pen button shows an eraser. The
+// shows the colour it writes in; the flyout also has the notepad's
+// switch of tools — pen, eraser, lasso — and the pen button shows the
+// tool in force: the pen, an eraser (the eraser is shared with the
+// notepad, lib/penTool.ts) or a lasso. The
 // notepad's icon is ReadingNotepad.tsx's. Reading mode itself is the
 // store's `readingMode`
 // — App.tsx gives the app the `reading-mode` class, and readingmode.css
 // hides the rest.
 import { useEffect, useRef, useState } from "react";
 import { useStore } from "../lib/store";
+import { LassoIcon } from "./NotepadBody";
 import { readerCommand, readerPen } from "./ReaderPane";
 
 const HOLD_MS = 450;
@@ -46,7 +49,9 @@ export function ReadingModeExit() {
   const leave = () => useStore.getState().setReadingMode(false);
   const sentenceTool = useStore((s) => s.sentenceTool);
   const inkMode = useStore((s) => s.inkMode);
-  const erasing = useStore((s) => s.inkMode && s.inkTool === "eraser");
+  const inkTool = useStore((s) => s.inkTool);
+  const erasing = inkMode && inkTool === "eraser";
+  const lassoing = inkMode && inkTool === "select";
   const pen = usePenColors(inkMode);
 
   useEffect(() => {
@@ -82,17 +87,48 @@ export function ReadingModeExit() {
       <button
         type="button"
         className={inkMode ? "reading-mode-tool reading-mode-pen on" : "reading-mode-tool reading-mode-pen"}
-        title={erasing ? "The Pencil erases (double-tap it to write)" : inkMode ? "The Pencil writes — hold for its colour" : "The Pencil selects and highlights"}
+        title={
+          erasing
+            ? "The Pencil erases (double-tap it to write) — hold for its tools"
+            : lassoing
+              ? "The Pencil draws a lasso round drawings — hold for its tools"
+              : inkMode
+                ? "The Pencil writes (hold it still to lasso) — hold for its colour and tools"
+                : "The Pencil selects and highlights"
+        }
         aria-label="Pen"
         aria-pressed={inkMode}
         aria-haspopup={inkMode ? "menu" : undefined}
         {...pen.holdProps}
       >
-        {erasing ? ERASER : PEN}
-        {inkMode && !erasing && pen.color && <span className="reading-mode-pen-dot" style={{ background: pen.color }} />}
+        {erasing ? ERASER : lassoing ? <LassoIcon size={20} /> : PEN}
+        {inkMode && inkTool === "pen" && pen.color && <span className="reading-mode-pen-dot" style={{ background: pen.color }} />}
       </button>
       {pen.open && (
-        <div className="reading-mode-pen-colors" role="menu" aria-label="Pen colour" ref={pen.menuRef}>
+        <div className="reading-mode-pen-colors" role="menu" aria-label="Pen colour and tool" ref={pen.menuRef}>
+          {/* The notepad's switch: pen, eraser (shared with it), lasso. */}
+          <div className="notepad-modes" role="radiogroup" aria-label="What the Pencil does">
+            {(
+              [
+                ["pen", "Write", PEN],
+                ["eraser", "Erase (the Pencil's double-tap)", ERASER],
+                ["select", "Lasso — draw a loop round drawings (or hold the pen still)", <LassoIcon key="l" />],
+              ] as const
+            ).map(([t, label, icon]) => (
+              <button
+                key={t}
+                type="button"
+                role="radio"
+                className={inkTool === t ? "notepad-mode on" : "notepad-mode"}
+                title={label}
+                aria-label={label}
+                aria-checked={inkTool === t}
+                onClick={() => pen.chooseTool(t)}
+              >
+                {icon}
+              </button>
+            ))}
+          </div>
           {pen.palette.map((c) => (
             <button
               key={c}
@@ -182,9 +218,16 @@ function usePenColors(inkMode: boolean) {
     palette: readerPen()?.palette ?? [],
     menuRef,
     holdProps,
+    /** A colour: the pen writes in it (back to the pen, if it wasn't). */
     choose(c: string): void {
-      readerPen()?.setColor(c);
+      const p = readerPen();
+      p?.setColor(c);
+      if (p && p.tool() !== "pen") p.setTool("pen");
       setColor(c);
+      setOpen(false);
+    },
+    chooseTool(t: "pen" | "eraser" | "select"): void {
+      readerPen()?.setTool(t);
       setOpen(false);
     },
   };

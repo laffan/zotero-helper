@@ -17,6 +17,7 @@
 import {
   erasePaths,
   hitsPaths,
+  inPolygon,
   MAX_POSITION_CHARS,
   MERGE_DISTANCE,
   MERGE_MS,
@@ -58,7 +59,9 @@ export function positionOf(pageIndex: number, width: number, paths: number[][]):
 }
 
 function make(base: Omit<InkAnn, "pos" | "bounds">): InkAnn {
-  return { ...base, pos: positionOf(base.pageIndex, base.width, base.paths) };
+  // Made from another (`{ ...a, paths }`), it would carry that one's
+  // bounds along: they are measured again from the new paths.
+  return { ...base, bounds: undefined, pos: positionOf(base.pageIndex, base.width, base.paths) };
 }
 
 export function boundsOf(a: InkAnn): Rect | null {
@@ -201,13 +204,15 @@ export function createInkSession(layer: InkLayer, sink: InkSink) {
     return null;
   }
 
-  /** The editable annotations with a point inside `rect`. */
-  function within(pageIndex: number, rect: Rect): InkAnn[] {
-    const inside = (x: number, y: number) => x >= rect[0] && x <= rect[2] && y >= rect[1] && y <= rect[3];
+  /** The editable drawings on a page with a point inside a lasso's
+   *  loop (PDF points, x, y pairs). */
+  function inLoop(pageIndex: number, loop: number[]): InkAnn[] {
+    const box = pathsBounds([loop]);
+    if (!box) return [];
     return pageList(pageIndex).filter((a) => {
       const b = boundsOf(a);
-      if (!a.editable || !b || !rectsIntersect(b, rect)) return false;
-      return a.paths.some((p) => p.some((_, i) => i % 2 === 0 && inside(p[i], p[i + 1])));
+      if (!a.editable || !b || !rectsIntersect(b, box)) return false;
+      return a.paths.some((p) => p.some((_, i) => i % 2 === 0 && inPolygon(p[i], p[i + 1], loop)));
     });
   }
 
@@ -277,7 +282,7 @@ export function createInkSession(layer: InkLayer, sink: InkSink) {
     addStroke,
     eraseAlong,
     hit,
-    within,
+    inLoop,
     translate,
     restyle,
     remove,

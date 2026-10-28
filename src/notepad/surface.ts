@@ -16,7 +16,10 @@
 // stroke it passes over. A finger pans, and taps. A mouse (a Mac, no
 // Pencil) writes with a drag and taps with a click; a wheel or trackpad
 // pans. Any of them held still where it came down (HOLD_MS) draws a
-// lasso instead, which selects what it encloses (lasso.ts). Strokes
+// lasso instead, which selects what it encloses (lasso.ts); with the
+// lasso as the tool, the Pencil and the mouse draw one at once. The
+// eraser is shared with the pages' ink mode (lib/penTool.ts, through
+// NotepadBody). Strokes
 // written while the reader stays on one page are one note (model.ts),
 // which remembers the reader's place when it began; turning to another
 // page — even to come straight back — starts the next. Each note shows
@@ -62,7 +65,7 @@ const ERASE_PX = 10;
 /** A pen's eraser button (PointerEvent.buttons). */
 const ERASER_BUTTON = 32;
 
-export type PadTool = "pen" | "eraser";
+export type PadTool = "pen" | "eraser" | "lasso";
 
 export interface SurfaceEnv {
   pad: () => Notepad;
@@ -180,6 +183,7 @@ export function createSurface(host: HTMLElement, env: SurfaceEnv) {
       chips.set(l.id, chip);
       labels.appendChild(chip);
     }
+    lasso.prune();
     tell("content");
   }
 
@@ -235,6 +239,7 @@ export function createSurface(host: HTMLElement, env: SurfaceEnv) {
   function setTool(t: PadTool): void {
     tool = t;
     host.classList.toggle("erasing", t === "eraser");
+    host.classList.toggle("lassoing", t === "lasso");
     env.toolChanged?.(t);
   }
 
@@ -322,6 +327,11 @@ export function createSurface(host: HTMLElement, env: SurfaceEnv) {
     if (tool === "eraser" || e.buttons & ERASER_BUTTON) {
       g = { ...press, kind: "erase", step: { strokes: [], notes: [] } };
       eraseAt(x, y, g.step);
+      return;
+    }
+    if (tool === "lasso") {
+      g = { ...press, kind: "lasso" };
+      lasso.begin(x, y);
       return;
     }
     const path = document.createElementNS(SVG_NS, "path");

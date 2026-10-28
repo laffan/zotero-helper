@@ -99,6 +99,9 @@ src/            React + TypeScript UI (Vite, zustand, MiniSearch)
                 laid over the library until a sync includes them
   lib/pencil.ts the Apple Pencil's double-tap and squeeze, from
                 tauri-plugin-pencil, as a window event for ink mode
+  lib/penTool.ts
+                the eraser shared by ink mode and the notepad, which
+                the double-tap turns on and off
   lib/statusBar.ts
                 asking tauri-plugin-status-bar, at boot, whether the
                 status bar is hidden (the `status-bar-hidden` class)
@@ -616,12 +619,15 @@ the pen shows the colour it writes in, and holding the pen a moment
 and black, the bottom bar's colour chip, which reading mode hides; a
 colour, a press elsewhere or Escape closes it, and the press that
 opened it doesn't also end ink mode (`usePenColors` in
-`ReadingModeExit.tsx`, through the viewer's `inkPen`). While ink
-mode's tool is the eraser (the Pencil's double-tap), the pen button
-shows an eraser instead of the pen, and no colour dot (the store's
-`inkTool`, from the viewer's `onInkTool`). At the top right to begin
-with, a red rectangle is the notepad's icon, dragged anywhere, which
-opens it (see The notepad). The pages'
+`ReadingModeExit.tsx`, through the viewer's `inkPen`). The flyout
+begins with the notepad's switch of tools — pen, eraser, lasso (ink
+mode's select tool) — and a colour picked there goes back to the pen.
+The pen button shows the tool in force: the pen (with the colour dot),
+an eraser (the eraser is shared with the notepad, `lib/penTool.ts`) or
+a lasso (the store's `inkTool`, from the viewer's `onInkTool`). Below
+the pen, in the next place down the left, a filled red rectangle is
+the notepad's icon, dragged anywhere, which opens it (see The notepad).
+The pages'
 bookmark buttons are hidden in reading mode (a bookmarked page still
 shows its filled button and name): holding a page's top-right corner
 still for a full second opens the bookmark box for that page instead —
@@ -853,9 +859,17 @@ shows the nearest step). Samples are smoothed a little as they arrive
 (`smooth` in `input.ts`): each drawn point goes only part of the way to
 the pen's sample, less of the way the slower the pen moves, so a slow
 line loses the hand's tremor and a fast one doesn't trail the tip; the
-line drawn live and the one kept are the same points. Select takes a drawing by a tap on its line, or every drawing
-a dragged box touches; a drag from inside the selection moves it, the
-colours and width restyle it, ⌫ deletes it. Whatever the tool, a
+line drawn live and the one kept are the same points. Select is a lasso: it takes a drawing by a tap on its line, or every
+drawing with a point inside a loop drawn round them (`inLoop` in
+`session.ts`, the loop drawn dashed by `live.ts`); a drag from inside
+the selection moves it, the colours and width restyle it, ⌫ deletes it.
+The pen held still where it came down (500ms, within 4px) draws the
+same lasso, as in Hush and the notepad: the stroke begun is dropped,
+the loop is drawn on from there, and the tool stays the pen; a pen
+pressed on the selection drags it, whatever the tool, and one pressed
+anywhere else writes and lets go of it. (A drawing moved used to keep
+the bounds it had before — `make` copied them along — so its frame,
+and what a press on it hit, stayed where it had been.) Whatever the tool, a
 finger is the select tool on drawings: one landing on a drawing's line
 (within 16px) or on the selection selects it and drags it, and the bar's
 colours, width and Delete then act on it, until a tap off it or a new
@@ -891,9 +905,12 @@ stroke over a link or a highlight doesn't press it. The Pencil's touches are can
 it is down every touch is, so a resting hand can't move the page. Those
 non-passive touch listeners exist only in ink mode — they make each
 scroll wait on the main thread. A pen's eraser button erases whatever
-tool is on. The Pencil's double-tap switches between the pen and the
-eraser, whatever Settings → Apple Pencil says (its "last used tool"
-did nothing from the pen); the Pencil Pro's squeeze follows the setting — through `tauri-plugin-pencil` (ported from Hush's: a
+tool is on. The Pencil's double-tap turns the eraser on and off,
+whatever Settings → Apple Pencil says (its "last used tool" did
+nothing from the pen) — the one eraser of ink mode and the notepad
+together (`lib/penTool.ts`: either one's eraser, or the double-tap,
+sets it in both; it used to go to whichever the Pencil had touched
+last, and the two disagreed); the Pencil Pro's squeeze follows the setting — through `tauri-plugin-pencil` (ported from Hush's: a
 `UIPencilInteraction` on the web view, events `tap` / `squeeze` with the
 preferred action) and `src/lib/pencil.ts`.
 
@@ -1250,15 +1267,21 @@ places, sharing one pad (`notepadFor` / `watchNotepad` in
 the pages in reading mode, and in the notes pane's lower half.
 
 **In reading mode** (`ReadingNotepad.tsx`) the closed pad is an icon, a
-red rectangle at the top right to begin with, which a drag moves
-anywhere (kept on this device, `zh-notepad-icon`). A tap opens the pad
+filled red rectangle, at home in the next place down reading mode's
+buttons at the left (below the pen, `homeSpot`), which a drag moves
+anywhere. While it is dragged, its home shows as a dashed ring (filled
+once the icon is within 40px), and let go there the icon settles home
+again (kept on this device, `zh-notepad-icon-2` and
+`zh-notepad-icon-home`). A tap opens the pad
 out of it: the pad grows from the icon's box to its own (`morph`, the
 Web Animations API, 260ms), and closing shrinks it back into the icon;
 while the pad is open the icon is hidden. The pad opens with the corner
 facing away from the window's middle at the icon (its top right for an
 icon at the top right; `cornerOf` / `boxAtIcon`), and closes back into
 that same corner of wherever it has been moved (`iconAtBox`), so the
-icon and the pad keep to one place. Four-fifths of the window's height
+icon and the pad keep to one place. A floating pad keeps 20px clear of
+the window's left edge, for the quote knob's half that reaches out over
+its own. Four-fifths of the window's height
 to begin with, its background 90% opaque so the pages show through
 faintly; the bar's empty middle drags it, a dotted circle at its corner
 sizes it. Let go with the pointer at the window's left or right edge (a
@@ -1280,8 +1303,8 @@ change; where it sits, its size and the dock are kept on this device.
 
 **Auto-shift.** With two pages side by side — "Fit 2 pages", outside
 the folded view, which the viewer reports as the store's `twoUp`
-(`onTwoUp`) — the pad's bar gains a button of arrows pointing left and
-right, on or off (`zh-notepad-autoshift`). On, a press on the pages on
+(`onTwoUp`) — the pad's bar gains a button of two pages side by side,
+one drawn dashed, on or off (`zh-notepad-autoshift`). On, a press on the pages on
 the pad's half of the window — the Pencil's or a finger's; not on the
 pad itself — slides the pad to the same place on the other half
 (`left` mirrored, a 0.3s slide), so it keeps to the page not being
@@ -1294,24 +1317,31 @@ divider, dragged to share the height, with Hide Notepad at its middle.
 
 Either way it is one continuous surface in the panel's colour: a slim
 bar of tools over the canvas — a very faint dot grid, which pans with
-it. At the bar's left, one switch of three parts says what the Pencil
-does: write in the ink of the theme — black, white in the dark theme
-(`--notepad-ink`; such a stroke is kept with no colour, so it follows
-the appearance) — write in red, the reading-mode red (`RED_INK`,
-`#ff5f57`, kept with the stroke), or erase. The colour is this device's
-(`zh-notepad-pen-color`), shared by every view. Then the quote mark (a
-link onto the pages), the branch (following the PDF), the map, the
-host's own tools (auto-shift), the empty middle, undo, and the host's
-close.
+it. From the bar's left: the branch (following the PDF), the map, the
+host's own tools (auto-shift), the empty middle; then, just before
+undo and the host's close, one switch of four parts saying what the
+Pencil does: write in the ink of the theme — black, white in the dark
+theme (`--notepad-ink`; such a stroke is kept with no colour, so it
+follows the appearance) — write in red, the reading-mode red
+(`RED_INK`, `#ff5f57`, kept with the stroke), erase, or lasso. The
+colour is this device's (`zh-notepad-pen-color`), shared by every view.
+
+The quote knob sits on the pad's edge at its middle, half outside it,
+on the side facing the pages (the left; the right for a pad docked at
+the window's left; just inside the edge under the notes, whose pane
+clips what leaves it): a round bump in the pad's colour with a grey
+ring set a little in, which turns the highlight orange (`#f19837`)
+while a link is being drawn out of it.
 
 On the canvas the Pencil writes — a tap is a dot — a finger pans, and a
 mouse writes with a drag (a Mac has no Pencil) while a wheel pans; each
 view pans on its own. Strokes are SVG paths grown sample by sample, as
 the viewer's ink is, with no React render under the pen (`surface.ts`).
 The eraser — the switch's third part, a pen's eraser end, or the
-Pencil's double-tap when the Pencil last touched this pad (ink mode
-takes the double-tap otherwise; `pencilLastOn` in `lib/pencil.ts`) —
-takes out every stroke it passes over; the switch always shows it. A
+Pencil's double-tap — takes out every stroke it passes over; the switch
+always shows it. It is one eraser with ink mode's on the pages
+(`lib/penTool.ts`): turned on or off in either, it is on or off in
+both. A
 gesture on the canvas always ends: its end is heard on the window,
 whatever element it reaches; a pen coming down while one is still open
 ends that one first, as does any press once the open one has heard
@@ -1330,9 +1360,13 @@ from there, dashed. Let go, it selects the strokes with any point
 inside it and the links whose middle is. The selection is framed, with
 Delete above the frame; a drag that starts inside the frame moves it
 (any pointer), ⌫ deletes it, Escape lets go, and so does a tap on it
-or a press anywhere else — the Pencil then writes at once. The lasso
-is borrowed for the one press: there is no select tool to switch back
-from.
+or a press anywhere else — the Pencil then writes at once. Held, the
+lasso is borrowed for the one press; the switch's fourth part makes it
+the tool, when every press of the Pencil or the mouse draws one at
+once. Strokes or links selected and then gone some other way — erased,
+undone, cleared, changed in another view — leave the selection too
+(`prune`, after every change), and with nothing left the frame and its
+Delete go.
 
 Strokes written while the reader stays on one page are one note;
 turning to another page — even to come straight back — starts the next
@@ -1341,7 +1375,7 @@ A note remembers where in the PDF the reader was when it began — the
 page at the view's centre and the height a quarter of the way down the
 view (`placeInView` in `pdfviewer/places.ts`) — and shows that page,
 small, above it; a finger tap (or a click) on a note goes back there.
-The branch icon (two dots joined by a stepped line) makes the pad
+The branch icon (two dots joined by a dotted, stepped line) makes the pad
 follow the PDF: as the reader turns pages it glides to the part of the
 pad about the page in view — the top of its notes and links, or for a
 page with none, between those of the pages before and after it as far
@@ -1350,7 +1384,7 @@ along as the page is, or just under the last (`spotFor` in
 is read. It starts off in the floating pad and on under the notes, and
 each view remembers its own.
 
-The quote mark makes a link (`links.ts`): pressed and dragged out onto
+The quote knob makes a link (`links.ts`): pressed and dragged out onto
 the pages, a dashed line running from it to the pointer, and let go
 over a highlight or a spot on a page (`placeAtPoint`), it puts a link on
 the pad — a link icon and "p. 12", or the whole of the highlight's text

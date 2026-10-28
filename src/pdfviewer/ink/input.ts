@@ -7,6 +7,10 @@
 // link — so reading and writing need no mode switch beyond the pen in
 // hand; except that a finger landing on a drawing (or on what is
 // selected) is the select tool: it selects that drawing and drags it.
+// The select tool draws a lasso — a loop round the drawings to select —
+// and the pen held still where it came down (HOLD_MS) draws one too, as
+// Hush's does: the stroke begun is dropped and the loop is drawn on from
+// there. A pen pressed on the selection drags it, whatever the tool.
 // `PointerEvent.pointerType` tells them apart reliably in WKWebView. Out
 // of ink mode, the Pencil is a finger like any other.
 //
@@ -30,7 +34,6 @@
 // are reliable; on iOS, as in Hush and tldraw, they are not.
 import { pageBoxAt } from "../annotate";
 import type { PageRecord } from "../types";
-import type { Rect } from "./geometry";
 import type { LiveLayer } from "./live";
 
 export type InkTool = "pen" | "eraser" | "select";
@@ -44,6 +47,10 @@ const ERASER_BUTTON = 32;
  *  is wider. */
 const SELECT_REACH_PX = 8;
 const FINGER_REACH_PX = 16;
+/** How long the pen is held still to draw a lasso, ms, and how far it
+ *  may stray meanwhile, CSS px. */
+const HOLD_MS = 500;
+const STILL_PX = 4;
 /** A gesture that has heard nothing for this long has lost its end. */
 const STALE_MS = 1500;
 /** Pen smoothing (see `smooth`): the share of the way to a new sample
@@ -66,13 +73,17 @@ export interface InkInputEnv {
   stroke: (pageIndex: number, points: number[]) => void;
   erase: (pageIndex: number, from: Pt | null, to: Pt) => void;
   /** Select: a press at a point; true when it took hold of the
-   *  selection (to move it) rather than starting a rectangle. */
+   *  selection (to move it) rather than starting a lasso. */
   press: (pageIndex: number, at: Pt, reach: number) => boolean;
   /** Would a press here take hold of a drawing (or the selection)? */
   grabbable: (pageIndex: number, at: Pt, reach: number) => boolean;
   drag: (dx: number, dy: number) => void;
   drop: (dx: number, dy: number) => void;
-  sweep: (pageIndex: number, rect: Rect | null) => void;
+  /** Is a point on the page inside the selection? */
+  inSelection: (pageIndex: number, at: Pt) => boolean;
+  /** A lasso let go: select what its loop (PDF points) encloses — or,
+   *  for a tap, nothing. */
+  sweep: (pageIndex: number, loop: number[] | null) => void;
   /** A press off the pages. */
   pressOutside: () => void;
 }
@@ -93,6 +104,10 @@ interface Gesture {
   /** The latest place, for ending a gesture whose end was lost. */
   lastClient: Pt;
   finger: boolean;
+  /** The lasso's timer, while the pen may yet be held still; the loop
+   *  drawn (client px). */
+  hold: number;
+  loop: number[];
 }
 
 export function attachInkInput(env: InkInputEnv) {
@@ -112,7 +127,7 @@ export function attachInkInput(env: InkInputEnv) {
       id, mode, idx: at.pageIndex, p, rect,
       k: rect.width / p.viewport.width,
       client: [x, y], start: [0, 0], last: null, grabbed: false,
-      startClient: [x, y], lastClient: [x, y], finger,
+      startClient: [x, y], lastClient: [x, y], finger, hold: 0, loop: [x, y],
     };
     gs.start = toPdf(gs, x, y);
     return gs;
@@ -159,14 +174,17 @@ export function attachInkInput(env: InkInputEnv) {
     e.stopPropagation();
     // A pen can't be down twice: one still open lost its end.
     abandon();
-    const mode: InkTool = e.buttons & ERASER_BUTTON ? "eraser" : env.tool();
+    let mode: InkTool = e.buttons & ERASER_BUTTON ? "eraser" : env.tool();
     const gs = gestureAt(target, e.clientX, e.clientY, e.pointerId, mode, false);
     if (!gs) {
       env.pressOutside();
       return;
     }
+    // On the selection: it is dragged, whatever the tool.
+    if (mode !== "eraser" && env.inSelection(gs.idx, gs.start)) gs.mode = mode = "select";
     start(gs);
     if (mode === "pen") {
+      gs.hold = window.setTimeout(() => toLasso(gs), HOLD_MS);
       env.begin();
       const s = env.penStyle();
       live.begin({ color: s.color, width: Math.max(0.5, s.width * gs.k) }, e.clientX, e.clientY);
@@ -188,6 +206,17 @@ export function attachInkInput(env: InkInputEnv) {
     } catch {
       /* the pointer is already gone */
     }
+  }
+
+  /** Held still: the stroke begun is dropped, and the pen draws a lasso
+   *  from where it came down. */
+  function toLasso(gs: Gesture): void {
+    if (g !== gs || gs.mode !== "pen") return;
+    live.clear();
+    env.end();
+    gs.mode = "select";
+    gs.grabbed = false;
+    gs.loop = [...gs.startClient];
   }
 
   /** End a gesture left open — its end was lost — where it last was. */
@@ -229,6 +258,10 @@ export function attachInkInput(env: InkInputEnv) {
     if (e.pointerId !== g.id) return;
     heardAt = performance.now();
     g.lastClient = [e.clientX, e.clientY];
+    if (g.hold && Math.hypot(e.clientX - g.startClient[0], e.clientY - g.startClient[1]) > STILL_PX) {
+      window.clearTimeout(g.hold);
+      g.hold = 0;
+    }
     if (g.mode === "pen") {
       for (const s of samples(e)) {
         const [x, y] = smooth(g, s.clientX, s.clientY);
@@ -245,7 +278,10 @@ export function attachInkInput(env: InkInputEnv) {
     } else {
       const pt = toPdf(g, e.clientX, e.clientY);
       if (g.grabbed) env.drag(pt[0] - g.start[0], pt[1] - g.start[1]);
-      else live.showMarquee(g.startClient, [e.clientX, e.clientY]);
+      else {
+        g.loop.push(e.clientX, e.clientY);
+        live.showLasso(g.loop);
+      }
     }
   }
 
@@ -263,6 +299,7 @@ export function attachInkInput(env: InkInputEnv) {
   function finish(gs: Gesture, ex: number, ey: number, cancelled: boolean): void {
     if (g !== gs) return;
     g = null;
+    window.clearTimeout(gs.hold);
     penUpAt = performance.now();
     if (gs.mode === "pen") {
       // The line ends where the pen left the page, not just short of it.
@@ -286,12 +323,11 @@ export function attachInkInput(env: InkInputEnv) {
       const pt = toPdf(gs, ex, ey);
       if (gs.grabbed) env.drop(pt[0] - gs.start[0], pt[1] - gs.start[1]);
       else {
-        live.showMarquee(null);
-        const tap = Math.hypot(ex - gs.startClient[0], ey - gs.startClient[1]) < 4;
-        env.sweep(gs.idx, tap ? null : [
-          Math.min(gs.start[0], pt[0]), Math.min(gs.start[1], pt[1]),
-          Math.max(gs.start[0], pt[0]), Math.max(gs.start[1], pt[1]),
-        ]);
+        live.showLasso(null);
+        const loop: number[] = [];
+        for (let i = 0; i + 1 < gs.loop.length; i += 2) loop.push(...toPdf(gs, gs.loop[i], gs.loop[i + 1]));
+        // A tap (or a loop too small to hold anything) selects nothing.
+        env.sweep(gs.idx, gs.loop.length < 8 ? null : loop);
       }
     }
   }

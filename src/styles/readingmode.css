@@ -141,6 +141,13 @@
   background: var(--panel);
   box-shadow: 0 4px 14px rgb(0 0 0 / 0.22);
 }
+/* The pen's tools first: the notepad's switch (notepad.css). */
+.reading-mode-pen-colors {
+  align-items: center;
+}
+.reading-mode-pen-colors .notepad-modes {
+  margin: 0 4px 0 0;
+}
 .ipados:not(.status-bar-hidden) .reading-mode-pen-colors {
   top: calc(max(env(safe-area-inset-top), 30px) + 119px);
 }
@@ -194,9 +201,9 @@
   opacity: 1;
 }
 
-/* The notepad's icon (ReadingNotepad.tsx): a red rectangle, the ×'s
-   size, at the top right to begin with and dragged anywhere — placed
-   inline. Hidden while the pad is open; the pad grows out of it. */
+/* The notepad's icon (ReadingNotepad.tsx): a filled red rectangle, the
+   ×'s size, at home below the pen to begin with and dragged anywhere —
+   placed inline. Hidden while the pad is open; the pad grows out of it. */
 .reading-mode-notepad {
   position: fixed;
   z-index: 60;
@@ -218,10 +225,25 @@
   left: 14px;
   width: 16px;
   height: 22px;
-  box-sizing: border-box;
-  border: 3px solid #ff5f57;
   border-radius: 3px;
+  background: #ff5f57;
   transition: transform 0.12s;
+}
+/* Its home, while it is dragged: a dashed ring where it settles if let
+   go near — the place below the pen, down the left. */
+.reading-mode-notepad-home {
+  position: fixed;
+  z-index: 59;
+  width: 44px;
+  height: 44px;
+  border: 2px dashed color-mix(in srgb, #ff5f57 55%, transparent);
+  border-radius: 10px;
+  pointer-events: none;
+  transition: background 0.12s, border-color 0.12s;
+}
+.reading-mode-notepad-home.near {
+  border-color: #ff5f57;
+  background: color-mix(in srgb, #ff5f57 14%, transparent);
 }
 .reading-mode-notepad:hover::before {
   transform: scale(1.15);

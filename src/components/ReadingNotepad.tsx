@@ -1,7 +1,9 @@
 // Reading mode's notepad: a pad for the Apple Pencil — NotepadBody (its
 // bar and canvas) in a window of its own — and, while it is closed, its
-// icon: a red rectangle, at the window's top right to begin with, that
-// can be dragged anywhere. A tap on the icon opens the pad out of it,
+// icon: a filled red rectangle, at home below reading mode's buttons
+// down the window's left edge, that can be dragged anywhere — and back
+// home: while it is dragged, its home shows as a dashed ring, and let go
+// near it, it settles there. A tap on the icon opens the pad out of it,
 // growing from the icon to its full size, as if the icon were the pad
 // in miniature; closing it shrinks it back into the icon. The pad opens
 // with the corner facing away from the window's middle at the icon (its
@@ -18,8 +20,8 @@
 // again. Where the icon and the pad sit is this device's.
 //
 // Auto-shift: with two pages side by side ("Fit 2 pages", the store's
-// `twoUp`), a button of arrows in the pad's bar, on or off (this
-// device's), makes the pad keep out of the way: a press on the pages on
+// `twoUp`), a button in the pad's bar — two pages side by side, one
+// dashed — on or off (this device's), makes the pad keep out of the way: a press on the pages on
 // the pad's side of the window — the Pencil's or a finger's — slides it
 // to the same place on the other side (a docked pad changes edges, once
 // the press is over, since the pages are laid out again). One pad per
@@ -31,7 +33,11 @@ import { NotepadBody } from "./NotepadBody";
 
 // Version 2: the default became 80% of the window's height.
 const BOX_KEY = "zh-notepad-box-2";
-const ICON_KEY = "zh-notepad-icon";
+// Version 2: the icon starts at home, below reading mode's buttons.
+const ICON_KEY = "zh-notepad-icon-2";
+const HOME_KEY = "zh-notepad-icon-home";
+/** How near home the icon is let go to settle there, CSS px. */
+const HOME_SNAP_PX = 40;
 const SHIFT_KEY = "zh-notepad-autoshift";
 /** The icon's target, a finger's (the rectangle is drawn inside it). */
 const ICON = 44;
@@ -68,6 +74,9 @@ const topBand = () => {
   const c = document.documentElement.classList;
   return c.contains("ipados") && !c.contains("status-bar-hidden") ? 34 : 10;
 };
+/** The icon's home: the next place down reading mode's buttons, after
+ *  the ×, the sentence tool and the pen (readingmode.css), 56px apart. */
+const homeSpot = (): Spot => ({ left: 10, top: topBand() + 168 });
 const storedIcon = () =>
   stored<Spot>(ICON_KEY, (s) => Number.isFinite(s.left) && Number.isFinite(s.top), () => ({
     left: window.innerWidth - ICON - 10,
@@ -81,7 +90,9 @@ function clampBox(b: Box): Box {
   return {
     width,
     height,
-    left: Math.max(8, Math.min(b.left, window.innerWidth - width - 8)),
+    // Clear of the window's left edge by the quote knob's half, which
+    // reaches out over the pad's left edge.
+    left: Math.max(20, Math.min(b.left, window.innerWidth - width - 8)),
     top: Math.max(8, Math.min(b.top, window.innerHeight - height - 8)),
   };
 }
@@ -161,13 +172,11 @@ const storedDock = () =>
 
 const clampWidth = (w: number) => Math.round(Math.max(240, Math.min(w, window.innerWidth * 0.6)));
 
-/** Arrows left and right: the pad keeps to the other page. */
+/** Two pages side by side, one dashed: the pad keeps to the other. */
 const ShiftIcon = () => (
-  <svg viewBox="0 0 16 16" width="17" height="17" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-    <path d="M5 3.5L2 6.5l3 3" />
-    <path d="M2 6.5h9" />
-    <path d="M11 6.5l3 3-3 3" />
-    <path d="M14 9.5H5" />
+  <svg viewBox="0 0 16 16" width="17" height="17" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" aria-hidden="true">
+    <rect x="1.8" y="2.5" width="5.4" height="11" rx="1" />
+    <rect x="8.8" y="2.5" width="5.4" height="11" rx="1" strokeDasharray="1.8 1.4" />
   </svg>
 );
 
@@ -176,7 +185,11 @@ export function ReadingNotepad({ attKey }: { attKey: string }) {
   const twoUp = useStore((s) => s.twoUp);
   const [box, setBox] = useState(() => clampBox(storedBox()));
   const [dock, setDock] = useState(storedDock);
-  const [icon, setIcon] = useState(() => clampIcon(storedIcon()));
+  const [spot, setIcon] = useState(() => clampIcon(storedIcon()));
+  const [home, setHome] = useState(() => stored<boolean>(HOME_KEY, (v) => typeof v === "boolean", () => true));
+  const icon = home ? homeSpot() : spot;
+  // The icon being dragged: its home shows, ringed when it is near.
+  const [homing, setHoming] = useState<"far" | "near" | null>(null);
   const [autoShift, setAutoShift] = useState(() => stored<boolean>(SHIFT_KEY, (v) => typeof v === "boolean", () => false));
   // Sliding to the other side (auto-shift): the move is animated.
   const [shifting, setShifting] = useState(false);
@@ -190,7 +203,8 @@ export function ReadingNotepad({ attKey }: { attKey: string }) {
 
   useEffect(() => keep(BOX_KEY, box), [box]);
   useEffect(() => keep(DOCK_KEY, dock), [dock]);
-  useEffect(() => keep(ICON_KEY, icon), [icon]);
+  useEffect(() => keep(ICON_KEY, spot), [spot]);
+  useEffect(() => keep(HOME_KEY, home), [home]);
   useEffect(() => keep(SHIFT_KEY, autoShift), [autoShift]);
 
   // A window resized: the icon and the pad kept on screen.
@@ -233,7 +247,12 @@ export function ReadingNotepad({ attKey }: { attKey: string }) {
     const el = padRef.current;
     if (closing.current) return;
     const to = dock.side ? icon : iconAtBox(box, corner.current);
-    setIcon(to);
+    // Back home, if that is where it closes to.
+    const h = homeSpot();
+    if (!(home && Math.hypot(to.left - h.left, to.top - h.top) < 2)) {
+      setHome(false);
+      setIcon(to);
+    }
     const done = () => {
       closing.current = false;
       useStore.getState().setNotepadOpen(false);
@@ -313,25 +332,42 @@ export function ReadingNotepad({ attKey }: { attKey: string }) {
   };
 
   if (!open) {
+    const h = homeSpot();
+    const near = (s: Spot) => Math.hypot(s.left - h.left, s.top - h.top) < HOME_SNAP_PX;
     return (
-      <button
-        type="button"
-        className="reading-mode-notepad"
-        style={{ left: icon.left, top: icon.top }}
-        title="Open the notepad — write with the Pencil (drag to move)"
-        aria-label="Open the notepad"
-        onPointerDown={(e) => {
-          if (e.pointerType === "mouse" && e.button !== 0) return;
-          const start = icon;
-          follow(
-            e,
-            (dx, dy) => setIcon(clampIcon({ left: start.left + dx, top: start.top + dy })),
-            (ev, moved) => !moved && ev.type === "pointerup" && openPad(),
-          );
-        }}
-        onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && openPad()}
-        onContextMenu={(e) => e.preventDefault()}
-      />
+      <>
+        {homing && (
+          <div className={`reading-mode-notepad-home${homing === "near" ? " near" : ""}`} style={{ left: h.left, top: h.top }} />
+        )}
+        <button
+          type="button"
+          className="reading-mode-notepad"
+          style={{ left: icon.left, top: icon.top }}
+          title="Open the notepad — write with the Pencil (drag to move)"
+          aria-label="Open the notepad"
+          onPointerDown={(e) => {
+            if (e.pointerType === "mouse" && e.button !== 0) return;
+            const start = icon;
+            let to = start;
+            follow(
+              e,
+              (dx, dy) => {
+                to = clampIcon({ left: start.left + dx, top: start.top + dy });
+                setHome(false);
+                setIcon(to);
+                setHoming(near(to) ? "near" : "far");
+              },
+              (ev, moved) => {
+                setHoming(null);
+                if (moved) setHome(near(to));
+                else if (ev.type === "pointerup") openPad();
+              },
+            );
+          }}
+          onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && openPad()}
+          onContextMenu={(e) => e.preventDefault()}
+        />
+      </>
     );
   }
 
@@ -340,6 +376,7 @@ export function ReadingNotepad({ attKey }: { attKey: string }) {
       attKey={attKey}
       kind="floating"
       onBarPointerDown={dragBar}
+      knobSide={dock.side === "left" ? "right" : "left"}
       tools={
         twoUp && (
           <button

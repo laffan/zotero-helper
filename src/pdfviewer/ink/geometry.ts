@@ -139,6 +139,18 @@ export function hitsPaths(paths: number[][], width: number, x: number, y: number
   return false;
 }
 
+/** Is (x, y) inside the loop `poly` (x, y pairs)? Even-odd, as Hush's
+ *  lasso counts it. */
+export function inPolygon(x: number, y: number, poly: number[]): boolean {
+  let inside = false;
+  for (let i = 0, j = poly.length - 2; i + 1 < poly.length; j = i, i += 2) {
+    const xi = poly[i], yi = poly[i + 1];
+    const xj = poly[j], yj = poly[j + 1];
+    if (yi > y !== yj > y && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) inside = !inside;
+  }
+  return inside;
+}
+
 export function translatePaths(paths: number[][], dx: number, dy: number): number[][] {
   return paths.map((p) => p.map((v, i) => round3(v + (i % 2 ? dy : dx))));
 }

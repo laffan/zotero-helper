@@ -6,8 +6,14 @@
 // selection is framed, with Delete above the frame; a drag that starts
 // inside the frame moves it (the Pencil, a finger or the mouse alike),
 // ⌫ deletes it, Escape lets go of it, and so does a press anywhere else
-// — the Pencil then writes at once, as it does in Hush. The lasso is
-// borrowed for the one press: there is no tool to switch back from.
+// — the Pencil then writes at once, as it does in Hush. Held, the lasso
+// is borrowed for the one press; the bar's switch also has it as a tool,
+// when every press of the Pencil or the mouse draws one.
+//
+// What is selected and then leaves the pad by any other way — erased,
+// undone, cleared, changed in another view — leaves the selection too
+// (`prune`, after every change); with nothing left, the frame and its
+// Delete go.
 import { bounds, inPolygon, pathD } from "./geometry";
 import { onPress, TRASH_SVG } from "./links";
 import type { Notepad, NoteLink, NoteStroke } from "./model";
@@ -31,7 +37,7 @@ export function createLasso(layer: HTMLElement, svg: SVGSVGElement, env: LassoEn
   loop.setAttribute("class", "notepad-lasso");
   const frame = document.createElement("div");
   frame.className = "notepad-selection";
-  frame.hidden = true;
+  frame.style.display = "none";
   const bar = document.createElement("div");
   bar.className = "notepad-selection-menu";
   const del = document.createElement("button");
@@ -104,8 +110,8 @@ export function createLasso(layer: HTMLElement, svg: SVGSVGElement, env: LassoEn
       width: `${box[2] - box[0]}px`,
       height: `${box[3] - box[1]}px`,
       transform: "",
+      display: "",
     });
-    frame.hidden = false;
   }
 
   /** Let go of the selection (and any loop being drawn). */
@@ -115,8 +121,18 @@ export function createLasso(layer: HTMLElement, svg: SVGSVGElement, env: LassoEn
     strokes = [];
     links = [];
     box = null;
-    frame.hidden = true;
+    frame.style.display = "none";
     window.removeEventListener("keydown", onKey);
+  }
+
+  /** Keep to what is still on the pad: frame it again, or let go. */
+  function prune(): void {
+    if (!box) return;
+    const pad = env.pad();
+    strokes = strokes.filter((s) => pad.strokes.includes(s));
+    links = links.filter((l) => pad.links.includes(l));
+    if (strokes.length || links.length) showFrame();
+    else clear();
   }
 
   function remove(): void {
@@ -173,6 +189,7 @@ export function createLasso(layer: HTMLElement, svg: SVGSVGElement, env: LassoEn
     drag,
     drop,
     clear,
+    prune,
     remove,
     destroy(): void {
       clear();

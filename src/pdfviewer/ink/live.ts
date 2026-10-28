@@ -32,8 +32,11 @@ export function createLiveLayer(host: HTMLElement, area: HTMLElement) {
   const ctx = canvas.getContext("2d", { desynchronized: true } as CanvasRenderingContext2DSettings)!;
   const cursor = document.createElement("div");
   cursor.className = "pdf-ink-cursor";
-  const marquee = document.createElement("div");
-  marquee.className = "pdf-ink-marquee";
+  // A lasso's loop, being drawn (the select tool, or the pen held still).
+  const lasso = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  lasso.setAttribute("class", "pdf-ink-lasso");
+  const loop = document.createElementNS("http://www.w3.org/2000/svg", "path");
+  lasso.appendChild(loop);
   let dpr = 1;
   // The canvas's place in the viewport, read once per stroke.
   let originX = 0;
@@ -45,7 +48,7 @@ export function createLiveLayer(host: HTMLElement, area: HTMLElement) {
   /** Back the canvas at the viewer's size; a no-op when it already is
    *  (assigning `width` always clears and may reallocate). */
   function attach(): void {
-    if (!canvas.isConnected) host.append(canvas, cursor, marquee);
+    if (!canvas.isConnected) host.append(canvas, cursor, lasso);
     canvas.style.left = `${area.offsetLeft}px`;
     canvas.style.top = `${area.offsetTop}px`;
     canvas.style.width = `${area.clientWidth}px`;
@@ -62,7 +65,7 @@ export function createLiveLayer(host: HTMLElement, area: HTMLElement) {
     canvas.width = canvas.height = 0;
     canvas.remove();
     cursor.remove();
-    marquee.remove();
+    lasso.remove();
   }
 
   function grow(x: number, y: number): void {
@@ -150,21 +153,20 @@ export function createLiveLayer(host: HTMLElement, area: HTMLElement) {
     cursor.style.transform = `translate(${clientX - hr.left - diameter / 2}px, ${clientY - hr.top - diameter / 2}px)`;
   }
 
-  /** The select tool's rectangle, between two client points. */
-  function showMarquee(a: [number, number] | null, b: [number, number] = [0, 0]): void {
-    if (!a || !marquee.isConnected) {
-      marquee.style.display = "none";
+  /** A lasso's loop through client points (x, y pairs), or none. */
+  function showLasso(pts: number[] | null): void {
+    if (!pts || pts.length < 4 || !lasso.isConnected) {
+      lasso.style.display = "none";
       return;
     }
     const hr = host.getBoundingClientRect();
-    marquee.style.display = "block";
-    marquee.style.left = `${Math.min(a[0], b[0]) - hr.left}px`;
-    marquee.style.top = `${Math.min(a[1], b[1]) - hr.top}px`;
-    marquee.style.width = `${Math.abs(b[0] - a[0])}px`;
-    marquee.style.height = `${Math.abs(b[1] - a[1])}px`;
+    let d = "";
+    for (let i = 0; i + 1 < pts.length; i += 2) d += `${i ? "L" : "M"}${pts[i] - hr.left} ${pts[i + 1] - hr.top}`;
+    loop.setAttribute("d", `${d}Z`);
+    lasso.style.display = "block";
   }
 
-  return { attach, detach, begin, extend, finish, clear, showCursor, showMarquee };
+  return { attach, detach, begin, extend, finish, clear, showCursor, showLasso };
 }
 
 export type LiveLayer = ReturnType<typeof createLiveLayer>;

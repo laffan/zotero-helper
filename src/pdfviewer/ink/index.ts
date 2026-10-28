@@ -7,12 +7,13 @@
 // The parts: session.ts holds the drawings and this viewer's changes to
 // them (and writes them once the pen rests), layer.ts draws them on the
 // pages, live.ts draws the stroke still under the pen, input.ts reads
-// the pen, bar.ts is its tools in the bottom bar. A Pencil double-tap
-// (tauri-plugin-pencil, through lib/pencil.ts) switches between the
-// pen and the eraser, whatever the system's Pencil setting; a Pencil
-// Pro's squeeze does what that setting says.
+// the pen, bar.ts is its tools in the bottom bar. The eraser is shared
+// with the notepad (lib/penTool.ts): either one's eraser, or a Pencil
+// double-tap (tauri-plugin-pencil, through lib/pencil.ts), turns it on
+// or off in both, whatever the system's Pencil setting; a Pencil Pro's
+// squeeze set to "switch to previous" goes between the pen and select.
 import { ANNOTATION_COLORS, annotationPosition, type Annotation } from "../../lib/highlights";
-import { pencilOnNotepad } from "../../lib/pencil";
+import { isErasing, setErasing, watchErasing } from "../../lib/penTool";
 import type { PageRecord } from "../types";
 import { createInkBar, loadInkPrefs, saveInkPrefs } from "./bar";
 import {
@@ -104,6 +105,8 @@ export function createInkTool(env: InkEnv) {
   const { writer } = env;
   const prefs = loadInkPrefs();
   let previousTool: InkTool = prefs.tool === "eraser" ? "pen" : prefs.tool;
+  // Erasing is the notepad's too: start as it stands.
+  if (isErasing() !== (prefs.tool === "eraser")) prefs.tool = isErasing() ? "eraser" : previousTool;
   let active = false;
   let sel: { idx: number; keys: string[] } | null = null;
 
@@ -229,6 +232,7 @@ export function createInkTool(env: InkEnv) {
     if (prefs.tool !== "eraser") previousTool = prefs.tool;
     prefs.tool = t;
     saveInkPrefs(prefs);
+    setErasing(t === "eraser");
     if (t !== "select") select(0, []);
     live.showCursor(null);
     syncBar();
@@ -287,7 +291,8 @@ export function createInkTool(env: InkEnv) {
       if (Math.abs(dx) > 0.01 || Math.abs(dy) > 0.01) editSelection((keys) => session.translate(keys, dx, dy));
       else showSelection();
     },
-    sweep: (idx, rect) => select(idx, rect ? session.within(idx, rect).map((a) => a.key) : []),
+    inSelection: (idx, [x, y]) => selectionHas(idx, x, y),
+    sweep: (idx, loop) => select(idx, loop ? session.inLoop(idx, loop).map((a) => a.key) : []),
     pressOutside: () => select(0, []),
   });
 
@@ -308,18 +313,18 @@ export function createInkTool(env: InkEnv) {
     }
   }
 
-  /** A Pencil double-tap: the eraser and back, always — the system's
-   *  "switch to last used tool" would do nothing from the pen, and its
-   *  colour palette has no equivalent here. A squeeze follows the
-   *  system's setting. */
+  /** A Pencil Pro's squeeze set to "switch to previous": the pen and
+   *  the tool before it. (The double-tap, and a squeeze set to the
+   *  eraser, are lib/penTool.ts's, shared with the notepad.) */
   function onPencil(e: Event): void {
     const { kind, action } = (e as CustomEvent<{ kind?: string; action?: string }>).detail ?? {};
-    // The notepad's, when the Pencil was last on it.
-    if (!active || input.busy() || pencilOnNotepad()) return;
-    const back = previousTool === "eraser" ? "pen" : previousTool;
-    if (kind === "tap" || action === "switchEraser") setTool(prefs.tool === "eraser" ? back : "eraser");
-    else if (action === "switchPrevious") setTool(prefs.tool === previousTool ? "pen" : previousTool);
+    if (!active || input.busy() || kind === "tap" || action !== "switchPrevious") return;
+    setTool(prefs.tool === previousTool ? "pen" : previousTool);
   }
+  // The eraser turned on or off elsewhere (the notepad, the double-tap).
+  const unwatchErasing = watchErasing((on) => {
+    if (on !== (prefs.tool === "eraser")) setTool(on ? "eraser" : previousTool === "eraser" ? "pen" : previousTool);
+  });
 
   // A drawing a finger picked up stays selected for the bar's colours
   // and Delete — until the finger turns to the text: a new selection
@@ -367,11 +372,15 @@ export function createInkTool(env: InkEnv) {
   window.addEventListener("pagehide", flushNow);
 
   return {
-    /** The pen's colour and the colours it may take, for reading mode's
-     *  pen flyout — which sets the pen's own colour, not a selection's. */
+    /** The pen's colour and the colours it may take, and its tool, for
+     *  reading mode's pen flyout — which sets the pen's own colour, not a
+     *  selection's. */
     pen: {
       palette: [...ANNOTATION_COLORS, ...INK_EXTRA_COLORS],
       color: () => prefs.color,
+      /** Its tool — the pen, the eraser or the lasso (select). */
+      tool: () => prefs.tool,
+      setTool: (t: InkTool) => setTool(t),
       setColor(c: string): void {
         prefs.color = c;
         saveInkPrefs(prefs);
@@ -418,6 +427,7 @@ export function createInkTool(env: InkEnv) {
       sel = null;
     },
     destroy(): void {
+      unwatchErasing();
       setActive(false);
       session.flush();
       session.destroy();

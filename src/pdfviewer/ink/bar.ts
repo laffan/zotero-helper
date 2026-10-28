@@ -1,5 +1,5 @@
 // Ink mode's tools, in the viewer's bottom bar right after the pen
-// button that turns them on: pen / eraser / select; one chip for the
+// button that turns them on: pen / eraser / select (a lasso); one chip for the
 // colour and width — a dot in the colour, the width as a number — that
 // opens a small popup with Zotero's ink colours (its eight, and black)
 // and a width slider (the eraser's size, with the eraser); undo, redo,
@@ -101,7 +101,7 @@ export function createInkBar(popupHost: HTMLElement, handlers: InkBarHandlers) {
   const tools: Record<InkTool, HTMLButtonElement> = {
     pen: button("pdf-toggle-option", "Pen", PEN_ICON, () => handlers.tool("pen")),
     eraser: button("pdf-toggle-option", "Eraser — or double-tap the Pencil", ERASER_ICON, () => handlers.tool("eraser")),
-    select: button("pdf-toggle-option", "Select drawings: tap one, or drag a box", SELECT_ICON, () => handlers.tool("select")),
+    select: button("pdf-toggle-option", "Lasso: tap a drawing, or draw a loop round several (or hold the pen still)", SELECT_ICON, () => handlers.tool("select")),
   };
   for (const t of Object.keys(tools) as InkTool[]) tools[t].dataset.inkTool = t;
 

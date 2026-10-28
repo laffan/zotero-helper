@@ -7,7 +7,8 @@ export const PEN_ICON = svg(`<path d="M11.2 2.3l2.5 2.5L5.6 12.9l-3.3.8.8-3.3z"/
 
 export const ERASER_ICON = svg(`<path d="M6.2 13.5L2.4 9.7a1 1 0 0 1 0-1.4l5.9-5.9a1 1 0 0 1 1.4 0l3.8 3.8a1 1 0 0 1 0 1.4l-6 5.9z"/><path d="M5 7.1l4.9 4.9"/><path d="M6.2 13.5h7.3"/>`);
 
-export const SELECT_ICON = svg(`<path d="M3 3l3.8 10 1.6-4.3L12.7 7z"/><path d="M8.4 8.7l4 4"/>`);
+/** The select tool, a lasso: a dashed loop with a tail (the notepad's). */
+export const SELECT_ICON = svg(`<ellipse cx="8.5" cy="6.3" rx="5.5" ry="3.8" stroke-dasharray="2.2 1.8"/><path d="M5.2 9.4c-1 .9-1 2.2 0 2.8.9.6.9 1.6.1 2.3"/>`);
 
 export const UNDO_ICON = svg(`<path d="M5.5 3.5L2.5 6.5l3 3"/><path d="M2.5 6.5h7a4 4 0 0 1 0 8H7"/>`);
 

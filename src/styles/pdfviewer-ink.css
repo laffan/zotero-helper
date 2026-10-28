@@ -39,13 +39,23 @@
   pointer-events: none;
   z-index: 5;
 }
-.pdf-ink-marquee {
+/* A lasso's loop being drawn (the select tool, or the pen held still):
+   over the viewer, dashed. */
+.pdf-ink-lasso {
   position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
   display: none;
-  border: 1px dashed #2ea8e5;
-  background: rgb(46 168 229 / 0.08);
+  overflow: visible;
   pointer-events: none;
   z-index: 5;
+}
+.pdf-ink-lasso path {
+  fill: rgb(46 168 229 / 0.08);
+  stroke: #2ea8e5;
+  stroke-width: 1.5;
+  stroke-dasharray: 4 4;
 }
 
 

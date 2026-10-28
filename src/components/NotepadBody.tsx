@@ -3,22 +3,27 @@
 // (ReadingNotepad.tsx) and the notes pane's lower half (NotesPanel.tsx)
 // are both this, sharing one pad.
 //
-// The toolbar, from its left: what the Pencil does, one switch of three
-// parts — write in the theme's ink (black, white in the dark theme),
-// write in red, or erase (the eraser is also the Pencil's double-tap,
-// when the Pencil was last on this pad, and the switch shows it); the
-// colour is this device's choice, shared by every view. Then the quote
-// mark makes a link — press it (the Pencil, a finger or the mouse) and
-// drag onto the pages, a dashed line running from it to the pointer,
-// and let go over a highlight or a spot on a page: a link to it lands
-// on the pad. Beside it, the branch: while it is on the pad follows the
-// PDF, panning to the part about each page as the reader turns to it
-// (off by default in the floating pad, on under the notes; remembered
-// for each). Beside that, the map: a minimap of the whole pad down the
-// canvas's left (minimap.ts; off to begin with, remembered for each
-// view). The host's own tools follow (`tools`); undo is at the right.
-// At the canvas's lower left, a faint trash can clears the pad, once
-// confirmed (undo brings it back).
+// The toolbar, from its left: the branch (two dots joined by a dotted,
+// stepped line) — while it is on the pad follows the PDF, panning to the
+// part about each page as the reader turns to it (off by default in the
+// floating pad, on under the notes; remembered for each). Beside it, the
+// map: a minimap of the whole pad down the canvas's left (minimap.ts;
+// off to begin with, remembered for each view). The host's own tools
+// follow (`tools`). At the right, just before undo, what the Pencil
+// does, one switch of four parts — write in the theme's ink (black,
+// white in the dark theme), write in red, erase, or lasso; the colour
+// is this device's choice, shared by every view, and the eraser is
+// shared with the pages' ink mode (lib/penTool.ts — the Pencil's
+// double-tap turns it on and off in both).
+//
+// The quote knob sits on the pad's edge, at its middle — a round bump
+// in the pad's colour, half outside it, on the side facing the pages
+// (`knobSide`): press it (the Pencil, a finger or the mouse) and drag
+// onto the pages, a dashed line running from it to the pointer, its
+// ring turning the highlight orange, and let go over a highlight or a
+// spot on a page: a link to it lands on the pad. At the canvas's lower
+// left, a faint trash can clears the pad, once confirmed (undo brings it
+// back).
 //
 // Which visit to the page the reader is on is counted here: a stroke
 // joins the note being written only during the same visit
@@ -28,7 +33,7 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { readerPageNow, useReaderPage } from "../lib/outline";
-import { pencilLastOn } from "../lib/pencil";
+import { isErasing, setErasing, watchErasing } from "../lib/penTool";
 import { flushNotepad, notepadChanged, notepadFor, watchNotepad, type Notepad } from "../notepad/model";
 import { createMinimap } from "../notepad/minimap";
 import { createSurface, RED_INK, type NotepadSurface, type PadTool } from "../notepad/surface";
@@ -49,13 +54,20 @@ const EraserIcon = () => (
     <path d="M6.2 13.5h7.3" />
   </svg>
 );
-/** Two dots joined by a stepped line, as a branch is drawn: the pad
- *  linked to the PDF. */
+/** Two dots joined by a dotted, stepped line, as a branch is drawn:
+ *  the pad linked to the PDF. */
 const BranchIcon = () => (
   <svg viewBox="0 0 16 16" width="17" height="17" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-    <circle cx="4" cy="3.8" r="1.9" />
-    <circle cx="12" cy="12.2" r="1.9" />
-    <path d="M4 5.7V8h8v2.3" />
+    <circle cx="12.2" cy="4" r="1.9" />
+    <circle cx="3.8" cy="12" r="1.9" />
+    <path d="M10 4H8v8H6" strokeDasharray="0.1 2.3" />
+  </svg>
+);
+/** A loop with a tail: the lasso. */
+export const LassoIcon = ({ size = 14 }: { size?: number }) => (
+  <svg viewBox="0 0 16 16" width={size} height={size} fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <ellipse cx="8.5" cy="6.3" rx="5.5" ry="3.8" strokeDasharray="2.2 1.8" />
+    <path d="M5.2 9.4c-1 .9-1 2.2 0 2.8.9.6.9 1.6.1 2.3" />
   </svg>
 );
 const MapIcon = () => (
@@ -89,6 +101,8 @@ export interface NotepadBodyProps {
   onBarPointerDown?: (e: React.PointerEvent) => void;
   /** The host's own tools, after the bar's. */
   tools?: React.ReactNode;
+  /** The edge the quote knob sits on: the one facing the pages. */
+  knobSide?: "left" | "right";
   /** At the bar's right. */
   trailing?: React.ReactNode;
 }
@@ -133,7 +147,7 @@ function useFlag(key: string, fallback: boolean): [boolean, (on: boolean) => voi
   return [on, set];
 }
 
-export function NotepadBody({ attKey, kind, onBarPointerDown, tools, trailing }: NotepadBodyProps) {
+export function NotepadBody({ attKey, kind, onBarPointerDown, tools, knobSide = "left", trailing }: NotepadBodyProps) {
   const [follow, setFollow] = useFlag(followKey(kind), kind === "docked");
   const [map, setMap] = useFlag(mapKey(kind), false);
   const [confirming, setConfirming] = useState(false);
@@ -157,6 +171,7 @@ export function NotepadBody({ attKey, kind, onBarPointerDown, tools, trailing }:
   const [tool, setTool] = useState<PadTool>("pen");
   const [color, setColor] = useState(storedColor);
   const [line, setLine] = useState<{ x1: number; y1: number; x2: number; y2: number } | null>(null);
+  const [linking, setLinking] = useState(false);
 
   // The PDF's pad (shared with any other view of it), then the canvas.
   useEffect(() => {
@@ -180,9 +195,13 @@ export function NotepadBody({ attKey, kind, onBarPointerDown, tools, trailing }:
           return p && { ...p, visit: visit.current };
         },
         goTo,
-        toolChanged: setTool,
+        toolChanged: (t) => {
+          setTool(t);
+          setErasing(t === "eraser");
+        },
       });
       surface.setColor(storedColor());
+      surface.setTool(isErasing() ? "eraser" : "pen");
       surfaceRef.current = surface;
       padRef.current = p;
       setReady(true);
@@ -217,19 +236,18 @@ export function NotepadBody({ attKey, kind, onBarPointerDown, tools, trailing }:
     return () => window.removeEventListener("pointerdown", away, true);
   }, [confirming]);
 
-  // The Pencil's double-tap: the eraser and back, when the Pencil was
-  // last on this pad (ink mode's otherwise).
-  useEffect(() => {
-    const onPencil = (e: Event) => {
-      const kind = (e as CustomEvent<{ kind?: string }>).detail?.kind;
-      const host = hostRef.current;
-      const surface = surfaceRef.current;
-      if (kind !== "tap" || !host || !surface || !pencilLastOn(host)) return;
-      surface.setTool(surface.tool() === "eraser" ? "pen" : "eraser");
-    };
-    window.addEventListener("zh-pencil", onPencil);
-    return () => window.removeEventListener("zh-pencil", onPencil);
-  }, []);
+  // The eraser, shared with ink mode: on or off there (or by the
+  // Pencil's double-tap), on or off here.
+  useEffect(
+    () =>
+      watchErasing((on) => {
+        const surface = surfaceRef.current;
+        if (!surface) return;
+        if (on) surface.setTool("eraser");
+        else if (surface.tool() === "eraser") surface.setTool("pen");
+      }),
+    [],
+  );
 
   /** A colour dot: the pen writes in it from now on. */
   const pickColor = (c: string) => {
@@ -241,7 +259,7 @@ export function NotepadBody({ attKey, kind, onBarPointerDown, tools, trailing }:
     }
     const surface = surfaceRef.current;
     surface?.setColor(c);
-    if (surface?.tool() === "eraser") surface.setTool("pen");
+    if (surface && surface.tool() !== "pen") surface.setTool("pen");
   };
 
   function goTo(t: PlaceTarget): void {
@@ -260,6 +278,7 @@ export function NotepadBody({ attKey, kind, onBarPointerDown, tools, trailing }:
     const x0 = e.clientX;
     const y0 = e.clientY;
     let moved = false;
+    setLinking(true);
     const move = (ev: PointerEvent) => {
       moved ||= Math.hypot(ev.clientX - x0, ev.clientY - y0) > 4;
       if (moved) setLine({ x1, y1, x2: ev.clientX, y2: ev.clientY });
@@ -269,6 +288,7 @@ export function NotepadBody({ attKey, kind, onBarPointerDown, tools, trailing }:
       window.removeEventListener("pointerup", up);
       window.removeEventListener("pointercancel", up);
       setLine(null);
+      setLinking(false);
       if (!moved || ev.type === "pointercancel") return;
       const target = readerPlaceAt(ev.clientX, ev.clientY);
       if (target) surfaceRef.current?.addLink(target);
@@ -281,45 +301,6 @@ export function NotepadBody({ attKey, kind, onBarPointerDown, tools, trailing }:
   return (
     <>
       <div className="notepad-bar">
-        <div className="notepad-modes" role="radiogroup" aria-label="What the Pencil does">
-          {PEN_COLORS.map((c) => {
-            const on = tool === "pen" && c.color === color;
-            return (
-              <button
-                key={c.color || "ink"}
-                type="button"
-                role="radio"
-                className={on ? "notepad-mode on" : "notepad-mode"}
-                title={c.label}
-                aria-label={c.label}
-                aria-checked={on}
-                onClick={() => pickColor(c.color)}
-              >
-                <span className="notepad-mode-dot" style={c.color ? ({ "--swatch": c.color } as React.CSSProperties) : undefined} />
-              </button>
-            );
-          })}
-          <button
-            type="button"
-            role="radio"
-            className={tool === "eraser" ? "notepad-mode on" : "notepad-mode"}
-            title="Erase (the Pencil's double-tap)"
-            aria-label="Erase"
-            aria-checked={tool === "eraser"}
-            onClick={() => surfaceRef.current?.setTool("eraser")}
-          >
-            <EraserIcon />
-          </button>
-        </div>
-        <button
-          type="button"
-          className="notepad-tool notepad-link-btn"
-          title="Quote — drag onto a highlight or a place on the page"
-          aria-label="Link to a highlight or a place in the PDF"
-          onPointerDown={startLink}
-        >
-          <QuoteIcon />
-        </button>
         <button
           type="button"
           className={follow ? "notepad-tool active" : "notepad-tool"}
@@ -342,6 +323,47 @@ export function NotepadBody({ attKey, kind, onBarPointerDown, tools, trailing }:
         </button>
         {tools}
         <div className="notepad-bar-grab" onPointerDown={onBarPointerDown} />
+        <div className="notepad-modes" role="radiogroup" aria-label="What the Pencil does">
+          {PEN_COLORS.map((c) => {
+            const on = tool === "pen" && c.color === color;
+            return (
+              <button
+                key={c.color || "ink"}
+                type="button"
+                role="radio"
+                className={on ? "notepad-mode on" : "notepad-mode"}
+                title={c.label}
+                aria-label={c.label}
+                aria-checked={on}
+                onClick={() => pickColor(c.color)}
+              >
+                <span className="notepad-mode-dot" style={c.color ? ({ "--swatch": c.color } as React.CSSProperties) : undefined} />
+              </button>
+            );
+          })}
+          <button
+            type="button"
+            role="radio"
+            className={tool === "eraser" ? "notepad-mode on" : "notepad-mode"}
+            title="Erase (the Pencil's double-tap) — the pages' pen erases too"
+            aria-label="Erase"
+            aria-checked={tool === "eraser"}
+            onClick={() => surfaceRef.current?.setTool("eraser")}
+          >
+            <EraserIcon />
+          </button>
+          <button
+            type="button"
+            role="radio"
+            className={tool === "lasso" ? "notepad-mode on" : "notepad-mode"}
+            title="Lasso — draw a loop round what to select (or hold the Pencil still)"
+            aria-label="Lasso"
+            aria-checked={tool === "lasso"}
+            onClick={() => surfaceRef.current?.setTool("lasso")}
+          >
+            <LassoIcon />
+          </button>
+        </div>
         <button
           type="button"
           className="notepad-tool notepad-undo"
@@ -354,6 +376,15 @@ export function NotepadBody({ attKey, kind, onBarPointerDown, tools, trailing }:
         </button>
         {trailing}
       </div>
+      <button
+        type="button"
+        className={`notepad-link-knob notepad-link-knob-${knobSide}${linking ? " linking" : ""}`}
+        title="Quote — drag onto a highlight or a place on the page"
+        aria-label="Link to a highlight or a place in the PDF"
+        onPointerDown={startLink}
+      >
+        <QuoteIcon />
+      </button>
       <div className={map ? "notepad-main with-map" : "notepad-main"}>
         {map && <div className="notepad-minimap" ref={mapRef} />}
         <div className="notepad-canvas" ref={hostRef} />

@@ -18,13 +18,6 @@
   border: 1px solid var(--border);
   border-radius: 10px;
   box-shadow: 0 10px 34px rgb(0 0 0 / 0.28);
-  /* The quote knob reaches out over its edge; the canvas keeps to the
-     rounded corners itself. */
-  overflow: visible;
-}
-.notepad-floating .notepad-main {
-  overflow: hidden;
-  border-radius: 0 0 10px 10px;
 }
 /* Grown out of its icon and shrunk back into it (ReadingNotepad.tsx
    `morph`): scaled from its top left. */
@@ -121,26 +114,22 @@
   background: var(--swatch, var(--notepad-ink));
   box-shadow: 0 0 0 1px color-mix(in srgb, var(--text-dim) 45%, transparent);
 }
-/* The quote knob: a round bump in the pad's colour on its edge, at its
-   top, level with the bar — half outside the pad, on the side facing the pages — with a
-   grey ring set a little in, which turns the highlight orange while a
-   link is being drawn out. The quote mark in the reading-mode red. */
-.notepad-link-knob {
-  position: absolute;
-  z-index: 4;
-  /* Level with the bar (its tools are 28px tall, 4px in). */
-  top: 1px;
+/* The quote button: round, at the bar's left, ringed (set a little in)
+   in the highlight orange, the ring stronger while a link is drawn out
+   of it; the quote mark in the reading-mode red. */
+.notepad-quote-btn {
   display: inline-flex;
+  flex-shrink: 0;
   align-items: center;
   justify-content: center;
-  width: 34px;
-  height: 34px;
+  width: 28px;
+  height: 28px;
+  margin-right: 4px;
   padding: 0;
   border: none;
   border-radius: 50%;
-  background: var(--panel);
-  box-shadow: inset 0 0 0 3px var(--panel), inset 0 0 0 4.5px color-mix(in srgb, var(--text-dim) 55%, transparent),
-    0 1px 4px rgb(0 0 0 / 0.16);
+  background: transparent;
+  box-shadow: inset 0 0 0 2px var(--panel), inset 0 0 0 3.5px #f19837;
   color: #ff5f57;
   cursor: grab;
   touch-action: none;
@@ -148,42 +137,13 @@
   -webkit-user-select: none;
   user-select: none;
 }
-.notepad-link-knob svg {
-  width: 14px;
-  height: 14px;
+.notepad-quote-btn svg {
+  width: 13px;
+  height: 13px;
 }
-.notepad-floating .notepad-link-knob,
-.notepad-edge .notepad-link-knob {
-  border: 1px solid var(--border);
-}
-.notepad-floating .notepad-link-knob {
-  background: color-mix(in srgb, var(--panel) 90%, transparent);
-}
-.notepad-link-knob-left {
-  left: -17px;
-}
-.notepad-link-knob-right {
-  right: -17px;
-}
-.notepad-link-knob.linking {
-  box-shadow: inset 0 0 0 3px var(--panel), inset 0 0 0 5px #f19837, 0 1px 4px rgb(0 0 0 / 0.16);
-}
-/* Under the notes the pane clips what leaves it: the knob sits just
-   inside the pad's edge. */
-.notepad-docked .notepad-link-knob-left {
-  left: 4px;
-}
-/* The bar keeps clear of the knob at its end. */
-.notepad-floating .notepad-bar-knob-left,
-.notepad-edge .notepad-bar-knob-left {
-  padding-left: 20px;
-}
-.notepad-floating .notepad-bar-knob-right,
-.notepad-edge .notepad-bar-knob-right {
-  padding-right: 20px;
-}
-.notepad-docked .notepad-bar-knob-left {
-  padding-left: 42px;
+.notepad-quote-btn.linking {
+  background: color-mix(in srgb, #f19837 16%, transparent);
+  box-shadow: inset 0 0 0 1.5px var(--panel), inset 0 0 0 4px #f19837;
 }
 .notepad-undo {
   color: var(--accent);

@@ -4,12 +4,11 @@
 // down the window's left edge, that can be dragged anywhere — and back
 // home: while it is dragged, its home shows as a dashed ring, and let go
 // near it, it settles there. A tap on the icon opens the pad out of it,
-// growing from the icon to its full size, as if the icon were the pad
-// in miniature; closing it shrinks it back into the icon. The pad opens
-// with the corner facing away from the window's middle at the icon (its
-// top right, for an icon at the top right), and closing it — moved or
-// not — leaves the icon at that same corner of where it was, so the two
-// keep to one place. Open, the icon is hidden; closed, the pad is.
+// growing from the icon to its own place and size, as if the icon were
+// the pad in miniature; closing it shrinks it back into the icon. The
+// two keep their places apart: the pad opens where it was last left, and
+// the icon stays where it was put. Open, the icon is hidden; closed, the
+// pad is.
 //
 // The pad floats: the bar's empty middle drags it about, the dotted
 // circle at its corner sizes it. Or it docks: let go with the pointer at
@@ -20,8 +19,9 @@
 // again. Where the icon and the pad sit is this device's.
 //
 // Auto-shift: with two pages side by side ("Fit 2 pages", the store's
-// `twoUp`), a button in the pad's bar — two pages side by side, one
-// dashed — on or off (this device's), makes the pad keep out of the way: a press on the pages on
+// `twoUp`), a button in the pad's bar — two pages side by side, the left
+// filled, an arrow from it to the right — on or off (this device's),
+// makes the pad keep out of the way: a press on the pages on
 // the pad's side of the window — the Pencil's or a finger's — slides it
 // to the same place on the other side (a docked pad changes edges, once
 // the press is over, since the pages are laid out again). One pad per
@@ -90,9 +90,7 @@ function clampBox(b: Box): Box {
   return {
     width,
     height,
-    // Clear of the window's left edge by the quote knob's half, which
-    // reaches out over the pad's left edge.
-    left: Math.max(20, Math.min(b.left, window.innerWidth - width - 8)),
+    left: Math.max(8, Math.min(b.left, window.innerWidth - width - 8)),
     top: Math.max(8, Math.min(b.top, window.innerHeight - height - 8)),
   };
 }
@@ -100,22 +98,6 @@ const clampIcon = (s: Spot): Spot => ({
   left: Math.max(0, Math.min(s.left, window.innerWidth - ICON)),
   top: Math.max(0, Math.min(s.top, window.innerHeight - ICON)),
 });
-
-/** Which of the pad's corners is at the icon: the one facing away from
- *  the window's middle, as the icon is placed. */
-type Corner = { right: boolean; below: boolean };
-const cornerOf = (i: Spot): Corner => ({
-  right: i.left + ICON / 2 > window.innerWidth / 2,
-  below: i.top + ICON / 2 > window.innerHeight / 2,
-});
-/** The pad's box opened from the icon, that corner at it. */
-function boxAtIcon(b: Box, i: Spot, c: Corner): Box {
-  return clampBox({ ...b, left: c.right ? i.left + ICON - b.width : i.left, top: c.below ? i.top + ICON - b.height : i.top });
-}
-/** …and the icon where a pad at `b` closes into: the same corner. */
-function iconAtBox(b: Box, c: Corner): Spot {
-  return clampIcon({ left: c.right ? b.left + b.width - ICON : b.left, top: c.below ? b.top + b.height - ICON : b.top });
-}
 
 /** The pad grown out of `from` (the icon) to where it is — or, with
  *  `back`, shrunk into it. */
@@ -172,11 +154,14 @@ const storedDock = () =>
 
 const clampWidth = (w: number) => Math.round(Math.max(240, Math.min(w, window.innerWidth * 0.6)));
 
-/** Two pages side by side, one dashed: the pad keeps to the other. */
+/** Two pages side by side, the left one filled, an arrow from it to the
+ *  right one: the pad moves across to the other page. */
 const ShiftIcon = () => (
-  <svg viewBox="0 0 16 16" width="17" height="17" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" aria-hidden="true">
-    <rect x="1.8" y="2.5" width="5.4" height="11" rx="1" />
-    <rect x="8.8" y="2.5" width="5.4" height="11" rx="1" strokeDasharray="1.8 1.4" />
+  <svg viewBox="0 0 16 16" width="17" height="17" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <rect x="1.5" y="2.5" width="5.2" height="11" rx="1" fill="currentColor" fillOpacity="0.35" />
+    <rect x="9.3" y="2.5" width="5.2" height="11" rx="1" />
+    <path d="M4.1 8h7.6" />
+    <path d="M10.3 6.6L11.9 8l-1.6 1.4" />
   </svg>
 );
 
@@ -197,9 +182,6 @@ export function ReadingNotepad({ attKey }: { attKey: string }) {
   const [preview, setPreview] = useState<Side | null>(null);
   const padRef = useRef<HTMLDivElement>(null);
   const closing = useRef(false);
-  // The pad's corner at the icon, chosen as it opens: it closes back
-  // into that corner, wherever it has been moved.
-  const corner = useRef(cornerOf(icon));
 
   useEffect(() => keep(BOX_KEY, box), [box]);
   useEffect(() => keep(DOCK_KEY, dock), [dock]);
@@ -235,24 +217,13 @@ export function ReadingNotepad({ attKey }: { attKey: string }) {
     if (open && padRef.current) morph(padRef.current, { ...icon, width: ICON, height: ICON }, false);
   }, [open]);
 
-  const openPad = () => {
-    corner.current = cornerOf(icon);
-    if (!dock.side) setBox((b) => boxAtIcon(b, icon, corner.current));
-    useStore.getState().setNotepadOpen(true);
-  };
+  const openPad = () => useStore.getState().setNotepadOpen(true);
 
-  /** Shrink the pad into the icon — moved to the pad's corner, for a
-   *  floating pad — and close it. */
+  /** Shrink the pad into the icon, where it is, and close it. */
   const close = () => {
     const el = padRef.current;
     if (closing.current) return;
-    const to = dock.side ? icon : iconAtBox(box, corner.current);
-    // Back home, if that is where it closes to.
-    const h = homeSpot();
-    if (!(home && Math.hypot(to.left - h.left, to.top - h.top) < 2)) {
-      setHome(false);
-      setIcon(to);
-    }
+    const to = icon;
     const done = () => {
       closing.current = false;
       useStore.getState().setNotepadOpen(false);
@@ -376,7 +347,6 @@ export function ReadingNotepad({ attKey }: { attKey: string }) {
       attKey={attKey}
       kind="floating"
       onBarPointerDown={dragBar}
-      knobSide={dock.side === "left" ? "right" : "left"}
       tools={
         twoUp && (
           <button

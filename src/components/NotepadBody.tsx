@@ -3,13 +3,14 @@
 // (ReadingNotepad.tsx) and the notes pane's lower half (NotesPanel.tsx)
 // are both this, sharing one pad.
 //
-// The toolbar, from its left: the scroll lock (a lock between arrows up
-// and down) — while it is on the pad follows the PDF, panning to the
-// part about each page as the reader turns to it (off by default in the
-// floating pad, on under the notes; remembered for each). Beside it, the
-// map: a minimap of the whole pad down the canvas's left (minimap.ts;
-// off to begin with, remembered for each view). The host's own tools
-// follow (`tools`). At the right, just before undo, what the Pencil
+// The toolbar, from its left: the quote button, then the host's own
+// tools (`tools` — reading mode's auto-shift), the map — a minimap of
+// the whole pad down the canvas's left (minimap.ts; off to begin with,
+// remembered for each view) — and the scroll link (an arrow up and down
+// with two bars across it): while it is on the pad follows the PDF,
+// panning to the part about each page as the reader turns to it (off by
+// default in the floating pad, on under the notes; remembered for
+// each). At the right, just before undo, what the Pencil
 // does, one switch of four parts — write in the theme's ink (black,
 // white in the dark theme), write in red, erase, or lasso; the colour
 // is this device's choice, shared by every view, and the eraser is
@@ -17,12 +18,11 @@
 // double-tap turns it on and off in both). A press held still borrows
 // the lasso, and the switch shows the lasso while its loop is drawn.
 //
-// The quote knob sits on the pad's edge, at its top — a round bump
-// in the pad's colour, half outside it, on the side facing the pages
-// (`knobSide`): press it (the Pencil, a finger or the mouse) and drag
-// onto the pages, a dashed line running from it to the pointer, its
-// ring turning the highlight orange, and let go over a highlight or a
-// spot on a page: a link to it lands on the pad. At the canvas's lower
+// The quote button is round, ringed in the highlight orange: press it
+// (the Pencil, a finger or the mouse) and drag onto the pages, a dashed
+// line running from it to the pointer, its ring stronger as it goes,
+// and let go over a highlight or a spot on a page: a link to it lands
+// on the pad. At the canvas's lower
 // left, a faint trash can clears the pad, once confirmed (undo brings it
 // back).
 //
@@ -55,14 +55,14 @@ const EraserIcon = () => (
     <path d="M6.2 13.5h7.3" />
   </svg>
 );
-/** A lock between an arrow up and an arrow down: the pad's scrolling
- *  locked to the PDF's. */
-const ScrollLockIcon = () => (
-  <svg viewBox="0 0 16 16" width="17" height="17" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-    <path d="M6.4 2.6L8 1.1l1.6 1.5" />
-    <path d="M6.4 13.4L8 14.9l1.6-1.5" />
-    <rect x="4.6" y="7.2" width="6.8" height="4.8" rx="1" />
-    <path d="M6.2 7.2V5.9a1.8 1.8 0 0 1 3.6 0v1.3" />
+/** An arrow pointing up and down, two bars across its middle: the
+ *  pad's scrolling linked to the PDF's. */
+const ScrollLinkIcon = () => (
+  <svg viewBox="0 0 16 16" width="17" height="17" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M8 1.8v12.4" />
+    <path d="M5.6 4.2L8 1.8l2.4 2.4" />
+    <path d="M5.6 11.8L8 14.2l2.4-2.4" />
+    <path d="M5.2 7h5.6M5.2 9h5.6" />
   </svg>
 );
 /** A loop with a tail: the lasso. */
@@ -103,8 +103,6 @@ export interface NotepadBodyProps {
   onBarPointerDown?: (e: React.PointerEvent) => void;
   /** The host's own tools, after the bar's. */
   tools?: React.ReactNode;
-  /** The edge the quote knob sits on: the one facing the pages. */
-  knobSide?: "left" | "right";
   /** At the bar's right. */
   trailing?: React.ReactNode;
 }
@@ -149,7 +147,7 @@ function useFlag(key: string, fallback: boolean): [boolean, (on: boolean) => voi
   return [on, set];
 }
 
-export function NotepadBody({ attKey, kind, onBarPointerDown, tools, knobSide = "left", trailing }: NotepadBodyProps) {
+export function NotepadBody({ attKey, kind, onBarPointerDown, tools, trailing }: NotepadBodyProps) {
   const [follow, setFollow] = useFlag(followKey(kind), kind === "docked");
   const [map, setMap] = useFlag(mapKey(kind), false);
   const [confirming, setConfirming] = useState(false);
@@ -307,17 +305,17 @@ export function NotepadBody({ attKey, kind, onBarPointerDown, tools, knobSide = 
 
   return (
     <>
-      <div className={`notepad-bar notepad-bar-knob-${knobSide}`}>
+      <div className="notepad-bar">
         <button
           type="button"
-          className={follow ? "notepad-tool active" : "notepad-tool"}
-          title={follow ? "Following the PDF — the pad shows the part about the page in view" : "Follow the PDF as it scrolls"}
-          aria-label="Follow the PDF"
-          aria-pressed={follow}
-          onClick={() => setFollow(!follow)}
+          className={linking ? "notepad-quote-btn linking" : "notepad-quote-btn"}
+          title="Quote — drag onto a highlight or a place on the page"
+          aria-label="Link to a highlight or a place in the PDF"
+          onPointerDown={startLink}
         >
-          <ScrollLockIcon />
+          <QuoteIcon />
         </button>
+        {tools}
         <button
           type="button"
           className={map ? "notepad-tool active" : "notepad-tool"}
@@ -328,7 +326,16 @@ export function NotepadBody({ attKey, kind, onBarPointerDown, tools, knobSide = 
         >
           <MapIcon />
         </button>
-        {tools}
+        <button
+          type="button"
+          className={follow ? "notepad-tool active" : "notepad-tool"}
+          title={follow ? "Following the PDF — the pad shows the part about the page in view" : "Follow the PDF as it scrolls"}
+          aria-label="Follow the PDF"
+          aria-pressed={follow}
+          onClick={() => setFollow(!follow)}
+        >
+          <ScrollLinkIcon />
+        </button>
         <div className="notepad-bar-grab" onPointerDown={onBarPointerDown} />
         <div className="notepad-modes" role="radiogroup" aria-label="What the Pencil does">
           {PEN_COLORS.map((c) => {
@@ -383,15 +390,6 @@ export function NotepadBody({ attKey, kind, onBarPointerDown, tools, knobSide = 
         </button>
         {trailing}
       </div>
-      <button
-        type="button"
-        className={`notepad-link-knob notepad-link-knob-${knobSide}${linking ? " linking" : ""}`}
-        title="Quote — drag onto a highlight or a place on the page"
-        aria-label="Link to a highlight or a place in the PDF"
-        onPointerDown={startLink}
-      >
-        <QuoteIcon />
-      </button>
       <div className={map ? "notepad-main with-map" : "notepad-main"}>
         {map && <div className="notepad-minimap" ref={mapRef} />}
         <div className="notepad-canvas" ref={hostRef} />

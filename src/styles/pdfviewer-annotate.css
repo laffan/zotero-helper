@@ -128,10 +128,12 @@
   }
 }
 
+/* As wide as its row of colours needs, spaced as in the selection bar:
+   eight swatches, 8px apart (finger-sized on a touch screen, below). */
 .pdf-annot-popover {
   position: absolute;
   z-index: 40;
-  width: 195px;
+  width: 202px;
   padding: 8px;
   border: 1px solid var(--border);
   border-radius: 6px;
@@ -139,6 +141,11 @@
   box-shadow: 0 3px 14px rgb(0 0 0 / 0.25);
   font-size: calc(10px * var(--font-scale));
   color: var(--text);
+}
+@media (hover: none) {
+  .pdf-annot-popover {
+    width: 242px;
+  }
 }
 .pdf-annot-popover-colors {
   display: flex;

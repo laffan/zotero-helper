@@ -763,7 +763,8 @@ size, and the renderer rasterises at the resulting scale.
 above the passage (below it only when the passage starts at the top
 of the view), on iPad as on the Mac:
 Zotero's eight colours (5px further apart than the bar's other items,
-for a finger), a highlight / underline switch beside them
+for a finger; the highlight editor is wide enough for them so spaced —
+202px, 242px with a touch screen's larger swatches), a highlight / underline switch beside them
 (remembered between selections), then three icons — Copy (the text),
 Add to notes (a quote with a link to its page; the Highlights tab's two
 icons) and, with an AI service connected, Look up (see AI) — and the
@@ -1278,13 +1279,10 @@ again (kept on this device, `zh-notepad-icon-2` and
 `zh-notepad-icon-home`). A tap opens the pad
 out of it: the pad grows from the icon's box to its own (`morph`, the
 Web Animations API, 260ms), and closing shrinks it back into the icon;
-while the pad is open the icon is hidden. The pad opens with the corner
-facing away from the window's middle at the icon (its top right for an
-icon at the top right; `cornerOf` / `boxAtIcon`), and closes back into
-that same corner of wherever it has been moved (`iconAtBox`), so the
-icon and the pad keep to one place. A floating pad keeps 20px clear of
-the window's left edge, for the quote knob's half that reaches out over
-its own. Four-fifths of the window's height
+while the pad is open the icon is hidden. The two keep their places
+apart: the pad opens where it was last left, whatever the icon's
+place, and closing it leaves the icon where it was put. Four-fifths of
+the window's height
 to begin with, its background 90% opaque so the pages show through
 faintly; the bar's empty middle drags it, a dotted circle at its corner
 sizes it. Let go with the pointer at the window's left or right edge (a
@@ -1307,7 +1305,8 @@ change; where it sits, its size and the dock are kept on this device.
 **Auto-shift.** With two pages side by side — "Fit 2 pages", outside
 the folded view, which the viewer reports as the store's `twoUp`
 (`onTwoUp`) — the pad's bar gains a button of two pages side by side,
-one drawn dashed, on or off (`zh-notepad-autoshift`). On, a press on the pages on
+the left one filled, an arrow from its middle to the right one's, on or
+off (`zh-notepad-autoshift`). On, a press on the pages on
 the pad's half of the window — the Pencil's or a finger's; not on the
 pad itself — slides the pad to the same place on the other half
 (`left` mirrored, a 0.3s slide), so it keeps to the page not being
@@ -1320,8 +1319,9 @@ divider, dragged to share the height, with Hide Notepad at its middle.
 
 Either way it is one continuous surface in the panel's colour: a slim
 bar of tools over the canvas — a very faint dot grid, which pans with
-it. From the bar's left: the scroll lock (following the PDF), the map, the
-host's own tools (auto-shift), the empty middle; then, just before
+it. From the bar's left: the quote button, the host's own tools
+(auto-shift), the map, the scroll link (following the PDF), the empty
+middle; then, just before
 undo and the host's close, one switch of four parts saying what the
 Pencil does: write in the ink of the theme — black, white in the dark
 theme (`--notepad-ink`; such a stroke is kept with no colour, so it
@@ -1329,13 +1329,9 @@ follows the appearance) — write in red, the reading-mode red
 (`RED_INK`, `#ff5f57`, kept with the stroke), erase, or lasso. The
 colour is this device's (`zh-notepad-pen-color`), shared by every view.
 
-The quote knob sits on the pad's edge at its top, level with the bar
-(which keeps clear of it), half outside it,
-on the side facing the pages (the left; the right for a pad docked at
-the window's left; just inside the edge under the notes, whose pane
-clips what leaves it): a round bump in the pad's colour with a grey
-ring set a little in, which turns the highlight orange (`#f19837`)
-while a link is being drawn out of it.
+The quote button is round, ringed (set a little in) in the highlight
+orange (`#f19837`); while a link is drawn out of it the ring is
+stronger and the button tinted.
 
 On the canvas the Pencil writes — a tap is a dot — a finger pans, and a
 mouse writes with a drag (a Mac has no Pencil) while a wheel pans; each
@@ -1382,7 +1378,8 @@ A note remembers where in the PDF the reader was when it began — the
 page at the view's centre and the height a quarter of the way down the
 view (`placeInView` in `pdfviewer/places.ts`) — and shows that page,
 small, above it; a finger tap (or a click) on a note goes back there.
-The scroll lock (a lock between an arrow up and an arrow down) makes the pad
+The scroll link (an arrow pointing up and down, two bars across its
+middle) makes the pad
 follow the PDF: as the reader turns pages it glides to the part of the
 pad about the page in view — the top of its notes and links, or for a
 page with none, between those of the pages before and after it as far
@@ -1391,7 +1388,7 @@ along as the page is, or just under the last (`spotFor` in
 is read. It starts off in the floating pad and on under the notes, and
 each view remembers its own.
 
-The quote knob makes a link (`links.ts`): pressed and dragged out onto
+The quote button makes a link (`links.ts`): pressed and dragged out onto
 the pages, a dashed line running from it to the pointer, and let go
 over a highlight or a spot on a page (`placeAtPoint`), it puts a link on
 the pad — a link icon and "p. 12", or the whole of the highlight's text

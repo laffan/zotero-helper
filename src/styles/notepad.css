@@ -122,19 +122,19 @@
   box-shadow: 0 0 0 1px color-mix(in srgb, var(--text-dim) 45%, transparent);
 }
 /* The quote knob: a round bump in the pad's colour on its edge, at its
-   middle — half outside the pad, on the side facing the pages — with a
+   top, level with the bar — half outside the pad, on the side facing the pages — with a
    grey ring set a little in, which turns the highlight orange while a
    link is being drawn out. The quote mark in the reading-mode red. */
 .notepad-link-knob {
   position: absolute;
   z-index: 4;
-  top: 50%;
+  /* Level with the bar (its tools are 28px tall, 4px in). */
+  top: 1px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   width: 34px;
   height: 34px;
-  margin-top: -17px;
   padding: 0;
   border: none;
   border-radius: 50%;
@@ -172,6 +172,18 @@
    inside the pad's edge. */
 .notepad-docked .notepad-link-knob-left {
   left: 4px;
+}
+/* The bar keeps clear of the knob at its end. */
+.notepad-floating .notepad-bar-knob-left,
+.notepad-edge .notepad-bar-knob-left {
+  padding-left: 20px;
+}
+.notepad-floating .notepad-bar-knob-right,
+.notepad-edge .notepad-bar-knob-right {
+  padding-right: 20px;
+}
+.notepad-docked .notepad-bar-knob-left {
+  padding-left: 42px;
 }
 .notepad-undo {
   color: var(--accent);

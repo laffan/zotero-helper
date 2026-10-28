@@ -191,9 +191,10 @@
 }
 
 /* --- reading mode's page picker (readingProgress.ts): the thumbnail
-   grid as a popup over the pages, the outline as a column at its left --- */
+   grid as a popup over the pages, the outline as a column at its left;
+   over the notepad (notepad.css, 65) and reading mode's buttons too --- */
 .pdf-thumbnail-overlay.pdf-thumb-picker {
-  z-index: 55;
+  z-index: 66;
   align-items: center;
   justify-content: center;
   background: rgb(0 0 0 / 0.35);

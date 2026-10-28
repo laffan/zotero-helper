@@ -86,6 +86,8 @@ export interface InkInputEnv {
   sweep: (pageIndex: number, loop: number[] | null) => void;
   /** A press off the pages. */
   pressOutside: () => void;
+  /** The pen held still has borrowed the lasso (on), or let it go. */
+  lassoBorrowed?: (on: boolean) => void;
 }
 
 interface Gesture {
@@ -108,6 +110,8 @@ interface Gesture {
    *  drawn (client px). */
   hold: number;
   loop: number[];
+  /** The lasso was borrowed by holding the pen still. */
+  borrowed?: boolean;
 }
 
 export function attachInkInput(env: InkInputEnv) {
@@ -217,6 +221,8 @@ export function attachInkInput(env: InkInputEnv) {
     gs.mode = "select";
     gs.grabbed = false;
     gs.loop = [...gs.startClient];
+    gs.borrowed = true;
+    env.lassoBorrowed?.(true);
   }
 
   /** End a gesture left open — its end was lost — where it last was. */
@@ -328,6 +334,7 @@ export function attachInkInput(env: InkInputEnv) {
         for (let i = 0; i + 1 < gs.loop.length; i += 2) loop.push(...toPdf(gs, gs.loop[i], gs.loop[i + 1]));
         // A tap (or a loop too small to hold anything) selects nothing.
         env.sweep(gs.idx, gs.loop.length < 8 ? null : loop);
+        if (gs.borrowed) env.lassoBorrowed?.(false);
       }
     }
   }

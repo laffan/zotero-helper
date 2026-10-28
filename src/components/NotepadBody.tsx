@@ -3,8 +3,8 @@
 // (ReadingNotepad.tsx) and the notes pane's lower half (NotesPanel.tsx)
 // are both this, sharing one pad.
 //
-// The toolbar, from its left: the branch (two dots joined by a dotted,
-// stepped line) — while it is on the pad follows the PDF, panning to the
+// The toolbar, from its left: the scroll lock (a lock between arrows up
+// and down) — while it is on the pad follows the PDF, panning to the
 // part about each page as the reader turns to it (off by default in the
 // floating pad, on under the notes; remembered for each). Beside it, the
 // map: a minimap of the whole pad down the canvas's left (minimap.ts;
@@ -14,9 +14,10 @@
 // white in the dark theme), write in red, erase, or lasso; the colour
 // is this device's choice, shared by every view, and the eraser is
 // shared with the pages' ink mode (lib/penTool.ts — the Pencil's
-// double-tap turns it on and off in both).
+// double-tap turns it on and off in both). A press held still borrows
+// the lasso, and the switch shows the lasso while its loop is drawn.
 //
-// The quote knob sits on the pad's edge, at its middle — a round bump
+// The quote knob sits on the pad's edge, at its top — a round bump
 // in the pad's colour, half outside it, on the side facing the pages
 // (`knobSide`): press it (the Pencil, a finger or the mouse) and drag
 // onto the pages, a dashed line running from it to the pointer, its
@@ -54,13 +55,14 @@ const EraserIcon = () => (
     <path d="M6.2 13.5h7.3" />
   </svg>
 );
-/** Two dots joined by a dotted, stepped line, as a branch is drawn:
- *  the pad linked to the PDF. */
-const BranchIcon = () => (
-  <svg viewBox="0 0 16 16" width="17" height="17" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-    <circle cx="12.2" cy="4" r="1.9" />
-    <circle cx="3.8" cy="12" r="1.9" />
-    <path d="M10 4H8v8H6" strokeDasharray="0.1 2.3" />
+/** A lock between an arrow up and an arrow down: the pad's scrolling
+ *  locked to the PDF's. */
+const ScrollLockIcon = () => (
+  <svg viewBox="0 0 16 16" width="17" height="17" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M6.4 2.6L8 1.1l1.6 1.5" />
+    <path d="M6.4 13.4L8 14.9l1.6-1.5" />
+    <rect x="4.6" y="7.2" width="6.8" height="4.8" rx="1" />
+    <path d="M6.2 7.2V5.9a1.8 1.8 0 0 1 3.6 0v1.3" />
   </svg>
 );
 /** A loop with a tail: the lasso. */
@@ -169,6 +171,10 @@ export function NotepadBody({ attKey, kind, onBarPointerDown, tools, knobSide = 
   const [ready, setReady] = useState(false);
   const [canUndo, setCanUndo] = useState(false);
   const [tool, setTool] = useState<PadTool>("pen");
+  // A press held still has borrowed the lasso: the switch shows it for
+  // as long as the loop is being drawn.
+  const [borrowed, setBorrowed] = useState(false);
+  const shown: PadTool = borrowed ? "lasso" : tool;
   const [color, setColor] = useState(storedColor);
   const [line, setLine] = useState<{ x1: number; y1: number; x2: number; y2: number } | null>(null);
   const [linking, setLinking] = useState(false);
@@ -199,6 +205,7 @@ export function NotepadBody({ attKey, kind, onBarPointerDown, tools, knobSide = 
           setTool(t);
           setErasing(t === "eraser");
         },
+        lassoBorrowed: setBorrowed,
       });
       surface.setColor(storedColor());
       surface.setTool(isErasing() ? "eraser" : "pen");
@@ -300,7 +307,7 @@ export function NotepadBody({ attKey, kind, onBarPointerDown, tools, knobSide = 
 
   return (
     <>
-      <div className="notepad-bar">
+      <div className={`notepad-bar notepad-bar-knob-${knobSide}`}>
         <button
           type="button"
           className={follow ? "notepad-tool active" : "notepad-tool"}
@@ -309,7 +316,7 @@ export function NotepadBody({ attKey, kind, onBarPointerDown, tools, knobSide = 
           aria-pressed={follow}
           onClick={() => setFollow(!follow)}
         >
-          <BranchIcon />
+          <ScrollLockIcon />
         </button>
         <button
           type="button"
@@ -325,7 +332,7 @@ export function NotepadBody({ attKey, kind, onBarPointerDown, tools, knobSide = 
         <div className="notepad-bar-grab" onPointerDown={onBarPointerDown} />
         <div className="notepad-modes" role="radiogroup" aria-label="What the Pencil does">
           {PEN_COLORS.map((c) => {
-            const on = tool === "pen" && c.color === color;
+            const on = shown === "pen" && c.color === color;
             return (
               <button
                 key={c.color || "ink"}
@@ -344,10 +351,10 @@ export function NotepadBody({ attKey, kind, onBarPointerDown, tools, knobSide = 
           <button
             type="button"
             role="radio"
-            className={tool === "eraser" ? "notepad-mode on" : "notepad-mode"}
+            className={shown === "eraser" ? "notepad-mode on" : "notepad-mode"}
             title="Erase (the Pencil's double-tap) — the pages' pen erases too"
             aria-label="Erase"
-            aria-checked={tool === "eraser"}
+            aria-checked={shown === "eraser"}
             onClick={() => surfaceRef.current?.setTool("eraser")}
           >
             <EraserIcon />
@@ -355,10 +362,10 @@ export function NotepadBody({ attKey, kind, onBarPointerDown, tools, knobSide = 
           <button
             type="button"
             role="radio"
-            className={tool === "lasso" ? "notepad-mode on" : "notepad-mode"}
+            className={shown === "lasso" ? "notepad-mode on" : "notepad-mode"}
             title="Lasso — draw a loop round what to select (or hold the Pencil still)"
             aria-label="Lasso"
-            aria-checked={tool === "lasso"}
+            aria-checked={shown === "lasso"}
             onClick={() => surfaceRef.current?.setTool("lasso")}
           >
             <LassoIcon />

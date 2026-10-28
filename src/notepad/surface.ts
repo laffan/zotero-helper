@@ -79,6 +79,9 @@ export interface SurfaceEnv {
   goTo: (t: PlaceTarget) => void;
   /** The tool changed (the double-tap, the eraser end). */
   toolChanged?: (t: PadTool) => void;
+  /** A press held still has borrowed the lasso (on), or let it go —
+   *  for the bar's switch to show while the loop is drawn. */
+  lassoBorrowed?: (on: boolean) => void;
 }
 
 type Step =
@@ -276,7 +279,8 @@ export function createSurface(host: HTMLElement, env: SurfaceEnv) {
       // `panning` once the finger has gone past a tap's reach; `cleared`
       // when its press let go of a selection, so its tap does no more.
       | { kind: "pan"; panning: boolean; cleared: boolean }
-      | { kind: "lasso" }
+      // `borrowed`: a press held still, not the lasso tool's.
+      | { kind: "lasso"; borrowed?: boolean }
       | { kind: "move" }
     );
   let g: Gesture | null = null;
@@ -287,8 +291,9 @@ export function createSurface(host: HTMLElement, env: SurfaceEnv) {
     gs.hold = window.setTimeout(() => {
       if (g !== gs || (gs.kind !== "write" && gs.kind !== "pan")) return;
       if (gs.kind === "write") gs.path.remove();
-      g = { ...gs, kind: "lasso", hold: 0 };
+      g = { ...gs, kind: "lasso", hold: 0, borrowed: true };
       lasso.begin(...toCanvas(gs.from[0], gs.from[1]));
+      env.lassoBorrowed?.(true);
     }, HOLD_MS);
   }
 
@@ -400,6 +405,7 @@ export function createSurface(host: HTMLElement, env: SurfaceEnv) {
       type === "pointerup" && Math.hypot(cx - done.from[0], cy - done.from[1]) < TAP_PX && performance.now() - done.t0 < HOLD_MS;
     if (done.kind === "lasso") {
       lasso.finish();
+      if (done.borrowed) env.lassoBorrowed?.(false);
       return;
     }
     if (done.kind === "move") {

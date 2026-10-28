@@ -639,7 +639,8 @@ indicator ("54% | Pg 7 of 13") floats at the bottom centre of the screen, 20px
 up, and a press on it opens the page picker — the thumbnail grid as a
 popup over the pages, the page being read marked and in view, with the
 PDF's outline (when it has one) as a column at its left, the section
-being read marked; a thumbnail or a heading goes there and closes it,
+being read marked (over the notepad and reading mode's buttons); a
+thumbnail or a heading goes there and closes it,
 as do Escape and a press outside, without leaving reading mode
 (`readingProgress.ts`, `thumbnails.ts`). It lasts the session and ends when the
 PDF closes. Ink mode carries on in it: the Pencil writes, its double-tap
@@ -865,7 +866,9 @@ drawing with a point inside a loop drawn round them (`inLoop` in
 the selection moves it, the colours and width restyle it, ⌫ deletes it.
 The pen held still where it came down (500ms, within 4px) draws the
 same lasso, as in Hush and the notepad: the stroke begun is dropped,
-the loop is drawn on from there, and the tool stays the pen; a pen
+the loop is drawn on from there, and the tool stays the pen — though
+while the loop is drawn the bar's select tool, and reading mode's pen
+button, show the lasso (`lassoBorrowed`, reported as the tool); a pen
 pressed on the selection drags it, whatever the tool, and one pressed
 anywhere else writes and lets go of it. (A drawing moved used to keep
 the bounds it had before — `make` copied them along — so its frame,
@@ -1317,7 +1320,7 @@ divider, dragged to share the height, with Hide Notepad at its middle.
 
 Either way it is one continuous surface in the panel's colour: a slim
 bar of tools over the canvas — a very faint dot grid, which pans with
-it. From the bar's left: the branch (following the PDF), the map, the
+it. From the bar's left: the scroll lock (following the PDF), the map, the
 host's own tools (auto-shift), the empty middle; then, just before
 undo and the host's close, one switch of four parts saying what the
 Pencil does: write in the ink of the theme — black, white in the dark
@@ -1326,7 +1329,8 @@ follows the appearance) — write in red, the reading-mode red
 (`RED_INK`, `#ff5f57`, kept with the stroke), erase, or lasso. The
 colour is this device's (`zh-notepad-pen-color`), shared by every view.
 
-The quote knob sits on the pad's edge at its middle, half outside it,
+The quote knob sits on the pad's edge at its top, level with the bar
+(which keeps clear of it), half outside it,
 on the side facing the pages (the left; the right for a pad docked at
 the window's left; just inside the edge under the notes, whose pane
 clips what leaves it): a round bump in the pad's colour with a grey
@@ -1363,7 +1367,10 @@ Delete above the frame; a drag that starts inside the frame moves it
 or a press anywhere else — the Pencil then writes at once. Held, the
 lasso is borrowed for the one press; the switch's fourth part makes it
 the tool, when every press of the Pencil or the mouse draws one at
-once. Strokes or links selected and then gone some other way — erased,
+once. While a held press's loop is being drawn the switch shows the
+lasso — the only sign, before the Pencil moves, that it has become one
+— and goes back to the tool in force when it lifts (`lassoBorrowed`).
+Strokes or links selected and then gone some other way — erased,
 undone, cleared, changed in another view — leave the selection too
 (`prune`, after every change), and with nothing left the frame and its
 Delete go.
@@ -1375,7 +1382,7 @@ A note remembers where in the PDF the reader was when it began — the
 page at the view's centre and the height a quarter of the way down the
 view (`placeInView` in `pdfviewer/places.ts`) — and shows that page,
 small, above it; a finger tap (or a click) on a note goes back there.
-The branch icon (two dots joined by a dotted, stepped line) makes the pad
+The scroll lock (a lock between an arrow up and an arrow down) makes the pad
 follow the PDF: as the reader turns pages it glides to the part of the
 pad about the page in view — the top of its notes and links, or for a
 page with none, between those of the pages before and after it as far

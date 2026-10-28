@@ -109,6 +109,10 @@ export function createInkTool(env: InkEnv) {
   if (isErasing() !== (prefs.tool === "eraser")) prefs.tool = isErasing() ? "eraser" : previousTool;
   let active = false;
   let sel: { idx: number; keys: string[] } | null = null;
+  // The pen held still has borrowed the lasso: the bar (and reading
+  // mode's pen, through onToolChange) show it while the loop is drawn.
+  let borrowed = false;
+  const shownTool = (): InkTool => (borrowed ? "select" : prefs.tool);
 
   const layer = createInkLayer(env.getPages);
   const live = createLiveLayer(env.body, env.scrollArea);
@@ -216,7 +220,7 @@ export function createInkTool(env: InkEnv) {
     const list = selected();
     const colors = new Set(list.map((a) => a.color));
     bar.sync({
-      tool: prefs.tool,
+      tool: shownTool(),
       color: list.length ? (colors.size === 1 ? list[0].color : null) : prefs.color,
       width: list.length ? list[0].width : prefs.width,
       eraser: prefs.eraser,
@@ -294,6 +298,11 @@ export function createInkTool(env: InkEnv) {
     inSelection: (idx, [x, y]) => selectionHas(idx, x, y),
     sweep: (idx, loop) => select(idx, loop ? session.inLoop(idx, loop).map((a) => a.key) : []),
     pressOutside: () => select(0, []),
+    lassoBorrowed: (on) => {
+      borrowed = on;
+      syncBar();
+      env.onToolChange?.(shownTool());
+    },
   });
 
   // --- on and off -----------------------------------------------------------

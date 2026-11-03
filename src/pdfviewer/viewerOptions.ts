@@ -64,6 +64,9 @@ export interface PdfViewerOptions {
   initialView?: SavedView | null;
   /** The view changed — reported once it settles, and on closing. */
   onViewChange?: (page: number, view: SavedView) => void;
+  /** A line for the activity log, at debug level (the place being put
+   *  back after the app's trip to the background, place.ts). */
+  log?: (msg: string) => void;
 }
 
 /** Highlights and underlines (from a text selection) and ink (ink/). */

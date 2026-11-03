@@ -20,7 +20,7 @@
 import type { Annotation } from "../lib/highlights";
 import { PDFJS_ASSETS } from "../lib/pdfjsAssets";
 import {
-  centerPagePoint, pageFracAtCenter, restoreAnchor, scrollToPageFraction, scrollToPagePoint, viewAnchor, watchResize,
+  centerPagePoint, pageFracAtCenter, restoreAnchor, scrollToPageFraction, scrollToPagePoint, viewAnchor,
 } from "./anchor";
 import { createAnnotating, type DefinedWord } from "./annotating";
 import { createAnnotationLayer } from "./annotations";
@@ -43,6 +43,7 @@ import { changedPages, drawAnnotations } from "./paint";
 import { attachPagedWheel } from "./paged";
 import { getPdfjs } from "./pdfjs";
 import { attachPencilFinger } from "./pencilFinger";
+import { createPlaceKeeper } from "./place";
 import { placeAtPoint, placeInView } from "./places";
 import { createPageFinder } from "./readingProgress";
 import { createPageRenderer } from "./render";
@@ -182,9 +183,7 @@ export function createPdfViewer(container: HTMLElement, opts: PdfViewerOptions =
       if (!reportPages || !pages.length || pendingFoldAt) return null;
       const v: SavedView = { layoutMode, fitMode, fixedZoom, paged, folded, foldedZoom, crop: cropper.get() };
       v.foldFilter = foldLayer.getFilter();
-      if (folded) v.foldAt = foldLayer.viewAnchor() ?? undefined;
-      else v.at = viewAnchor(scrollArea, pages, layoutMode === "horizontal") ?? undefined;
-      return v;
+      return Object.assign(v, place.saved());
     },
     (v) => opts.onViewChange?.(currentPage(), v),
   );
@@ -395,6 +394,7 @@ export function createPdfViewer(container: HTMLElement, opts: PdfViewerOptions =
     opts.onTwoUp?.(!folded && fitMode === "fit-2" && (layoutMode === "vertical" || isPaged()));
     if (!folded && pdfDoc) saveViewPrefs({ layoutMode, fitMode, fixedZoom, paged });
     viewReporter.changed();
+    place.note();
   }
 
   function currentPage(): number {
@@ -405,7 +405,7 @@ export function createPdfViewer(container: HTMLElement, opts: PdfViewerOptions =
   let reportPages = false;
   let reportedPage = 0;
   // The set the paged view last showed — kept from before a resize
-  // moves the snapping (watchResize, anchor.ts).
+  // moves the snapping (place.ts).
   let shownLead = 1;
   function updatePageIndicator(): void {
     // How far through, and the page — a fixed set of several pages as
@@ -414,7 +414,8 @@ export function createPdfViewer(container: HTMLElement, opts: PdfViewerOptions =
     shownLead = lead;
     const last = isPaged() ? Math.min(pages.length, lead + perSet() - 1) : lead;
     progress.set(last > lead ? lead : currentPage(), last, pages.length);
-    if (!reportPages || !pages.length) return;
+    // Not a place the reader moved to while the offset is in doubt.
+    if (!reportPages || !pages.length || place.disturbed()) return;
     viewReporter.changed();
     const page = currentPage();
     if (page !== reportedPage) {
@@ -436,6 +437,7 @@ export function createPdfViewer(container: HTMLElement, opts: PdfViewerOptions =
       });
     }
     annotating.onScroll();
+    place.note();
   });
 
   // The page at the start of the view stays there: the anchor
@@ -484,7 +486,7 @@ export function createPdfViewer(container: HTMLElement, opts: PdfViewerOptions =
     }
     relayoutGuard = true;
     try {
-      const anchor = viewAnchor(scrollArea, pages, layoutMode === "horizontal");
+      const anchor = place.heldAt() ?? viewAnchor(scrollArea, pages, layoutMode === "horizontal");
       const scale = getEffectiveZoom();
       const state = layoutState();
       for (const p of pages) {
@@ -582,9 +584,7 @@ export function createPdfViewer(container: HTMLElement, opts: PdfViewerOptions =
     const w = pages[idx]?.wrapper;
     if (!w) return;
     const behavior = smooth ? "smooth" : "auto";
-    if (isPaged() && layoutMode === "horizontal") w.scrollIntoView({ behavior, inline: "start", block: "nearest" });
-    else if (isPaged()) w.scrollIntoView({ behavior, block: "start" });
-    else if (layoutMode === "horizontal") w.scrollIntoView({ behavior, inline: "start", block: "nearest" });
+    if (layoutMode === "horizontal") w.scrollIntoView({ behavior, inline: "start", block: "nearest" });
     else w.scrollIntoView({ behavior, block: "start" });
   }
 
@@ -597,13 +597,13 @@ export function createPdfViewer(container: HTMLElement, opts: PdfViewerOptions =
     else scrollToPagePoint(scrollArea, p, top);
   }
 
-
-  const stopWatchingResize = watchResize(scrollArea, {
-    hasPages: () => pages.length > 0,
-    geometryChanged: () => {
-      renderer.invalidateGeometry();
-      renderer.scheduleUpdate();
-    },
+  const place = createPlaceKeeper({
+    area: scrollArea,
+    getPages: () => pages,
+    isFolded: () => folded,
+    folds: foldLayer,
+    log: opts.log,
+    geometryChanged: () => (renderer.invalidateGeometry(), renderer.scheduleUpdate()),
     fitsView: () => layoutMode !== "fixed",
     relayout: relayoutPages,
     shownSet: () => shownLead,
@@ -616,7 +616,7 @@ export function createPdfViewer(container: HTMLElement, opts: PdfViewerOptions =
     viewReporter.flush();
     destroyed = true;
     search.onChange(null);
-    stopWatchingResize();
+    place.destroy();
     keys.detach();
     magnifier.destroy();
     cropper.destroy();

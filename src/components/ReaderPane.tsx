@@ -273,6 +273,7 @@ export function ReaderPane() {
           // The PDF reopens as it was left: layout, folded view, place.
           initialView: lastView(attKey),
           onViewChange: (page, view) => savePage(attKey, page, view),
+          log: (msg) => appLog("debug", `Reader: ${msg}`),
         });
         viewerRef.current = viewer;
         active = { attKey, viewer };

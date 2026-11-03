@@ -134,7 +134,9 @@ src/            React + TypeScript UI (Vite, zustand, MiniSearch)
                 paged view's sets of pages), pageTools (text
                 layer, notes hooks), search (find in the PDF), and
                 outline (the PDF's bookmarks, resolved to places),
-                anchor (keeping the place across a relayout),
+                anchor (keeping the place across a relayout), place
+                (the reader's place, kept through resizes and the
+                app's trips to the background),
                 tooltips (the toolbar's, drawn for iPad), keys (zoom
                 shortcuts and the page stepper), commands (the
                 keyboard's viewer commands: modes, page and fold
@@ -552,15 +554,27 @@ one shown when it began is put back, centred, once the pages are laid
 out again (`watchResize` in `anchor.ts` — the browser may otherwise
 settle on the neighbouring set, and WebKit may not snap again at all,
 leaving the set off-centre); side by side, the view is never left
-scrolled vertically. Going to the background keeps the place too.
-iPadOS lays an app out at its multitasking sizes then, for its
-snapshots, and at a compact width the outline (250px) and the notes
-panel can take all the room, leaving the pages none: fitted at a scale
-of 0, every page was laid out 0px, the scroll offset clamped to 0, and
-the place, measured again from that, was page 1. Now nothing is laid
-out while the app is hidden (`watchResize` waits for it to come back,
-at its size by then), and a view with no room for a page at least 48px
-each way keeps the pages as they were (`roomToFit` in `layout.ts`).
+scrolled vertically. Going to the background keeps the place too
+(`place.ts`). The pages' scroll offset can't be trusted then: iPadOS
+lays the app out at its multitasking sizes for its snapshots (and the
+status bar plugin toggles the band at the top as the window's geometry
+changes), the native scroll view behind the scroll area can move or
+clamp the offset, and coming back the page may show before it has its
+size again. At a compact width the outline (250px) and the notes panel
+take all the room, and fitted at a scale of 0 every page was laid out
+0px, the offset clamped to 0, and the place, measured again from that,
+page 1 — and in other orders, the last page. So the place is a record
+of its own that only the reader moves: a scroll counts while the view
+is undisturbed, and a resize, the app being hidden and the 0.7s after
+it comes back disturb it (a touch, a pointer or a wheel on the pages
+ends a disturbance). During one, a relayout keeps the kept place, the
+saved view records it and no page change is reported; once it is
+over, the view is put back on it if anything moved it. Nothing is laid
+out while the app is hidden — the relayout waits for it to come back —
+and a view with no room for a page at least 48px each way keeps the
+pages as they were (`roomToFit` in `layout.ts`). The activity log, at
+debug level, notes the place as the app goes and comes back, resizes
+while it was away, and any putting back ("Reader: …").
 It adds what note-taking needs: selectable text with
 an *Add to notes* bubble that quotes the passage, inserted at the caret
 with a `zotero://` link to the page (the bookmark button at the top

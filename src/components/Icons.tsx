@@ -154,6 +154,11 @@ export const ChevronUp = (p: IconProps = {}) =>
 export const ChevronDown = (p: IconProps = {}) =>
   svg(<path d="M3.5 6L8 10.5 12.5 6" />, p);
 
+// Two chevrons pointing apart (open every section) or together (fold
+// them all) — the outline's expand all / collapse all.
+export const ExpandAllIcon = (p: IconProps = {}) => svg(<path d="M5 6l3-3 3 3M5 10l3 3 3-3" />, p);
+export const CollapseAllIcon = (p: IconProps = {}) => svg(<path d="M5 2.5l3 3 3-3M5 13.5l3-3 3 3" />, p);
+
 export const CheckIcon = (p: IconProps = {}) =>
   svg(<path d="M2.5 8.5l3.5 3.5 7.5-8" />, p);
 

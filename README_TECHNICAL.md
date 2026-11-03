@@ -493,7 +493,10 @@ was. The tab in front is not remembered: a PDF opens on Highlights
 citation, which keeps the conversation in front (`setReading`'s tab). When the PDF has an outline,
 a panel button at the left of the toolbar, before the name, shows it
 beside the pages: a folding tree of its headings, each a link to its
-place, with the section being read marked as you go. Widen the notes
+place, with the section being read marked as you go. Beside its ×, a
+pair of chevrons opens every section, or, with every section open,
+folds them all (it is absent when the outline has no nested
+headings). Widen the notes
 panel past 600px and the Highlights and Notes tabs become one, with
 the highlights beside the notes (drag the edge between them to share
 the width differently); narrow it again and they separate. The

@@ -9,7 +9,7 @@ import { sectionAtPage, sectionsOf, useReaderPage, type OutlineEntry } from "../
 import { usePdfUiScroll } from "../lib/readerUi";
 import { lastUi, saveUi } from "../lib/recent";
 import { useStore } from "../lib/store";
-import { ChevronDown, ChevronRight, CloseIcon } from "./Icons";
+import { ChevronDown, ChevronRight, CloseIcon, CollapseAllIcon, ExpandAllIcon } from "./Icons";
 import { goToReaderPosition } from "./ReaderPane";
 
 const overlaid = () => window.matchMedia("(max-width: 700px)").matches;
@@ -21,24 +21,24 @@ function countEntries(list: OutlineEntry[]): number {
   return list.reduce((n, e) => n + 1 + countEntries(e.children), 0);
 }
 
+/** The ids of every heading with headings under it — the ones that fold. */
+function foldingIds(list: OutlineEntry[], parent = ""): string[] {
+  return list.flatMap((e, i) => {
+    const id = parent ? `${parent}.${i}` : String(i);
+    return e.children.length ? [id, ...foldingIds(e.children, id)] : [];
+  });
+}
+
 /** Keyed by the PDF: one panel per outline. */
 export function OutlinePanel({ attKey, outline }: { attKey: string; outline: OutlineEntry[] }) {
   const setOutlineOpen = useStore((s) => s.setOutlineOpen);
   const page = useReaderPage();
   const sections = useMemo(() => sectionsOf(outline), [outline]);
+  const folding = useMemo(() => foldingIds(outline), [outline]);
   const [expanded, setExpanded] = useState<Set<string>>(() => {
     const kept = lastUi(attKey).outlineExpanded;
     if (kept) return new Set(kept);
-    if (countEntries(outline) >= OPEN_ALL_BELOW) return new Set();
-    const all = new Set<string>();
-    const walk = (list: OutlineEntry[], id: string) =>
-      list.forEach((e, i) => {
-        const eid = id ? `${id}.${i}` : String(i);
-        if (e.children.length) all.add(eid);
-        walk(e.children, eid);
-      });
-    walk(outline, "");
-    return all;
+    return new Set(countEntries(outline) >= OPEN_ALL_BELOW ? [] : folding);
   });
 
   // The heading the reader is in — or, while it is folded away, the
@@ -66,12 +66,18 @@ export function OutlinePanel({ attKey, outline }: { attKey: string; outline: Out
     else if (rr.bottom > lr.bottom) list.scrollTop += rr.bottom - lr.bottom + 8;
   }, [current]);
 
-  const toggle = (id: string) => {
-    const next = new Set(expanded);
-    if (!next.delete(id)) next.add(id);
+  const remember = (next: Set<string>) => {
     setExpanded(next);
     saveUi(attKey, { outlineExpanded: [...next] });
   };
+  const toggle = (id: string) => {
+    const next = new Set(expanded);
+    if (!next.delete(id)) next.add(id);
+    remember(next);
+  };
+  // The head's toggle: with every section open it folds them all,
+  // otherwise it opens them all.
+  const allOpen = folding.every((id) => expanded.has(id));
 
   const rows = (list: OutlineEntry[], depth: number, parent: string): React.ReactNode =>
     list.map((e, i) => {
@@ -117,9 +123,21 @@ export function OutlinePanel({ attKey, outline }: { attKey: string; outline: Out
     <nav className="outline-panel" aria-label="Outline">
       <div className="outline-head">
         <span>Contents</span>
-        <button className="icon-btn" onClick={() => setOutlineOpen(false)} aria-label="Hide the outline">
-          <CloseIcon size={12} />
-        </button>
+        <div className="outline-head-buttons">
+          {folding.length > 0 && (
+            <button
+              className="icon-btn"
+              onClick={() => remember(new Set(allOpen ? [] : folding))}
+              aria-label={allOpen ? "Collapse all sections" : "Expand all sections"}
+              title={allOpen ? "Collapse all" : "Expand all"}
+            >
+              {allOpen ? <CollapseAllIcon size={12} /> : <ExpandAllIcon size={12} />}
+            </button>
+          )}
+          <button className="icon-btn" onClick={() => setOutlineOpen(false)} aria-label="Hide the outline">
+            <CloseIcon size={12} />
+          </button>
+        </div>
       </div>
       <div className="outline-list" ref={listRef}>
         {rows(outline, 0, "")}

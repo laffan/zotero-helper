@@ -33,7 +33,7 @@ import { attachDarkPages } from "./darkPages";
 import { createFoldLayer } from "./folds";
 import { createInkTool } from "./ink";
 import { attachViewerKeys } from "./keys";
-import { applyLayoutClasses, fitZoom, sizePage, sizePagedGap } from "./layout";
+import { applyLayoutClasses, fitZoom, roomToFit, sizePage, sizePagedGap } from "./layout";
 import { createLinkLayerManager } from "./links";
 import { createMagnifier, PLAIN } from "./magnify";
 import { readOutline } from "./outline";
@@ -470,14 +470,17 @@ export function createPdfViewer(container: HTMLElement, opts: PdfViewerOptions =
 
   // Geometry only — rasterising lives in render.ts. A relayout resizes
   // every wrapper and stretches the existing content box; the settle
-  // pass re-renders crisp once things are still.
+  // pass re-renders crisp once things are still. False when there was
+  // nothing to lay out, or no room to.
   let relayoutGuard = false;
-  function relayoutPages(): void {
-    if (relayoutGuard || !pdfDoc || !pages.length) return;
+  function relayoutPages(): boolean {
+    if (relayoutGuard || !pdfDoc || !pages.length) return false;
+    // No room (a compact snapshot size, layout.ts): the pages stay put.
+    if (!roomToFit(typical, getEffectiveZoom(), layoutMode)) return false;
     magnifier.reset();
     if (folded) {
       foldLayer.refresh();
-      return;
+      return true;
     }
     relayoutGuard = true;
     try {
@@ -500,6 +503,7 @@ export function createPdfViewer(container: HTMLElement, opts: PdfViewerOptions =
     } finally {
       relayoutGuard = false;
     }
+    return true;
   }
 
   /** Open a document, at `startPage` (1-based) when given. */
@@ -601,7 +605,7 @@ export function createPdfViewer(container: HTMLElement, opts: PdfViewerOptions =
       renderer.scheduleUpdate();
     },
     fitsView: () => layoutMode !== "fixed",
-    relayout: () => relayoutPages(),
+    relayout: relayoutPages,
     shownSet: () => shownLead,
     isPaged,
     horizontal: () => layoutMode === "horizontal",

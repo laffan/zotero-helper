@@ -65,6 +65,22 @@ export function fitZoom(area: HTMLElement, page1: PageViewport, s: LayoutState):
   return s.fixedZoom;
 }
 
+/** A fitted page narrower or shorter than this has no room to be read. */
+const MIN_PAGE_PX = 48;
+
+/** Whether the fit `scale` leaves the typical page room to be read.
+ *  iPadOS lays the app out at its multitasking sizes for snapshots as
+ *  it goes to the background; with the outline and the notes beside
+ *  the pages, a compact width leaves the scroll area its padding alone
+ *  and the fit scale 0 — every page 0px, the scroll offset clamped to
+ *  0, and the place, measured again from that, page 1. A view without
+ *  room keeps the pages as they were until it has room again. A fixed
+ *  zoom doesn't fit the view, so it always has room. */
+export function roomToFit(typical: PageViewport | null, scale: number, mode: LayoutMode): boolean {
+  if (!typical || mode === "fixed") return true;
+  return scale * typical.width >= MIN_PAGE_PX && scale * typical.height >= MIN_PAGE_PX;
+}
+
 /** Size a page's wrapper at `scale` — and, in the fixed view, close up
  *  the room its trimmed edges would take (crop.ts). */
 export function sizePage(p: PageRecord, scale: number, crop: Crop | null): void {

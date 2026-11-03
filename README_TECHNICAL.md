@@ -549,7 +549,16 @@ one shown when it began is put back, centred, once the pages are laid
 out again (`watchResize` in `anchor.ts` — the browser may otherwise
 settle on the neighbouring set, and WebKit may not snap again at all,
 leaving the set off-centre); side by side, the view is never left
-scrolled vertically. It adds what note-taking needs: selectable text with
+scrolled vertically. Going to the background keeps the place too.
+iPadOS lays an app out at its multitasking sizes then, for its
+snapshots, and at a compact width the outline (250px) and the notes
+panel can take all the room, leaving the pages none: fitted at a scale
+of 0, every page was laid out 0px, the scroll offset clamped to 0, and
+the place, measured again from that, was page 1. Now nothing is laid
+out while the app is hidden (`watchResize` waits for it to come back,
+at its size by then), and a view with no room for a page at least 48px
+each way keeps the pages as they were (`roomToFit` in `layout.ts`).
+It adds what note-taking needs: selectable text with
 an *Add to notes* bubble that quotes the passage, inserted at the caret
 with a `zotero://` link to the page (the bookmark button at the top
 right of each page is under "Bookmarks" below). A selection follows

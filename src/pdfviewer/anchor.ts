@@ -81,7 +81,9 @@ export interface ResizeEnv {
   geometryChanged: () => void;
   /** The pages are fitted to the view, so a resize lays them out again. */
   fitsView: () => boolean;
-  relayout: () => void;
+  /** Lay the pages out again; false when the view had no room for them
+   *  and they were left as they were. */
+  relayout: () => boolean;
   /** The paged view's set on screen (its first page, 1-based). */
   shownSet: () => number;
   isPaged: () => boolean;
@@ -89,16 +91,36 @@ export interface ResizeEnv {
   goToPage: (n: number) => void;
 }
 
+const hidden = () => document.visibilityState === "hidden";
+
 /** Follow the view's size. A resize (reading mode in or out, a panel
  *  opening) also moves where the paged view's sets snap: the browser
  *  may settle on the neighbouring set before the relayout runs, and
  *  WebKit may not snap again after it at all, leaving the set
  *  off-centre. So the set shown when the resize began is put back,
  *  centred, once the pages are relaid — and side by side the view is
- *  never left scrolled vertically (the pages fit its height). */
+ *  never left scrolled vertically (the pages fit its height).
+ *
+ *  While the app is in the background nothing is laid out: iPadOS
+ *  resizes it then, to take its snapshots at other sizes, and the
+ *  place is only safe measured from the pages as they were left. The
+ *  relayout waits for the app to come back, at its size by then. A
+ *  relayout that found no room keeps the set it was to put back for
+ *  the next. */
 export function watchResize(area: HTMLElement, env: ResizeEnv): () => void {
   let timer: number | null = null;
   let lead: number | null = null;
+  let waiting = false;
+  const run = () => {
+    const set = lead;
+    lead = null;
+    if (!env.relayout()) {
+      lead = set;
+      return;
+    }
+    if (env.horizontal() && area.scrollTop) area.scrollTop = 0;
+    if (env.isPaged() && set) env.goToPage(set);
+  };
   const observer = new ResizeObserver(() => {
     if (!env.hasPages()) return;
     lead ??= env.shownSet();
@@ -112,16 +134,20 @@ export function watchResize(area: HTMLElement, env: ResizeEnv): () => void {
     if (timer) clearTimeout(timer);
     timer = window.setTimeout(() => {
       timer = null;
-      const set = lead;
-      lead = null;
-      env.relayout();
-      if (env.horizontal() && area.scrollTop) area.scrollTop = 0;
-      if (env.isPaged() && set) env.goToPage(set);
+      if (hidden()) waiting = true;
+      else run();
     }, 80);
   });
+  const onVisible = () => {
+    if (hidden() || !waiting) return;
+    waiting = false;
+    if (env.hasPages() && env.fitsView()) run();
+  };
   observer.observe(area);
+  document.addEventListener("visibilitychange", onVisible);
   return () => {
     observer.disconnect();
+    document.removeEventListener("visibilitychange", onVisible);
     if (timer) clearTimeout(timer);
   };
 }

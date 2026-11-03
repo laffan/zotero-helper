@@ -12,17 +12,34 @@ export interface ViewAnchor {
 }
 
 /** The first page reaching into view, and how far into it the view
- *  starts. `horiz`: the pages run side by side. */
+ *  starts. `horiz`: the pages run side by side. The pages' far edges
+ *  go forward page by page, so it is found by halving — a scroll in a
+ *  long book measures a dozen pages, not every one before the view.
+ *  At a fixed zoom pages wrap in rows, where a short page can end
+ *  before a taller one beside it: the few pages before are looked at
+ *  too. */
+/** More pages than a row at a fixed zoom holds. */
+const ROW_LOOKBACK = 8;
+
 export function viewAnchor(area: HTMLElement, pages: PageRecord[], horiz: boolean): ViewAnchor | null {
   const ar = area.getBoundingClientRect();
   const edge = horiz ? ar.left : ar.top;
-  for (let i = 0; i < pages.length; i++) {
+  const farEdge = (i: number) => {
     const r = pages[i].wrapper.getBoundingClientRect();
-    if ((horiz ? r.right : r.bottom) <= edge) continue;
-    const size = horiz ? r.width : r.height;
-    return { idx: i, frac: size ? (edge - (horiz ? r.left : r.top)) / size : 0 };
+    return horiz ? r.right : r.bottom;
+  };
+  let lo = 0;
+  let hi = pages.length;
+  while (lo < hi) {
+    const mid = (lo + hi) >> 1;
+    if (farEdge(mid) <= edge) lo = mid + 1;
+    else hi = mid;
   }
-  return null;
+  for (let i = lo - 1; i >= Math.max(0, lo - ROW_LOOKBACK); i--) if (farEdge(i) > edge) lo = i;
+  if (lo >= pages.length) return null;
+  const r = pages[lo].wrapper.getBoundingClientRect();
+  const size = horiz ? r.width : r.height;
+  return { idx: lo, frac: size ? (edge - (horiz ? r.left : r.top)) / size : 0 };
 }
 
 /** Scroll so the view starts where `a` says, in the new geometry. Left

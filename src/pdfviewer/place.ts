@@ -10,13 +10,29 @@
 // those moments, the place came back as page 1, the last page, or
 // somewhere between — never where it was left.
 //
-// So the place is a record of its own, and only the reader moves it: a
-// scroll counts while the view is undisturbed. A resize, the app being
-// hidden, and the moments after it comes back disturb it; a touch, a
-// pointer or a wheel on the pages ends a disturbance (the reader has
-// taken over). During one, a relayout puts back the kept place, and
-// the view's reports use it. Once it is over, the view is put back on
-// the place if anything moved it, and the activity log says so.
+// So the place is a record of its own, and only the reader moves it. A
+// scroll counts when the reader meant it: an input anywhere (a touch, a
+// pointer, a wheel, a key) or a navigation (navigate.ts) makes the
+// scrolls of the next moments the reader's, and each scroll that
+// follows carries that on (momentum, a smooth scroll). And it counts
+// only while the view is undisturbed: a resize, the window losing focus
+// (the app switcher, Stage Manager, another app in front), the app
+// being hidden, and the moments after it comes back disturb it — an
+// input ends a disturbance (the reader has taken over). A scroll area of another size than when the
+// place was last taken is a resize too, even before the resize is
+// reported: a frame delivers its scroll events first. During a
+// disturbance, a relayout keeps the kept place, and the view's reports
+// use it. Once it is over — and whenever a scroll nobody asked for
+// leaves the pages somewhere else — the view is put back on the place,
+// and the activity log says so.
+//
+// After a trip away, the place is also written to the scroll area
+// again even when the page's own offset says it is there: a large PDF
+// may come back with its layers thrown away and redrawn (the pages
+// blink), and the native scroll view behind the area rebuilt, showing
+// another part of the pages than the offset says, without a scroll the
+// page hears of. An offset moved by a pixel and back over two frames
+// makes WebKit hand the native side the position again.
 //
 // Resizes themselves (watchResize below): fitted pages are laid out
 // again after a short debounce, never while the app is hidden — the
@@ -34,6 +50,12 @@ export type Place = { at: ViewAnchor } | { fold: FoldAnchor };
 const RESIZE_SETTLE_MS = 300;
 /** After the app comes back, the same — iPadOS may still be resizing. */
 const RETURN_SETTLE_MS = 700;
+/** An input makes the scrolls of this long the reader's… */
+const INTENT_MS = 1500;
+/** …and each of them carries that on this much further. */
+const CHAIN_MS = 400;
+/** A scroll nobody asked for is put right once scrolls stop this long. */
+const STRAY_MS = 150;
 
 export interface PlaceEnv {
   area: HTMLElement;
@@ -94,23 +116,83 @@ export function createPlaceKeeper(env: PlaceEnv) {
     else restoreAnchor(area, env.getPages(), env.horizontal(), p.at);
   }
   let place: Place | null = null;
-  /** Until when scrolls aren't the reader's. */
+  /** The scroll area's size when the place was last taken. */
+  let size = "";
+  const sizeNow = () => `${area.clientWidth}×${area.clientHeight}`;
+  /** Until when scrolls aren't the reader's, whatever the intent. */
   let calmAt = 0;
+  /** Until when scrolls are the reader's. */
+  let intentUntil = 0;
+  /** The window has lost focus (and not had it back). */
+  let blurred = false;
   let settleTimer = 0;
+  let strayTimer = 0;
   let measureRaf = 0;
+  /** Whether a scroll since the last frame was the reader's. */
+  let meant = false;
   /** A resize's relayout waiting for the app to come back. */
   let waiting = false;
+  /** The disturbance under way is a return from away. */
+  let returning = false;
 
-  const disturbed = () => hidden() || waiting || performance.now() < calmAt;
+  const disturbed = () => hidden() || blurred || waiting || performance.now() < calmAt;
+  const intend = (ms = INTENT_MS) => {
+    intentUntil = Math.max(intentUntil, performance.now() + ms);
+  };
 
-  /** The pages show what the reader did: take the place from them —
-   *  in the next frame, once a mode change has laid them out. */
-  function note(): void {
+  /** Take the place from the pages in the next frame, once a scroll or
+   *  a mode change has laid them out — if the reader moved them. */
+  function measureSoon(): void {
     if (measureRaf) return;
     measureRaf = requestAnimationFrame(() => {
       measureRaf = 0;
-      if (!disturbed() && hasPages()) place = measure() ?? place;
+      const was = meant;
+      meant = false;
+      if (disturbed() || !hasPages()) return;
+      if (place && sizeNow() !== size) return disturb(RESIZE_SETTLE_MS);
+      if (was) {
+        place = measure() ?? place;
+        size = sizeNow();
+      } else strayCheck();
     });
+  }
+
+  /** The viewer laid the pages out anew (a mode, a document opened):
+   *  what they show now is the place. */
+  function note(): void {
+    intend();
+    meant = true;
+    measureSoon();
+  }
+
+  /** A scroll: the reader's if they meant it, else a stray to put right. */
+  function scrolled(): void {
+    if (performance.now() < intentUntil) {
+      intend(CHAIN_MS);
+      meant = true;
+    }
+    measureSoon();
+  }
+
+  /** A scroll nobody asked for: once scrolls stop, put the place back
+   *  if it moved the pages off it. */
+  function strayCheck(): void {
+    window.clearTimeout(strayTimer);
+    strayTimer = window.setTimeout(() => {
+      strayTimer = 0;
+      if (disturbed() || performance.now() < intentUntil || !place || !hasPages()) return;
+      putBack("a scroll nobody asked for");
+    }, STRAY_MS);
+  }
+
+  function putBack(why: string): void {
+    // The view is settled at this size: scrolls at it count again.
+    size = sizeNow();
+    if (!place) return;
+    const shown = measure();
+    if (samePlace(shown, place)) return;
+    restore(place);
+    env.log?.(`put back at ${describe(place)} after ${why}; the pages had moved to ${describe(shown)}`);
   }
 
   function disturb(ms: number): void {
@@ -122,24 +204,55 @@ export function createPlaceKeeper(env: PlaceEnv) {
   /** The disturbance is over: put the view back on the place. */
   function settle(): void {
     settleTimer = 0;
-    if (hidden()) return; // coming back disturbs again
+    if (hidden() || blurred) return; // coming back disturbs again
     if (disturbed()) return disturb(0);
     if (!place || !hasPages()) return;
-    const shown = measure();
-    if (samePlace(shown, place)) return;
-    restore(place);
-    env.log?.(`put back at ${describe(place)}; the pages had moved to ${describe(shown)}`);
+    putBack("a disturbance");
+    if (returning) resync();
+    returning = false;
   }
 
-  // The reader's own hand ends a disturbance: what it does next counts.
-  const takeOver = () => {
+  /** Write the offset again — a pixel off, then back in the next frame
+   *  — so the native scroll view shows what the page says it does. */
+  function resync(): void {
+    const horiz = env.horizontal();
+    const at = horiz ? area.scrollLeft : area.scrollTop;
+    const set = (v: number) => (horiz ? (area.scrollLeft = v) : (area.scrollTop = v));
+    set(at > 0 ? at - 1 : at + 1);
+    requestAnimationFrame(() => set(at));
+    env.log?.(`back at ${describe(place)}`);
+  }
+
+  // Any input anywhere — on the pages, the outline, the search field,
+  // a shortcut — is the reader at work: the scrolls that follow are
+  // meant, and a disturbance is over (the window is in use, whatever
+  // its focus events said).
+  const onInput = () => {
     if (hidden()) return;
+    intend();
     calmAt = 0;
+    blurred = false;
+    returning = false;
     window.clearTimeout(settleTimer);
     settleTimer = 0;
   };
-  const inputs = ["pointerdown", "touchstart", "wheel"] as const;
-  for (const t of inputs) area.addEventListener(t, takeOver, { passive: true, capture: true });
+  const inputs = ["pointerdown", "touchstart", "wheel", "keydown"] as const;
+  for (const t of inputs) window.addEventListener(t, onInput, { passive: true, capture: true });
+  // The app switcher, Stage Manager, another app in front: the window
+  // loses focus before (or without) the page being hidden.
+  const onBlur = () => {
+    if (blurred || hidden()) return;
+    blurred = true;
+    env.log?.(`window left at ${describe(place)}`);
+  };
+  const onFocus = () => {
+    if (!blurred) return;
+    blurred = false;
+    returning = true;
+    disturb(RETURN_SETTLE_MS);
+  };
+  window.addEventListener("blur", onBlur);
+  window.addEventListener("focus", onFocus);
 
   // --- resizes ---------------------------------------------------------------
   let timer: number | null = null;
@@ -183,6 +296,8 @@ export function createPlaceKeeper(env: PlaceEnv) {
     }
     const size = `${area.clientWidth}×${area.clientHeight}`;
     env.log?.(`app back at ${size}; the pages show ${describe(hasPages() ? measure() : null)}`);
+    blurred = false;
+    returning = true;
     disturb(RETURN_SETTLE_MS);
     if (waiting) {
       waiting = false;
@@ -192,8 +307,12 @@ export function createPlaceKeeper(env: PlaceEnv) {
   document.addEventListener("visibilitychange", onVisibility);
 
   return {
-    /** A scroll, or a mode change: the place follows, unless disturbed. */
+    /** A scroll: the place follows it, if the reader meant it. */
+    scrolled,
+    /** The viewer laid the pages out anew: the place follows. */
     note,
+    /** A navigation: the scrolls that follow are the reader's. */
+    intend: () => intend(),
     /** Whether the pages' offset is in doubt just now. */
     disturbed,
     /** The place for the saved view (viewState.ts): the kept one while
@@ -209,7 +328,10 @@ export function createPlaceKeeper(env: PlaceEnv) {
     destroy: () => {
       observer.disconnect();
       document.removeEventListener("visibilitychange", onVisibility);
-      for (const t of inputs) area.removeEventListener(t, takeOver, { capture: true });
+      for (const t of inputs) window.removeEventListener(t, onInput, { capture: true });
+      window.removeEventListener("blur", onBlur);
+      window.removeEventListener("focus", onFocus);
+      window.clearTimeout(strayTimer);
       if (timer) clearTimeout(timer);
       window.clearTimeout(settleTimer);
       cancelAnimationFrame(measureRaf);

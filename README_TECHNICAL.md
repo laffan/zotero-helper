@@ -136,7 +136,8 @@ src/            React + TypeScript UI (Vite, zustand, MiniSearch)
                 outline (the PDF's bookmarks, resolved to places),
                 anchor (keeping the place across a relayout), place
                 (the reader's place, kept through resizes and the
-                app's trips to the background),
+                app's trips to the background), navigate (going to
+                a page, a place on one, a search hit),
                 tooltips (the toolbar's, drawn for iPad), keys (zoom
                 shortcuts and the page stepper), commands (the
                 keyboard's viewer commands: modes, page and fold
@@ -563,18 +564,33 @@ clamp the offset, and coming back the page may show before it has its
 size again. At a compact width the outline (250px) and the notes panel
 take all the room, and fitted at a scale of 0 every page was laid out
 0px, the offset clamped to 0, and the place, measured again from that,
-page 1 — and in other orders, the last page. So the place is a record
-of its own that only the reader moves: a scroll counts while the view
-is undisturbed, and a resize, the app being hidden and the 0.7s after
-it comes back disturb it (a touch, a pointer or a wheel on the pages
-ends a disturbance). During one, a relayout keeps the kept place, the
-saved view records it and no page change is reported; once it is
-over, the view is put back on it if anything moved it. Nothing is laid
-out while the app is hidden — the relayout waits for it to come back —
-and a view with no room for a page at least 48px each way keeps the
-pages as they were (`roomToFit` in `layout.ts`). The activity log, at
-debug level, notes the place as the app goes and comes back, resizes
-while it was away, and any putting back ("Reader: …").
+page 1 — and in other orders, the last page. A large PDF may also come
+back with its layers thrown away and redrawn (the pages blink), and
+the native scroll view rebuilt. So the place is a record of its own
+that only the reader moves. A scroll counts when it was meant: an
+input anywhere (a touch, a pointer, a wheel, a key) or a navigation
+(`navigate.ts` — a page, an outline entry, a search hit, a cited
+passage, however long after the click it lands) makes the scrolls of
+the next 1.5s the reader's, and each one carries that on (momentum, a
+smooth scroll). And it counts only while the view is undisturbed: a
+resize, the window losing focus (the app switcher, Stage Manager), the
+app being hidden and the 0.7s after it comes back disturb it, and so
+does a scroll area of another size than when the place was last taken
+(a frame delivers its scroll events before its resize observations);
+an input ends a disturbance. During one, a relayout keeps the kept
+place, the saved view records it and no page change is reported. Once
+it is over, and whenever a scroll nobody asked for leaves the pages
+somewhere else, the view is put back on the place; after a trip away
+the offset is also written again (a pixel off, then back, over two
+frames), so WebKit hands the native scroll view the position even when
+the page's own offset never moved. Nothing is laid out while the app
+is hidden — the relayout waits for it to come back — and a view with
+no room for a page at least 48px each way keeps the pages as they were
+(`roomToFit` in `layout.ts`). Finding the first page in view halves
+its way there, so a long book measures a dozen pages per scroll, not
+all of them. The activity log, at debug level, notes the place as the
+window is left and the app hidden, resizes while it was away, the
+return, and any putting back ("Reader: …").
 It adds what note-taking needs: selectable text with
 an *Add to notes* bubble that quotes the passage, inserted at the caret
 with a `zotero://` link to the page (the bookmark button at the top

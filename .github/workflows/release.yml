@@ -76,7 +76,24 @@ jobs:
           # __VERSION__ is replaced with the version in tauri.conf.json.
           tagName: v__VERSION__
           releaseName: "Zotero Helper v__VERSION__"
-          releaseBody: "Installers for macOS (Apple silicon and Intel), Windows and Linux are attached below. The builds are not code-signed, so macOS and Windows will warn the first time you open the app."
+          releaseBody: |
+            ## Downloads
+
+            - **macOS:** `AppleSilicon.dmg` for M-series Macs, `MacIntel.dmg` for Intel Macs.
+            - **Windows:** `Windows-Setup.exe` (installer) or `Windows.msi`.
+            - **Linux:** `Linux.AppImage` (runs anywhere) or `Linux.deb` (Debian/Ubuntu).
+
+            ## Opening the app on macOS
+
+            These builds are not signed with an Apple Developer certificate, so macOS blocks them the first time. Drag the app to Applications, then run this once in Terminal:
+
+            ```
+            xattr -cr "/Applications/Zotero Helper.app"
+            ```
+
+            ## Windows
+
+            SmartScreen may warn about an unknown publisher. Choose **More info**, then **Run anyway**.
           releaseDraft: true
           prerelease: false
           args: ${{ matrix.args }}

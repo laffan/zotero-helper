@@ -3,16 +3,14 @@ name: Release
 # Builds the app for macOS (Apple silicon + Intel), Windows and Linux and
 # attaches the installers to a GitHub Release.
 #
-# Run it by pushing a tag that matches the version in src-tauri/tauri.conf.json:
-#   git tag v1.0.0 && git push origin v1.0.0
-# or from the Actions tab -> Release -> "Run workflow".
+# Run it from the Actions tab -> Release -> "Run workflow". The release tag
+# comes from the version in src-tauri/tauri.conf.json.
 #
 # The release is created as a draft. Review it on GitHub, then publish it.
+# There is deliberately no tag trigger: publishing a draft creates the tag, and
+# a tag trigger would then build and upload everything a second time.
 
 on:
-  push:
-    tags:
-      - "v*"
   workflow_dispatch:
 
 permissions:

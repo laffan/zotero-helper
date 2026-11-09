@@ -18,7 +18,12 @@
 // only while the view is undisturbed: a resize, the window losing focus
 // (the app switcher, Stage Manager, another app in front), the app
 // being hidden, and the moments after it comes back disturb it — an
-// input ends a disturbance (the reader has taken over). A scroll area of another size than when the
+// input ends a disturbance (the reader has taken over). And while a
+// finger, the Pencil or a mouse button is down, every scroll is the
+// reader's, however long the press lasts and whatever else happens: a
+// drag that rests a while and then goes on used to outlast the intent
+// its first touch gave it, and the view went back to where the finger
+// had rested as it was let go. A scroll area of another size than when the
 // place was last taken is a resize too, even before the resize is
 // reported: a frame delivers its scroll events first. During a
 // disturbance, a relayout keeps the kept place, and the view's reports
@@ -135,7 +140,14 @@ export function createPlaceKeeper(env: PlaceEnv) {
   /** The disturbance under way is a return from away. */
   let returning = false;
 
-  const disturbed = () => hidden() || blurred || waiting || performance.now() < calmAt;
+  /** Mouse and Pencil presses under way, by pointer id. */
+  const pressed = new Set<number>();
+  /** Fingers (and the Pencil) on the screen. */
+  let touches = 0;
+  /** The reader is holding the pages: what they do is the place. */
+  const holding = () => !hidden() && (touches > 0 || pressed.size > 0);
+
+  const disturbed = () => !holding() && (hidden() || blurred || waiting || performance.now() < calmAt);
   const intend = (ms = INTENT_MS) => {
     intentUntil = Math.max(intentUntil, performance.now() + ms);
   };
@@ -149,7 +161,7 @@ export function createPlaceKeeper(env: PlaceEnv) {
       const was = meant;
       meant = false;
       if (disturbed() || !hasPages()) return;
-      if (place && sizeNow() !== size) return disturb(RESIZE_SETTLE_MS);
+      if (place && sizeNow() !== size && !holding()) return disturb(RESIZE_SETTLE_MS);
       if (was) {
         place = measure() ?? place;
         size = sizeNow();
@@ -167,7 +179,7 @@ export function createPlaceKeeper(env: PlaceEnv) {
 
   /** A scroll: the reader's if they meant it, else a stray to put right. */
   function scrolled(): void {
-    if (performance.now() < intentUntil) {
+    if (holding() || performance.now() < intentUntil) {
       intend(CHAIN_MS);
       meant = true;
     }
@@ -180,7 +192,7 @@ export function createPlaceKeeper(env: PlaceEnv) {
     window.clearTimeout(strayTimer);
     strayTimer = window.setTimeout(() => {
       strayTimer = 0;
-      if (disturbed() || performance.now() < intentUntil || !place || !hasPages()) return;
+      if (disturbed() || holding() || performance.now() < intentUntil || !place || !hasPages()) return;
       putBack("a scroll nobody asked for");
     }, STRAY_MS);
   }
@@ -238,9 +250,37 @@ export function createPlaceKeeper(env: PlaceEnv) {
   };
   const inputs = ["pointerdown", "touchstart", "wheel", "keydown"] as const;
   for (const t of inputs) window.addEventListener(t, onInput, { passive: true, capture: true });
+  // What is held down. Fingers are counted from the touch events: a
+  // touch that turns into a scroll has its pointer cancelled at once,
+  // while its touch events run to the lift. The lift is an input too —
+  // the momentum that follows is the reader's.
+  // Only presses on the pages count: one elsewhere (a pane's edge
+  // being dragged) resizes the view rather than scrolls it.
+  const onPages = (t: EventTarget | null) => t instanceof Node && area.contains(t);
+  const onTouch = (e: TouchEvent) => {
+    const was = touches;
+    touches = Array.from(e.touches).filter((t) => onPages(t.target)).length;
+    if (was && !touches) onInput();
+  };
+  const touchEnds = ["touchstart", "touchend", "touchcancel"] as const;
+  for (const t of touchEnds) window.addEventListener(t, onTouch, { passive: true, capture: true });
+  const onPointer = (e: PointerEvent) => {
+    if (e.pointerType === "touch") return;
+    if (e.type === "pointerdown") {
+      if (onPages(e.target)) pressed.add(e.pointerId);
+    } else if (pressed.delete(e.pointerId)) onInput();
+  };
+  const pointerEnds = ["pointerdown", "pointerup", "pointercancel"] as const;
+  for (const t of pointerEnds) window.addEventListener(t, onPointer, { passive: true, capture: true });
+  /** Away from the window, nothing is held (a lift may never be heard). */
+  const letGo = () => {
+    touches = 0;
+    pressed.clear();
+  };
   // The app switcher, Stage Manager, another app in front: the window
   // loses focus before (or without) the page being hidden.
   const onBlur = () => {
+    letGo();
     if (blurred || hidden()) return;
     blurred = true;
     env.log?.(`window left at ${describe(place)}`);
@@ -291,6 +331,7 @@ export function createPlaceKeeper(env: PlaceEnv) {
   // --- the background ----------------------------------------------------------
   const onVisibility = () => {
     if (hidden()) {
+      letGo();
       env.log?.(`app hidden at ${describe(place)}`);
       return;
     }
@@ -329,6 +370,8 @@ export function createPlaceKeeper(env: PlaceEnv) {
       observer.disconnect();
       document.removeEventListener("visibilitychange", onVisibility);
       for (const t of inputs) window.removeEventListener(t, onInput, { capture: true });
+      for (const t of touchEnds) window.removeEventListener(t, onTouch, { capture: true });
+      for (const t of pointerEnds) window.removeEventListener(t, onPointer, { capture: true });
       window.removeEventListener("blur", onBlur);
       window.removeEventListener("focus", onFocus);
       window.clearTimeout(strayTimer);

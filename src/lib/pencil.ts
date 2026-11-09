@@ -8,8 +8,11 @@
 // - The system's text-selection menu (Copy, Look Up, …), dismissed over
 //   a selection in the PDF, where it covers the viewer's own bar. Nothing
 //   on the page can keep it from appearing, so it is dismissed as the
-//   selection settles, and once more a moment later in case it came up
-//   after. Selections elsewhere (the notes) keep their menu.
+//   selection settles, once more a moment later in case it came up
+//   after, and then every quarter second while the selection lasts (a
+//   handle let go, or a tap on the selection, brings it up again without
+//   the page hearing of it). Selections elsewhere (the notes) keep
+//   their menu.
 //
 // iPad only: elsewhere there is nothing to hear and no such menu.
 import { appLog } from "./store";
@@ -17,6 +20,10 @@ import { invoke, isTauri } from "./tauri";
 
 /** After a selection in the PDF settles: dismiss the menu, and again. */
 const MENU_HIDE_MS = [60, 400];
+/** And for as long as the selection lasts, this often: the menu also
+ *  comes up when a selection handle is let go or the selection is
+ *  tapped — gestures of the system's that the page hears nothing of. */
+const MENU_WATCH_MS = 250;
 
 function selectionInPdf(): boolean {
   const sel = document.getSelection();
@@ -27,14 +34,20 @@ function selectionInPdf(): boolean {
 
 function watchPdfSelections(): void {
   let timers: number[] = [];
+  let watch = 0;
+  const dismiss = () => {
+    if (selectionInPdf()) void invoke("plugin:pencil|hide_edit_menu").catch(() => {});
+    else stopWatch();
+  };
+  const stopWatch = () => {
+    window.clearInterval(watch);
+    watch = 0;
+  };
   const hideSoon = () => {
-    if (!selectionInPdf()) return;
+    if (!selectionInPdf()) return stopWatch();
     timers.forEach(clearTimeout);
-    timers = MENU_HIDE_MS.map((ms) =>
-      window.setTimeout(() => {
-        if (selectionInPdf()) void invoke("plugin:pencil|hide_edit_menu").catch(() => {});
-      }, ms),
-    );
+    timers = MENU_HIDE_MS.map((ms) => window.setTimeout(dismiss, ms));
+    watch ||= window.setInterval(dismiss, MENU_WATCH_MS);
   };
   document.addEventListener("selectionchange", hideSoon);
   document.addEventListener("touchend", hideSoon, { passive: true });

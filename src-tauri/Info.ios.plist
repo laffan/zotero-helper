@@ -14,5 +14,41 @@
   -->
   <key>UIViewControllerBasedStatusBarAppearance</key>
   <true/>
+  <!--
+    Trackpad and mouse on the iPad. With a Magic Keyboard in landscape,
+    two-finger scrolls reached the web view turned a quarter round: a
+    vertical swipe arrived as a horizontal one, so the continuous view
+    (which only scrolls vertically) didn't move while the paged view
+    (which turns on either axis) did. Two settings, both needed:
+
+    - UIApplicationSupportsIndirectInputEvents: UIKit hands the pointer's
+      events on natively rather than as touch-compatibility events.
+    - UIApplicationSceneManifest, naming Tao's scene delegate: without
+      it Tao starts on the legacy application-delegate path, and the
+      window is not created in its scene's orientation. One window
+      only. (TaoSceneDelegate is tao's own class, 0.37 and later.)
+
+    Both are read from the built app's Info.plist: a hot reload does not
+    pick them up, the app has to be rebuilt and reinstalled.
+  -->
+  <key>UIApplicationSupportsIndirectInputEvents</key>
+  <true/>
+  <key>UIApplicationSceneManifest</key>
+  <dict>
+    <key>UIApplicationSupportsMultipleScenes</key>
+    <false/>
+    <key>UISceneConfigurations</key>
+    <dict>
+      <key>UIWindowSceneSessionRoleApplication</key>
+      <array>
+        <dict>
+          <key>UISceneConfigurationName</key>
+          <string>Default Configuration</string>
+          <key>UISceneDelegateClassName</key>
+          <string>TaoSceneDelegate</string>
+        </dict>
+      </array>
+    </dict>
+  </dict>
 </dict>
 </plist>

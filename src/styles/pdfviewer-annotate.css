@@ -13,6 +13,12 @@
   background: var(--panel);
   box-shadow: 0 2px 8px rgb(0 0 0 / 0.25);
   white-space: nowrap;
+  /* A press on it is a press on a button, never the start of a
+     selection, a callout or a scroll. */
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  touch-action: none;
 }
 .pdf-selection-bar-sep {
   width: 1px;

@@ -17,6 +17,14 @@
 // unselectable content is pressed — so a tap in a margin did nothing —
 // and on iPad a tap on text cleared it only after the tap gestures had
 // been told apart.
+//
+// On the iPad the system's own selection furniture is in the way: its
+// handles stand a finger's width above the first line and below the
+// last, taking the touches around them, and its gestures can swallow
+// the click a tap on the bar would end in. So where fingers select, the
+// bar keeps its distance from the passage (`TOUCH_GAP`), and its
+// buttons act on the release of a press rather than on the click
+// (`onRelease`). The system's menu is dismissed from lib/pencil.ts.
 import { ANNOTATION_COLORS } from "../lib/highlights";
 import { rangeText } from "./annotate";
 import { COPY_ICON, HIGHLIGHT_ICON, LOOKUP_ICON, NOTE_ICON, SPARKLES_ICON, UNDERLINE_ICON } from "./icons";
@@ -40,6 +48,35 @@ export interface SelectionBarHandlers {
 }
 
 const MODE_KEY = "zh-pdf-mark-type";
+/** How far the bar stands from the passage, CSS px: with a pointer, and
+ *  where the system's selection handles are (clear of their knobs and
+ *  the touches they take). */
+const GAP = 8;
+const TOUCH_GAP = 30;
+const fingers = () =>
+  document.documentElement.classList.contains("ipados") || window.matchMedia?.("(pointer: coarse)").matches;
+
+/** `act` on the release of a finger's or the Pencil's press on `btn`,
+ *  or on a click no such press led to (the mouse, whose clicks nothing
+ *  swallows, and the keyboard). Never twice for one press. */
+function onRelease(btn: HTMLElement, act: () => void): void {
+  let down = false;
+  let actedAt = -Infinity;
+  btn.addEventListener("pointerdown", (e) => (down = e.pointerType !== "mouse"));
+  btn.addEventListener("pointercancel", () => (down = false));
+  btn.addEventListener("pointerup", (e) => {
+    if (!down) return;
+    down = false;
+    const r = btn.getBoundingClientRect();
+    const inside = e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom;
+    if (!inside) return;
+    actedAt = performance.now();
+    act();
+  });
+  btn.addEventListener("click", () => {
+    if (performance.now() - actedAt > 700) act();
+  });
+}
 
 function stored(key: string): string | null {
   try {
@@ -119,7 +156,7 @@ export function createSelectionBar(
     modeBtns.highlight.innerHTML = HIGHLIGHT_ICON;
     modeBtns.underline.innerHTML = UNDERLINE_ICON;
     for (const m of ["highlight", "underline"] as const) {
-      modeBtns[m].addEventListener("click", () => {
+      onRelease(modeBtns[m], () => {
         mode = m;
         store(MODE_KEY, m);
         paintMode();
@@ -131,7 +168,7 @@ export function createSelectionBar(
     for (const color of ANNOTATION_COLORS) {
       const s = button("pdf-mark-swatch");
       s.style.setProperty("--swatch", color);
-      s.addEventListener("click", () => {
+      onRelease(s, () => {
         if (current) handlers.onAnnotate?.(current.range, mode, color);
         window.getSelection()?.removeAllRanges();
         hide();
@@ -145,7 +182,7 @@ export function createSelectionBar(
   }
   const copy = button("pdf-selection-icon", "Copy");
   copy.innerHTML = COPY_ICON;
-  copy.addEventListener("click", () => {
+  onRelease(copy, () => {
     if (!current) return;
     const text = current.text;
     // The Clipboard API, or — where it is refused — the browser's own
@@ -158,7 +195,7 @@ export function createSelectionBar(
   if (handlers.onQuote) {
     const quote = button("pdf-selection-icon", "Add to notes — a quote with a link back to the page");
     quote.innerHTML = NOTE_ICON;
-    quote.addEventListener("click", () => {
+    onRelease(quote, () => {
       if (current) handlers.onQuote?.(current.text, current.page);
       window.getSelection()?.removeAllRanges();
       hide();
@@ -168,7 +205,7 @@ export function createSelectionBar(
   const definition = createLookupPopup(root);
   if (lookup) {
     lookup.innerHTML = LOOKUP_ICON;
-    lookup.addEventListener("click", () => {
+    onRelease(lookup, () => {
       if (!current) return;
       const { text, page, range } = current;
       const answer = handlers.onLookup!(text, page, range);
@@ -178,7 +215,7 @@ export function createSelectionBar(
   const explain = handlers.onExplain ? button("pdf-selection-explain", "Ask the AI to explain this passage") : null;
   if (explain) {
     explain.innerHTML = SPARKLES_ICON;
-    explain.addEventListener("click", () => {
+    onRelease(explain, () => {
       if (current) handlers.onExplain?.(current.text, current.page, current.range);
       window.getSelection()?.removeAllRanges();
       hide();
@@ -239,8 +276,9 @@ export function createSelectionBar(
     // Above the passage on every platform, clear of what is being
     // marked; below it only when its first line is at the very top of
     // the view.
-    const above = r.top - host.top - bar.offsetHeight - 8;
-    const below = r.bottom - host.top + 8;
+    const gap = fingers() ? TOUCH_GAP : GAP;
+    const above = r.top - host.top - bar.offsetHeight - gap;
+    const below = r.bottom - host.top + gap;
     bar.style.left = `${left}px`;
     bar.style.top = `${above < 8 ? below : above}px`;
   }

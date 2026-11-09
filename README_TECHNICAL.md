@@ -572,7 +572,16 @@ input anywhere (a touch, a pointer, a wheel, a key) or a navigation
 (`navigate.ts` — a page, an outline entry, a search hit, a cited
 passage, however long after the click it lands) makes the scrolls of
 the next 1.5s the reader's, and each one carries that on (momentum, a
-smooth scroll). And it counts only while the view is undisturbed: a
+smooth scroll). While a finger, the Pencil or a mouse button is down on
+the pages, every scroll is the reader's, for as long as it is down, and
+the lift is an input of its own (the momentum after it): a drag that
+rested a while and then went on used to outlast the 1.5s its first
+touch gave it, its later scrolls counted as nobody's, and the view went
+back to where the finger had rested as it was let go. Fingers are
+counted from touch events — a touch that becomes a scroll has its
+pointer cancelled at once — and only presses that begin on the pages
+count, so a pane's edge being dragged is still a resize. And it counts
+only while the view is undisturbed: a
 resize, the window losing focus (the app switcher, Stage Manager), the
 app being hidden and the 0.7s after it comes back disturb it, and so
 does a scroll area of another size than when the place was last taken
@@ -635,7 +644,13 @@ written; pressing it heads the line with the page in view —
 `Example note text` becomes
 `[p. 22](zotero://open-pdf/library/items/6M6B2TX9?page=22) - Example note text`
 (after any `- ` / `> ` / `## ` marker, replacing a page link already
-there). Page pills move the open viewer rather than leaving for
+there). Pressed and dragged out onto the pages instead (`startPress` in
+`citeGutter.ts`), a dashed line runs from the icon to the pointer — the
+notepad's quote button's line, see The notepad — and let go over a
+highlight or a spot on a page, the line is headed with a link to that:
+the highlight itself (`…?page=22&annotation=KEY`, so the pill takes its
+colour and following it selects the highlight), or the page the spot is
+on; let go anywhere else, nothing is added. Page pills move the open viewer rather than leaving for
 Zotero.
 
 **Reading mode.** The first button in the bottom bar (R from the
@@ -979,9 +994,20 @@ viewer's own bar, and nothing on the page can stop it — CSS
 PDF's text layer settles, `src/lib/pencil.ts` asks `tauri-plugin-pencil`
 to dismiss it (`hide_edit_menu`: WebKit's `UIEditMenuInteraction`, found
 among the web view's interactions, `dismissMenu()`; on iOS 15,
-`UIMenuController`), and again 400ms later in case it came up after. It
-may show for a moment before it goes. Selections elsewhere — the notes —
-keep their menu.
+`UIMenuController`), again 400ms later in case it came up after, and
+then every 250ms for as long as the selection lasts: letting go of a
+selection handle, or tapping the selection, brings the menu up again
+without the page hearing of either. It may show for a moment before it
+goes. Selections elsewhere — the notes — keep their menu.
+
+The system's selection handles stay, and they take the touches around
+their knobs (above the first line's start, below the last line's end).
+So where fingers select (the iPad, or a coarse pointer) the viewer's bar
+stands 30px from the passage rather than 8 (`TOUCH_GAP` in
+`selectionBar.ts`), and its buttons act on the release of a finger's or
+the Pencil's press (`onRelease`) rather than on the click, which the
+system's gestures could swallow; the mouse and the keyboard still click.
+The bar itself can't be selected, called out or scrolled from.
 
 Why it keeps up with fast writing:
 - *No page re-render per stroke.* Highlights are painted into the pdf.js
@@ -1713,6 +1739,23 @@ the app's WebKit targets have it, but a test browser may need a polyfill.
 
   Keep `rust-toolchain.toml`: swift-rs still needs `llvm-tools` to build
   for iOS with Xcode 27.
+- Trackpad scrolling (Magic Keyboard) needs two keys in
+  `src-tauri/Info.ios.plist`, as in Snorkle, where the same fault was
+  found: in landscape, two-finger scrolls reached the web view turned a
+  quarter round — a vertical swipe arrived as a horizontal one — so the
+  continuous view, which only scrolls vertically, didn't move, while a
+  finger scrolled it fine. `UIApplicationSupportsIndirectInputEvents`
+  makes UIKit deliver the pointer natively, and a single-window
+  `UIApplicationSceneManifest` naming `TaoSceneDelegate` puts Tao (0.37
+  or later) on the scene lifecycle, so the window is created in its
+  scene's orientation; without the manifest Tao starts on the legacy
+  application-delegate path. Both are read from the built app, so a
+  change to them needs a rebuild and reinstall, not a hot reload. The
+  native plugins already find their windows through the scenes. To
+  check on a device: in landscape and in portrait, launched in each,
+  two fingers on the trackpad scroll the continuous view vertically and
+  turn sets in the paged view; a finger still scrolls; the status bar
+  still hides full screen and returns in a windowed layout.
 - The capture browser works in-app on iPad via a custom plugin
   (`src-tauri/tauri-plugin-capture-view/`): a native WKWebView overlays the
   modal body, PDFs are recognized by response MIME type and downloaded

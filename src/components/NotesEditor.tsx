@@ -18,7 +18,7 @@ import { appLog, useStore } from "../lib/store";
 import type { NoteMeta } from "../lib/types";
 import type { NotesEditorHandle } from "../noteseditor/editor";
 import { NotesPrompts } from "./NotesPrompts";
-import { currentReaderPage, showInReader } from "./ReaderPane";
+import { currentReaderPage, readerPlaceAt, showInReader } from "./ReaderPane";
 
 const SAVE_DELAY_MS = 600;
 
@@ -121,10 +121,25 @@ export function NotesEditor({ itemKey, initialText, initialMeta, pdfAttKey }: Pr
         },
         follow: (href) => follow(itemKey, href),
         annotationColor: (key) => annotationByKey(useStore.getState().library.items, key)?.color,
-        cite: () => {
-          const page = pdfAttKey ? currentReaderPage(pdfAttKey) : null;
-          if (!pdfAttKey || page == null) return null;
-          return `[p. ${page}](${pdfLink(useStore.getState().settings, pdfAttKey, page)})`;
+        cite: {
+          page: () => {
+            const page = pdfAttKey ? currentReaderPage(pdfAttKey) : null;
+            if (!pdfAttKey || page == null) return null;
+            return `[p. ${page}](${pdfLink(useStore.getState().settings, pdfAttKey, page)})`;
+          },
+          // The icon dragged onto the pages: the highlight under the
+          // point (by its own page label, as its quote is cited), or
+          // the page there.
+          at: (x, y) => {
+            if (!pdfAttKey || currentReaderPage(pdfAttKey) == null) return null;
+            const t = readerPlaceAt(x, y);
+            if (!t) return null;
+            const { settings, library } = useStore.getState();
+            const label = t.kind === "annotation" ? annotationByKey(library.items, t.key)?.pageLabel : "";
+            const page = label || t.pageIndex + 1;
+            const key = t.kind === "annotation" ? t.key : undefined;
+            return `[p. ${page}](${pdfLink(settings, pdfAttKey, page, key)})`;
+          },
         },
       });
       editorRef.current = handle;

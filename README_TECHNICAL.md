@@ -1714,6 +1714,27 @@ the app's WebKit targets have it, but a test browser may need a polyfill.
 
 ### iPad build notes
 
+- After moving or copying the checkout, a build can fail with `failed to
+  read plugin permissions` and a missing `.toml` file under the **old**
+  checkout's `src-tauri/target` directory. Tauri's generated permission
+  metadata contains absolute paths that can survive in Cargo's build cache.
+  From the current checkout root, run:
+
+  ```sh
+  npm run ios:clean
+  npm run ios:build
+  ```
+
+  Stop any running builds first. `ios:clean` runs Cargo's full clean so both
+  host build-script outputs and iOS target artifacts are regenerated. It
+  removes compiled artifacts for all targets in the configured Cargo target
+  directory; the next build recompiles dependencies. It preserves source,
+  lockfiles, and `src-tauri/gen/apple`, including Xcode signing settings.
+  Disabling Xcode script sandboxing does not repair stale paths. If the
+  error still names the old checkout after cleaning, check `CARGO_TARGET_DIR`,
+  Cargo configuration, and the Xcode project's Build Rust Code phase for
+  references to that location.
+
 - Xcode 27 (iOS 27 SDK) needs Tauri 2.12 or later: its `swift build`
   uses the new Swift Build backend, which older swift-rs (pulled in by
   Tauri ≤ 2.11) can't drive, and the build fails compiling Tauri's own

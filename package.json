@@ -7,6 +7,7 @@
     "dev": "vite",
     "build": "npm run check:lines && tsc && vite build",
     "check:lines": "node scripts/check-line-limit.mjs",
+    "ios:clean": "cargo clean --manifest-path src-tauri/Cargo.toml",
     "ios:build": "tauri ios build --export-method debugging",
     "ios:deploy": "bash scripts/ios-deploy.sh",
     "preview": "vite preview",

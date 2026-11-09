@@ -549,7 +549,15 @@ however hard the flick (CSS scroll snapping, so the renderer and
 everything over the pages is unchanged). A mouse wheel notch or a
 trackpad swipe turns one set too, as do the arrow keys; zooming in goes back
 to continuous, since pages larger than the view have no single place
-to rest. Switching scroll direction keeps the page in view, and a
+to rest. Going to a page or a set scrolls the scroll area and nothing else
+(`scrollAreaTo` in `anchor.ts`), placing the set from the area's own
+scroll-padding: `scrollIntoView`, used before, also scrolled the
+viewer's `overflow: hidden` frames whenever anything overflowed them,
+by the set's padding — large with two or three pages to a set — and
+nothing scrolled them back, so changing the page count (in reading
+mode, by its shortcut) left the pages shifted up over a grey band,
+still there after leaving reading mode. The two frames are also pinned
+at 0 (`pinFrames`), whatever else might scroll them. Switching scroll direction keeps the page in view, and a
 resize (reading mode in or out, a panel opening) keeps the set: the
 one shown when it began is put back, centred, once the pages are laid
 out again (`watchResize` in `anchor.ts` — the browser may otherwise

@@ -4,6 +4,7 @@
 // Highlights tab beside the viewer already lists, filters and quotes
 // them.
 import { annotationPosition, type Annotation } from "../lib/highlights";
+import { scrollAreaTo } from "./anchor";
 import type { LayoutMode, PageRecord, PageViewport } from "./types";
 
 /** PDF user-space point → top-left-origin page units for a scale-1
@@ -44,7 +45,7 @@ export function createAnnotationLayer(scrollArea: HTMLElement, viewer: Annotatio
     const path = pos.paths?.[0];
     const anchor = rect ? [rect[0], rect[3]] : path && path.length >= 2 ? [path[0], path[1]] : null;
     if (!anchor) {
-      p.wrapper.scrollIntoView({ behavior: "smooth", block: "center" });
+      scrollAreaTo(scrollArea, p.wrapper, viewer.getLayoutMode() === "horizontal", { block: "center", behavior: "smooth" });
       return;
     }
     const [vx, vy] = pdfPointToViewport(p.viewport, anchor[0], anchor[1]);

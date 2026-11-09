@@ -77,6 +77,62 @@ export function scrollToPageFraction(area: HTMLElement, wrapper: HTMLElement, x:
   area.scrollTo({ left: Math.max(0, left), top: Math.max(0, top), behavior: "smooth" });
 }
 
+/** Bring `el` (a page, a fold) into view by scrolling the scroll area
+ *  alone: at the start of the view — after the area's scroll-padding,
+ *  which in the paged view centres the set (pdfviewer.css) — or at its
+ *  centre. `horiz`: along the row, the pages running side by side.
+ *
+ *  Not `scrollIntoView`, which also scrolls every box around the area,
+ *  `overflow: hidden` ones included — and nothing scrolls those back,
+ *  so the whole viewer stays shifted, a band of nothing below it. And
+ *  on WebKit an instant `scrollIntoView` in the paged view put the set's
+ *  first page at the very top of the view, its scroll-padding ignored
+ *  and the set never snapped again: with two or three pages to a set
+ *  (their pad a large part of the view) the set sat at the top with a
+ *  gap beneath, until the next swipe. */
+export function scrollAreaTo(
+  area: HTMLElement,
+  el: HTMLElement,
+  horiz: boolean,
+  opts: { block?: "start" | "center"; behavior?: ScrollBehavior } = {},
+): void {
+  const er = el.getBoundingClientRect();
+  const ar = area.getBoundingClientRect();
+  const cs = getComputedStyle(area);
+  const centre = opts.block === "center";
+  // "auto" (no scroll-padding) is no room.
+  const padding = (v: string) => parseFloat(v) || 0;
+  const behavior = opts.behavior ?? "auto";
+  if (horiz) {
+    const lead = centre ? (area.clientWidth - er.width) / 2 : padding(cs.scrollPaddingLeft);
+    const left = area.scrollLeft + er.left - (ar.left + area.clientLeft) - lead;
+    area.scrollTo({ left: Math.max(0, Math.round(left)), behavior });
+  } else {
+    const lead = centre ? (area.clientHeight - er.height) / 2 : padding(cs.scrollPaddingTop);
+    const top = area.scrollTop + er.top - (ar.top + area.clientTop) - lead;
+    area.scrollTo({ top: Math.max(0, Math.round(top)), behavior });
+  }
+}
+
+/** Keep boxes that are never meant to scroll — the viewer's frame
+ *  around the scroll area, `overflow: hidden` — at their origin. Script
+ *  can still scroll them (a `scrollIntoView`, a focus, WebKit's own
+ *  revealing of a caret), and once moved nothing moved them back: the
+ *  pages sat shifted up, a band of nothing below them. Their scroll
+ *  events are heard, so whatever moved them, they are put back. */
+export function pinFrames(...frames: HTMLElement[]): void {
+  for (const f of frames) {
+    f.addEventListener(
+      "scroll",
+      () => {
+        if (f.scrollTop) f.scrollTop = 0;
+        if (f.scrollLeft) f.scrollLeft = 0;
+      },
+      { passive: true },
+    );
+  }
+}
+
 /** Put the point `frac` of the way down page `p` at the centre of the
  *  view (at once). Side by side, the page is centred across instead. */
 export function centerPagePoint(area: HTMLElement, p: PageRecord, frac: number, horiz: boolean): void {

@@ -8,7 +8,7 @@
 // PDF has loaded) — so it tells place.ts that the scrolls to come are
 // the reader's. An instant move is the layout's own (a mode switch, the
 // place put back) and says nothing.
-import { scrollToPageFraction, scrollToPagePoint } from "./anchor";
+import { scrollAreaTo, scrollToPageFraction, scrollToPagePoint } from "./anchor";
 import type { PageRecord } from "./types";
 
 export interface NavigatorEnv {
@@ -41,9 +41,8 @@ export function createNavigator(env: NavigatorEnv) {
     if (env.isPaged()) idx -= idx % env.perSet();
     const w = pages[idx]?.wrapper;
     if (!w) return;
-    const behavior = smooth ? "smooth" : "auto";
-    if (env.horizontal()) w.scrollIntoView({ behavior, inline: "start", block: "nearest" });
-    else w.scrollIntoView({ behavior, block: "start" });
+    // The scroll area only — scrollAreaTo (anchor.ts) says why.
+    scrollAreaTo(area, w, env.horizontal(), { behavior: smooth ? "smooth" : "auto" });
   }
 
   /** A place on a page: `top` in PDF user space (y up), null for the

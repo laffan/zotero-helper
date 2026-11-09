@@ -20,7 +20,7 @@
 import type { Annotation } from "../lib/highlights";
 import { PDFJS_ASSETS } from "../lib/pdfjsAssets";
 import {
-  centerPagePoint, pageFracAtCenter, restoreAnchor, viewAnchor,
+  centerPagePoint, pageFracAtCenter, pinFrames, restoreAnchor, viewAnchor,
 } from "./anchor";
 import { createAnnotating, type DefinedWord } from "./annotating";
 import { createAnnotationLayer } from "./annotations";
@@ -270,6 +270,7 @@ export function createPdfViewer(container: HTMLElement, opts: PdfViewerOptions =
   const citeMark = createCiteMark({ getPdfDoc: () => pdfDoc, getPages: () => pages, reveal: revealPoint, goToPage: (n) => goToPage(n) });
 
   attachDarkPages(body, tb.darkBtn);
+  pinFrames(root, body);
 
   // --- zoom & modes ---------------------------------------------------------
   // While folded, a zoom step scales the folds in place via a multiplier

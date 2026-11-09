@@ -25,6 +25,7 @@
 // decoded images, which pdf.js keeps until told to clean up — for a
 // scanned book, megabytes a page).
 import { annotationPosition, type Annotation } from "../lib/highlights";
+import { scrollAreaTo } from "./anchor";
 import { drawAnnotations } from "./paint";
 import { COLLAPSE_ICON, EXPAND_ICON } from "./icons";
 import { adoptViewport, pageViewport } from "./pageSizes";
@@ -586,7 +587,7 @@ export function createFoldLayer(scrollArea: HTMLElement, env: FoldEnv) {
   function goToPage(n: number): void {
     if (!folds.length) return;
     const target = folds.find((f) => f.pageIndex >= n - 1) || folds[folds.length - 1];
-    target.wrapper.scrollIntoView({ behavior: "smooth", block: "start" });
+    scrollAreaTo(scrollArea, target.wrapper, false, { behavior: "smooth" });
   }
 
   /** Where the view starts: the first fold reaching into it, and how

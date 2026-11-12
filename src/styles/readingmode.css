@@ -173,14 +173,16 @@
   border-color: var(--text);
 }
 
-/* Where the reader is ("7 / 13"), at the bottom centre — the bottom
-   bar's page indicator, which reading mode hides; a press opens the
-   page picker (readingProgress.ts). Only in reading mode. */
+/* Where the reader is ("54% | 7 of 13 | 1:33pm"), at the bottom centre —
+   the bottom bar's page indicator, which reading mode hides: the place,
+   whose press opens the page picker (readingProgress.ts), and the clock
+   or timer (clock.ts, pdfviewer-clock.css). Only in reading mode. */
 .pdf-reading-progress {
   display: none;
 }
 .app.reading-mode .pdf-reading-progress:not([hidden]) {
-  display: block;
+  display: flex;
+  align-items: baseline;
   position: fixed;
   z-index: 50;
   bottom: calc(20px + env(safe-area-inset-bottom));
@@ -199,6 +201,10 @@
 }
 .app.reading-mode .pdf-reading-progress:hover {
   opacity: 1;
+}
+.pdf-reading-progress-pages {
+  padding: 0;
+  color: inherit;
 }
 
 /* The notepad's icon (ReadingNotepad.tsx): a filled red rectangle, the

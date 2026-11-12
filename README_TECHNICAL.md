@@ -166,7 +166,8 @@ src/            React + TypeScript UI (Vite, zustand, MiniSearch)
                 (a selection's leap to a page's end, undone),
                 readingProgress (the page indicator — the bar's, and
                 reading mode's — the thumbnails and the page picker
-                its presses open), magnify (the
+                its presses open), clock (the clock beside it, and the
+                reading timer it turns into), magnify (the
                 pinch's loupe over the pages), pageSizes (odd-sized
                 pages brought to the typical page's size)
   pdfviewer/ink/
@@ -515,13 +516,26 @@ bound (`data-shortcut` on the button, read by `tooltips.ts`). The bar
 is in sections 14px apart — reading mode and dark pages, pages per
 screen (fit one / two / three; four and five from the keyboard only,
 4 and 5 — the three-page button is lit then, the number over its
-middle page, `.pdf-fit-more`), scroll direction, paged / continuous,
+last page, `.pdf-fit-more`), scroll direction, paged / continuous,
 folding, zoom (−, the zoom or fit, and + as one bordered group), the
 sentence tool and the pen — and, at its right, where the reader is:
-"54% | Pg 7 of 13" (the share of the document up to the page in view,
-then the page, or the set's range, "Pg 7–9 of 13"), a press on which
-shows every page at a glance, the thumbnail grid (G from the keyboard;
-`createPageFinder` in `readingProgress.ts`). The viewer is a port of Hush's: horizontal or vertical
+"54% | 7 of 13 | 1:33pm" (the share of the document up to the page in
+view, then the page, or the set's range, "7–9 of 13", then the time).
+A press on the place shows every page at a glance, the thumbnail grid
+(G from the keyboard; `createPageFinder` in `readingProgress.ts`); a
+press on the time, a button of its own, opens the reading timer
+(`clock.ts`): a small card in the upper part of the window — clear of
+the iPad's keyboard — over a faint backdrop, with For (hours and
+minutes) or Until (a time of day; one already past today is
+tomorrow's) and Start. While a timer runs, the time's place counts
+down ("24:59", "1:05:00"), and a press opens the card again with when
+it ends and Cancel Timer. At zero it shows 0:00 in red, pulsing, until
+a press puts the clock back (or ten minutes pass). There is one timer
+for the app, on this device (`zh-reading-timer`, its end): it carries on
+through switching PDFs and closing the app, and every clock shows it —
+reading mode's pill too. The card's last For is remembered
+(`zh-reading-timer-last`). One ticker updates the clocks: each second
+while a timer runs, else as each minute turns. The viewer is a port of Hush's: horizontal or vertical
 scrolling, fit one / two / three pages, zoom, a thumbnail grid, the
 PDF's own links, Zotero's highlights, underlines and ink painted into
 the pages, and the **folded view**, which collapses the paper to the regions around
@@ -707,8 +721,9 @@ the button comes up under the finger and fills as the second counts —
 to name a new bookmark, or rename or remove the one there
 (`bookmarkHold.ts`; while the press lasts the page's text can't be
 selected, so the iPad's own long press doesn't start under it). The bottom bar's page
-indicator ("54% | Pg 7 of 13") floats at the bottom centre of the screen, 20px
-up, and a press on it opens the page picker — the thumbnail grid as a
+indicator ("54% | 7 of 13 | 1:33pm") floats at the bottom centre of the screen, 20px
+up, and a press on the place opens the page picker (a press on the time,
+the reading timer) — the thumbnail grid as a
 popup over the pages, the page being read marked and in view, with the
 PDF's outline (when it has one) as a column at its left, the section
 being read marked (over the notepad and reading mode's buttons); a

@@ -1,6 +1,7 @@
 // Reading mode's place in the document: the page indicator the bottom
-// bar shows ("54% | Pg 7 of 13", "54% | Pg 7–9 of 13" for a set — the
-// share of the document up to the page in view), floating at the bottom
+// bar shows ("54% | 7 of 13", "54% | 7–9 of 13" for a set — the share
+// of the document up to the page in view — then the clock, which is
+// also the reading timer, clock.ts), floating at the bottom
 // centre of the screen while the bar is hidden. It shows only in
 // reading mode (readingmode.css; the viewer itself doesn't know the
 // mode). A press opens the page picker — the thumbnail grid as a popup
@@ -8,7 +9,9 @@
 // with the PDF's outline, when it has one, as a column at its left.
 // The same text is the bottom bar's indicator, whose press shows every
 // page at a glance — the thumbnail grid over the viewer
-// (createPageFinder puts the two together).
+// (createPageFinder puts the two together). The clock is a button of its
+// own beside each, so a press on it opens the timer, not the pages.
+import { createClock } from "./clock";
 import type { OutlineEntry } from "./outline";
 import { createThumbnailManager, type ThumbnailEnv } from "./thumbnails";
 
@@ -26,7 +29,7 @@ export interface ReadingProgressEnv {
 export function progressText(first: number, last: number, total: number): string {
   if (!total) return "";
   const pct = Math.round((first / total) * 100);
-  return `${pct}% | Pg ${last > first ? `${first}–${last}` : first} of ${total}`;
+  return `${pct}% | ${last > first ? `${first}–${last}` : first} of ${total}`;
 }
 
 /** The outline as a column of links, the section being read marked. */
@@ -64,22 +67,29 @@ function outlineColumn(outline: OutlineEntry[], page: number, pick: (e: OutlineE
 }
 
 export function createReadingProgress(root: HTMLElement, env: ReadingProgressEnv) {
-  const pill = document.createElement("button");
-  pill.type = "button";
+  const pill = document.createElement("div");
   pill.className = "pdf-reading-progress";
-  pill.title = "Go to a page";
-  pill.addEventListener("click", () => {
+  const pages = document.createElement("button");
+  pages.type = "button";
+  pages.className = "pdf-reading-progress-pages";
+  pages.title = "Go to a page";
+  pages.addEventListener("click", () => {
     const side = outlineColumn(env.getOutline(), env.currentPage(), env.goToEntry);
     env.openPicker(side);
   });
+  const clock = createClock();
+  pill.append(pages, clock.el);
   root.appendChild(pill);
   return {
     /** The indicator's text, as the bottom bar shows it. */
     set(text: string): void {
-      if (pill.textContent !== text) pill.textContent = text;
+      if (pages.textContent !== text) pages.textContent = text;
       pill.hidden = !text;
     },
-    destroy: () => pill.remove(),
+    destroy(): void {
+      clock.remove();
+      pill.remove();
+    },
   };
 }
 
@@ -105,6 +115,8 @@ export function createPageFinder(body: HTMLElement, root: HTMLElement, indicator
     },
   });
   indicator.addEventListener("click", () => indicator.classList.toggle("active", thumbs.toggle()));
+  const clock = createClock();
+  indicator.after(clock.el);
   return {
     /** The page (or set, `first`–`last`) of `total` in view. */
     set(first: number, last: number, total: number): void {
@@ -116,6 +128,7 @@ export function createPageFinder(body: HTMLElement, root: HTMLElement, indicator
     destroy(): void {
       thumbs.destroy();
       pill.destroy();
+      clock.remove();
     },
   };
 }

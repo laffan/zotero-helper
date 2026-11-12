@@ -167,13 +167,6 @@
   background-image: radial-gradient(circle, color-mix(in srgb, var(--text-dim) 30%, transparent) 1px, transparent 1.3px);
   background-size: 20px 20px;
 }
-/* Following the PDF to another page: a short glide. */
-.notepad-canvas.following .notepad-layer {
-  transition: transform 0.35s ease;
-}
-.notepad-canvas.following {
-  transition: background-position 0.35s ease;
-}
 .notepad-canvas.erasing {
   cursor: cell;
 }
@@ -187,6 +180,18 @@
   width: 0;
   height: 0;
 }
+/* The ink: one canvas the size of the view, drawn by ink.ts (the
+   strokes are pixels, not elements — what the pen costs doesn't grow
+   with the pad). */
+.notepad-ink {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+/* The lasso's loop, while it is drawn. */
 .notepad-strokes {
   position: absolute;
   top: 0;
@@ -195,7 +200,6 @@
   height: 1px;
   overflow: visible;
   fill: none;
-  stroke: var(--notepad-ink);
   stroke-linecap: round;
   stroke-linejoin: round;
   pointer-events: none;
@@ -363,11 +367,12 @@
   width: 100%;
   height: 100%;
 }
-.notepad-minimap-strokes path {
-  fill: none;
-  stroke: var(--notepad-ink);
-  stroke-width: 1;
-  stroke-linecap: round;
+/* The strokes, on a canvas (minimap.ts). */
+.notepad-minimap-ink {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
   opacity: 0.75;
 }
 .notepad-minimap-frame {

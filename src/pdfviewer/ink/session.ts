@@ -100,9 +100,10 @@ export function createInkSession(layer: InkLayer, sink: InkSink) {
 
   const pageList = (idx: number) => [...(byPage.get(idx)?.values() ?? [])];
 
-  /** The one way an annotation changes: drawn at once, remembered for
-   *  undo and for the next flush. */
-  function set(key: string, next: InkAnn | null, record = true): void {
+  /** The one way an annotation changes: drawn at once — or, for a
+   *  stroke of the pen (`parked`), left on the live canvas for now
+   *  (layer.ts) — and remembered for undo and for the next flush. */
+  function set(key: string, next: InkAnn | null, record = true, parked = false): void {
     const prev = get(key);
     if (record && group && !group.has(key)) group.set(key, prev);
     local.set(key, next);
@@ -117,7 +118,7 @@ export function createInkSession(layer: InkLayer, sink: InkSink) {
       m.set(key, next);
       pages.add(next.pageIndex);
     }
-    for (const p of pages) layer.render(p, pageList(p));
+    for (const p of pages) (parked ? layer.park : layer.render)(p, pageList(p));
     if (!dirtySince) dirtySince = Date.now();
   }
 
@@ -169,7 +170,7 @@ export function createInkSession(layer: InkLayer, sink: InkSink) {
       rectDistance(boundsOf(prev)!, bounds) < MERGE_DISTANCE;
     const key = join ? prev!.key : sink.newKey();
     const paths = join ? [...prev!.paths, path] : [path];
-    set(key, make({ key, pageIndex, color: style.color, width: style.width, paths, editable: true }));
+    set(key, make({ key, pageIndex, color: style.color, width: style.width, paths, editable: true }), true, true);
     last = { key, at: Date.now() };
     return key;
   }

@@ -29,6 +29,11 @@
 // Every gesture is reported to lib/penActivity.ts, which the page
 // renderer and the app's other deferrable work wait on.
 //
+// A finished stroke stays on the live canvas until the pen rests
+// (layer.ts); the canvas doesn't move with the pages, so a pen-down
+// that finds the page elsewhere than when the strokes were parked — or
+// that is anything but more writing on that page — settles them first.
+//
 // Per sample, the pen path does no layout reads and no allocation
 // beyond the point itself: the page's box is read once at pen-down,
 // samples are kept as client coordinates and drawn straight onto the
@@ -92,6 +97,8 @@ export interface InkInputEnv {
   pressOutside: () => void;
   /** The pen held still has borrowed the lasso (on), or let it go. */
   lassoBorrowed?: (on: boolean) => void;
+  /** Draw the strokes parked on the live canvas into their pages. */
+  settle: () => void;
 }
 
 interface Gesture {
@@ -165,6 +172,7 @@ export function attachInkInput(env: InkInputEnv) {
     // left to scroll, select text, tap.
     if (e.pointerType === "touch") {
       if (!e.isPrimary || fresh()) return;
+      env.settle();
       const gs = fingerGrabs(e.clientX, e.clientY);
       if (!gs) {
         // Left to scroll or select text — or, if it lifts where it
@@ -187,11 +195,21 @@ export function attachInkInput(env: InkInputEnv) {
     let mode: InkTool = e.buttons & ERASER_BUTTON ? "eraser" : env.tool();
     const gs = gestureAt(target, e.clientX, e.clientY, e.pointerId, mode, false);
     if (!gs) {
+      env.settle();
       env.pressOutside();
       return;
     }
     // On the selection: it is dragged, whatever the tool.
     if (mode !== "eraser" && env.inSelection(gs.idx, gs.start)) gs.mode = mode = "select";
+    // Strokes parked on the live canvas stay only under more writing on
+    // the same page, where it was.
+    const r = gs.rect;
+    const moved =
+      !parkedAt ||
+      parkedAt.idx !== gs.idx ||
+      Math.abs(parkedAt.left - r.left) + Math.abs(parkedAt.top - r.top) + Math.abs(parkedAt.width - r.width) > 0.5;
+    if (mode !== "pen" || moved || !live.fits()) env.settle();
+    parkedAt = { idx: gs.idx, left: r.left, top: r.top, width: r.width };
     start(gs);
     if (mode === "pen") {
       gs.hold = window.setTimeout(() => toLasso(gs), HOLD_MS);
@@ -223,6 +241,7 @@ export function attachInkInput(env: InkInputEnv) {
    *  from where it came down. */
   function toLasso(gs: Gesture): void {
     if (g !== gs || gs.mode !== "pen") return;
+    env.settle();
     live.clear();
     env.end();
     gs.mode = "select";
@@ -299,6 +318,8 @@ export function attachInkInput(env: InkInputEnv) {
     }
   }
 
+  // The page the last pen-down was on, and where it was in the window.
+  let parkedAt: { idx: number; left: number; top: number; width: number } | null = null;
   let fingerTap: { id: number; x: number; y: number; at: number } | null = null;
   function onUp(e: PointerEvent): void {
     const tap = fingerTap;
@@ -326,11 +347,11 @@ export function attachInkInput(env: InkInputEnv) {
       live.finish();
       const pts: number[] = [];
       for (let i = 0; i + 1 < gs.client.length; i += 2) pts.push(...toPdf(gs, gs.client[i], gs.client[i + 1]));
-      // The stroke joins the page's SVG, then leaves the live canvas —
-      // in the same task, so no frame shows it twice or not at all.
+      // The stroke is kept, and stays on the live canvas as drawn: it
+      // joins the page's SVG once the pen rests (layer.ts).
       env.stroke(gs.idx, pts);
       env.end();
-      live.clear();
+      live.park();
     } else if (gs.mode === "eraser") {
       env.end();
       if (cancelled) live.showCursor(null);

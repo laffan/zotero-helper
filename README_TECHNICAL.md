@@ -120,10 +120,12 @@ src/            React + TypeScript UI (Vite, zustand, MiniSearch)
                 its floating or edge-docked window), WordList (Words),
                 terminal, import/rescue modals
   notepad/      the notepad: model (notes, links, storage, the pad
-                shared between views), surface (the canvas: the Pencil
-                writes, a finger pans), geometry (paths, hit tests),
-                links (the links' chips, their sizing and menu), lasso
-                (a long press selects), minimap (the whole pad, small)
+                shared between views), surface (the Pencil writes, a
+                finger pans), ink (the strokes, on one canvas the size
+                of the view), geometry (paths, hit tests), links (the
+                links' chips, their sizing and menu), lasso (a long
+                press selects), follow (the part of the pad about a
+                page), minimap (the whole pad, small)
   components/settings/
                 the settings page: SettingsView (section list, the
                 draft and Save) and one component per section —
@@ -1060,7 +1062,20 @@ the Pencil's press (`onRelease`) rather than on the click, which the
 system's gestures could swallow; the mouse and the keyboard still click.
 The bar itself can't be selected, called out or scrolled from.
 
-Why it keeps up with fast writing:
+Why it keeps up with fast writing. One rule covers the pages and the
+notepad alike: **what the pen costs must not depend on what is already
+there** — not on the ink written so far, nor on the PDF under it. It
+comes to three budgets:
+- *a sample* (up to 240 a second) draws one curve onto a canvas, reads
+  no layout and changes no element;
+- *a pen-up* keeps the stroke (plain data) and changes nothing in the
+  document, so the next pen-down — a twentieth of a second later, and
+  the one place the pen reads a box — finds no layout to do;
+- *everything else* (the page's SVG, saves, renders, the store) waits
+  for the pen to rest (`lib/penActivity.ts`), and is done at once by
+  whatever needs it sooner.
+
+The ways each was broken, and is now kept:
 - *No page re-render per stroke.* Highlights are painted into the pdf.js
   raster (`paint.ts`), which costs a page render per change. Ink on the
   pages is instead an `<svg>` per page (`layer.ts`), its outer group
@@ -1073,11 +1088,35 @@ Why it keeps up with fast writing:
 - *A constant cost per sample.* The stroke under the pen is drawn on one
   canvas over the pages (`live.ts`), one curve segment per sample, with
   no layout read (the page's box is read once at pen-down) and no
-  redraw; at pen-up it moves into the SVG and its region is cleared in
-  the same task. The canvas is allocated when ink mode starts and
+  redraw. The canvas is allocated when ink mode starts and
   released when it ends — never mid-stroke, which on iPad drops samples
   (Hush measured it). Coalesced events are used off iOS only, as in
   Hush.
+- *Nothing in the page changes while the pen writes.* A finished
+  stroke used to join its page's SVG at pen-up. Adding a path makes
+  the browser lay the SVG out and paint it again — work that grows
+  with the ink on the page (WebKit is reported to paint an SVG's
+  elements whether or not they are in view; not measured here) — in
+  the gap before the letter's next stroke. Now the stroke stays on
+  the live canvas, in the pixels the pen drew (`park` in `layer.ts`
+  and `live.ts`), and the strokes of a word or a line join the SVG
+  together once the pen has rested 600ms (`SETTLE_REST_MS`, `settle`).
+  The canvas lies over the viewer and doesn't move with the pages, so
+  they are settled at once by anything that might move the pages or
+  needs the drawing: a scroll, a resize of the viewer, a press that
+  isn't the pen writing on the same page where it was (a finger, the
+  eraser, select, a press on the notepad or a button), the wheel, a
+  key, undo, a change of tool, leaving ink mode and the app being put
+  away. The bar is written to only when what it shows has changed
+  (`sync` in `bar.ts`), not at every pen-up.
+- *The text layers are left alone.* `textSelect.ts` put every text
+  layer's `.endOfContent` back at every pointer-up anywhere in the
+  window, and re-appending it is a change to the layer even when it
+  is already in place: each stroke — on the pages or on the notepad —
+  left every text layer to be laid out again, and the next pen-down
+  paid for it. On a scan with an OCR text layer (thousands of spans a
+  page) that was the largest cost of a stroke. Only a layer a
+  selection has disturbed is put back.
 - *Nothing written while writing.* A change reaches the store and the
   annotation outbox only once the pen has rested 2s — past the pause
   between two words or two lines, so the write doesn't land on the start
@@ -1148,7 +1187,11 @@ yet drawn — on the pages or on the notepad — holding renders through
 the gaps took the frames over 50ms from 11–19 per sentence to 2–4, the
 median wait for a pen-down from 29–50ms to 16–37ms, and the longest
 from 223–358ms to 54–266ms. With every page already drawn the two were
-the same. Headless Chromium copies every software canvas at each
+the same. A sentence of 60 strokes written over a 32-page scan with an
+OCR text layer, every page drawn (same set-up): 62 forced layouts
+taking 1.4–1.5s before the last two changes above, 1–2 taking 1–3ms
+after, and no element changed between the first pen-down and the
+pause. Headless Chromium copies every software canvas at each
 frame's commit — its own cost, not WebKit's — which dominates what is
 left there, so the figures say more about the difference than about an
 iPad. Hush's stroke engine (tile-baked
@@ -1521,15 +1564,32 @@ stronger and the button tinted.
 
 On the canvas the Pencil writes — a tap is a dot — a finger pans, and a
 mouse writes with a drag (a Mac has no Pencil) while a wheel pans; each
-view pans on its own. Strokes are SVG paths grown sample by sample, as
-the viewer's ink is, with no React render under the pen (`surface.ts`).
-What a stroke sets off waits for the pen, as the pages' ink does (see
+view pans on its own. The ink is one canvas the size of the view
+(`ink.ts`), under a layer that pans with it and holds the notes'
+labels, the links' chips and the lasso; there is no React render under
+the pen (`surface.ts`). A sample draws one curve from the last sample
+onto the canvas, and at pen-up the stroke is already where it stays;
+the canvas's box is read once, as a press begins. The pad is drawn
+from its strokes only when the view changes — a pan (once a frame), a
+resize, an erasure, a move, another theme — and then only the strokes
+in view, each one's box and line kept with its points. So the pen
+costs the same on a full pad as on an empty one. It used not to: the
+ink was one `<svg>` with a `<path>` per stroke, the stroke under the
+pen grown by setting its whole `d` again at each sample, and every
+sample had the SVG laid out again (a walk over every stroke, forced
+at once by the next sample's read of the canvas's box) and painted
+again — which is why the pad slowed to a crawl after a few pages of
+notes. The same sentence written at the foot of a pad of 0, 500, 2,000
+and 6,000 strokes (Chromium, CPU slowed 4×) took 2.8, 4.2, 5.7 and
+10.5s of the main thread, with 988 forced layouts; now 1.7–1.9s
+whatever the pad holds, with 2. The canvas is sized when the view is,
+never while the pen writes. What a stroke sets off waits for the pen, as the pages' ink does (see
 "The pages wait for the pen"): the pad's gestures report to
 `lib/penActivity.ts`, so the PDF's renders hold off while it writes
 (they used not to: the pad over an image-heavy PDF had every page
 render land between its strokes); a finished stroke moves only its own
-note's label, where it used to rebuild every label and every link's
-chip; and the save (the whole pad as JSON, over IPC), the minimap's
+note's label (from the note's corner, kept as its strokes arrive),
+where it used to rebuild every label and every link's chip; and the save (the whole pad as JSON, over IPC), the minimap's
 redraw and the other view's (the notes pane's pad, hidden in reading
 mode, which redraws in full) wait for a 1.8s pause. Putting the app away
 saves at once.
@@ -1576,11 +1636,12 @@ view (`placeInView` in `pdfviewer/places.ts`) — and shows that page,
 small, above it; a finger tap (or a click) on a note goes back there.
 The scroll link (an arrow pointing up and down, two bars across its
 middle) makes the pad
-follow the PDF: as the reader turns pages it glides to the part of the
+follow the PDF: as the reader turns pages it glides (350ms, easing out;
+a press on the pad stops it) to the part of the
 pad about the page in view — the top of its notes and links, or for a
 page with none, between those of the pages before and after it as far
 along as the page is, or just under the last (`spotFor` in
-`surface.ts`) — supposing the pad is written top to bottom as the PDF
+`follow.ts`) — supposing the pad is written top to bottom as the PDF
 is read. It starts off in the floating pad and on under the notes, and
 each view remembers its own.
 
@@ -1604,9 +1665,11 @@ The map icon shows a minimap, a 60px column down the canvas's left
 pad small — strokes, and links as bars in their colours — with the part
 in view outlined; a tap or a drag on it brings that part into view,
 going no further than half a view past what it draws. It fits the pad's
-contents and the view together under one SVG transform, so a pan moves
-only the outline and the transform, and the strokes are drawn again
-only when the pad changes (the surface's `watch`). A faint trash can at
+contents and the view together; its strokes are on a small canvas of
+their own (the links and the outline are SVG over it), so a pan within
+the contents moves only the outline, and the strokes are drawn again
+only when the pad changes (the surface's `watch`, at a pause in the
+writing) or the fit does. A faint trash can at
 the canvas's lower left clears the pad — strokes, notes and links —
 once "Clear the whole notepad?" is answered. Undo takes back the last
 stroke, erasing, link, move, deletion or clearing. Kept on this device

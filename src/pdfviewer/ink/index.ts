@@ -7,12 +7,22 @@
 // The parts: session.ts holds the drawings and this viewer's changes to
 // them (and writes them once the pen rests), layer.ts draws them on the
 // pages, live.ts draws the stroke still under the pen, input.ts reads
-// the pen, bar.ts is its tools in the bottom bar. The eraser is shared
+// the pen, bar.ts is its tools in the bottom bar.
+//
+// While the pen writes, nothing in the page changes: a finished stroke
+// stays on the live canvas, and the strokes of a word or a line join
+// their page's SVG together once the pen has rested SETTLE_REST_MS
+// (layer.ts's `park` and `settle`). The canvas lies over the viewer
+// and doesn't move with the pages, so they are settled at once by
+// whatever might move the pages or needs the drawing itself: a scroll,
+// a resize, a press that isn't the pen writing, the wheel, a key, the
+// tools, and the app being put away. The eraser is shared
 // with the notepad (lib/penTool.ts): either one's eraser, or a Pencil
 // double-tap (tauri-plugin-pencil, through lib/pencil.ts), turns it on
 // or off in both, whatever the system's Pencil setting; a Pencil Pro's
 // squeeze set to "switch to previous" goes between the pen and select.
 import { ANNOTATION_COLORS, annotationPosition, type Annotation } from "../../lib/highlights";
+import { whenPenRested } from "../../lib/penActivity";
 import { isErasing, setErasing, watchErasing } from "../../lib/penTool";
 import type { PageRecord } from "../types";
 import { createInkBar, loadInkPrefs, saveInkPrefs } from "./bar";
@@ -68,6 +78,9 @@ export interface InkEnv {
 }
 
 const SELECTION_PAD = 3;
+/** How long the pen rests before the strokes it has written move from
+ *  the live canvas into their pages — past the gap between two words. */
+const SETTLE_REST_MS = 600;
 
 /** The character on the page nearest a point (page fractions), counted
  *  in the text layer — what Zotero's sortIndex orders by within a page.
@@ -114,6 +127,26 @@ export function createInkTool(env: InkEnv) {
 
   const layer = createInkLayer(env.getPages);
   const live = createLiveLayer(env.body, env.scrollArea);
+
+  // --- strokes parked on the live canvas ---------------------------------
+  let cancelSettle: (() => void) | null = null;
+  const settle = () => layer.settle();
+  layer.onSettled(() => {
+    cancelSettle?.();
+    cancelSettle = null;
+    live.clear();
+  });
+  /** A stroke was parked: settle once the pen has rested. */
+  function settleSoon(): void {
+    cancelSettle?.();
+    cancelSettle = whenPenRested(SETTLE_REST_MS, settle);
+  }
+  // A press that isn't the pen on the pages (input.ts sees to that one).
+  const onPress = (e: PointerEvent) => {
+    if (!layer.parked()) return;
+    if (e.pointerType !== "pen" || !(e.target instanceof Node && env.scrollArea.contains(e.target))) settle();
+  };
+  const moved = new ResizeObserver(settle);
 
   function sortIndexFor(a: InkAnn): string {
     const p = env.getPages()[a.pageIndex];
@@ -236,6 +269,7 @@ export function createInkTool(env: InkEnv) {
     saveInkPrefs(prefs);
     setErasing(t === "eraser");
     if (t !== "select") select(0, []);
+    settle();
     live.showCursor(null);
     syncBar();
     env.onToolChange?.(t);
@@ -272,7 +306,9 @@ export function createInkTool(env: InkEnv) {
       for (const piece of splitLongPath(path, Math.floor(MAX_POSITION_CHARS / 20))) {
         session.addStroke(idx, piece, { color: prefs.color, width: prefs.width });
       }
+      settleSoon();
     },
+    settle,
     erase: (idx, from, to) => session.eraseAlong(idx, from, to, prefs.eraser),
     grabbable: (idx, [x, y], reach) => selectionHas(idx, x, y) || Boolean(session.hit(idx, x, y, reach)),
     press: (idx, [x, y], reach) => {
@@ -343,7 +379,10 @@ export function createInkTool(env: InkEnv) {
 
   // Changes still waiting are written before the app is put away —
   // ahead of the annotation push that the same event starts.
-  const flushNow = () => session.flush();
+  const flushNow = () => {
+    settle();
+    session.flush();
+  };
   const onHidden = () => document.visibilityState === "hidden" && flushNow();
 
   function setActive(on: boolean): void {
@@ -358,14 +397,25 @@ export function createInkTool(env: InkEnv) {
     input.setEnabled(on);
     if (on) {
       live.attach();
+      window.addEventListener("pointerdown", onPress, true);
+      window.addEventListener("keydown", settle, true);
+      window.addEventListener("wheel", settle, { capture: true, passive: true });
+      env.scrollArea.addEventListener("scroll", settle, { passive: true });
+      moved.observe(env.scrollArea);
       window.addEventListener("keydown", onKey);
       window.addEventListener("zh-pencil", onPencil);
       document.addEventListener("selectionchange", onSelectionChange);
       syncBar();
     } else {
       select(0, []);
+      settle();
       session.flush();
       live.detach();
+      window.removeEventListener("pointerdown", onPress, true);
+      window.removeEventListener("keydown", settle, true);
+      window.removeEventListener("wheel", settle, true);
+      env.scrollArea.removeEventListener("scroll", settle);
+      moved.disconnect();
       window.removeEventListener("keydown", onKey);
       window.removeEventListener("zh-pencil", onPencil);
       document.removeEventListener("selectionchange", onSelectionChange);
@@ -428,6 +478,7 @@ export function createInkTool(env: InkEnv) {
     pageRendered: (idx: number) => layer.pageRendered(idx),
     /** A new document: forget the old one's pages. */
     reset: () => {
+      settle();
       session.flush();
       layer.reset();
       sel = null;

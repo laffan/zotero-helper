@@ -25,6 +25,16 @@
 // just past the moving end after each change, every re-reading could
 // land past it again, and a selection held still crept on down the
 // page a word at a time.
+//
+// Putting a layer back (`reset`) is done only for a layer a selection
+// has disturbed. It used to be done for every layer at every
+// pointer-up anywhere in the window, and re-appending `.endOfContent`
+// is a change to the layer's children even when it is already last: so
+// each stroke of the Pencil — on the pages or on the notepad — left
+// every text layer to be laid out again, and the next pen-down, which
+// reads a box, paid for it. On a scan with an OCR text layer (thousands
+// of spans a page) that was several milliseconds at the start of every
+// stroke.
 import { guardSelections, justReverted } from "./selectGuard";
 
 const layers = new Map<HTMLElement, HTMLElement>();
@@ -34,8 +44,18 @@ let pointerDown = false;
 let byTouch = false;
 let prevRange: Range | null = null;
 let native: boolean | undefined;
+// The layers a selection has changed: marked `.selecting`, or with
+// their `.endOfContent` moved.
+const disturbed = new Set<HTMLElement>();
+
+/** Mark a layer as one a selection is being made in. */
+function selecting(layer: HTMLElement): void {
+  disturbed.add(layer);
+  layer.classList.add("selecting");
+}
 
 function reset(end: HTMLElement, layer: HTMLElement): void {
+  if (!disturbed.delete(layer)) return;
   layer.append(end);
   end.style.width = "";
   end.style.height = "";
@@ -77,7 +97,7 @@ function onSelectionChange(): void {
   }
   const range = selection.getRangeAt(0);
   for (const [layer, end] of all) {
-    if (range.intersectsNode(layer)) layer.classList.add("selecting");
+    if (range.intersectsNode(layer)) selecting(layer);
     else reset(end, layer);
   }
   if (!all.length || selectsNatively(all[0][0])) return;
@@ -109,6 +129,7 @@ function onSelectionChange(): void {
   const layer = anchor.parentElement?.closest<HTMLElement>(".textLayer");
   const end = layer ? layers.get(layer) : undefined;
   if (layer && end && anchor.parentElement) {
+    disturbed.add(layer);
     end.style.width = layer.style.width;
     end.style.height = layer.style.height;
     end.style.userSelect = "text";
@@ -142,7 +163,7 @@ export function enableTextSelection(layer: HTMLElement): void {
   const end = document.createElement("div");
   end.className = "endOfContent";
   layer.append(end);
-  layer.addEventListener("mousedown", () => !byTouch && layer.classList.add("selecting"));
+  layer.addEventListener("mousedown", () => !byTouch && selecting(layer));
   layers.set(layer, end);
   listen();
 }

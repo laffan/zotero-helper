@@ -181,13 +181,17 @@ export function createInkBar(popupHost: HTMLElement, handlers: InkBarHandlers) {
     if (menu.style.display !== "none") return closeMenu();
     menu.style.display = "";
     chip.classList.add("active");
-    if (last) sync(last);
+    if (last) sync(last, true);
     placeMenu();
     document.addEventListener("pointerdown", onOutside, true);
     document.addEventListener("keydown", onEscape, true);
   }
 
-  function sync(s: InkBarState): void {
+  function sync(s: InkBarState, again = false): void {
+    // Called at every pen-up: with nothing changed, nothing is written
+    // (a write would leave the bar to be laid out at the next pen-down).
+    const was = last;
+    if (!again && was && (Object.keys(s) as (keyof InkBarState)[]).every((k) => was[k] === s[k])) return;
     last = s;
     for (const t of Object.keys(tools) as InkTool[]) tools[t].classList.toggle("active", s.tool === t);
     // A selection (a finger's, in any tool) is what the chip edits.

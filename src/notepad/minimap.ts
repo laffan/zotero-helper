@@ -3,15 +3,19 @@
 // the links as bars in their colours — with the part in view outlined.
 // A tap on it, or a drag, brings that part into view.
 //
-// Drawn in the canvas's own coordinates under one transform, so when
-// only the view moves (a pan, the pad following the PDF) just the
-// outline and the transform change; the strokes are drawn again only
-// when the pad does. What it fits is the pad's contents and the view
-// together, so the outline never leaves it; a tap on the map's empty
-// part below takes the view no further than half its height past that.
+// Drawn in the pad's own coordinates under one fit. The strokes are
+// on a small canvas (as the pad's own are, ink.ts — an element per
+// stroke made the map's redraw, at each pause in the writing, grow
+// with the pad); the links and the outline of the view are SVG over
+// it. When only the view moves (a pan, the pad following the PDF) and
+// stays within the contents, just the outline changes; the strokes are
+// drawn again when the pad changes or the fit does. What it fits is
+// the pad's contents and the view together, so the outline never
+// leaves it; a tap on the map's empty part below takes the view no
+// further than half its height past that.
 import { penRested, WRITING_PAUSE_MS } from "../lib/penActivity";
 import type { Notepad } from "./model";
-import { pathD } from "./geometry";
+import { strokeBox, strokeLine } from "./ink";
 import type { NotepadSurface, SurfaceChange } from "./surface";
 
 const SVG_NS = "http://www.w3.org/2000/svg";
@@ -21,18 +25,21 @@ const MARGIN = 5;
 type Box = [number, number, number, number];
 
 export function createMinimap(el: HTMLElement, surface: NotepadSurface, pad: () => Notepad) {
+  const canvas = document.createElement("canvas");
+  canvas.className = "notepad-minimap-ink";
+  const ctx = canvas.getContext("2d")!;
   const svg = document.createElementNS(SVG_NS, "svg");
   svg.setAttribute("class", "notepad-minimap-svg");
   const g = document.createElementNS(SVG_NS, "g");
-  const strokes = document.createElementNS(SVG_NS, "g");
-  strokes.setAttribute("class", "notepad-minimap-strokes");
   const links = document.createElementNS(SVG_NS, "g");
   const frame = document.createElementNS(SVG_NS, "rect");
   frame.setAttribute("class", "notepad-minimap-frame");
   frame.setAttribute("vector-effect", "non-scaling-stroke");
-  g.append(strokes, links, frame);
+  g.append(links, frame);
   svg.appendChild(g);
-  el.appendChild(svg);
+  el.append(canvas, svg);
+  // The fit the strokes were last drawn at.
+  let drawnFit = "";
 
   // The contents' extent, and the current fit (canvas → map).
   let content: Box | null = null;
@@ -43,21 +50,39 @@ export function createMinimap(el: HTMLElement, surface: NotepadSurface, pad: () 
   // map would slide beneath the finger as the view leaves the contents.
   let dragging = false;
 
+  /** The strokes, small: the canvas at the map's size, the pad fitted
+   *  to it. */
+  function drawStrokes(): void {
+    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    const w = Math.round(el.clientWidth * dpr);
+    const h = Math.round(el.clientHeight * dpr);
+    if (canvas.width !== w) canvas.width = w;
+    if (canvas.height !== h) canvas.height = h;
+    drawnFit = `${fit.s} ${fit.tx} ${fit.ty} ${w} ${h}`;
+    if (!w || !h) return;
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.clearRect(0, 0, w, h);
+    ctx.setTransform(fit.s * dpr, 0, 0, fit.s * dpr, fit.tx * dpr, fit.ty * dpr);
+    // A line a pixel wide, whatever the fit.
+    ctx.lineWidth = 1 / fit.s;
+    ctx.lineCap = ctx.lineJoin = "round";
+    const ink = getComputedStyle(el).getPropertyValue("--notepad-ink").trim() || "#000";
+    let color: string | null = null;
+    for (const s of pad().strokes) {
+      if (s.points.length < 2) continue;
+      if (s.color !== color) ctx.strokeStyle = (color = s.color) || ink;
+      ctx.stroke(strokeLine(s));
+    }
+  }
+
   function drawContent(): void {
-    strokes.replaceChildren();
+    drawnFit = "";
     links.replaceChildren();
     let box: Box = [Infinity, Infinity, -Infinity, -Infinity];
     const grow = (x0: number, y0: number, x1: number, y1: number) => {
       box = [Math.min(box[0], x0), Math.min(box[1], y0), Math.max(box[2], x1), Math.max(box[3], y1)];
     };
-    for (const s of pad().strokes) {
-      const p = document.createElementNS(SVG_NS, "path");
-      p.setAttribute("d", pathD(s.points));
-      p.setAttribute("vector-effect", "non-scaling-stroke");
-      if (s.color) p.style.stroke = s.color;
-      strokes.appendChild(p);
-      for (let i = 0; i + 1 < s.points.length; i += 2) grow(s.points[i], s.points[i + 1], s.points[i], s.points[i + 1]);
-    }
+    for (const s of pad().strokes) if (s.points.length >= 2) grow(...strokeBox(s));
     for (const b of surface.linkBoxes()) {
       const r = document.createElementNS(SVG_NS, "rect");
       r.setAttribute("x", String(b.x));
@@ -88,6 +113,7 @@ export function createMinimap(el: HTMLElement, surface: NotepadSurface, pad: () 
     const s = Math.min((w - 2 * MARGIN) / (x1 - x0), (h - 2 * MARGIN) / (y1 - y0));
     fit = { s, tx: (w - (x1 - x0) * s) / 2 - x0 * s, ty: MARGIN - y0 * s };
     g.setAttribute("transform", `translate(${fit.tx} ${fit.ty}) scale(${s})`);
+    if (drawnFit !== `${fit.s} ${fit.tx} ${fit.ty} ${canvas.width} ${canvas.height}`) drawStrokes();
   }
 
   // Changes come in bursts (every move of a pan): drawn once a frame.
@@ -171,6 +197,8 @@ export function createMinimap(el: HTMLElement, surface: NotepadSurface, pad: () 
       unwatch();
       resize.disconnect();
       el.removeEventListener("pointerdown", onDown);
+      canvas.width = canvas.height = 0;
+      canvas.remove();
       svg.remove();
     },
   };

@@ -12,9 +12,12 @@
 //    strokes dropped outright when the backing store was made mid-
 //    gesture), so a stroke never waits for one; only a resize of the
 //    viewer reallocates it.
-//  - It covers the viewer, not a page, and does nothing between
-//    strokes; at pen-up the stroke moves into the page's SVG
-//    (layer.ts) and its region here is cleared in the same frame.
+//  - It covers the viewer, not a page. A finished stroke stays on it
+//    (`park`) while the writing goes on, and nothing else happens at
+//    pen-up; once the pen rests the strokes move into their page's SVG
+//    (layer.ts's `settle`) and their region here is cleared in the same
+//    task. Since the canvas doesn't move with the pages, whatever
+//    moves them settles the strokes first (index.ts).
 //  - `desynchronized` asks for the low-latency path where the browser
 //    has one; WebKit ignores it.
 
@@ -89,11 +92,11 @@ export function createLiveLayer(host: HTMLElement, area: HTMLElement) {
     ctx.lineWidth = s.width;
     ctx.lineCap = "round";
     ctx.lineJoin = "round";
-    half = s.width / 2 + 2;
+    // With strokes parked here, the region to clear takes this one in.
+    half = Math.max(dirty ? half : 0, s.width / 2 + 2);
     const x = clientX - originX;
     const y = clientY - originY;
     pts = [x, y];
-    dirty = null;
     grow(x, y);
     ctx.beginPath();
     ctx.arc(x, y, s.width / 2, 0, Math.PI * 2);
@@ -131,7 +134,17 @@ export function createLiveLayer(host: HTMLElement, area: HTMLElement) {
     ctx.stroke();
   }
 
-  /** Wipe what the stroke drew — only its own region. */
+  /** The stroke is finished and stays as drawn, until `clear`. */
+  function park(): void {
+    pts = [];
+  }
+
+  /** Does the canvas still fit the viewer? (Sized again, it would lose
+   *  the strokes parked on it.) */
+  const fits = () => canvas.width === Math.round(area.clientWidth * dpr) && canvas.height === Math.round(area.clientHeight * dpr);
+
+  /** Wipe what was drawn — the stroke under the pen and those parked —
+   *  and only their region. */
   function clear(): void {
     if (dirty) {
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -166,7 +179,7 @@ export function createLiveLayer(host: HTMLElement, area: HTMLElement) {
     lasso.style.display = "block";
   }
 
-  return { attach, detach, begin, extend, finish, clear, showCursor, showLasso };
+  return { attach, detach, begin, extend, finish, park, fits, clear, showCursor, showLasso };
 }
 
 export type LiveLayer = ReturnType<typeof createLiveLayer>;

@@ -24,8 +24,10 @@ const FRAME_PAD = 8;
 
 export interface LassoEnv {
   pad: () => Notepad;
-  /** Each stroke's path, and each link's chip, as drawn. */
-  pathOf: (id: string) => SVGPathElement | undefined;
+  /** Show strokes shifted by (dx, dy) while they are dragged (the
+   *  ink's canvas, ink.ts) — with null, back where they are. */
+  lift: (strokes: NoteStroke[] | null, dx: number, dy: number) => void;
+  /** Each link's chip, as drawn. */
   chipOf: (id: string) => HTMLElement | undefined;
   /** The selection was dragged by (dx, dy), or deleted. */
   moved: (strokes: NoteStroke[], links: NoteLink[], dx: number, dy: number) => void;
@@ -158,7 +160,7 @@ export function createLasso(layer: HTMLElement, svg: SVGSVGElement, env: LassoEn
   /** Show the selection dragged by (dx, dy) — not yet moved. */
   function drag(dx: number, dy: number): void {
     const t = `translate(${dx}px, ${dy}px)`;
-    for (const s of strokes) env.pathOf(s.id)?.setAttribute("transform", `translate(${dx} ${dy})`);
+    env.lift(strokes, dx, dy);
     for (const l of links) {
       const chip = env.chipOf(l.id);
       if (chip) chip.style.transform = t;
@@ -168,7 +170,7 @@ export function createLasso(layer: HTMLElement, svg: SVGSVGElement, env: LassoEn
 
   /** The drag let go: move the selection by (dx, dy). */
   function drop(dx: number, dy: number): void {
-    for (const s of strokes) env.pathOf(s.id)?.removeAttribute("transform");
+    env.lift(null, 0, 0);
     for (const l of links) {
       const chip = env.chipOf(l.id);
       if (chip) chip.style.transform = "";

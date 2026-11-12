@@ -11,6 +11,17 @@
 // relayout without being redrawn. (The thumbnails and the folded view
 // still paint ink into their rasters; nothing is drawn there.)
 //
+// A stroke the pen has just finished is not drawn here at once. It is
+// already on the live canvas (live.ts), in the pixels the pen drew, and
+// stays there while the writing goes on: the page's new drawing waits
+// (`park`) until the pen rests, or until anything else needs it
+// (`settle` — an erasure, a selection, a scroll, a relayout). Adding a
+// path makes the browser lay out and paint the page's SVG again, a cost
+// that grows with the ink on the page and that would otherwise land in
+// the twentieth of a second before the letter's next stroke; and with
+// nothing changed in the page, the next pen-down's read of the page's
+// box finds no layout to do.
+//
 // The SVG's outer group maps PDF user space onto the page through the
 // page's own viewport transform, so paths go in as Zotero stores them
 // and a CropBox origin or /Rotate is honoured, as in paint.ts.
@@ -56,6 +67,10 @@ function el<K extends keyof SVGElementTagNameMap>(name: K): SVGElementTagNameMap
 
 export function createInkLayer(getPages: () => PageRecord[]) {
   const svgs = new Map<number, PageSvg>();
+  // The pages whose drawing waits for the pen to rest, and what each
+  // is to show.
+  const waiting = new Map<number, InkAnn[]>();
+  let settled: () => void = () => {};
 
   function matrixOf(p: PageRecord): string {
     return `matrix(${p.viewport.transform.join(" ")})`;
@@ -122,11 +137,34 @@ export function createInkLayer(getPages: () => PageRecord[]) {
     return { g, color: a.color, width: a.width, pos: a.pos, paths: a.paths };
   }
 
+  /** A page's drawing after a stroke of the pen: not yet — the stroke
+   *  is on the live canvas, and stays there until `settle`. */
+  function park(idx: number, list: InkAnn[]): void {
+    waiting.set(idx, list);
+  }
+
+  /** Draw what waited, and say so (the live canvas is then cleared, in
+   *  the same task: no frame shows a stroke twice, or not at all). */
+  function settle(): void {
+    if (!waiting.size) return;
+    const lists = [...waiting];
+    waiting.clear();
+    for (const [idx, list] of lists) draw(idx, list);
+    settled();
+  }
+
   /** Bring one page's drawing in line with `list` (its ink, bottom to
-   *  top). Unchanged annotations are left alone; one that only gained
-   *  a stroke at the end — the common case while writing — gets just
-   *  that stroke. */
+   *  top) — and with it every page that waited. */
   function render(idx: number, list: InkAnn[]): void {
+    if (!waiting.size) return draw(idx, list);
+    waiting.set(idx, list);
+    settle();
+  }
+
+  /** Unchanged annotations are left alone; one that only gained
+   *  strokes at the end — the common case while writing — gets just
+   *  those. */
+  function draw(idx: number, list: InkAnn[]): void {
     const s = pageSvg(idx, list.length > 0);
     if (!s) return;
     const keep = new Set<string>();
@@ -137,9 +175,9 @@ export function createInkLayer(getPages: () => PageRecord[]) {
       if (d && (d.pos !== a.pos || d.color !== a.color)) {
         const n = d.paths.length;
         const appended =
-          a.paths.length === n + 1 && d.color === a.color && d.width === a.width && d.paths.every((p, i) => p === a.paths[i]);
+          a.paths.length > n && d.color === a.color && d.width === a.width && d.paths.every((p, i) => p === a.paths[i]);
         if (appended) {
-          addPath(d.g, a.paths[n]);
+          for (let i = n; i < a.paths.length; i++) addPath(d.g, a.paths[i]);
           d.pos = a.pos;
           d.paths = a.paths;
         } else if (d.paths === a.paths) {
@@ -176,6 +214,7 @@ export function createInkLayer(getPages: () => PageRecord[]) {
   /** Shift annotations while they are dragged (PDF points), or put
    *  them back with 0, 0. */
   function setOffset(idx: number, keys: Iterable<string>, dx: number, dy: number): void {
+    settle();
     const s = svgs.get(idx);
     if (!s) return;
     for (const k of keys) {
@@ -210,9 +249,25 @@ export function createInkLayer(getPages: () => PageRecord[]) {
   function reset(): void {
     for (const s of svgs.values()) s.svg.remove();
     svgs.clear();
+    if (!waiting.size) return;
+    waiting.clear();
+    settled();
   }
 
-  return { render, pageRendered, setOffset, showSelection, reset, pages: () => [...svgs.keys()] };
+  return {
+    render,
+    park,
+    settle,
+    /** Is any page's drawing waiting? */
+    parked: () => waiting.size > 0,
+    /** Hear when what waited has been drawn (or dropped). */
+    onSettled: (fn: () => void) => (settled = fn),
+    pageRendered,
+    setOffset,
+    showSelection,
+    reset,
+    pages: () => [...svgs.keys()],
+  };
 }
 
 export type InkLayer = ReturnType<typeof createInkLayer>;

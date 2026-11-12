@@ -41,27 +41,69 @@
   }
 }
 
-/* The card: a small box in the upper part of the window (clear of the
-   iPad's keyboard), over a faint backdrop that a press closes it on. */
+/* The window over the clock (clock.ts places it): its arrow points down
+   at the clock's middle (--arrow-x), and goes while the window is lifted
+   above the iPad's keyboard. */
+.pdf-timer-pop {
+  position: fixed;
+  z-index: 90;
+  min-width: 190px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--panel);
+  box-shadow: 0 8px 24px rgb(0 0 0 / 0.18);
+  color: var(--text);
+  font-size: calc(13px * var(--font-scale));
+}
+.pdf-timer-arrow {
+  position: absolute;
+  bottom: -6px;
+  left: calc(var(--arrow-x, 50%) - 5px);
+  width: 10px;
+  height: 10px;
+  border-right: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  background: var(--panel);
+  transform: rotate(45deg);
+}
+.pdf-timer-pop.lifted .pdf-timer-arrow {
+  display: none;
+}
+/* At zero: "Time’s up" in the middle of the window, over a faint
+   backdrop. */
 .pdf-timer-backdrop {
   position: fixed;
   inset: 0;
-  z-index: 90;
-  background: rgb(0 0 0 / 0.12);
+  z-index: 95;
+  background: rgb(0 0 0 / 0.18);
 }
-.pdf-timer-card {
+.pdf-timer-alert {
   position: absolute;
-  top: 22%;
+  top: 50%;
   left: 50%;
-  transform: translateX(-50%);
-  min-width: 200px;
-  padding: 14px;
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  min-width: 220px;
+  padding: 18px 20px 16px;
   border: 1px solid var(--border);
   border-radius: 12px;
   background: var(--panel);
-  box-shadow: 0 10px 30px rgb(0 0 0 / 0.2);
+  box-shadow: 0 10px 30px rgb(0 0 0 / 0.22);
   color: var(--text);
-  font-size: calc(13px * var(--font-scale));
+  text-align: center;
+}
+.pdf-timer-alert-title {
+  font-size: calc(17px * var(--font-scale));
+  font-weight: 600;
+}
+.pdf-timer-alert-detail {
+  margin-bottom: 8px;
+  color: var(--text-dim);
+  font-size: calc(12px * var(--font-scale));
 }
 .pdf-timer-form,
 .pdf-timer-running {
@@ -112,6 +154,7 @@
 }
 .pdf-timer-go {
   align-self: stretch;
+  min-width: 140px;
   padding: 6px 0;
   border-radius: var(--radius);
   background: var(--accent);

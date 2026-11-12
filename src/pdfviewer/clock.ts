@@ -1,28 +1,38 @@
 // The clock beside the reader's place — "25% | 8 of 32 | 1:33pm", in the
 // bottom bar and in reading mode's pill — and the reading timer it turns
-// into. A press on the clock opens a small card to start a timer, for a
-// span (hours and minutes) or until a time of day; while it runs, the
-// clock's place counts down ("24:59") and a press opens the card again,
-// to cancel it. At zero the count stays at 0:00, in red, until pressed,
-// which puts the clock back (or for ten minutes, if nobody does).
+// into. A press on the clock opens a little window over it, its arrow
+// pointing down at it, to start a timer: for a span (hours and minutes)
+// or until a time of day. While it runs, the clock's place counts down
+// ("24:59"), and a press opens the window again — when it ends, and
+// Cancel Timer. A press outside, Escape or the clock again closes it.
 //
-// One timer for the app, kept on this device (`zh-reading-timer`, its
-// end): it lives through switching PDFs and closing the app, and every
-// clock shows it. One ticker updates every clock — each second while a
-// timer runs, else as each minute turns — and only while one is shown.
+// At zero a modal in the middle of the window says so ("Time’s up"), and
+// its OK puts the clock back; until then the count shows 0:00 in red. The
+// end is its own timeout, apart from the clocks, so the alert comes with
+// no PDF open too — and a timer that ended while the app was put away is
+// announced as it comes back (late timeouts fire at once).
 //
-// The card sits in the upper part of the window, not over the clock at
-// the bottom, where the iPad's keyboard would cover it.
+// One timer for the app, kept on this device (`zh-reading-timer`): it
+// lives through switching PDFs and closing the app, and every clock
+// shows it. One ticker updates every clock — each second while a timer
+// runs, else as each minute turns — and only while one is shown.
+//
+// The window sits over the clock at the bottom of the screen, where the
+// iPad's keyboard comes up: while it covers the window (the visual
+// viewport ends above it), the window moves up out of its way.
 const KEY = "zh-reading-timer";
 const LAST_KEY = "zh-reading-timer-last";
-/** How long a finished timer waits to be acknowledged. */
-const DONE_FOR_MS = 10 * 60_000;
 
 type Mode = "for" | "until";
 interface Last {
   mode: Mode;
   h: number;
   m: number;
+}
+/** A timer: when it ends, and what it was ("25 min", "until 1:33pm"). */
+interface Timer {
+  endsAt: number;
+  label: string;
 }
 
 function read<T>(key: string, fallback: T): T {
@@ -42,9 +52,17 @@ function write(key: string, v: unknown): void {
   }
 }
 
-let endsAt: number | null = read<number | null>(KEY, null);
+/** The stored timer — a bare end time, as first kept, read as one. */
+function stored(): Timer | null {
+  const v = read<Timer | number | null>(KEY, null);
+  if (typeof v === "number") return { endsAt: v, label: "" };
+  return v && typeof v.endsAt === "number" ? v : null;
+}
+
+let timer: Timer | null = stored();
 const slots = new Set<HTMLButtonElement>();
 let ticker = 0;
+let ending = 0;
 
 const pad2 = (n: number) => String(n).padStart(2, "0");
 
@@ -62,37 +80,46 @@ function countText(ms: number): string {
   return h ? `${h}:${pad2(m)}:${pad2(s % 60)}` : `${m}:${pad2(s % 60)}`;
 }
 
-function setEnd(at: number | null): void {
-  endsAt = at;
-  write(KEY, at);
+/** "25 min", "1 h", "1 h 30 min". */
+function spanText(mins: number): string {
+  const h = Math.floor(mins / 60);
+  const m = mins % 60;
+  return [h ? `${h} h` : "", m ? `${m} min` : ""].filter(Boolean).join(" ");
+}
+
+function setTimer(t: Timer | null): void {
+  timer = t;
+  write(KEY, t);
+  armEnd();
   tick();
 }
+
+/** The end's own timeout, whatever clocks there are. */
+function armEnd(): void {
+  window.clearTimeout(ending);
+  if (timer) ending = window.setTimeout(() => (tick(), showDone()), Math.max(0, timer.endsAt - Date.now()) + 20);
+}
+
+type State = "clock" | "running" | "done";
+const stateNow = (): State => (!timer ? "clock" : Date.now() < timer.endsAt ? "running" : "done");
 
 /** Paint every clock, and wake again when its text next changes. */
 function tick(): void {
   window.clearTimeout(ticker);
   const now = Date.now();
-  if (endsAt !== null && now - endsAt > DONE_FOR_MS) {
-    endsAt = null;
-    write(KEY, null);
-  }
-  const state = endsAt === null ? "clock" : now < endsAt ? "running" : "done";
-  const text = state === "clock" ? clockText() : countText(endsAt! - now);
+  const state = stateNow();
+  const text = state === "clock" ? clockText() : countText(timer!.endsAt - now);
   const title =
-    state === "clock" ? "Start a timer" : state === "running" ? `Timer — until ${clockText(new Date(endsAt!))}` : "Time’s up";
+    state === "clock" ? "Start a timer" : state === "running" ? `Timer — until ${clockText(new Date(timer!.endsAt))}` : "Time’s up";
   for (const s of slots) {
     if (s.textContent !== text) s.textContent = text;
     s.dataset.state = state;
     s.title = title;
   }
   if (!slots.size) return;
-  const wait = state === "running" ? ((endsAt! - now) % 1000 || 1000) + 5 : 60_000 - (now % 60_000) + 20;
+  const wait = state === "running" ? ((timer!.endsAt - now) % 1000 || 1000) + 5 : 60_000 - (now % 60_000) + 20;
   ticker = window.setTimeout(tick, wait);
 }
-
-// --- the card ---------------------------------------------------------------
-
-let card: { el: HTMLElement; close: () => void } | null = null;
 
 function el<K extends keyof HTMLElementTagNameMap>(tag: K, cls: string, text = ""): HTMLElementTagNameMap[K] {
   const e = document.createElement(tag);
@@ -100,6 +127,10 @@ function el<K extends keyof HTMLElementTagNameMap>(tag: K, cls: string, text = "
   if (text) e.textContent = text;
   return e;
 }
+
+// --- the window over the clock ----------------------------------------------
+
+let pop: { el: HTMLElement; anchor: HTMLElement; close: () => void } | null = null;
 
 function numberInput(value: number, label: string): HTMLInputElement {
   const i = el("input", "pdf-timer-num");
@@ -147,29 +178,29 @@ function startForm(done: () => void): HTMLElement {
     untilBtn.classList.toggle("on", mode === "until");
     span.hidden = mode !== "for";
     until.hidden = mode !== "until";
+    placePop();
   };
   forBtn.addEventListener("click", () => show("for"));
   untilBtn.addEventListener("click", () => show("until"));
-  show(mode);
   form.append(modes, span, until, start);
+  show(mode);
   form.addEventListener("submit", (e) => {
     e.preventDefault();
-    let end: number;
     if (mode === "for") {
       const mins = (Number(h.value) || 0) * 60 + (Number(m.value) || 0);
       if (mins <= 0) return;
-      end = Date.now() + mins * 60_000;
       write(LAST_KEY, { mode, h: Number(h.value) || 0, m: Number(m.value) || 0 });
+      setTimer({ endsAt: Date.now() + mins * 60_000, label: spanText(mins) });
     } else {
       const [hh, mm] = at.value.split(":").map(Number);
       if (!Number.isFinite(hh) || !Number.isFinite(mm)) return;
       const d = new Date();
       d.setHours(hh, mm, 0, 0);
       // A time already past today is tomorrow's.
-      end = d.getTime() <= Date.now() ? d.getTime() + 86_400_000 : d.getTime();
+      const end = d.getTime() <= Date.now() ? d.getTime() + 86_400_000 : d.getTime();
       write(LAST_KEY, { ...last, mode });
+      setTimer({ endsAt: end, label: `until ${clockText(new Date(end))}` });
     }
-    setEnd(end);
     done();
   });
   return form;
@@ -178,29 +209,53 @@ function startForm(done: () => void): HTMLElement {
 /** The running timer: when it ends, and Cancel. */
 function runningView(done: () => void): HTMLElement {
   const box = el("div", "pdf-timer-running");
-  box.append(el("div", "pdf-timer-until", `Until ${clockText(new Date(endsAt!))}`));
+  box.append(el("div", "pdf-timer-until", `Until ${clockText(new Date(timer!.endsAt))}`));
   const cancel = el("button", "pdf-timer-cancel", "Cancel timer");
   cancel.type = "button";
   cancel.addEventListener("click", () => {
-    setEnd(null);
+    setTimer(null);
     done();
   });
   box.append(cancel);
   return box;
 }
 
-function openCard(): void {
-  card?.close();
-  // At zero, a press acknowledges it: the clock comes back.
-  if (endsAt !== null && Date.now() >= endsAt) return setEnd(null);
-  const backdrop = el("div", "pdf-timer-backdrop");
-  const box = el("div", "pdf-timer-card");
+/** Over the clock, the arrow at its middle, kept inside the window —
+ *  and above the iPad's keyboard while it is up. */
+function placePop(): void {
+  if (!pop) return;
+  const { el: box, anchor } = pop;
+  if (!anchor.isConnected || !anchor.getClientRects().length) return pop.close();
+  const a = anchor.getBoundingClientRect();
+  const w = box.offsetWidth;
+  const mid = a.left + a.width / 2;
+  const left = Math.max(8, Math.min(mid - w / 2, window.innerWidth - w - 8));
+  box.style.left = `${left}px`;
+  box.style.setProperty("--arrow-x", `${Math.max(14, Math.min(mid - left, w - 14))}px`);
+  let top = a.top - 10 - box.offsetHeight;
+  const vv = window.visualViewport;
+  const floor = vv ? vv.offsetTop + vv.height - 8 : window.innerHeight;
+  const covered = top + box.offsetHeight > floor;
+  if (covered) top = floor - box.offsetHeight;
+  box.style.top = `${Math.max(8, top)}px`;
+  // The arrow points at the clock only while the window is over it.
+  box.classList.toggle("lifted", covered);
+}
+
+function closePop(): void {
+  pop?.close();
+}
+
+function openPop(anchor: HTMLElement): void {
+  closePop();
+  const box = el("div", "pdf-timer-pop");
   box.setAttribute("role", "dialog");
   box.setAttribute("aria-label", "Timer");
-  const close = () => {
-    backdrop.remove();
-    window.removeEventListener("keydown", onKey, true);
-    card = null;
+  box.append(el("span", "pdf-timer-arrow"));
+  const onOutside = (e: PointerEvent) => {
+    const t = e.target as Element;
+    // The clock's own press toggles the window (its click).
+    if (!box.contains(t) && !t.closest?.(".pdf-clock")) close();
   };
   const onKey = (e: KeyboardEvent) => {
     if (e.key !== "Escape") return;
@@ -209,14 +264,65 @@ function openCard(): void {
     e.stopPropagation();
     close();
   };
-  box.append(endsAt === null ? startForm(close) : runningView(close));
+  const close = () => {
+    box.remove();
+    document.removeEventListener("pointerdown", onOutside, true);
+    window.removeEventListener("keydown", onKey, true);
+    window.removeEventListener("resize", placePop);
+    window.visualViewport?.removeEventListener("resize", placePop);
+    window.visualViewport?.removeEventListener("scroll", placePop);
+    if (pop?.el === box) pop = null;
+  };
+  pop = { el: box, anchor, close };
+  box.append(timer ? runningView(close) : startForm(close));
+  document.body.appendChild(box);
+  placePop();
+  document.addEventListener("pointerdown", onOutside, true);
+  window.addEventListener("keydown", onKey, true);
+  window.addEventListener("resize", placePop);
+  window.visualViewport?.addEventListener("resize", placePop);
+  window.visualViewport?.addEventListener("scroll", placePop);
+}
+
+// --- the alert at zero --------------------------------------------------------
+
+let alertBox: HTMLElement | null = null;
+
+/** "Time’s up", in the middle of the window; OK puts the clock back. */
+function showDone(): void {
+  if (alertBox || stateNow() !== "done") return;
+  closePop();
+  const t = timer!;
+  const backdrop = el("div", "pdf-timer-backdrop");
+  const box = el("div", "pdf-timer-alert");
+  box.setAttribute("role", "alertdialog");
+  box.setAttribute("aria-label", "Time’s up");
+  box.append(
+    el("div", "pdf-timer-alert-title", "Time’s up"),
+    el("div", "pdf-timer-alert-detail", [t.label, `ended ${clockText(new Date(t.endsAt))}`].filter(Boolean).join(" · ")),
+  );
+  const ok = el("button", "pdf-timer-go", "OK");
+  ok.type = "button";
+  box.append(ok);
   backdrop.append(box);
-  // On the click, not the press, so the tap ends on the backdrop rather
-  // than on whatever is under it once the card has gone.
-  backdrop.addEventListener("click", (e) => e.target === backdrop && close());
+  const onKey = (e: KeyboardEvent) => {
+    if (e.key !== "Escape" && e.key !== "Enter") return;
+    e.preventDefault();
+    e.stopPropagation();
+    dismiss();
+  };
+  const dismiss = () => {
+    backdrop.remove();
+    window.removeEventListener("keydown", onKey, true);
+    alertBox = null;
+    setTimer(null);
+  };
+  ok.addEventListener("click", dismiss);
+  // On the click, so the tap ends on the backdrop, not what is under it.
+  backdrop.addEventListener("click", (e) => e.target === backdrop && dismiss());
   window.addEventListener("keydown", onKey, true);
   document.body.appendChild(backdrop);
-  card = { el: backdrop, close };
+  alertBox = backdrop;
 }
 
 /** A clock (or the timer, while one runs) for a place beside the
@@ -225,7 +331,12 @@ export function createClock(): { el: HTMLButtonElement; remove: () => void } {
   const b = document.createElement("button");
   b.type = "button";
   b.className = "pdf-clock";
-  b.addEventListener("click", openCard);
+  b.addEventListener("click", () => {
+    if (pop?.anchor === b) return closePop();
+    // At zero, the press brings the alert back (its OK clears it).
+    if (stateNow() === "done") return showDone();
+    openPop(b);
+  });
   slots.add(b);
   tick();
   return {
@@ -233,10 +344,12 @@ export function createClock(): { el: HTMLButtonElement; remove: () => void } {
     remove(): void {
       slots.delete(b);
       b.remove();
-      if (!slots.size) {
-        window.clearTimeout(ticker);
-        card?.close();
-      }
+      if (pop?.anchor === b) closePop();
+      if (!slots.size) window.clearTimeout(ticker);
     },
   };
 }
+
+// A timer kept from before (another PDF, the app closed): its end is
+// armed as this loads, and one already past is announced.
+armEnd();

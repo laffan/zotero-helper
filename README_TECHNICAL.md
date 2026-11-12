@@ -524,16 +524,22 @@ view, then the page, or the set's range, "7–9 of 13", then the time).
 A press on the place shows every page at a glance, the thumbnail grid
 (G from the keyboard; `createPageFinder` in `readingProgress.ts`); a
 press on the time, a button of its own, opens the reading timer
-(`clock.ts`): a small card in the upper part of the window — clear of
-the iPad's keyboard — over a faint backdrop, with For (hours and
-minutes) or Until (a time of day; one already past today is
-tomorrow's) and Start. While a timer runs, the time's place counts
-down ("24:59", "1:05:00"), and a press opens the card again with when
-it ends and Cancel Timer. At zero it shows 0:00 in red, pulsing, until
-a press puts the clock back (or ten minutes pass). There is one timer
-for the app, on this device (`zh-reading-timer`, its end): it carries on
-through switching PDFs and closing the app, and every clock shows it —
-reading mode's pill too. The card's last For is remembered
+(`clock.ts`): a little window over the time, its arrow pointing down at
+it, with For (hours and minutes) or Until (a time of day; one already
+past today is tomorrow's) and Start. While the iPad's keyboard covers
+it (the visual viewport ends above it) the window moves up out of its
+way, without the arrow. A press outside, Escape or the time again closes
+it. While a timer runs, the time's place counts down ("24:59",
+"1:05:00"), and a press opens the window again with when it ends and
+Cancel Timer. At zero a modal in the middle of the window says "Time’s
+up", with what the timer was ("25 min", "until 1:33pm") and when it
+ended, and its OK (or Enter, Escape, a press beside it) puts the clock
+back; until then the count shows 0:00 in red. The end has a timeout of
+its own, apart from the clocks, so the alert comes with no PDF open too,
+and one that came while the app was put away shows as it comes back.
+There is one timer for the app, on this device (`zh-reading-timer`): it
+carries on through switching PDFs and closing the app, and every clock
+shows it — reading mode's pill too. The last For is remembered
 (`zh-reading-timer-last`). One ticker updates the clocks: each second
 while a timer runs, else as each minute turns. The viewer is a port of Hush's: horizontal or vertical
 scrolling, fit one / two / three pages, zoom, a thumbnail grid, the

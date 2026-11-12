@@ -16,7 +16,7 @@ import {
   topLevelItems,
   yearOf,
 } from "../lib/collections";
-import { startItemDrag } from "../lib/dragdrop";
+import { setPinMover, startItemDrag, useDrag } from "../lib/dragdrop";
 import { trackPointerDrag } from "../lib/dragGesture";
 import { readItem } from "../lib/notes";
 import { RECENT, useRecent } from "../lib/recent";
@@ -143,6 +143,7 @@ export function ItemList() {
   const folderView =
     useStore((s) => s.folderViews[selectedCollection]) ?? DEFAULT_FOLDER_VIEW;
   const togglePin = useStore((s) => s.togglePin);
+  const arrangePins = useStore((s) => s.arrangePins);
   const setFolderMode = useStore((s) => s.setFolderMode);
   const setThumbScale = useStore((s) => s.setThumbScale);
   // Results come back ranked by relevance (or by date), which a grid of
@@ -195,13 +196,15 @@ export function ItemList() {
     }
     // Rows for in-flight jobs replace their library rows.
     list = list.filter((i) => !jobItemKeys.has(i.key));
-    // Pinned items float to the top, keeping their relative order.
+    // Pinned items float to the top: in the order the reader dragged
+    // them into, once they have been, else keeping the sort's order.
     if (pinned.length) {
       const isPinned = new Set(pinned);
-      list = [
-        ...list.filter((i) => isPinned.has(i.key)),
-        ...list.filter((i) => !isPinned.has(i.key)),
-      ];
+      const inList = new Map(list.map((i) => [i.key, i]));
+      const top = folderView.pinsArranged
+        ? pinned.map((k) => inList.get(k)).filter((i): i is ZItem => Boolean(i))
+        : list.filter((i) => isPinned.has(i.key));
+      list = [...top, ...list.filter((i) => !isPinned.has(i.key))];
     }
     return list;
   }, [
@@ -213,7 +216,29 @@ export function ItemList() {
     sortDir,
     jobItemKeys,
     pinned,
+    folderView.pinsArranged,
   ]);
+
+  // A pinned item dragged among the pinned moves there (lib/dragdrop):
+  // the order shown, with the moved ones (the pinned among those
+  // dragged) taken out and put back before or after the one dropped on.
+  // Pins not in the list just now (an item being imported) keep their
+  // places after. Not while searching, whose order isn't the folder's.
+  const pinOver = useDrag((s) => s.pinOver);
+  useEffect(() => {
+    if (searching || !pinned.length) return setPinMover(null);
+    setPinMover((keys, slot) => {
+      const shown = items.filter((i) => pinned.includes(i.key)).map((i) => i.key);
+      const moving = shown.filter((k) => keys.includes(k));
+      const rest = shown.filter((k) => !keys.includes(k));
+      let at = rest.indexOf(slot.key);
+      if (!moving.length || at < 0) return;
+      if (slot.after) at++;
+      const order = [...rest.slice(0, at), ...moving, ...rest.slice(at)];
+      arrangePins(selectedCollection, [...order, ...pinned.filter((k) => !order.includes(k))]);
+    });
+    return () => setPinMover(null);
+  }, [items, pinned, searching, selectedCollection]);
 
   const jobsHeight = activeJobs.length * JOB_ROW_HEIGHT;
   const totalHeight = jobsHeight + items.length * ROW_HEIGHT;
@@ -495,10 +520,14 @@ export function ItemList() {
           {visible.map((item, i) => {
             const idx = firstVisible + i;
             const selected = selectedKeys.includes(item.key);
+            const isPin = pinned.includes(item.key);
+            const drop = pinOver?.key === item.key ? (pinOver.after ? "pin-drop-after" : "pin-drop-before") : "";
             return (
               <div
                 key={item.key}
-                className={`item-row ${selected ? "selected" : ""}`}
+                className={`item-row ${selected ? "selected" : ""} ${drop}`}
+                data-pin-key={isPin ? item.key : undefined}
+                data-pinned={isPin ? "" : undefined}
                 style={{
                   position: "absolute",
                   top: jobsHeight + idx * ROW_HEIGHT,
@@ -509,7 +538,9 @@ export function ItemList() {
                 onClick={(e) => handleRowClick(e, item)}
                 onDoubleClick={() => openItem(item)}
                 onPointerDown={(e) => startItemDrag(e, item.key)}
-                title="Double-click to read the PDF beside its notes · drag onto a folder to file it there"
+                title={`Double-click to read the PDF beside its notes · drag onto a folder to file it there${
+                  isPin && !searching ? " · drag among the pinned to reorder" : ""
+                }`}
               >
                 <button
                   className={`col col-pin ${pinned.includes(item.key) ? "on" : ""}`}

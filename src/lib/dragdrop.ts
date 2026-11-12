@@ -4,6 +4,14 @@
 // than anywhere else. A mouse starts dragging after a few pixels of
 // movement; a finger has to hold still for a moment first, so ordinary
 // scrolling still scrolls.
+//
+// The same drag, begun on a pinned item, also puts the pinned in order:
+// over another pinned item (`data-pin-key`) a line shows where it would
+// go — before or after it, by which half of it the pointer is over, up
+// and down in the list, left and right in the grid (`data-pin-axis`) —
+// and letting go there moves it (the pinned among the dragged, as a
+// block). What the move means is the list's (`setPinMover`), which knows
+// the order shown.
 import { create } from "zustand";
 import { addItemsToCollection } from "./actions";
 import { itemTitle } from "./collections";
@@ -22,6 +30,19 @@ export interface DropTarget {
   name: string;
 }
 
+/** A place among the pinned: before or after the pinned item `key`. */
+export interface PinSlot {
+  key: string;
+  after: boolean;
+}
+
+/** What a drop among the pinned does — the list registers it while it
+ *  can be reordered (not while searching). */
+let pinMover: ((keys: string[], slot: PinSlot) => void) | null = null;
+export function setPinMover(fn: typeof pinMover): void {
+  pinMover = fn;
+}
+
 interface DragState {
   /** Item keys under the cursor. Empty means nothing is being dragged. */
   keys: string[];
@@ -29,9 +50,11 @@ interface DragState {
   x: number;
   y: number;
   over: DropTarget | null;
+  /** Over a pinned item, while a pinned one is dragged. */
+  pinOver: PinSlot | null;
 }
 
-const IDLE: DragState = { keys: [], label: "", x: 0, y: 0, over: null };
+const IDLE: DragState = { keys: [], label: "", x: 0, y: 0, over: null, pinOver: null };
 
 /** Kept out of the main app store: a drag updates on every pointer move
  *  and nothing else should re-render at that rate. */
@@ -41,6 +64,24 @@ export const useDrag = create<DragState>(() => IDLE);
  *  a sidebar row re-renders only when its own highlight flips. */
 export function useIsDropTarget(key: string): boolean {
   return useDrag((s) => s.over?.key === key);
+}
+
+/** Where a pinned item dragged over `key` would go — "before" or
+ *  "after" it — or null. */
+export function usePinSlot(key: string): "before" | "after" | null {
+  return useDrag((s) => (s.pinOver?.key === key ? (s.pinOver.after ? "after" : "before") : null));
+}
+
+/** The place among the pinned under a viewport point, if any (not one
+ *  of the items being moved). */
+function pinSlotAt(x: number, y: number, moving: string[]): PinSlot | null {
+  const el = document.elementFromPoint(x, y) as HTMLElement | null;
+  const slot = el?.closest?.("[data-pin-key]") as HTMLElement | null;
+  const key = slot?.dataset.pinKey;
+  if (!slot || !key || moving.includes(key)) return null;
+  const r = slot.getBoundingClientRect();
+  const after = slot.dataset.pinAxis === "x" ? x > r.left + r.width / 2 : y > r.top + r.height / 2;
+  return { key, after };
 }
 
 /** True while a drag is in progress (the sidebar dims non-targets). */
@@ -80,6 +121,9 @@ export function startItemDrag(e: React.PointerEvent, itemKey: string): void {
 
   const selected = useStore.getState().selectedKeys;
   const keys = selected.includes(itemKey) ? [...selected] : [itemKey];
+  // Begun on a pinned item, it can also reorder the pinned.
+  const arranging = (e.currentTarget as HTMLElement).dataset.pinned !== undefined && pinMover !== null;
+  const pinAt = (x: number, y: number) => (arranging ? pinSlotAt(x, y, keys) : null);
   const startX = e.clientX;
   const startY = e.clientY;
   const isTouch = e.pointerType !== "mouse";
@@ -106,6 +150,7 @@ export function startItemDrag(e: React.PointerEvent, itemKey: string): void {
       x,
       y,
       over: targetAt(x, y),
+      pinOver: pinAt(x, y),
     });
   };
 
@@ -136,14 +181,16 @@ export function startItemDrag(e: React.PointerEvent, itemKey: string): void {
       x: ev.clientX,
       y: ev.clientY,
       over: targetAt(ev.clientX, ev.clientY),
+      pinOver: pinAt(ev.clientX, ev.clientY),
     });
   };
 
   const onUp = () => {
-    const dropped = active ? useDrag.getState().over : null;
+    const { over, pinOver } = active ? useDrag.getState() : IDLE;
     if (active) swallowNextClick();
     stop();
-    if (dropped) void addItemsToCollection(keys, dropped.key, dropped.name);
+    if (over) void addItemsToCollection(keys, over.key, over.name);
+    else if (pinOver) pinMover?.(keys, pinOver);
   };
 
   const onCancel = () => stop();

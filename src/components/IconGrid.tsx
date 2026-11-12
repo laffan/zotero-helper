@@ -3,6 +3,7 @@
 // are cached on disk, so a folder is slow only the first time.
 import { useEffect, useRef, useState } from "react";
 import { creatorSummary, itemTitle, yearOf } from "../lib/collections";
+import { usePinSlot } from "../lib/dragdrop";
 import { gridNav } from "../lib/shortcuts/listNav";
 import { useThumbnail } from "../lib/thumbnails";
 import type { ZItem } from "../lib/types";
@@ -41,9 +42,15 @@ function Cell({
   onDragStart: (e: React.PointerEvent, itemKey: string) => void;
 }) {
   const thumb = useThumbnail(attKey);
+  // A pinned cell is a place to drop another among the pinned
+  // (lib/dragdrop), before or after it, left and right.
+  const drop = usePinSlot(item.key);
   return (
     <div
-      className={`icon-cell ${selected ? "selected" : ""}`}
+      className={`icon-cell ${selected ? "selected" : ""} ${drop ? `pin-drop-${drop}` : ""}`}
+      data-pin-key={pinned ? item.key : undefined}
+      data-pin-axis={pinned ? "x" : undefined}
+      data-pinned={pinned ? "" : undefined}
       onClick={(e) => onSelect(e, item)}
       onDoubleClick={() => onOpen(item)}
       onPointerDown={(e) => onDragStart(e, item.key)}

@@ -100,8 +100,14 @@ interface UiPrefs {
 }
 
 export interface FolderView {
-  /** Item keys pinned to the top of this folder's list. */
+  /** Item keys pinned to the top of this folder's list — in the order
+   *  shown, once `pinsArranged`. */
   pinned: string[];
+  /** The pinned have been put in an order of the reader's (dragged,
+   *  lib/dragdrop.ts): they show in `pinned`'s order, a new pin last.
+   *  Until then (and again once none are pinned) they follow the
+   *  folder's sort. */
+  pinsArranged?: boolean;
   mode: "list" | "icons";
   /** Thumbnail size multiplier for the icon view (see THUMB_SCALE). */
   thumbScale: number;
@@ -197,6 +203,8 @@ interface AppStore extends UiPrefs {
   toggleTagColors: () => void;
   setColWidth: (col: ResizableCol, w: number) => void;
   togglePin: (collection: string, itemKey: string) => void;
+  /** The pinned, in the reader's order (a drag among them). */
+  arrangePins: (collection: string, pinned: string[]) => void;
   setFolderMode: (collection: string, mode: FolderView["mode"]) => void;
   setThumbScale: (collection: string, scale: number) => void;
 
@@ -374,13 +382,23 @@ export const useStore = create<AppStore>()(
       togglePin: (collection, itemKey) =>
         set((s) => {
           const view = s.folderViews[collection] ?? DEFAULT_FOLDER_VIEW;
+          // Unpinned, an item loses its place in the order: pinned again,
+          // it comes last.
           const pinned = view.pinned.includes(itemKey)
             ? view.pinned.filter((k) => k !== itemKey)
             : [...view.pinned, itemKey];
+          const pinsArranged = Boolean(view.pinsArranged && pinned.length);
           return {
-            folderViews: { ...s.folderViews, [collection]: { ...view, pinned } },
+            folderViews: { ...s.folderViews, [collection]: { ...view, pinned, pinsArranged } },
           };
         }),
+      arrangePins: (collection, pinned) =>
+        set((s) => ({
+          folderViews: {
+            ...s.folderViews,
+            [collection]: { ...(s.folderViews[collection] ?? DEFAULT_FOLDER_VIEW), pinned, pinsArranged: true },
+          },
+        })),
       setFolderMode: (collection, mode) =>
         set((s) => ({
           folderViews: {

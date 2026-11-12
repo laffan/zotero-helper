@@ -3,19 +3,22 @@
 // into. A press on the clock opens a little window over it, its arrow
 // pointing down at it, to start a timer: for a span (hours and minutes)
 // or until a time of day. While it runs, the clock's place counts down
-// ("24:59"), and a press opens the window again — when it ends, and
-// Cancel Timer. A press outside, Escape or the clock again closes it.
+// in whole minutes, rounded up ("1 h 25 min", "2 min"; no seconds), in
+// the clock's own weight and colour, and a press opens the window again
+// — when it ends, and Cancel Timer. A press outside, Escape or the clock
+// again closes it.
 //
 // At zero a modal in the middle of the window says so ("Time’s up"), and
-// its OK puts the clock back; until then the count shows 0:00 in red. The
+// its OK puts the clock back; until then the count shows "0 min" in red. The
 // end is its own timeout, apart from the clocks, so the alert comes with
 // no PDF open too — and a timer that ended while the app was put away is
 // announced as it comes back (late timeouts fire at once).
 //
 // One timer for the app, kept on this device (`zh-reading-timer`): it
 // lives through switching PDFs and closing the app, and every clock
-// shows it. One ticker updates every clock — each second while a timer
-// runs, else as each minute turns — and only while one is shown.
+// shows it. One ticker updates every clock — as the count's minute
+// turns while a timer runs, else as the clock's does — and only while
+// one is shown.
 //
 // The window sits over the clock at the bottom of the screen, where the
 // iPad's keyboard comes up: while it covers the window (the visual
@@ -72,20 +75,16 @@ export function clockText(d = new Date()): string {
   return `${h % 12 || 12}:${pad2(d.getMinutes())}${h < 12 ? "am" : "pm"}`;
 }
 
-/** "24:59", "1:05:00". */
-function countText(ms: number): string {
-  const s = Math.max(0, Math.ceil(ms / 1000));
-  const h = Math.floor(s / 3600);
-  const m = Math.floor((s % 3600) / 60);
-  return h ? `${h}:${pad2(m)}:${pad2(s % 60)}` : `${m}:${pad2(s % 60)}`;
-}
-
-/** "25 min", "1 h", "1 h 30 min". */
+/** "25 min", "1 h", "1 h 30 min" ("0 min" for none). */
 function spanText(mins: number): string {
   const h = Math.floor(mins / 60);
   const m = mins % 60;
-  return [h ? `${h} h` : "", m ? `${m} min` : ""].filter(Boolean).join(" ");
+  return [h ? `${h} h` : "", m || !h ? `${m} min` : ""].filter(Boolean).join(" ");
 }
+
+/** What is left, in whole minutes rounded up: "2 min" until the last
+ *  minute is over, "1 h 5 min". */
+const countText = (ms: number) => spanText(Math.max(0, Math.ceil(ms / 60_000)));
 
 function setTimer(t: Timer | null): void {
   timer = t;
@@ -117,7 +116,7 @@ function tick(): void {
     s.title = title;
   }
   if (!slots.size) return;
-  const wait = state === "running" ? ((timer!.endsAt - now) % 1000 || 1000) + 5 : 60_000 - (now % 60_000) + 20;
+  const wait = state === "running" ? ((timer!.endsAt - now) % 60_000 || 60_000) + 20 : 60_000 - (now % 60_000) + 20;
   ticker = window.setTimeout(tick, wait);
 }
 

@@ -26,13 +26,9 @@
 .pdf-zoom-toolbar .pdf-clock:hover {
   color: var(--text);
 }
-.pdf-clock[data-state="running"] {
-  color: var(--text);
-  font-weight: 600;
-}
+/* A running timer reads as the clock does; at zero, in red. */
 .pdf-clock[data-state="done"] {
   color: var(--bad);
-  font-weight: 600;
   animation: pdf-timer-done 1.2s ease-in-out infinite;
 }
 @keyframes pdf-timer-done {

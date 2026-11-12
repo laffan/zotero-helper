@@ -293,6 +293,20 @@ cover in a folder has been rendered, the list view shows them too,
 tiny, in a column before the title (the list never sets off a render
 itself). Both are app-side only — nothing is written to Zotero.
 
+**Ordering the pinned** — pinned items follow the folder's sort until
+one is dragged among them: the same drag that files items into a folder
+(a few pixels with a mouse, a press held still with a finger), begun on
+a pinned item and taken over another, draws a line before or after it —
+above or below a row, left or right of a cell, by which half the pointer
+is over — and letting go there moves it (the pinned among the dragged
+go as a block; `setPinMover` in `lib/dragdrop.ts`, the order worked out
+in `ItemList.tsx`). From then on the folder keeps that order
+(`FolderView.pinsArranged`, the order being `pinned`'s), a new pin goes
+last, and unpinning an item drops its place: pinned again, it comes
+last. With none left pinned, the folder's sort takes over again. Not
+while searching, whose order isn't the folder's. Kept with the folder's
+view, on this device, from one session to the next.
+
 **Colored tags** — Zotero's colored ("numbered") tags show as swatches
 before the title in list view and on the caption's second line in icon
 view, up to four per item, in Zotero's own 1–9 order. A tag named with an
@@ -529,19 +543,20 @@ it, with For (hours and minutes) or Until (a time of day; one already
 past today is tomorrow's) and Start. While the iPad's keyboard covers
 it (the visual viewport ends above it) the window moves up out of its
 way, without the arrow. A press outside, Escape or the time again closes
-it. While a timer runs, the time's place counts down ("24:59",
-"1:05:00"), and a press opens the window again with when it ends and
+it. While a timer runs, the time's place counts down in whole minutes,
+rounded up ("1 h 25 min", "2 min" — no seconds), in the clock's own
+weight and colour, and a press opens the window again with when it ends and
 Cancel Timer. At zero a modal in the middle of the window says "Time’s
 up", with what the timer was ("25 min", "until 1:33pm") and when it
 ended, and its OK (or Enter, Escape, a press beside it) puts the clock
-back; until then the count shows 0:00 in red. The end has a timeout of
+back; until then the count shows "0 min" in red. The end has a timeout of
 its own, apart from the clocks, so the alert comes with no PDF open too,
 and one that came while the app was put away shows as it comes back.
 There is one timer for the app, on this device (`zh-reading-timer`): it
 carries on through switching PDFs and closing the app, and every clock
 shows it — reading mode's pill too. The last For is remembered
-(`zh-reading-timer-last`). One ticker updates the clocks: each second
-while a timer runs, else as each minute turns. The viewer is a port of Hush's: horizontal or vertical
+(`zh-reading-timer-last`). One ticker updates the clocks, as the
+count's or the clock's minute turns. The viewer is a port of Hush's: horizontal or vertical
 scrolling, fit one / two / three pages, zoom, a thumbnail grid, the
 PDF's own links, Zotero's highlights, underlines and ink painted into
 the pages, and the **folded view**, which collapses the paper to the regions around

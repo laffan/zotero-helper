@@ -16,6 +16,7 @@ import type {
   ChatMessage,
   ChatUsage,
   ImportStage,
+  PageSpan,
   PendingAsk,
 } from "../types";
 import { getAbstracts } from "./index";
@@ -32,9 +33,11 @@ interface ChatReply {
 /** What the AI menu's two Ask entries call. Reads the works, prices the
  *  request, and puts it behind the confirmation popup — nothing is sent
  *  to a provider until the user says go. */
+/** `pages`: only that part of the one PDF asked about (Ask PDF). */
 export async function startAsk(
   target: AskTarget,
   depth: AskDepth,
+  pages?: PageSpan,
 ): Promise<void> {
   const store = useStore.getState();
   if (store.askPreparing) return;
@@ -45,7 +48,7 @@ export async function startAsk(
   }
   store.setAskPreparing(true);
   try {
-    const ask = await prepareAsk(target, items, depth);
+    const ask = await prepareAsk(target, items, depth, pages);
     useStore.getState().setPendingAsk(ask);
     useStore.getState().setModal({ kind: "askCost" });
   } catch (e) {
@@ -106,7 +109,7 @@ export async function refillAsk(ask: PendingAsk): Promise<void> {
       await getAbstracts(fixable);
     }
     const items = itemsForAsk(ask.target);
-    const next = await prepareAsk(ask.target, items, ask.source.depth);
+    const next = await prepareAsk(ask.target, items, ask.source.depth, ask.source.pages);
     // The user may have closed the popup while this ran; don't reopen
     // something they dismissed.
     if (useStore.getState().modal?.kind === "askCost") {

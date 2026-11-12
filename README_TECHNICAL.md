@@ -99,6 +99,10 @@ src/            React + TypeScript UI (Vite, zustand, MiniSearch)
                 laid over the library until a sync includes them
   lib/pencil.ts the Apple Pencil's double-tap and squeeze, from
                 tauri-plugin-pencil, as a window event for ink mode
+  lib/penActivity.ts
+                the pen at work, on the pages or the notepad, as one
+                signal: how long it has rested, which page renders,
+                the notepad's save and the annotation push wait on
   lib/penTool.ts
                 the eraser shared by ink mode and the notepad, which
                 the double-tap turns on and off
@@ -509,7 +513,9 @@ the button — since iPadOS shows no `title` tooltips; a button with a
 keyboard shortcut shows the key after its text, dimmed, as currently
 bound (`data-shortcut` on the button, read by `tooltips.ts`). The bar
 is in sections 14px apart — reading mode and dark pages, pages per
-screen (fit one / two / three), scroll direction, paged / continuous,
+screen (fit one / two / three; four and five from the keyboard only,
+4 and 5 — the three-page button is lit then, the number over its
+middle page, `.pdf-fit-more`), scroll direction, paged / continuous,
 folding, zoom (−, the zoom or fit, and + as one bordered group), the
 sentence tool and the pen — and, at its right, where the reader is:
 "54% | Pg 7 of 13" (the share of the document up to the page in view,
@@ -540,8 +546,9 @@ the folds are up. Hush's annotation shelf is left out: the
 Highlights tab beside the viewer already lists, filters and quotes
 the same annotations. Beside the folded-view button, a **paged /
 continuous** toggle (its icons turn with the scroll direction) chooses
-between the pages as one strip and a set at a time — one, two
-or three pages, as the fit buttons say, in either scroll direction.
+between the pages as one strip and a set at a time — one to five
+pages, as the fit buttons (and the 4 and 5 keys) say, in either scroll
+direction (`pdfviewer-paged.css`).
 The set is fitted whole and centred (the page indicator shows its
 range, "7–9 / 13"), and a swipe moves to the next set — left/right
 with horizontal scrolling, up/down with vertical — one set per swipe
@@ -756,9 +763,9 @@ gets no context — pages stopped drawing, and with no raster no text
 layer. Should it happen anyway, the renderer lets go of every page out
 of view and draws the page plainly rather than leave it blank (it asks
 for the canvas's context first, with pdf.js's own attributes). The redraw comes after the pinch,
-never during writing: no page render starts while the Pencil is down
-(`holdRenders` in `render.ts`, which retries every 120ms), since pdf.js
-draws on the main thread, in slices, and would cost the stroke samples.
+never during writing: no page render runs while the pen writes (see
+"The pages wait for the pen" under Drawing), since pdf.js draws on the
+main thread, in slices, and would cost the stroke samples.
 Any relayout ends the
 magnification (a mode, a zoom step, a resize, a search hit or citation
 being shown, a new PDF), since the code that keeps the place across one
@@ -1054,16 +1061,61 @@ Why it keeps up with fast writing:
   ink mode keeps each one's parsed drawing with it — so a write no
   longer re-reads every drawing in the PDF. No push starts within 5s of
   the pen writing (`notePenActivity`): its results are a store write too.
-- *The pages wait for the pen.* No page render starts while it is down,
-  and one under way when it comes down is stopped and started again
-  once it lifts (`yieldToPen` in `render.ts`); a page that finished
-  meanwhile lays out its text and links only after. pdf.js draws and
-  lays out text on the main thread, in slices that would cost the
-  stroke its samples.
+- *The pages wait for the pen — through the gaps between strokes.*
+  pdf.js draws and lays out text on the main thread, in slices, and a
+  slice that paints a large image (a scan, a photograph) can't be cut
+  short: on an image-heavy PDF one is enough to cost a stroke its
+  first samples, which on the iPad are lost, not late. Running
+  handwriting lifts the pen every twentieth of a second within a
+  letter and every few tenths between words, so "the pen is up" is no
+  pause: renders used to start in those gaps and be cancelled at the
+  next pen-down, to begin again from the first slice in the next gap.
+  Now the pen's gestures — ink mode's and the notepad's — report to
+  `lib/penActivity.ts`, and what can wait asks how long the pen has
+  rested. A page in view with nothing drawn on it yet is drawn once
+  the pen has rested 700ms (`PEN_REST_SHOW_MS`, longer than the gap
+  between words); everything else — the pages around the view, a
+  redraw of a page still showing its old raster, the text and link
+  layers of a page drawn meanwhile — once it has rested 1.8s
+  (`PEN_REST_MS`, the pause at the end of a thought). A render under
+  way when the pen comes down pauses after its current slice and
+  carries on from there (`pauseForPen`, through pdf.js's
+  `onContinue`, which asks before each next slice) rather than
+  beginning again; the folded view's strips wait the same way. A
+  relayout (the notepad docking, reading mode) keeps the old,
+  stretched raster of the pages in view until the crisp one is drawn
+  (the settle pass marks them stale rather than clearing them), so
+  the pages written about don't go blank while the pen holds the
+  redraw back.
+- *Decoded images are let go.* pdf.js keeps a drawn page's decoded
+  images and operator list for its next draw. For a page of
+  photographs or a scan that is tens of MB, and with two dozen pages
+  kept on the iPad a heavy PDF held hundreds of MB besides its rasters
+  — memory pressure the iPad answers with stalls. Only the pages in
+  view keep theirs (a repaint after a highlight stays quick); a page
+  out of view lets go as soon as it is drawn, or as it leaves the view
+  (`releaseDecoded` in `render.ts`), and draws again from the PDF's
+  data, in the worker, when it comes back.
+- *Ink is written at a pause, never between two strokes of a word.*
+  The changes of a long stretch of writing without a 2s rest are
+  written, once 15s have gone by, at the next gap of at least 250ms
+  (`FLUSH_GAP_MS` in `session.ts`) — a gap between words — not at the
+  next pen-up, which in running handwriting is a letter's next stroke.
 
 Measured in Chromium (`npm run dev`, the viewer driven with synthetic pen
 events): about 0.01ms of script per pen sample, and under 1ms on average
-at pen-up (smoothing, merge, SVG). Hush's stroke engine (tile-baked
+at pen-up (smoothing, merge, SVG). With a 30-page, 9MB PDF of large
+images, the CPU slowed 4×, and a sentence written at handwriting pace
+(2–5 strokes a letter, ~50ms between a letter's strokes, ~100ms between
+letters, ~300ms between words) begun just after turning to a page not
+yet drawn — on the pages or on the notepad — holding renders through
+the gaps took the frames over 50ms from 11–19 per sentence to 2–4, the
+median wait for a pen-down from 29–50ms to 16–37ms, and the longest
+from 223–358ms to 54–266ms. With every page already drawn the two were
+the same. Headless Chromium copies every software canvas at each
+frame's commit — its own cost, not WebKit's — which dominates what is
+left there, so the figures say more about the difference than about an
+iPad. Hush's stroke engine (tile-baked
 canvases, brush atlases) was not needed: Zotero's ink is one width per
 annotation with round caps, which SVG draws natively.
 
@@ -1125,7 +1177,10 @@ filter box that searches highlighted text, comments, page labels and
 tags; a column of colour swatches (a click shows one colour, ⌘-click —
 Ctrl elsewhere — adds or removes one, as in a file list); and the
 highlights in reading
-order, each with its page and three small buttons: **Copy** (a
+order, each with its page and three small buttons — shown on the row
+the mouse or trackpad pointer is over, and on the row last picked (a
+finger's way to them; on a screen with no hovering pointer at all, on
+every row): **Copy** (a
 Markdown blockquote with a link back to the page), **Note** (the same
 quote, inserted into the entry's notes at the caret — offered when one
 entry is selected, since notes belong to an entry) and **Zotero**,
@@ -1149,8 +1204,22 @@ remembered visit to Questions opens All Items instead.
 **The conversations tab.** With a service connected, one entry in the
 right panel gets a fourth tab (the conversation icon, with a count; Q
 from the keyboard): the Questions conversations about that entry alone
-(`isAbout`), newest first, with Ask Abstract / Ask Full Paper to start
-one (`ItemChats.tsx`). Conversations it was only part of — a selection
+(`isAbout`), newest first, with Ask Abstract / Ask PDF to start
+one (`ItemChats.tsx`). Ask PDF opens a small chooser beneath the
+buttons (`AskPdf.tsx`): the whole PDF, one section of its outline — a
+list of the outline's headings that point into the pages, each with
+its pages, running to where the next heading at its level or above
+begins (`sectionSpans` in `lib/outline.ts`; left out when the PDF has
+no outline, or one that resolves to no pages) — or a run of pages,
+"from" to "to". The PDF's outline and page count are read as the
+chooser opens (the open PDF's come from the viewer; any other is read
+from the device, downloaded first if need be, as asking would). A part
+goes to the model as its pages only, after their page markers, under
+a line saying which part of the work it is; the chat keeps it
+(`ChatSource.pages`, a `PageSpan`), so its lines say "section
+“Methods”, pp. 4–9" where a whole paper's say "full text", and a
+retrieval after the cost popup reads the same part again. With no PDF
+on record, Ask PDF goes straight to the popup that offers to find one. Conversations it was only part of — a selection
 or a folder asked about — are listed above as links, which open in
 Questions (leaving the PDF). A conversation opens in the tab, in place of the
 list, so it can be read beside the PDF; one started while a PDF is open
@@ -1194,7 +1263,12 @@ box at its top that narrows the list by passage, answer or work. The
 explained passage stays marked in the PDF with a dashed pink outline
 (`--explain-mark`, an overlay like a citation's, `passageMarks.ts`;
 where it is kept as the chat's `passage`), and a tap on it opens its
-explainer again — in reading mode too.
+explainer again — in reading mode too. The window's foot has
+**Remove Highlight** (a second press confirms): the explanation is
+kept, and its page (the Context toggle and the list's link back go by
+it), but the passage's rects are let go, so the outline and its tap
+are gone from the PDF, and going back from the list no longer marks
+the passage.
 
 **Look up and Words.** The selection bar's magnifier (and the
 highlight editor's) asks for a definition of the selected word or
@@ -1413,6 +1487,16 @@ On the canvas the Pencil writes — a tap is a dot — a finger pans, and a
 mouse writes with a drag (a Mac has no Pencil) while a wheel pans; each
 view pans on its own. Strokes are SVG paths grown sample by sample, as
 the viewer's ink is, with no React render under the pen (`surface.ts`).
+What a stroke sets off waits for the pen, as the pages' ink does (see
+"The pages wait for the pen"): the pad's gestures report to
+`lib/penActivity.ts`, so the PDF's renders hold off while it writes
+(they used not to: the pad over an image-heavy PDF had every page
+render land between its strokes); a finished stroke moves only its own
+note's label, where it used to rebuild every label and every link's
+chip; and the save (the whole pad as JSON, over IPC), the minimap's
+redraw and the other view's (the notes pane's pad, hidden in reading
+mode, which redraws in full) wait for a 1.8s pause. Putting the app away
+saves at once.
 The eraser — the switch's third part, a pen's eraser end, or the
 Pencil's double-tap — takes out every stroke it passes over; the switch
 always shows it. It is one eraser with ink mode's on the pages
@@ -1636,7 +1720,7 @@ doesn't cost the role, so there is nothing to reclaim.
 | PDF viewer | Folded view filters | ⇧F |
 | PDF viewer | Open / close the fold under the pointer | E |
 | PDF viewer | Horizontal / vertical scroll | Z / V |
-| PDF viewer | Fit one / two / three pages | 1 / 2 / 3 |
+| PDF viewer | Fit one / two / three / four / five pages | 1 / 2 / 3 / 4 / 5 |
 | PDF viewer | Paged / continuous view | P / C |
 | PDF viewer | Draw (ink mode) on / off | I |
 | PDF viewer | Sentence tool (a tap selects a sentence) on / off | S |

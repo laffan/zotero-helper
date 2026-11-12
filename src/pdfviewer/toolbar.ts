@@ -64,13 +64,21 @@ export function buildPdfToolbar() {
 
   const fitOneBtn = svgBtn("pdf-toggle-option active", "Fit one page", FIT_ONE_ICON, "pdfFit1");
   const fitTwoBtn = svgBtn("pdf-toggle-option", "Fit two pages", FIT_TWO_ICON, "pdfFit2");
-  const fitThreeBtn = svgBtn("pdf-toggle-option", "Fit three pages", FIT_THREE_ICON, "pdfFit3");
+  const fitThreeBtn = svgBtn("pdf-toggle-option pdf-fit-three", "Fit three pages", FIT_THREE_ICON, "pdfFit3");
+  // Four and five pages across have no buttons of their own (the 4 and 5
+  // keys press these, never shown); while either is on, the three-page
+  // button is lit with its number over it.
+  const fitMore = document.createElement("span");
+  fitMore.className = "pdf-fit-more";
+  fitThreeBtn.appendChild(fitMore);
+  const fitFourBtn = btn("pdf-toggle-option", "", "Fit four pages", "pdfFit4");
+  const fitFiveBtn = btn("pdf-toggle-option", "", "Fit five pages", "pdfFit5");
   const fitToggleWrap = group("pdf-toggle-group", fitOneBtn, fitTwoBtn, fitThreeBtn);
   fitToggleWrap.style.display = "none";
 
   // A fixed set of pages (as many as the fit buttons say), swiped
   // through, or the pages as one strip.
-  const fixedBtn = svgBtn("pdf-toggle-option", "Paged — one, two or three pages at a time; swipe to turn", FIXED_ICON, "pdfFixed");
+  const fixedBtn = svgBtn("pdf-toggle-option", "Paged — one to five pages at a time; swipe to turn", FIXED_ICON, "pdfFixed");
   const continuousBtn = svgBtn("pdf-toggle-option active", "Continuous — the pages as one strip", CONTINUOUS_ICON, "pdfContinuous");
   const pageModeWrap = group("pdf-toggle-group pdf-page-mode", fixedBtn, continuousBtn);
 
@@ -123,7 +131,7 @@ export function buildPdfToolbar() {
     toolbar,
     zoomOutBtn, zoomLabel, zoomInBtn,
     scrollHBtn, scrollVBtn,
-    fitOneBtn, fitTwoBtn, fitThreeBtn, fitToggleWrap,
+    fitOneBtn, fitTwoBtn, fitThreeBtn, fitFourBtn, fitFiveBtn, fitToggleWrap,
     pageModeWrap, fixedBtn, continuousBtn,
     foldBtn, foldFilterBtn,
     pageIndicator, zoteroLink, readingBtn, darkBtn, sentenceBtn, inkBtn,
@@ -151,7 +159,7 @@ export function syncToolbar(tb: PdfToolbar, s: ToolbarState): void {
     tb.zoomLabel.textContent =
       Math.abs(s.foldedZoom - 1) < 0.01 ? "Folded" : `Folded ${Math.round(s.foldedZoom * 100)}%`;
   } else if (s.layoutMode !== "fixed") {
-    const labels: Record<FitMode, string> = { fit: "Fit", "fit-2": "Fit 2", "fit-3": "Fit 3" };
+    const labels: Record<FitMode, string> = { fit: "Fit", "fit-2": "Fit 2", "fit-3": "Fit 3", "fit-4": "Fit 4", "fit-5": "Fit 5" };
     tb.zoomLabel.textContent = isVert || s.paged ? labels[s.fitMode] : "Fit";
   } else {
     tb.zoomLabel.textContent = `${Math.round(s.zoom() * 100)}%`;
@@ -164,7 +172,10 @@ export function syncToolbar(tb: PdfToolbar, s: ToolbarState): void {
   tb.continuousBtn.classList.toggle("active", !s.folded && !s.paged);
   tb.fitOneBtn.classList.toggle("active", s.fitMode === "fit" && !s.folded);
   tb.fitTwoBtn.classList.toggle("active", s.fitMode === "fit-2");
-  tb.fitThreeBtn.classList.toggle("active", s.fitMode === "fit-3");
+  const more = s.fitMode === "fit-4" || s.fitMode === "fit-5";
+  tb.fitThreeBtn.classList.toggle("active", s.fitMode === "fit-3" || more);
+  tb.fitThreeBtn.classList.toggle("more", more);
+  tb.fitThreeBtn.querySelector(".pdf-fit-more")!.textContent = more ? s.fitMode.slice(4) : "";
   tb.foldBtn.classList.toggle("active", s.folded);
   tb.foldFilterBtn.style.display = s.folded ? "" : "none";
 }

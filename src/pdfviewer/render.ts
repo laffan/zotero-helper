@@ -16,18 +16,36 @@
 //  - Canvas resolution is capped per page (iOS has hard canvas limits).
 //  - `scheduleSettle()` is the crisp pass after a zoom or resize: in the
 //    meantime existing rasters are only CSS-stretched.
+//  - pdf.js keeps a drawn page's decoded images (and its operator list)
+//    for the next draw of it. For a page of photographs or a scan that
+//    is tens of MB a page — with two dozen pages kept, a heavy PDF held
+//    hundreds of MB besides the rasters, the memory pressure an iPad
+//    answers with stalls. So only the pages in view keep theirs (a
+//    repaint there, after a highlight, stays quick); a page out of view
+//    lets go once drawn, or as it leaves the view (`releaseDecoded`).
 //  - A redraw at the same zoom (a repaint after an annotation changed, a
 //    sharper raster under a pinch) swaps only the canvas: the content
 //    box and its text layer stay, so a selection being made in it isn't
 //    lost, and the text isn't laid out again.
-//  - The Pencil comes first. No render starts while it is down; one
-//    under way when it comes down is stopped and started again after
-//    (`yieldToPen`), and the text and link layers of a page that
-//    finished meanwhile wait for it to lift — pdf.js draws and lays out
-//    text on the main thread, which the stroke's samples need.
+//  - The pen comes first — the Pencil on the pages or on the notepad
+//    (lib/penActivity.ts). pdf.js draws on the main thread, a slice at
+//    a time, and a slice that paints a large image can't be cut short:
+//    on an image-heavy PDF one is enough to drop a stroke's first
+//    samples. So nothing is drawn while the pen writes, and "writing"
+//    lasts through the gaps between strokes and words: a page in view
+//    with nothing on it yet is drawn once the pen has rested
+//    PEN_REST_SHOW_MS, everything else (the pages around the view, a
+//    redraw of a page still showing its old raster, text and link
+//    layers) once it has rested PEN_REST_MS. A render under way when
+//    the pen comes down pauses after its current slice and carries on
+//    from there (`pauseForPen`, through pdf.js's `onContinue`) — it
+//    used to be cancelled and begun again, so on a heavy page each gap
+//    between strokes paid for the same opening slices again.
+import { penRested, WRITING_PAUSE_MS } from "../lib/penActivity";
 import { PLAIN, type Resolution } from "./magnify";
 import { adoptViewport, pageViewport } from "./pageSizes";
 import type { LayoutMode, PageRecord, PageViewport, PDFDocumentProxy, PDFPageProxy } from "./types";
+import type { RenderTask } from "pdfjs-dist";
 
 const RENDER_BUFFER = 2; // pages rendered beyond the visible range
 const VISIBLE_MARGIN = 200; // px of scroll slack counted as "visible"
@@ -46,13 +64,31 @@ export const MAX_CANVAS_PIXELS = IS_IOS ? 8_000_000 : 16_777_216;
  *  at ×2. One page only: WebKit also caps all canvases together (a few
  *  hundred MB on an iPad), and past it no page draws at all. */
 const MAX_DETAIL_PIXELS = 16_777_216;
-/** While the Pencil is down, page renders wait this long and look again. */
+/** How long the pen must have rested before a page in view with
+ *  nothing drawn on it is drawn, and before anything else is, ms. */
+export const PEN_REST_SHOW_MS = 700;
+export const PEN_REST_MS = WRITING_PAUSE_MS;
+/** While the pen writes, waiting renders look again this often, ms. */
 const HOLD_RETRY_MS = 120;
 
 const KEEP_BUDGET_BYTES = IS_IOS ? 192_000_000 : 512_000_000;
 const KEEP_MAX_PAGES = IS_IOS ? 24 : 48;
 /** Page renders at once — the folded view keeps to it too. */
 export const MAX_CONCURRENT_RENDERS = IS_IOS ? 1 : 2;
+
+/** Let a render's slices run only while the pen has rested `rest()` ms:
+ *  pdf.js asks `onContinue` before each next slice, so the render waits
+ *  where it is and carries on from there. `alive` false stops waiting
+ *  (the render was cancelled). */
+export function pauseForPen(task: RenderTask, rest: () => number, alive: () => boolean): void {
+  task.onContinue = (cont: () => void) => {
+    const go = () => {
+      if (!alive() || penRested(rest())) cont();
+      else window.setTimeout(go, HOLD_RETRY_MS);
+    };
+    go();
+  };
+}
 
 /** Clamp a render scale so the page stays under `max` pixels. */
 export function capRenderScale(
@@ -106,9 +142,6 @@ export interface RendererEnv {
   /** Extra resolution for a page — while the pages are magnified
    *  (magnify.ts), for those in view. */
   resolutionFor?: (idx: number) => Resolution;
-  /** Hold off starting renders (the Pencil is down): a render runs on
-   *  the main thread, in slices, and would cost the stroke samples. */
-  holdRenders?: () => boolean;
   /** Draw into a page's raster before it is shown (annotations). */
   paintPage?: (idx: number, ctx: CanvasRenderingContext2D, viewport: PageViewport) => void;
   /** Link and text layers join the page here. */
@@ -134,12 +167,26 @@ export function createPageRenderer(scrollArea: HTMLElement, env: RendererEnv) {
   let queue: number[] = [];
   let inFlight = 0;
   const inFlightIdx = new Set<number>();
-  // Renders stopped for the pen, to start again once it lifts.
-  const resume = new Set<number>();
   let lastRange: [number, number] | null = null;
   // Pages still showing a raster that is waiting to be redrawn (see
   // repaint) — uncounted in renderedBytes, so let go of explicitly.
   const stale = new Set<number>();
+  // Drawn pages whose decoded images pdf.js still holds.
+  const decoded = new Set<number>();
+
+  /** Let pdf.js drop a page's decoded images and operator list (it
+   *  declines while a render of the page is running — a fold's, say —
+   *  and the page stays listed to try again). */
+  function releaseDecoded(idx: number): void {
+    decoded.delete(idx);
+    void env
+      .getPdfDoc()
+      ?.getPage(idx + 1)
+      .then((page) => {
+        if (!page.cleanup()) decoded.add(idx);
+      })
+      .catch(() => {});
+  }
 
   function invalidateGeometry(): void {
     geom = null;
@@ -221,6 +268,7 @@ export function createPageRenderer(scrollArea: HTMLElement, env: RendererEnv) {
     for (const i of [...inFlightIdx, ...stale]) {
       if (i < rFrom || i > rTo) clearPage(i);
     }
+    for (const i of decoded) if (i < first || i > last) releaseDecoded(i);
     pump();
     if (renderedBytes > KEEP_BUDGET_BYTES * 1.5) evictOverBudget();
     scheduleIdleEvict();
@@ -235,15 +283,26 @@ export function createPageRenderer(scrollArea: HTMLElement, env: RendererEnv) {
     });
   }
 
+  /** The rest a page's render waits for: short for a page in view with
+   *  nothing on it yet, which the reader is looking at; long for the
+   *  rest, which can wait for the writing to stop. */
+  function restFor(idx: number): number {
+    const p = env.getPages()[idx];
+    const inView = lastRange && idx >= lastRange[0] && idx <= lastRange[1];
+    return inView && p && !p.contentEl ? PEN_REST_SHOW_MS : PEN_REST_MS;
+  }
+
   let holdTimer = 0;
   function pump(): void {
-    if (queue.length && env.holdRenders?.()) {
-      clearTimeout(holdTimer);
-      holdTimer = window.setTimeout(pump, HOLD_RETRY_MS);
-      return;
-    }
+    clearTimeout(holdTimer);
     while (inFlight < MAX_CONCURRENT_RENDERS && queue.length) {
-      const idx = queue.shift()!;
+      // The queue is in order of need; the first the pen's rest allows.
+      const at = queue.findIndex((i) => penRested(restFor(i)));
+      if (at < 0) {
+        holdTimer = window.setTimeout(pump, HOLD_RETRY_MS);
+        return;
+      }
+      const idx = queue.splice(at, 1)[0];
       const p = env.getPages()[idx];
       if (!p || p.rendered || p.rendering) continue;
       inFlight++;
@@ -253,7 +312,6 @@ export function createPageRenderer(scrollArea: HTMLElement, env: RendererEnv) {
         .finally(() => {
           inFlight--;
           inFlightIdx.delete(idx);
-          if (resume.delete(idx) && !queue.includes(idx)) queue.unshift(idx);
           pump();
         });
     }
@@ -266,11 +324,18 @@ export function createPageRenderer(scrollArea: HTMLElement, env: RendererEnv) {
       if (env.isDestroyed() || env.isFolded()) return;
       const scale = env.getEffectiveZoom();
       const pages = env.getPages();
+      const off: number[] = [];
       for (let i = 0; i < pages.length; i++) {
         const p = pages[i];
-        if (p.rendered && Math.abs((p.renderedZoom ?? scale) - scale) > 0.001) clearPage(i);
+        if (p.rendered && Math.abs((p.renderedZoom ?? scale) - scale) > 0.001) off.push(i);
       }
-      update();
+      // The pages in view keep their stretched raster until the crisp
+      // one replaces it — a resize (the notepad docking, reading mode)
+      // no longer blanks the pages being written about while the pen
+      // keeps the redraw waiting. Those out of view let theirs go.
+      lastRange = visibleRange() ?? lastRange;
+      if (off.length) repaint(off, true);
+      else update();
     }, SETTLE_MS);
   }
 
@@ -317,10 +382,6 @@ export function createPageRenderer(scrollArea: HTMLElement, env: RendererEnv) {
     try {
       const page = await pdfDoc.getPage(idx + 1);
       if (env.isDestroyed() || p.cancelled || pages !== env.getPages()) return;
-      if (env.holdRenders?.()) {
-        resume.add(idx);
-        return;
-      }
 
       // Wrappers are seeded from the typical page's size; adopt the
       // real one (brought to the typical size if far from it) the first
@@ -352,6 +413,7 @@ export function createPageRenderer(scrollArea: HTMLElement, env: RendererEnv) {
 
       const task = page.render({ canvas, viewport, background: "#ffffff" });
       p.renderTask = task;
+      pauseForPen(task, () => restFor(idx), () => p.renderTask === task && !p.cancelled);
       await task.promise;
       p.renderTask = null;
       if (env.isDestroyed() || p.cancelled || pages !== env.getPages()) return;
@@ -395,6 +457,8 @@ export function createPageRenderer(scrollArea: HTMLElement, env: RendererEnv) {
       renderedBytes += p.canvasBytes;
       const curW = parseFloat(p.wrapper.style.width) || cssW;
       if (!sameBox && Math.abs(curW - cssW) > 0.5) content.style.transform = `scale(${curW / cssW})`;
+      decoded.add(idx);
+      if (!lastRange || idx < lastRange[0] || idx > lastRange[1]) releaseDecoded(idx);
       afterPen(() => p.contentEl === content && env.onPageRendered(idx, page));
     } catch (e) {
       if (!isCancelError(e)) console.error(`Failed to render page ${idx + 1}:`, e);
@@ -409,32 +473,12 @@ export function createPageRenderer(scrollArea: HTMLElement, env: RendererEnv) {
     }
   }
 
-  /** Run `fn` now, or once the Pencil has lifted. */
+  /** Run `fn` now, or once the pen has rested (a page's text and link
+   *  layers: pdf.js lays text out on the main thread). */
   function afterPen(fn: () => void): void {
     if (env.isDestroyed()) return;
-    if (!env.holdRenders?.()) fn();
+    if (penRested(PEN_REST_MS)) fn();
     else window.setTimeout(() => afterPen(fn), HOLD_RETRY_MS);
-  }
-
-  /** The Pencil came down: stop the renders under way, to start them
-   *  again once it lifts (a repaint keeps its old raster meanwhile). */
-  function yieldToPen(): void {
-    const pages = env.getPages();
-    for (const idx of inFlightIdx) {
-      const p = pages[idx];
-      if (!p?.renderTask) continue;
-      p.cancelled = true;
-      try {
-        p.renderTask.cancel();
-      } catch {
-        /* already finished */
-      }
-      resume.add(idx);
-    }
-    if (resume.size) {
-      clearTimeout(holdTimer);
-      holdTimer = window.setTimeout(pump, HOLD_RETRY_MS);
-    }
   }
 
   /** Let go of every page out of view but `keep` — when canvas memory
@@ -450,7 +494,6 @@ export function createPageRenderer(scrollArea: HTMLElement, env: RendererEnv) {
   function clearPage(idx: number): void {
     const p = env.getPages()[idx];
     stale.delete(idx);
-    resume.delete(idx);
     if (!p) return;
     if (p.rendering) {
       p.cancelled = true;
@@ -466,12 +509,8 @@ export function createPageRenderer(scrollArea: HTMLElement, env: RendererEnv) {
     releaseCanvas(p.canvas);
     p.canvas = null;
     // pdf.js keeps a drawn page's parsed content; let it go with the
-    // raster (it declines while a render of the page is still running).
-    void env
-      .getPdfDoc()
-      ?.getPage(idx + 1)
-      .then((page) => page.cleanup())
-      .catch(() => {});
+    // raster.
+    releaseDecoded(idx);
     p.contentW = 0;
     p.contentH = 0;
     if (p.rendered) renderedBytes -= p.canvasBytes || 0;
@@ -486,15 +525,18 @@ export function createPageRenderer(scrollArea: HTMLElement, env: RendererEnv) {
   }
 
   /** Re-render pages in place: the old raster stays up until the new
-   *  one replaces it, so a repaint after a sync doesn't flash. */
-  function repaint(indices: Iterable<number>): void {
+   *  one replaces it, so a repaint after a sync doesn't flash. With
+   *  `inViewOnly`, only the pages in view keep theirs (the settle pass,
+   *  whose old rasters may be larger than the new ones). */
+  function repaint(indices: Iterable<number>, inViewOnly = false): void {
     const pages = env.getPages();
+    const pad = inViewOnly ? 0 : RENDER_BUFFER;
     for (const i of indices) {
       const p = pages[i];
       if (!p?.rendered) continue;
       // Only pages about to be redrawn keep their old raster meanwhile;
       // anywhere else (or folded away) it would hang on unredrawn.
-      const near = lastRange && i >= lastRange[0] - RENDER_BUFFER && i <= lastRange[1] + RENDER_BUFFER;
+      const near = lastRange && i >= lastRange[0] - pad && i <= lastRange[1] + pad;
       if (env.isFolded() || !near) {
         clearPage(i);
         continue;
@@ -532,7 +574,7 @@ export function createPageRenderer(scrollArea: HTMLElement, env: RendererEnv) {
   function reset(): void {
     for (const p of env.getPages()) releaseCanvas(p.canvas);
     stale.clear();
-    resume.clear();
+    decoded.clear();
     queue = [];
     lastRange = null;
     renderedBytes = 0;
@@ -558,7 +600,6 @@ export function createPageRenderer(scrollArea: HTMLElement, env: RendererEnv) {
     clearAll,
     repaint,
     refreshResolution,
-    yieldToPen,
     reset,
     destroy,
     invalidateGeometry,

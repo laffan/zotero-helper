@@ -8,7 +8,12 @@
 // alone) or Context (the work, the page and the PDF's text around it) —
 // and switching asks again, the new answer in place of the old. ×,
 // Escape or a press anywhere outside closes the window; the explanation
-// is kept, under Explanations.
+// is kept, under Explanations. Remove Highlight, at its foot (a second
+// press confirms), unmarks the passage in the PDF: the explanation stays
+// under Explanations, its page still known (the Context toggle and the
+// list's link back go by it), but the passage's rects are let go, so the
+// dashed outline — and the tap that reopened it there — are gone, and
+// going back from the list no longer marks the passage.
 import { useEffect, useRef, useState } from "react";
 import { persistChats, sendChatMessage } from "../lib/ai/chat";
 import { explainContext } from "../lib/ai/explain";
@@ -38,6 +43,12 @@ export function ExplainChat() {
   const again = useRef<{ question?: string; display?: string } | null>(null);
 
   const close = () => useStore.getState().setExplain(null);
+  const [confirmUnmark, setConfirmUnmark] = useState(false);
+  useEffect(() => {
+    if (!confirmUnmark) return;
+    const t = window.setTimeout(() => setConfirmUnmark(false), 3000);
+    return () => window.clearTimeout(t);
+  }, [confirmUnmark]);
 
   const send = async (text: string, display?: string) => {
     if (!chat || !text.trim()) return;
@@ -123,6 +134,17 @@ export function ExplainChat() {
     await send(question, display);
   };
 
+  /** Unmark the passage (the explanation stays). */
+  const unmark = () => {
+    if (!confirmUnmark) return setConfirmUnmark(true);
+    const s = useStore.getState();
+    const cur = s.chats.find((c) => c.id === chat.id);
+    if (cur?.passage) s.upsertChat({ ...cur, passage: { ...cur.passage, rects: [] } });
+    void persistChats();
+    close();
+  };
+  const marked = Boolean(chat.passage?.rects.length);
+
   const waiting = busy || preparing;
   return (
     <div className="explain-chat" role="dialog" aria-label="Explain the passage" ref={boxRef}>
@@ -180,8 +202,19 @@ export function ExplainChat() {
         )}
       </div>
       <div className="explain-meter">
-        {withContext && `${Math.round(chat.contextTokens / 1000)}K tokens of context · `}
-        {formatUsd(chat.costUsd)} spent
+        {marked && (
+          <button
+            className={`link-btn explain-unmark ${confirmUnmark ? "confirm" : ""}`}
+            onClick={unmark}
+            title="Take the dashed outline off this passage in the PDF — the explanation is kept"
+          >
+            {confirmUnmark ? "Press again to remove" : "Remove Highlight"}
+          </button>
+        )}
+        <span>
+          {withContext && `${Math.round(chat.contextTokens / 1000)}K tokens of context · `}
+          {formatUsd(chat.costUsd)} spent
+        </span>
       </div>
     </div>
   );

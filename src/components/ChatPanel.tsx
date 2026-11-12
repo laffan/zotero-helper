@@ -9,6 +9,7 @@ import Markdown, { defaultUrlTransform } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { openInZotero } from "../lib/actions";
 import { removeChat, sendChatMessage } from "../lib/ai/chat";
+import { depthLabel } from "../lib/ai/context";
 import {
   CITE_SCHEME,
   citationLabel,
@@ -264,7 +265,7 @@ export function ChatPanel({ chat }: { chat: Chat }) {
         <div className="chat-head-title">{chat.title}</div>
         <div className="chat-head-sub">
           {n} work{n === 1 ? "" : "s"} ·{" "}
-          {chat.mode === "explain" ? "explainer" : chat.source.depth === "full" ? "full text" : "abstracts"} ·{" "}
+          {chat.mode === "explain" ? "explainer" : depthLabel(chat.source)} ·{" "}
           {formatTokens(chat.contextTokens)} tokens · {modelLabel(chat.model)}
         </div>
         {chat.source.missing.length > 0 && (

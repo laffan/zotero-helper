@@ -29,7 +29,7 @@ import {
 } from "../lib/highlights";
 import { addBookmark, bookmarksOf, removeBookmark, renameBookmark, useBookmarks } from "../lib/bookmarks";
 import { insertIntoNotes, readItem } from "../lib/notes";
-import { setOutline, setReaderPage, useOutline } from "../lib/outline";
+import { setOutline, setPageCount, setReaderPage, useOutline } from "../lib/outline";
 import { flushSavedPage, lastPage, lastView, savePage } from "../lib/recent";
 import { appLog, useStore, type MetaTab } from "../lib/store";
 import { invoke } from "../lib/tauri";
@@ -260,7 +260,10 @@ export function ReaderPane() {
             canEdit: (a) => canEditAnnotation(a, settings()),
             writing: notePenActivity,
           },
-          onOutline: (o) => setOutline(attKey, o),
+          onOutline: (o) => {
+            setPageCount(attKey, viewerRef.current?.getPageCount() ?? 0);
+            setOutline(attKey, o);
+          },
           onReadingMode: () => {
             const s = useStore.getState();
             s.setReadingMode(!s.readingMode);

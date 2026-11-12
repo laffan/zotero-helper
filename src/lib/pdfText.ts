@@ -43,6 +43,19 @@ export async function extractFullText(
   };
 }
 
+/** Pages `from`–`to` (1-based, inclusive) only, for Ask PDF's section or
+ *  page range — each after its page marker, numbered as in the PDF,
+ *  and capped in length as the full text is. */
+export async function extractPageSpan(
+  data: ArrayBuffer,
+  from: number,
+  to: number,
+  maxChars = 120000,
+): Promise<{ text: string; truncated: boolean }> {
+  const text = await parsePages(data, to - from + 1, maxChars + 1, true, [from, to]);
+  return { text: text.slice(0, maxChars), truncated: text.length > maxChars };
+}
+
 /** The text around page `page` (1-based) of a `total`-page PDF, for an
  *  explainer asked with its context (lib/ai/explain.ts): the whole PDF
  *  when it is no longer than `span` pages, else the `span` pages

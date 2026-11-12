@@ -29,11 +29,17 @@
 // Which visit to the page the reader is on is counted here: a stroke
 // joins the note being written only during the same visit
 // (surface.ts).
+//
+// A change made in the other view redraws this one in full, so while
+// the Pencil writes it waits for the pause (lib/penActivity.ts): the
+// other view is out of sight then (reading mode hides the notes pane),
+// and the redraw, at each pen-up, cost the next stroke its start.
 // What else the host puts in the bar (a close button) goes at its right;
 // the bar's empty middle is the host's to drag the pad by.
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { readerPageNow, useReaderPage } from "../lib/outline";
+import { whenPenRested, WRITING_PAUSE_MS } from "../lib/penActivity";
 import { isErasing, setErasing, watchErasing } from "../lib/penTool";
 import { flushNotepad, notepadChanged, notepadFor, watchNotepad, type Notepad } from "../notepad/model";
 import { createMinimap } from "../notepad/minimap";
@@ -183,7 +189,16 @@ export function NotepadBody({ attKey, kind, onBarPointerDown, tools, trailing }:
     let surface: NotepadSurface | null = null;
     let pad: Notepad | null = null;
     const me = {};
-    const unwatch = watchNotepad(attKey, (from) => from !== me && surface?.render());
+    let waiting: (() => void) | null = null;
+    const unwatchPad = watchNotepad(attKey, (from) => {
+      if (from === me) return;
+      waiting?.();
+      waiting = whenPenRested(WRITING_PAUSE_MS, () => surface?.render());
+    });
+    const unwatch = () => {
+      unwatchPad();
+      waiting?.();
+    };
     void notepadFor(attKey).then((p) => {
       const host = hostRef.current;
       if (cancelled || !host) return;

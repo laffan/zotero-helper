@@ -214,6 +214,18 @@
   gap: 8px;
   white-space: nowrap;
 }
+/* Only on the row the pointer is over (data-hover, HighlightsPanel.tsx),
+   the row last picked, or one being typed in; on a screen with no
+   pointer at all, on every row. Hidden rather than removed, so a row
+   doesn't change height as the pointer crosses it. */
+.hl-row:not([data-hover], .shown, :focus-within) .hl-actions {
+  visibility: hidden;
+}
+@media (hover: none) and (any-hover: none) {
+  .hl-row .hl-actions {
+    visibility: visible;
+  }
+}
 .hl-actions .link-btn {
   font-size: calc(11px * var(--font-scale));
   display: inline-flex;

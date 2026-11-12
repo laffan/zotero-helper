@@ -90,7 +90,7 @@ function SourceLink({ chat }: { chat: Chat }) {
   return (
     <button
       className="link-btn explanation-source"
-      onClick={() => openReaderAt(itemKey, attKey, page, { quote: chat.passage ? question : undefined })}
+      onClick={() => openReaderAt(itemKey, attKey, page, { quote: chat.passage?.rects.length ? question : undefined })}
       title={`Open the PDF at the passage — “${question}”`}
     >
       {chat.source.itemTitles[0] || chat.source.label}, p. {page}

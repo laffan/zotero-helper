@@ -52,7 +52,7 @@ import { createPdfSearch } from "./search";
 import { buildPdfToolbar, syncToolbar } from "./toolbar";
 import { attachTooltips } from "./tooltips";
 import type { LayoutMode, PageRecord, PageViewport, PDFDocumentProxy } from "./types";
-import { loadViewPrefs, saveViewPrefs, type FitMode } from "./viewPrefs";
+import { loadViewPrefs, pagesAcross, saveViewPrefs, type FitMode } from "./viewPrefs";
 import type { PdfViewerOptions } from "./viewerOptions";
 import { createViewReporter, initialLayout, type FoldAnchor, type SavedView } from "./viewState";
 
@@ -77,8 +77,9 @@ export function createPdfViewer(container: HTMLElement, opts: PdfViewerOptions =
   // for the annotations, which arrive after the pages).
   let pendingFoldAt: FoldAnchor | null = (folded && saved?.foldAt) || null;
   const isPaged = () => paged && !folded && layoutMode !== "fixed";
-  /** Pages to a set in the fixed view: the fit buttons' one, two, three. */
-  const perSet = () => (fitMode === "fit-3" ? 3 : fitMode === "fit-2" ? 2 : 1);
+  /** Pages to a set in the fixed view: the fit buttons' one, two, three
+   *  (and the keys' four and five). */
+  const perSet = () => pagesAcross(fitMode);
   /** The page in view — in the fixed view, its set's first page. */
   const leadPage = () => {
     const page = currentPage();
@@ -151,7 +152,6 @@ export function createPdfViewer(container: HTMLElement, opts: PdfViewerOptions =
     getEffectiveZoom: () => getEffectiveZoom(),
     getTypical: () => typical,
     resolutionFor: (idx) => (pages[idx] ? magnifier.resolutionFor(pages[idx].wrapper) : PLAIN),
-    holdRenders: () => ink.isDrawing(),
     sizePage: (p, scale) => sizePage(p, scale, layoutState().crop),
     getLayoutMode: () => layoutMode,
     isFolded: () => folded,
@@ -180,7 +180,6 @@ export function createPdfViewer(container: HTMLElement, opts: PdfViewerOptions =
     getPageLabels: () => pageLabels,
     writer: opts.annotate,
     onStart: () => exitFolded(),
-    onPenDown: () => renderer.yieldToPen(),
     onActiveChange: (on) => opts.onInkMode?.(on),
     onToolChange: (t) => opts.onInkTool?.(t),
   });
@@ -316,6 +315,8 @@ export function createPdfViewer(container: HTMLElement, opts: PdfViewerOptions =
   fitBtn(tb.fitOneBtn, "fit");
   fitBtn(tb.fitTwoBtn, "fit-2");
   fitBtn(tb.fitThreeBtn, "fit-3");
+  fitBtn(tb.fitFourBtn, "fit-4");
+  fitBtn(tb.fitFiveBtn, "fit-5");
 
   function enterFolded(): void {
     if (folded) return;

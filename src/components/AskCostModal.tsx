@@ -8,6 +8,7 @@
 // already knows how to go and get them — so it offers, and re-prices
 // once it has, since retrieval changes the token count.
 import { confirmAsk, refillAsk } from "../lib/ai/chat";
+import { depthLabel } from "../lib/ai/context";
 import {
   cachedFollowUpCost,
   estimateCost,
@@ -84,7 +85,7 @@ export function AskCostModal({ onClose }: { onClose: () => void }) {
           <span>
             {ask.source.itemKeys.length} work
             {ask.source.itemKeys.length === 1 ? "" : "s"} ·{" "}
-            {ask.source.depth === "full" ? "full text" : "abstracts"} ·{" "}
+            {depthLabel(ask.source)} ·{" "}
             {modelLabel(ask.model)}
           </span>
         </div>

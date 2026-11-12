@@ -3,6 +3,7 @@
 // the three things you need to find a conversation again a week later.
 import { useMemo } from "react";
 import { removeChat } from "../lib/ai/chat";
+import { depthLabel } from "../lib/ai/context";
 import { formatTokens, formatUsd, modelLabel } from "../lib/ai/models";
 import { useStore } from "../lib/store";
 import type { Chat } from "../lib/types";
@@ -22,7 +23,7 @@ function started(ms: number): string {
 
 function contextLine(chat: Chat): string {
   const n = chat.source.itemKeys.length;
-  const depth = chat.mode === "explain" ? "explainer" : chat.source.depth === "full" ? "full text" : "abstracts";
+  const depth = chat.mode === "explain" ? "explainer" : depthLabel(chat.source);
   const scope =
     chat.source.kind === "folder"
       ? `Folder “${chat.source.label}” · ${n} item${n === 1 ? "" : "s"}`

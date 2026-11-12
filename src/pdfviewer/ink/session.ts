@@ -35,8 +35,11 @@ import type { InkAnn, InkLayer } from "./layer";
  *  start of the next stroke. */
 const FLUSH_IDLE_MS = 2000;
 /** Writing without a pause doesn't hold changes back longer than this:
- *  past it they are written at the next pen-up. */
+ *  past it they are written at the next gap between words (the pen up
+ *  FLUSH_GAP_MS) — not at the next pen-up, which in running handwriting
+ *  is a letter's next stroke a twentieth of a second later. */
 const FLUSH_MAX_MS = 15_000;
+const FLUSH_GAP_MS = 250;
 const UNDO_LIMIT = 100;
 
 export interface InkStyle {
@@ -143,8 +146,8 @@ export function createInkSession(layer: InkLayer, sink: InkSink) {
     }
     group = null;
     if (!local.size) return;
-    if (Date.now() - dirtySince > FLUSH_MAX_MS) flush();
-    else flushTimer = window.setTimeout(flush, FLUSH_IDLE_MS);
+    const overdue = Date.now() - dirtySince > FLUSH_MAX_MS;
+    flushTimer = window.setTimeout(flush, overdue ? FLUSH_GAP_MS : FLUSH_IDLE_MS);
     onChange();
   }
 

@@ -7,7 +7,7 @@
 import type { PdfToolbar } from "./toolbar";
 
 export type ViewerCommand =
-  | "horizontal" | "vertical" | "fit1" | "fit2" | "fit3" | "fixed" | "continuous"
+  | "horizontal" | "vertical" | "fit1" | "fit2" | "fit3" | "fit4" | "fit5" | "fixed" | "continuous"
   | "folded" | "foldFilters" | "expandFold" | "thumbnails" | "next" | "prev"
   | "ink" | "readingMode" | "sentence";
 
@@ -82,6 +82,8 @@ export function createViewerCommands(env: CommandEnv) {
       case "fit1": return fit(tb.fitOneBtn);
       case "fit2": return fit(tb.fitTwoBtn);
       case "fit3": return fit(tb.fitThreeBtn);
+      case "fit4": return fit(tb.fitFourBtn);
+      case "fit5": return fit(tb.fitFiveBtn);
       case "fixed": return tb.fixedBtn.click();
       case "continuous": return tb.continuousBtn.click();
       case "folded": return tb.foldBtn.click();

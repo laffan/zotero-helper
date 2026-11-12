@@ -5,7 +5,7 @@
 import { cropWrapper, croppedSize, type Crop } from "./crop";
 import { pagedFitZoom, PAGED_PAD, SET_GAP, setPagedGap } from "./paged";
 import type { LayoutMode, PageRecord, PageViewport } from "./types";
-import type { FitMode } from "./viewPrefs";
+import { pagesAcross, type FitMode } from "./viewPrefs";
 
 export interface LayoutState {
   layoutMode: LayoutMode;
@@ -23,7 +23,7 @@ export interface LayoutState {
 
 const LAYOUT_CLASSES = [
   "pdf-layout-fit", "pdf-layout-fixed", "pdf-layout-horizontal", "pdf-layout-folded", "pdf-layout-pagedv",
-  "pdf-paged", "pdf-paged-1", "pdf-paged-2", "pdf-paged-3", "pdf-cropped",
+  "pdf-paged", "pdf-paged-1", "pdf-paged-2", "pdf-paged-3", "pdf-paged-4", "pdf-paged-5", "pdf-cropped",
 ];
 
 export function applyLayoutClasses(area: HTMLElement, s: LayoutState): void {
@@ -57,9 +57,8 @@ export function fitZoom(area: HTMLElement, page1: PageViewport, s: LayoutState):
   if (s.layoutMode === "vertical") {
     const availW = area.clientWidth - pad;
     if (s.folded) return (availW / first.width) * s.foldedZoom;
-    if (s.fitMode === "fit-2") return (availW - gap - 4) / (first.width * 2);
-    if (s.fitMode === "fit-3") return (availW - gap * 2 - 4) / (first.width * 3);
-    return availW / first.width;
+    const n = pagesAcross(s.fitMode);
+    return n > 1 ? (availW - gap * (n - 1) - 4) / (first.width * n) : availW / first.width;
   }
   if (s.layoutMode === "horizontal") return (area.clientHeight - pad) / first.height;
   return s.fixedZoom;

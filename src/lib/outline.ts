@@ -14,8 +14,9 @@ import { invoke } from "./tauri";
 
 export type { OutlineEntry };
 
-/** attKey → outline (empty: the PDF has none). */
+/** attKey → outline (empty: the PDF has none), and its page count. */
 const outlines = new Map<string, OutlineEntry[]>();
+const pageCounts = new Map<string, number>();
 const loading = new Set<string>();
 
 /** A value React components can watch. */
@@ -42,6 +43,12 @@ const outlinesVersion = signal(0);
 /** The page the reader shows (1-based), for the panel's current entry —
  *  apart, so a page turn doesn't re-render what only needs outlines. */
 const readerPage = signal(0);
+
+/** The PDF's page count — given before its outline, whose arrival is
+ *  what watchers hear. */
+export function setPageCount(attKey: string, pages: number): void {
+  if (pages > 0) pageCounts.set(attKey, pages);
+}
 
 export function setOutline(attKey: string, outline: OutlineEntry[]): void {
   outlines.set(attKey, outline);
@@ -71,7 +78,8 @@ async function loadFromCache(attKey: string): Promise<void> {
     const pdfjs = await getPdfjs();
     const doc = await pdfjs.getDocument({ data: new Uint8Array(bytes), ...PDFJS_ASSETS }).promise;
     try {
-      if (!outlines.has(attKey)) setOutline(attKey, await readOutline(doc));
+      setPageCount(attKey, doc.numPages);
+      setOutline(attKey, outlines.get(attKey) ?? (await readOutline(doc)));
     } finally {
       await doc.loadingTask.destroy().catch(() => {});
     }
@@ -81,6 +89,19 @@ async function loadFromCache(attKey: string): Promise<void> {
   } finally {
     loading.delete(attKey);
   }
+}
+
+/** One PDF's outline and page count, for Ask PDF — read (and, if it
+ *  isn't on this device, downloaded: it is about to be sent) once
+ *  `load` is true. Null while unknown. */
+export function usePdfShape(attKey: string | null, load: boolean): { outline: OutlineEntry[]; pages: number } | null {
+  outlinesVersion.use();
+  const known = attKey ? outlines.get(attKey) : undefined;
+  const pages = attKey ? pageCounts.get(attKey) : undefined;
+  useEffect(() => {
+    if (load && attKey && (!known || !pages) && !loading.has(attKey)) void loadFromCache(attKey);
+  }, [load, attKey, Boolean(known && pages)]);
+  return known && pages ? { outline: known, pages } : null;
 }
 
 /** Outlines of these PDFs, as far as known. Asking reads, one after
@@ -184,6 +205,23 @@ export function sectionIndexOf(sections: Section[], a: Annotation): number {
     } else hi = mid - 1;
   }
   return found;
+}
+
+/** Each section's pages, 1-based and inclusive: from its heading's page
+ *  to where the next heading at its level or above begins — that page
+ *  too, unless the heading is at the page's top — or the PDF's end. */
+export function sectionSpans(sections: Section[], pages: number): { section: Section; from: number; to: number }[] {
+  return sections.map((s, i) => {
+    const from = s.pageIndex + 1;
+    let to = pages;
+    for (let j = i + 1; j < sections.length; j++) {
+      const n = sections[j];
+      if (n.depth > s.depth) continue;
+      to = n.top === Infinity ? n.pageIndex : n.pageIndex + 1;
+      break;
+    }
+    return { section: s, from, to: Math.max(from, Math.min(pages, to)) };
+  });
 }
 
 /** The section the reader is in: the last heading on or before `page`

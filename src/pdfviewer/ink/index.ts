@@ -60,8 +60,6 @@ export interface InkEnv {
   writer?: InkWriter;
   /** Ink mode is starting: the viewer leaves views it can't draw in. */
   onStart: () => void;
-  /** The pen (or eraser) came down. */
-  onPenDown?: () => void;
   /** Ink mode went on or off. */
   onActiveChange?: (on: boolean) => void;
   /** The tool changed (and as ink mode starts): the pen, the eraser or
@@ -262,7 +260,6 @@ export function createInkTool(env: InkEnv) {
     begin: () => {
       if (prefs.tool !== "select" && sel) select(0, []);
       writer?.writing?.();
-      env.onPenDown?.();
       session.begin();
     },
     end: () => {

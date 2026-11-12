@@ -1,5 +1,6 @@
 // The paged view ("Paged" on the toolbar, against "Continuous"): one
-// set of pages at a time — one, two or three, as the fit buttons say —
+// set of pages at a time — one to three, as the fit buttons say, or four
+// or five, as the 4 and 5 keys do —
 // fitted whole and centred, and a swipe moves exactly one set: left/
 // right when the pages run side by side, up/down when they run top to
 // bottom (in rows of the set's size).

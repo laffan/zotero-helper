@@ -25,6 +25,12 @@
 // page — even to come straight back — starts the next. Each note shows
 // its page, small, above it.
 //
+// What the pen sets off waits for it. Its gestures are reported to
+// lib/penActivity.ts, which holds the pages' renders (and the pad's
+// save and minimap) while it writes; and a finished stroke updates only
+// its own note's label, where every other change redraws the labels and
+// the links' chips.
+//
 // A gesture always ends. Its end is heard on the window, whatever
 // element it reaches; a pen coming down while one is still open ends
 // that one first (a pen can't be down twice), as does any press once
@@ -41,6 +47,7 @@
 // own, and `render` redraws one when another has changed the pad.
 // `watch` tells a minimap (minimap.ts) when the view moves or the pad
 // changes.
+import { penDown, penHeard, penUp } from "../lib/penActivity";
 import type { PagePlace, PlaceTarget } from "../pdfviewer/places";
 import { bounds, pathD, touches } from "./geometry";
 import { createLasso } from "./lasso";
@@ -113,6 +120,8 @@ export function createSurface(host: HTMLElement, env: SurfaceEnv) {
 
   const paths = new Map<string, SVGPathElement>();
   const chips = new Map<string, HTMLElement>();
+  // Each note's page label, by note.
+  const noteLabels = new Map<string, HTMLElement>();
   // What undo takes back, last first.
   const history: Step[] = [];
   // The note being written: the reader's visit to its page.
@@ -165,21 +174,33 @@ export function createSurface(host: HTMLElement, env: SurfaceEnv) {
     remove: (l) => removeItems([], [l]),
   });
 
+  /** A note's label, made or moved to the top left of its strokes;
+   *  null when it has none. */
+  function noteLabel(n: Note): HTMLElement | null {
+    const pts = env.pad().strokes.filter((s) => s.note === n.id).flatMap((s) => s.points);
+    if (!pts.length) return null;
+    const [x0, y0] = bounds(pts);
+    let el = noteLabels.get(n.id);
+    if (!el) {
+      el = document.createElement("span");
+      el.className = "notepad-note-label";
+      el.textContent = `p. ${n.pageIndex + 1}`;
+      noteLabels.set(n.id, el);
+    }
+    el.style.left = `${x0}px`;
+    el.style.top = `${y0 - 16}px`;
+    return el;
+  }
+
   /** Each note's page, small, above its first line; and the links. */
   function drawLabels(): void {
     const pad = env.pad();
     labels.replaceChildren();
     chips.clear();
+    noteLabels.clear();
     for (const n of pad.notes) {
-      const pts = pad.strokes.filter((s) => s.note === n.id).flatMap((s) => s.points);
-      if (!pts.length) continue;
-      const [x0, y0] = bounds(pts);
-      const el = document.createElement("span");
-      el.className = "notepad-note-label";
-      el.textContent = `p. ${n.pageIndex + 1}`;
-      el.style.left = `${x0}px`;
-      el.style.top = `${y0 - 16}px`;
-      labels.appendChild(el);
+      const el = noteLabel(n);
+      if (el) labels.appendChild(el);
     }
     for (const l of pad.links) {
       const chip = linkChips.chip(l);
@@ -285,6 +306,8 @@ export function createSurface(host: HTMLElement, env: SurfaceEnv) {
     );
   let g: Gesture | null = null;
   let heardAt = 0;
+  // This view's pen, to lib/penActivity.ts.
+  const me = {};
 
   /** Held still for HOLD_MS where it came down: a lasso from there. */
   function armHold(gs: Gesture): void {
@@ -312,6 +335,8 @@ export function createSurface(host: HTMLElement, env: SurfaceEnv) {
     capture(host, e.pointerId);
     dropPageSelection();
     heardAt = performance.now();
+    // A finger pans and taps; anything else writes, erases or selects.
+    if (e.pointerType !== "touch") penDown(me);
     const press: Press = { id: e.pointerId, from: [e.clientX, e.clientY], last: [e.clientX, e.clientY], t0: heardAt, hold: 0 };
     const [x, y] = toCanvas(e.clientX, e.clientY);
     // A selection: dragged from inside its frame; let go of from outside.
@@ -351,6 +376,7 @@ export function createSurface(host: HTMLElement, env: SurfaceEnv) {
   function onMove(e: PointerEvent): void {
     if (!g || e.pointerId !== g.id) return;
     heardAt = performance.now();
+    penHeard(heardAt);
     const [dx, dy] = [e.clientX - g.last[0], e.clientY - g.last[1]];
     g.last = [e.clientX, e.clientY];
     const away = Math.hypot(e.clientX - g.from[0], e.clientY - g.from[1]);
@@ -401,6 +427,7 @@ export function createSurface(host: HTMLElement, env: SurfaceEnv) {
     if (g !== done) return;
     g = null;
     window.clearTimeout(done.hold);
+    penUp(me);
     const tap =
       type === "pointerup" && Math.hypot(cx - done.from[0], cy - done.from[1]) < TAP_PX && performance.now() - done.t0 < HOLD_MS;
     if (done.kind === "lasso") {
@@ -458,7 +485,13 @@ export function createSurface(host: HTMLElement, env: SurfaceEnv) {
     pad.strokes.push(stroke);
     paths.set(stroke.id, path);
     history.push({ kind: "stroke", id: stroke.id });
-    drawLabels();
+    // Only this note's label moves (or appears): rebuilding them all,
+    // and every link's chip, at each pen-up cost the next stroke its
+    // start on a full pad.
+    const n = pad.notes.find((x) => x.id === note);
+    const el = n && noteLabel(n);
+    if (el && !el.isConnected) labels.prepend(el);
+    tell("content");
     env.changed();
   }
 
@@ -614,7 +647,10 @@ export function createSurface(host: HTMLElement, env: SurfaceEnv) {
       return () => watchers.delete(fn);
     },
     destroy(): void {
-      if (g) window.clearTimeout(g.hold);
+      if (g) {
+        window.clearTimeout(g.hold);
+        penUp(me);
+      }
       linkChips.closeMenu();
       lasso.destroy();
       host.removeEventListener("pointerdown", onDown);

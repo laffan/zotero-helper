@@ -13,9 +13,11 @@
 // Every store write re-renders what watches the library (the
 // Highlights tab, the viewer's annotations), so writes made together —
 // an ink flush of several drawings, a push's results — reach the store
-// as one; and no push starts while the Pencil is writing, since its
-// results would land in the middle of a stroke (`notePenActivity`).
+// as one; and no push starts while the Pencil is writing — on the pages
+// or on the notepad (lib/penActivity.ts) — since its results would land
+// in the middle of a stroke (`notePenActivity`).
 import type { Annotation } from "./highlights";
+import { penRestedMs } from "./penActivity";
 import { forget, holdDeleted, holdItem, holdPatch } from "./pendingAnnotations";
 import { appLog, useStore } from "./store";
 import { invoke, isTauri } from "./tauri";
@@ -253,7 +255,7 @@ function schedulePush(delay = PUSH_DELAY_MS): void {
  *  while the Pencil is writing (unless the app is being put away). */
 export async function pushAnnotations(): Promise<void> {
   if (!isTauri || !navigator.onLine) return;
-  const sincePen = performance.now() - penAt;
+  const sincePen = Math.min(performance.now() - penAt, penRestedMs());
   if (sincePen < PEN_QUIET_MS && document.visibilityState !== "hidden") {
     schedulePush(PEN_QUIET_MS - sincePen + 100);
     return;

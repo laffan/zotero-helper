@@ -39,7 +39,7 @@ import {
   foldedPages,
   type FoldSpec,
 } from "./foldSpecs";
-import { capRenderScale, MAX_CONCURRENT_RENDERS, releaseCanvas } from "./render";
+import { capRenderScale, MAX_CONCURRENT_RENDERS, PEN_REST_SHOW_MS, pauseForPen, releaseCanvas } from "./render";
 import type { PageRecord, PageViewport, PDFDocumentProxy } from "./types";
 import type { FoldAnchor } from "./viewState";
 
@@ -473,7 +473,10 @@ export function createFoldLayer(scrollArea: HTMLElement, env: FoldEnv) {
       canvas.style.width = `${fold.cssW}px`;
       canvas.style.height = `${cssH}px`;
       try {
-        await page.render({ canvas, viewport, background: "#ffffff" }).promise;
+        const task = page.render({ canvas, viewport, background: "#ffffff" });
+        // While the pen writes (the notepad, over the folds), wait.
+        pauseForPen(task, () => PEN_REST_SHOW_MS, () => enabled && fold.wrapper.isConnected);
+        await task.promise;
       } catch (e) {
         releaseCanvas(canvas);
         throw e;

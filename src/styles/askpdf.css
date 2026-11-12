@@ -1,0 +1,51 @@
+/* Ask PDF's chooser (src/components/AskPdf.tsx), under the conversations
+   tab's buttons: the whole PDF, a section of its outline, or a run of
+   pages. */
+.ask-pdf {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 12px 10px;
+  border-bottom: 1px solid var(--border);
+  font-size: calc(12px * var(--font-scale));
+  color: var(--text-dim);
+}
+.ask-pdf-head {
+  display: flex;
+  align-items: center;
+  font-weight: 600;
+  color: var(--text);
+}
+.ask-pdf-close {
+  margin-left: auto;
+  display: inline-flex;
+  color: var(--text-dim);
+}
+.ask-pdf-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+/* The tab's link-like buttons, in the rows rather than pushed right. */
+.ask-pdf-row .meta-tab-action {
+  margin: 0;
+}
+.ask-pdf-note {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: calc(11px * var(--font-scale));
+}
+.ask-pdf-select {
+  flex: 1;
+  min-width: 0;
+  padding: 3px 6px;
+  font-size: calc(12px * var(--font-scale));
+}
+.ask-pdf-page {
+  width: 4.2em;
+  padding: 3px 6px;
+  font-size: calc(12px * var(--font-scale));
+  text-align: center;
+}

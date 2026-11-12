@@ -9,6 +9,7 @@
 // when the pad does. What it fits is the pad's contents and the view
 // together, so the outline never leaves it; a tap on the map's empty
 // part below takes the view no further than half its height past that.
+import { penRested, WRITING_PAUSE_MS } from "../lib/penActivity";
 import type { Notepad } from "./model";
 import { pathD } from "./geometry";
 import type { NotepadSurface, SurfaceChange } from "./surface";
@@ -90,17 +91,34 @@ export function createMinimap(el: HTMLElement, surface: NotepadSurface, pad: () 
   }
 
   // Changes come in bursts (every move of a pan): drawn once a frame.
-  let queued: SurfaceChange | null = null;
-  const onChange = (what: SurfaceChange) => {
-    if (queued === "content") return;
-    const first = queued === null;
-    queued = what;
-    if (!first) return;
+  // The pad's content is drawn again in full, so not while the Pencil
+  // writes: a change then waits for its pause (the outline of the view
+  // still follows a pan at once).
+  let queued = false;
+  let contentStale = false;
+  let waitTimer = 0;
+  const schedule = () => {
+    if (queued) return;
+    queued = true;
     requestAnimationFrame(() => {
-      if (queued === "content") drawContent();
-      queued = null;
+      queued = false;
+      if (contentStale && penRested(WRITING_PAUSE_MS)) {
+        contentStale = false;
+        drawContent();
+      }
       place();
     });
+  };
+  const waitForPause = () => {
+    window.clearTimeout(waitTimer);
+    if (penRested(WRITING_PAUSE_MS)) schedule();
+    else waitTimer = window.setTimeout(waitForPause, 250);
+  };
+  const onChange = (what: SurfaceChange) => {
+    if (what === "content") {
+      contentStale = true;
+      waitForPause();
+    } else schedule();
   };
   const unwatch = surface.watch(onChange);
   const resize = new ResizeObserver(() => place());
@@ -149,6 +167,7 @@ export function createMinimap(el: HTMLElement, surface: NotepadSurface, pad: () 
 
   return {
     destroy(): void {
+      window.clearTimeout(waitTimer);
       unwatch();
       resize.disconnect();
       el.removeEventListener("pointerdown", onDown);

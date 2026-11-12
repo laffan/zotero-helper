@@ -26,12 +26,16 @@
 // mode is on — a non-passive touch listener makes every scroll wait on
 // the main thread, which reading shouldn't pay for.
 //
+// Every gesture is reported to lib/penActivity.ts, which the page
+// renderer and the app's other deferrable work wait on.
+//
 // Per sample, the pen path does no layout reads and no allocation
 // beyond the point itself: the page's box is read once at pen-down,
 // samples are kept as client coordinates and drawn straight onto the
 // live canvas, and only at pen-up are they converted to PDF points.
 // Coalesced events (the samples between frames) are used where they
 // are reliable; on iOS, as in Hush and tldraw, they are not.
+import { penDown, penHeard, penUp } from "../../lib/penActivity";
 import { pageBoxAt } from "../annotate";
 import type { PageRecord } from "../types";
 import type { LiveLayer } from "./live";
@@ -118,6 +122,8 @@ export function attachInkInput(env: InkInputEnv) {
   const { scrollArea: area, live } = env;
   let on = false;
   let g: Gesture | null = null;
+  // This viewer's pen, to lib/penActivity.ts.
+  const me = {};
   let heardAt = 0;
   const fresh = () => g !== null && performance.now() - heardAt < STALE_MS;
 
@@ -205,6 +211,7 @@ export function attachInkInput(env: InkInputEnv) {
   function start(gs: Gesture): void {
     g = gs;
     heardAt = performance.now();
+    penDown(me);
     try {
       area.setPointerCapture(gs.id);
     } catch {
@@ -263,6 +270,7 @@ export function attachInkInput(env: InkInputEnv) {
     }
     if (e.pointerId !== g.id) return;
     heardAt = performance.now();
+    penHeard(heardAt);
     g.lastClient = [e.clientX, e.clientY];
     if (g.hold && Math.hypot(e.clientX - g.startClient[0], e.clientY - g.startClient[1]) > STILL_PX) {
       window.clearTimeout(g.hold);
@@ -307,6 +315,7 @@ export function attachInkInput(env: InkInputEnv) {
     g = null;
     window.clearTimeout(gs.hold);
     penUpAt = performance.now();
+    penUp(me);
     if (gs.mode === "pen") {
       // The line ends where the pen left the page, not just short of it.
       const n = gs.client.length;
@@ -396,6 +405,7 @@ export function attachInkInput(env: InkInputEnv) {
     } else {
       area.removeEventListener("touchstart", onTouch);
       area.removeEventListener("touchmove", onTouch);
+      penUp(me);
       g = null;
     }
   }

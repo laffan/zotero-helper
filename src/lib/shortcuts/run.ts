@@ -109,6 +109,8 @@ export const RUN: Record<string, () => void> = {
   pdfFit1: viewer("fit1"),
   pdfFit2: viewer("fit2"),
   pdfFit3: viewer("fit3"),
+  pdfFit4: viewer("fit4"),
+  pdfFit5: viewer("fit5"),
   pdfFixed: viewer("fixed"),
   pdfContinuous: viewer("continuous"),
   pdfInk: viewer("ink"),

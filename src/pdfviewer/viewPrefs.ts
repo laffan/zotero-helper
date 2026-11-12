@@ -4,7 +4,14 @@
 // crops them there.
 import type { LayoutMode } from "./types";
 
-export type FitMode = "fit" | "fit-2" | "fit-3";
+/** Pages across: one to three have buttons; four and five, keys only. */
+export type FitMode = "fit" | "fit-2" | "fit-3" | "fit-4" | "fit-5";
+
+/** How many pages a fit mode puts side by side (and to a paged set). */
+export function pagesAcross(fit: FitMode): number {
+  const n = Number(fit.slice(4));
+  return n >= 2 && n <= 5 ? n : 1;
+}
 
 export interface ViewPrefs {
   layoutMode: LayoutMode;

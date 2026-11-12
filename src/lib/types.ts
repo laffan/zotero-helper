@@ -209,6 +209,15 @@ export const SUMMARY_FIELD_OPTIONS: { id: string; label: string }[] = [
 /** How much of each work went into the conversation. */
 export type AskDepth = "abstracts" | "full";
 
+/** Part of one PDF (Ask PDF's section or pages): its PDF pages, 1-based
+ *  and inclusive, and a label that says so ("section “Methods”,
+ *  pp. 4–9", "pp. 4–9"). */
+export interface PageSpan {
+  from: number;
+  to: number;
+  label: string;
+}
+
 /** What a chat is about — shown under its title in the Questions list,
  *  and the reason the chat can never silently change scope: the works
  *  are read once, at creation, and the text is kept with the chat. */
@@ -226,6 +235,8 @@ export interface ChatSource {
    *  what you want for an entry filed in several. */
   collectionKey?: string;
   depth: AskDepth;
+  /** Full text of only these pages of the one PDF; absent, all of it. */
+  pages?: PageSpan;
   /** Works that contributed nothing (no PDF, no abstract). */
   missing: string[];
 }

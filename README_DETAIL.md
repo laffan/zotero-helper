@@ -20,7 +20,7 @@ Windows/Linux desktops too).
 - **Read and annotate** — a PDF viewer beside Markdown reading notes, with
   Zotero-compatible highlights and pen drawings (Apple Pencil on iPad; the
   same ink annotations Zotero's reader makes), a folded view of just the
-  annotated passages, a paged view of one to three pages at a time (with
+  annotated passages, a paged view of one to five pages at a time (with
   an adjustable reading crop), a full-screen reading mode, white-on-black
   pages in the dark theme, pinch to magnify, search, outlines and page
   citations into the notes;

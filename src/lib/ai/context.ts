@@ -25,6 +25,8 @@ import type {
   AskDepth,
   AskGap,
   AskTarget,
+  ChatSource,
+  PageSpan,
   PendingAsk,
   ZCollection,
   ZItem,
@@ -72,7 +74,15 @@ function gatherAbstracts(items: ZItem[]): Gathered {
   };
 }
 
-async function gatherFullText(items: ZItem[]): Promise<Gathered> {
+/** What a chat's full text covers, for the lines under its title and
+ *  the cost popup: "full text", or the part of the PDF asked about. */
+export function depthLabel(source: Pick<ChatSource, "depth" | "pages">): string {
+  if (source.depth !== "full") return "abstracts";
+  return source.pages ? source.pages.label : "full text";
+}
+
+/** `pages`: only that part of the PDF (Ask PDF, one work). */
+async function gatherFullText(items: ZItem[], pages?: PageSpan): Promise<Gathered> {
   const store = useStore.getState();
   store.startUiTasks(
     "Read papers",
@@ -104,11 +114,13 @@ async function gatherFullText(items: ZItem[]): Promise<Gathered> {
       }
       try {
         appLog("info", `Ask: reading the PDF of “${label(item)}”…`);
-        const [{ extractFullText }, bytes] = await Promise.all([
+        const [{ extractFullText, extractPageSpan }, bytes] = await Promise.all([
           import("../pdfText"),
           invoke<ArrayBuffer>("download_attachment_file", { attKey: att.key }),
         ]);
-        const { text, truncated } = await extractFullText(bytes);
+        const { text, truncated } = pages
+          ? await extractPageSpan(bytes, pages.from, pages.to)
+          : await extractFullText(bytes);
         if (!text.trim()) {
           missing.push(itemTitle(item));
           sections.push(
@@ -117,8 +129,11 @@ async function gatherFullText(items: ZItem[]): Promise<Gathered> {
           task(item.key, "done", "no text in PDF");
           continue;
         }
+        // A part of the work says which part, so the model doesn't take
+        // it for the whole.
+        const part = pages ? `\n- Only part of this work is included: ${pages.label}` : "";
         sections.push(
-          `${head}${truncated ? "\n- Note: long work, text below is cut short" : ""}\n\n${text}`,
+          `${head}${part}${truncated ? "\n- Note: long work, text below is cut short" : ""}\n\n${text}`,
         );
         task(item.key, "done", `${Math.round(text.length / 1000)}K chars`);
       } catch (e) {
@@ -225,16 +240,19 @@ export async function prepareAsk(
   target: AskTarget,
   items: ZItem[],
   depth: AskDepth,
+  pages?: PageSpan,
 ): Promise<PendingAsk> {
+  // A part of a PDF is one work's; anywhere else it means nothing.
+  if (depth !== "full" || items.length !== 1) pages = undefined;
   const settings = useStore.getState().settings;
   if (!settings) throw new Error("Settings are not loaded yet");
   const gaps = askGaps(items, depth);
   appLog(
     "info",
-    `Ask ${depth === "full" ? "Full Papers" : "Abstracts"}: gathering ${items.length} work(s)…`,
+    `Ask ${pages ? `PDF (${pages.label})` : depth === "full" ? "Full Papers" : "Abstracts"}: gathering ${items.length} work(s)…`,
   );
   const { context, missing } =
-    depth === "full" ? await gatherFullText(items) : gatherAbstracts(items);
+    depth === "full" ? await gatherFullText(items, pages) : gatherAbstracts(items);
 
   const count = await invoke<{
     tokens: number;
@@ -256,6 +274,7 @@ export async function prepareAsk(
         : undefined,
       label: target.label,
       depth,
+      ...(pages ? { pages } : {}),
       missing,
     },
     context,

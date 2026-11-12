@@ -3,7 +3,12 @@
 // column of colour swatches, and the highlights in reading order, each
 // with its page and three actions: Copy (a Markdown quote), Note (the
 // same quote, into the entry's notes) and Zotero (opens the PDF there,
-// on the highlight).
+// on the highlight). The actions show only on the row the pointer is
+// over (`data-hover`, set from a mouse or trackpad's moves — not CSS
+// :hover, which a finger's tap sets too, and a tap that reveals
+// something is one WebKit doesn't pass on as a click) and on the row
+// last picked, the finger's way to them; on a screen with no pointer
+// at all, on every row (tabs.css).
 //
 // Several selected entries (or one with several PDFs) list under a
 // heading per PDF. Nothing is fetched: annotations arrive with every
@@ -149,9 +154,10 @@ export function HighlightsPanel({ items }: { items: ZItem[] }) {
 
   /** Scroll the open PDF to the highlight. */
   const reveal = (g: Group, a: Annotation) => {
-    if (g.att.key !== openAttKey) return;
     // A text selection in the row is someone copying, not navigating.
     if (window.getSelection()?.toString()) return;
+    // With the PDF elsewhere, picking a row only shows its actions.
+    if (g.att.key !== openAttKey) return setShownKey(a.key);
     const page = annotationPosition(a)?.pageIndex;
     if (showInReader(g.att.key, page != null ? page + 1 : undefined, a.key)) setShownKey(a.key);
   };
@@ -159,6 +165,18 @@ export function HighlightsPanel({ items }: { items: ZItem[] }) {
   const open = (g: Group, a: Annotation) => {
     const page = parseInt(a.pageLabel, 10);
     void openInZotero(g.item.key, g.att.key, undefined, isNaN(page) ? undefined : page, a.key);
+  };
+
+  /** The row under a mouse or trackpad pointer, marked for its
+   *  actions (and none once the pointer has left the list). */
+  const hovered = useRef<HTMLElement | null>(null);
+  const hoverRow = (e: React.PointerEvent) => {
+    if (e.pointerType !== "mouse") return;
+    const over = e.type === "pointerleave" ? null : (e.target as Element).closest<HTMLElement>(".hl-row");
+    if (over === hovered.current) return;
+    hovered.current?.removeAttribute("data-hover");
+    over?.setAttribute("data-hover", "");
+    hovered.current = over;
   };
 
   const row = (g: Group, a: Annotation) =>
@@ -308,7 +326,7 @@ export function HighlightsPanel({ items }: { items: ZItem[] }) {
             )}
           </div>
         )}
-        <div className="hl-list" ref={listRef}>
+        <div className="hl-list" ref={listRef} onPointerMove={hoverRow} onPointerLeave={hoverRow}>
           {visible.length === 0 && <div className="meta-empty">Nothing matches.</div>}
           {visible.map((g) => (
             <section key={g.att.key}>

@@ -9,6 +9,7 @@
 // Coordinates are the pad's own canvas, in CSS pixels; the pad pans over
 // it, so a note keeps its place on the canvas wherever the view is.
 import type { PagePlace, PlaceTarget } from "../pdfviewer/places";
+import { penRestedMs, WRITING_PAUSE_MS } from "../lib/penActivity";
 import { appLog } from "../lib/store";
 import { invoke, isTauri } from "../lib/tauri";
 
@@ -93,12 +94,24 @@ export function notepadChanged(attKey: string, pad: Notepad, from: object): void
 let saveTimer = 0;
 let pending: { attKey: string; pad: Notepad } | null = null;
 
-/** Write `pad` a moment from now (the last of a burst of changes). */
+/** Write `pad` a moment from now (the last of a burst of changes) —
+ *  and, while the Pencil is writing, once it pauses: the write is the
+ *  whole pad as JSON, over IPC, and landing between two words it cost
+ *  the next one its first stroke. Putting the app away writes it at
+ *  once. */
 function saveNotepadSoon(attKey: string, pad: Notepad): void {
   if (pending && pending.attKey !== attKey) flushNotepad();
   pending = { attKey, pad };
   window.clearTimeout(saveTimer);
-  saveTimer = window.setTimeout(flushNotepad, 600);
+  const wait = () => {
+    const rest = penRestedMs();
+    if (rest >= WRITING_PAUSE_MS) flushNotepad();
+    else saveTimer = window.setTimeout(wait, WRITING_PAUSE_MS - rest);
+  };
+  saveTimer = window.setTimeout(wait, 600);
+}
+if (typeof document !== "undefined") {
+  document.addEventListener("visibilitychange", () => document.visibilityState === "hidden" && flushNotepad());
 }
 
 /** Write what is waiting now (the pad closing). */

@@ -1,0 +1,66 @@
+/* The PDF viewer's fixed (paged) view: sets of one to five pages,
+   paged by snapping (src/pdfviewer/paged.ts) — and a reading crop's
+   trimmed pages, which close up the same way in every view (crop.ts).
+   A set takes all of the view but PAGED_PAD, and its pages sit SET_GAP
+   (4px) apart. Four and five pages to a set (the 4 and 5 keys) have no
+   button of their own; the fit-three button shows them (pdfviewer.css,
+   `.pdf-fit-more`). */
+.pdf-scroll-area.pdf-paged.pdf-layout-horizontal {
+  scroll-snap-type: x mandatory;
+  scroll-padding-inline: var(--pdf-paged-pad, 0px);
+  padding: 4px 0;
+  gap: 4px;
+}
+/* Top to bottom, a grid of rows the set's size. Padding is safe here
+   (a set's room plus two pads is the view), unlike in the flex column. */
+.pdf-scroll-area.pdf-layout-pagedv {
+  display: grid;
+  grid-template-columns: repeat(var(--pdf-paged-cols, 1), max-content);
+  justify-content: center;
+  align-content: start;
+  column-gap: 4px;
+  row-gap: var(--pdf-paged-gap, 24px);
+  padding-block: var(--pdf-paged-pad, 4px);
+  padding-inline: 4px;
+  scroll-snap-type: y mandatory;
+  scroll-padding-block: var(--pdf-paged-pad, 0px);
+}
+/* Each set's first page is its snap point. */
+.pdf-paged-1 > .pdf-page-wrapper,
+.pdf-paged-2 > .pdf-page-wrapper:nth-child(2n + 1),
+.pdf-paged-3 > .pdf-page-wrapper:nth-child(3n + 1),
+.pdf-paged-4 > .pdf-page-wrapper:nth-child(4n + 1),
+.pdf-paged-5 > .pdf-page-wrapper:nth-child(5n + 1) {
+  scroll-snap-align: start;
+  scroll-snap-stop: always;
+}
+/* A trimmed page (crop.ts) is clipped to what is left, and its trimmed
+   edges' room is closed up by negative margins — --cm-* on each page,
+   zero when untrimmed. The scroll margins match, so the snapping
+   centres what is left rather than the whole page. */
+.pdf-paged > .pdf-page-wrapper,
+.pdf-cropped > .pdf-page-wrapper {
+  margin: var(--cm-t, 0px) var(--cm-r, 0px) var(--cm-b, 0px) var(--cm-l, 0px);
+}
+.pdf-cropped > .pdf-page-wrapper {
+  scroll-margin: var(--cm-t, 0px) var(--cm-r, 0px) var(--cm-b, 0px) var(--cm-l, 0px);
+  clip-path: inset(
+    calc(var(--crop-t) * 100%) calc(var(--crop-r) * 100%) calc(var(--crop-b) * 100%)
+      calc(var(--crop-l) * 100%)
+  );
+}
+/* Side by side: room outside the end sets, and between sets. Margins
+   rather than padding, which would stretch the flex row's height. */
+.pdf-paged.pdf-layout-horizontal > .pdf-page-wrapper:first-child {
+  margin-left: calc(var(--pdf-paged-pad, 0px) + var(--cm-l, 0px));
+}
+.pdf-paged.pdf-layout-horizontal > .pdf-page-wrapper:last-child {
+  margin-right: calc(var(--pdf-paged-pad, 0px) + var(--cm-r, 0px));
+}
+.pdf-paged-1.pdf-layout-horizontal > .pdf-page-wrapper:not(:first-child),
+.pdf-paged-2.pdf-layout-horizontal > .pdf-page-wrapper:nth-child(2n + 1):not(:first-child),
+.pdf-paged-3.pdf-layout-horizontal > .pdf-page-wrapper:nth-child(3n + 1):not(:first-child),
+.pdf-paged-4.pdf-layout-horizontal > .pdf-page-wrapper:nth-child(4n + 1):not(:first-child),
+.pdf-paged-5.pdf-layout-horizontal > .pdf-page-wrapper:nth-child(5n + 1):not(:first-child) {
+  margin-left: calc(var(--pdf-paged-gap, 24px) - 4px + var(--cm-l, 0px));
+}

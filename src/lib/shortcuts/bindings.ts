@@ -74,6 +74,8 @@ export const ACTIONS: ShortcutAction[] = [
   a("pdf", "pdfFit1", "Fit one page", "1"),
   a("pdf", "pdfFit2", "Fit two pages", "2"),
   a("pdf", "pdfFit3", "Fit three pages", "3"),
+  a("pdf", "pdfFit4", "Fit four pages", "4"),
+  a("pdf", "pdfFit5", "Fit five pages", "5"),
   a("pdf", "pdfFixed", "Paged view", "p"),
   a("pdf", "pdfContinuous", "Continuous view", "c"),
   a("pdf", "pdfInk", "Draw (ink mode) on / off", "i"),

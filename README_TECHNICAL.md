@@ -1599,9 +1599,10 @@ With strokes selected (the lasso), a colour picked recolours them too,
 and the tool stays as it was (`setColor` in `surface.ts`; undone like
 anything else).
 
-The quote button and the scissors are discs of the highlight orange
-(`#f19837`), their glyphs in the pad's own colour; a ring round one
-shows a link being drawn out of the quote, or clip mode on.
+The quote button is a disc of the highlight orange (`#f19837`), its
+quote marks in the pad's own colour, ringed while a link is drawn out
+of it. The scissors beside it are a grey tool like the map, lit while
+clip mode is on.
 
 On the canvas the Pencil writes — a tap is a dot — a finger pans, and a
 mouse writes with a drag (a Mac has no Pencil) while a wheel pans; each

@@ -114,9 +114,9 @@
   background: var(--swatch, var(--notepad-ink));
   box-shadow: 0 0 0 1px color-mix(in srgb, var(--text-dim) 45%, transparent);
 }
-/* The quote button and the scissors (clip mode), at the bar's left:
-   discs of the highlight orange, their glyphs in the pad's own colour;
-   ringed while a link is drawn out of the quote, or clip mode is on. */
+/* The quote button, at the bar's left: a disc of the highlight orange,
+   its quote marks in the pad's own colour; ringed while a link is drawn
+   out of it. */
 .notepad-quote-btn {
   display: inline-flex;
   flex-shrink: 0;
@@ -143,9 +143,10 @@
 .notepad-quote-btn.linking {
   box-shadow: 0 0 0 2px var(--panel), 0 0 0 3.5px #f19837;
 }
-.notepad-clip-btn {
-  margin-right: 6px;
-  cursor: pointer;
+/* The scissors (clip mode): a tool like the others, lit while on. */
+.notepad-clip-btn svg {
+  width: 16px;
+  height: 16px;
 }
 .notepad-undo {
   color: var(--accent);

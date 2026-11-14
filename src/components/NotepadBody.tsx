@@ -24,8 +24,9 @@
 // the pad's own colour: press it (the Pencil, a finger or the mouse) and
 // drag onto the pages, a dashed line running from it to the pointer, a
 // ring round it as it goes, and let go over a highlight or a spot on a
-// page: a link to it lands on the pad. The scissors beside it, the same
-// disc, turn clip mode on and off (notepad/clip.ts): a box drawn on a
+// page: a link to it lands on the pad. The scissors beside it, a grey
+// tool like the map, lit while it is on, turn clip mode on and off
+// (notepad/clip.ts): a box drawn on a
 // page, and Clip puts what it holds on the pad as an image, its page
 // under it (the clip's `top` its place, which a tap goes back to). At
 // the canvas's lower
@@ -360,7 +361,7 @@ export function NotepadBody({ attKey, kind, onBarPointerDown, tools, trailing }:
         </button>
         <button
           type="button"
-          className={clipping ? "notepad-quote-btn notepad-clip-btn linking" : "notepad-quote-btn notepad-clip-btn"}
+          className={clipping ? "notepad-tool notepad-clip-btn active" : "notepad-tool notepad-clip-btn"}
           title={clipping ? "Stop clipping (Esc)" : "Clip — draw a box on a page to put that part of it on the pad"}
           aria-label="Clip part of a page"
           aria-pressed={clipping}

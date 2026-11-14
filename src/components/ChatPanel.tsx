@@ -7,19 +7,13 @@
 // has cost so far, and how long the works stay in the provider's prompt
 // cache. Ask again inside that window and the papers are re-read at a
 // tenth of the price; let it lapse and the next question pays for them
-// in full again.
-import { memo, useEffect, useMemo, useRef, useState } from "react";
-import Markdown, { defaultUrlTransform } from "react-markdown";
-import remarkGfm from "remark-gfm";
-import { openInZotero } from "../lib/actions";
+// in full again. The transcript is the first column of a strip
+// (ThreadStrip.tsx): a passage of an answer selected and asked about
+// opens a column to its right, which can be carried on from its own
+// box, as this one is from the one below.
+import { useEffect, useRef, useState } from "react";
 import { removeChat, sendChatMessage } from "../lib/ai/chat";
 import { depthLabel } from "../lib/ai/context";
-import {
-  CITE_SCHEME,
-  citationLabel,
-  linkifyCitations,
-  parseCiteHref,
-} from "../lib/ai/citations";
 import { shareConversation } from "../lib/ai/export";
 import {
   CACHE_TTL_MS,
@@ -27,18 +21,11 @@ import {
   formatUsd,
   modelLabel,
 } from "../lib/ai/models";
-import { firstAuthorLast, pdfAttachmentOf } from "../lib/collections";
 import { useStore } from "../lib/store";
-import type { Chat, ChatSource } from "../lib/types";
-import {
-  ExternalIcon,
-  EyeIcon,
-  ShareIcon,
-  Spinner,
-  TrashIcon,
-} from "./Icons";
-import { openReaderAt } from "./ReaderPane";
+import type { Chat } from "../lib/types";
+import { ShareIcon, Spinner, TrashIcon } from "./Icons";
 import { started } from "./ChatList";
+import { followRoot, ThreadStrip } from "./ThreadStrip";
 import { WorkTitles } from "./WorkTitles";
 
 /** mm:ss left on the provider's cache window, or null once it's gone.
@@ -90,140 +77,6 @@ function CacheCountdown({ chat }: { chat: Chat }) {
   );
 }
 
-/** The button a [[cite:W:P]] becomes: which page, and the two ways to
- *  go and look at it. */
-function CitePill({
-  href,
-  source,
-}: {
-  href: string;
-  source: ChatSource;
-}) {
-  const items = useStore((s) => s.library.items);
-  const cite = parseCiteHref(href);
-  if (!cite) return null;
-
-  // A citation that named only a page is unambiguous when the chat
-  // covers a single work, and guesswork when it doesn't.
-  const index =
-    cite.work ?? (source.itemKeys.length === 1 ? 1 : 0);
-  const itemKey = source.itemKeys[index - 1];
-  const title = source.itemTitles?.[index - 1] ?? "";
-  const label = citationLabel(cite);
-
-  // Which paper this came from, when there is more than one it could
-  // have come from. A page number on its own is only ever unambiguous
-  // in a chat about a single work; across a folder, "p. 3" three times
-  // in a paragraph is three different papers.
-  const item = itemKey ? items.find((i) => i.key === itemKey) : undefined;
-  const who = source.itemKeys.length > 1 && item ? firstAuthorLast(item) : "";
-
-  // No work to resolve, or the work has no PDF any more: keep the
-  // reference visible, just without buttons that would go nowhere.
-  const att = itemKey ? pdfAttachmentOf(items, itemKey) : undefined;
-  if (!itemKey || !att) {
-    return (
-      <span className="cite-pill cite-pill-dead" title={title || undefined}>
-        {who && <span className="cite-who">{who}</span>}
-        {label}
-      </span>
-    );
-  }
-
-  return (
-    <span className="cite-pill" title={title || undefined}>
-      {who && <span className="cite-who">{who}</span>}
-      <span className="cite-label">{label}</span>
-      <button
-        onClick={() => openReaderAt(itemKey, att.key, cite.page, { quote: cite.quote, tab: "chats" })}
-        aria-label={`Show page ${cite.page} in the PDF`}
-        title={
-          cite.quote
-            ? `Open the PDF at page ${cite.page}, with the passage highlighted:\n“${cite.quote}”`
-            : `Open the PDF at page ${cite.page}${title ? ` — ${title}` : ""}`
-        }
-      >
-        <EyeIcon size={12} />
-      </button>
-      <button
-        onClick={() =>
-          void openInZotero(itemKey, att.key, undefined, cite.page)
-        }
-        aria-label={`Open page ${cite.page} in Zotero`}
-        title={`Open in Zotero at page ${cite.page}`}
-      >
-        <ExternalIcon size={12} />
-      </button>
-    </span>
-  );
-}
-
-/** Who said it is carried by the styling — the question sits in a box,
- *  the answer runs plain down the panel.
- *
- *  Answers render as Markdown (GitHub flavour, so tables and strike-
- *  through work): models write headings, lists and tables whether or not
- *  you ask, and a comparison of five papers is a table. The question is
- *  left as typed — nobody writes Markdown into a chat box on purpose,
- *  and an underscore in a title shouldn't turn into emphasis. */
-export const Bubble = memo(function Bubble({
-  role,
-  content,
-  source,
-}: {
-  role: string;
-  content: string;
-  source: ChatSource;
-}) {
-  // Citations become links with a private scheme so the Markdown
-  // pipeline carries them as real nodes, and the `a` override below
-  // turns those back into pills.
-  const md = useMemo(
-    () => (role === "user" ? content : linkifyCitations(content)),
-    [role, content],
-  );
-  return (
-    <div className={`chat-msg chat-msg-${role}`}>
-      {role === "user" ? (
-        <div className="chat-msg-body">{content}</div>
-      ) : (
-        <div className="chat-msg-body chat-md">
-          <Markdown
-            remarkPlugins={[remarkGfm]}
-            // react-markdown drops any URL whose scheme it doesn't
-            // recognise, which would strip citations before they reach
-            // the `a` override below. Let ours through and leave every
-            // other link to the default sanitizer — the text is a
-            // model's, so `javascript:` still has to be blocked.
-            urlTransform={(url) =>
-              url.startsWith(CITE_SCHEME) ? url : defaultUrlTransform(url)
-            }
-            components={{
-              // The panel is a narrow column; a wide table scrolls
-              // inside its own box rather than stretching it.
-              table: ({ children }) => (
-                <div className="chat-md-table">
-                  <table>{children}</table>
-                </div>
-              ),
-              a: ({ href, children }) =>
-                parseCiteHref(String(href ?? "")) ? (
-                  <CitePill href={String(href)} source={source} />
-                ) : (
-                  <a href={href} target="_blank" rel="noreferrer">
-                    {children}
-                  </a>
-                ),
-            }}
-          >
-            {md}
-          </Markdown>
-        </div>
-      )}
-    </div>
-  );
-});
-
 export function ChatPanel({ chat }: { chat: Chat }) {
   const busy = useStore((s) => s.chatBusy) === chat.id;
   const [draft, setDraft] = useState("");
@@ -232,10 +85,10 @@ export function ChatPanel({ chat }: { chat: Chat }) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const shareRef = useRef<HTMLButtonElement>(null);
 
-  // Follow the conversation as it grows.
+  // Follow the conversation as it grows: its own column, to its foot.
   useEffect(() => {
     const el = scrollRef.current;
-    if (el) el.scrollTop = el.scrollHeight;
+    if (el) followRoot(el);
   }, [chat.messages.length, busy]);
 
   const send = async () => {
@@ -288,29 +141,32 @@ export function ChatPanel({ chat }: { chat: Chat }) {
         <WorkTitles source={chat.source} />
       </div>
 
-      <div className="chat-scroll" ref={scrollRef}>
-        {chat.messages.length === 0 && (
-          <div className="chat-empty">
-            The works are loaded. Ask your first question below.
-          </div>
-        )}
-        {chat.messages.map((m, i) => (
-          <Bubble
-            key={i}
-            role={m.role}
-            content={m.display ?? m.content}
-            source={chat.source}
-          />
-        ))}
-        {busy && (
-          <div className="chat-msg chat-msg-assistant">
-            <div className="chat-msg-body chat-thinking">
-              <Spinner size={13} /> reading…
+      {/* The conversation, and to its right the columns of what was
+          asked about its answers (ThreadStrip.tsx). */}
+      <ThreadStrip
+        chat={chat}
+        continuable
+        scrollRef={scrollRef}
+        rootBefore={
+          chat.messages.length === 0 && (
+            <div className="chat-empty">
+              The works are loaded. Ask your first question below.
             </div>
-          </div>
-        )}
-        {error && <div className="error-msg">{error}</div>}
-      </div>
+          )
+        }
+        rootAfter={
+          <>
+            {busy && (
+              <div className="chat-msg chat-msg-assistant">
+                <div className="chat-msg-body chat-thinking">
+                  <Spinner size={13} /> reading…
+                </div>
+              </div>
+            )}
+            {error && <div className="error-msg">{error}</div>}
+          </>
+        }
+      />
 
       <div className="chat-compose">
         <textarea

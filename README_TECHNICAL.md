@@ -61,7 +61,10 @@ src/            React + TypeScript UI (Vite, zustand, MiniSearch)
                 catalog and its prices (models), gathering works to ask
                 about (context), conversations (chat), the reader's
                 explainer of a passage (explain) and look-up (lookup),
-                their editable prompts (prompts), export
+                their editable prompts (prompts), export,
+                clarifications (threads: a passage of an answer asked
+                about, in a column of its own; threadMarks: where each
+                passage is in its answer, measured and marked)
   lib/words.ts  Words: every word looked up in a PDF, and where
   lib/bookmarks.ts
                 the reader's bookmarks: the store, its file (through
@@ -116,6 +119,11 @@ src/            React + TypeScript UI (Vite, zustand, MiniSearch)
                 empty note's reading questions), reader pane (and
                 ReadingModeExit, reading mode's way back and its
                 buttons; ExplainChat, the explainer's window;
+                ChatBubble, a question or an answer (Markdown, its
+                citations as pills, its passages asked about marked);
+                ThreadStrip, a conversation's columns — its own, then
+                its clarifications' — and ClarifyPopover, the bar a
+                selection in an answer brings up;
                 ExplanationList, the explanations as boxes, and the
                 sidebar's Explanations;
                 NotepadBody, a view of the notepad, and ReadingNotepad,
@@ -195,7 +203,8 @@ src/            React + TypeScript UI (Vite, zustand, MiniSearch)
                 keyboard = the pane outline and sidebar cursor;
                 pdfviewer-dark = dark pages; explanations = the
                 explanation boxes; notepad-clips = the notepad's pins
-                and clips, and clip mode)
+                and clips, and clip mode; threads = a conversation's
+                columns and the passages marked in its answers)
 src-tauri/      Rust core (all networking + state)
   src/zotero/      Zotero Web API v3: paginated sync (sync), versioned
                    writes, and attachment files (files — create, upload
@@ -1459,8 +1468,9 @@ over the pages at the bottom right — reading mode included — and ask
 about it at once, in the words of Settings → AI → Prompts ("What would
 the encyclopedia entry for “…” be?" unless changed), of which the
 window shows only the passage (the message's `display`)
-(`lib/ai/explain.ts`, `ExplainChat.tsx`). There are no follow-ups: a
-toggle under the window's head says what goes with the question.
+(`lib/ai/explain.ts`, `ExplainChat.tsx`). There are no follow-ups
+(though a passage of the answer can be clarified — see Clarifications):
+a toggle under the window's head says what goes with the question.
 **No Context**, the default: nothing but the question — no page, no
 paper — answered under the backend's own system prompt, which explains
 the concept on its own terms, as an encyclopedia entry would, in under
@@ -1523,8 +1533,66 @@ finds and marks on the way back (`WordList.tsx`, `lib/words.ts`;
 `words.json` in the app's data folder, `src-tauri/src/words.rs`). The
 same word looked up again in the same PDF replaces the one before.
 
-**Prompts.** Settings → AI → Prompts holds the explainer's and the
-look-up's questions as templates — text with tokens in it, shown as
+**Clarifications.** In a Questions conversation or an explainer, a
+passage of an answer can be selected and asked about. The selection,
+once it comes to rest (a pointer let go; on the iPad, a pause while the
+handles move), brings up a small bar under it (`ClarifyPopover.tsx`):
+the passage, quoted, then **Clarify** — which asks in the words of
+Settings → AI → Prompts ("Clarify this part of your last answer: “…”"
+unless changed) — and a box to ask a question of one's own about it
+instead. Either way the answer opens in a new column to the right of
+the one it was asked in, its head — the passage again, quoted — level
+with the passage (`ThreadStrip.tsx`). The columns share one vertical
+scroll, each pushed down to its passage's height in the column before
+(measured after every layout and whenever a column resizes), and the
+strip scrolls sideways between them, settling on a column's edge: each
+column is the strip's width where the strip is narrow (the details
+panel, as usual), half of it where two fit (640px and up), and the
+explainer's window widens to show two while one is open. A new column
+is scrolled into view; its head's back arrow scrolls to where it was
+asked, × closes it, and the trash can (pressed twice) deletes it and
+the clarifications asked in it. Every passage asked about stays marked
+in its answer, tinted (`--thread-mark`); the one whose column is open
+more strongly, with an amber edge under it. A tap on a passage opens
+its column, or closes it if open. One column is open to the right of
+each, so the columns open are a path — the conversation, a
+clarification of it, a clarification of that, as deep as one likes —
+and opening another from a column closes those right of it. In a
+Questions conversation a clarification has a box at its foot to carry
+it on, as the conversation itself is carried on from the one below; an
+explainer's clarifications can be asked about, not carried on.
+
+What the model is sent is an ordinary next turn: the conversation as it
+stood when the answer was given — its messages up to that answer, and
+for a clarification of a clarification, each one on the way down up to
+the answer the next was asked of — then the question, over the same
+works and under the same system prompt (`askModel` in
+`lib/ai/chat.ts`), so the works come from the provider's cache as any
+later turn's do, and an answer's citations are pills like any other.
+Each clarification is kept with its conversation (`Chat.threads`: the
+thread it was asked in, the answer, the passage and its exchange, in
+`chats.json`), and what it cost goes into the conversation's total.
+A clarification's request runs apart from the conversation's
+(`useThreadBusy` in `lib/ai/threads.ts`), and every reply — the
+conversation's own too — goes into the chat as it is when the reply
+comes, so asking about one passage while another is answered loses
+neither. One that fails keeps its question, unanswered, with **Try
+again**. Asking an explainer again with the other context lets go of
+its clarifications, with the answer they were asked of. Share
+Conversation adds them after the exchange, under **Clarifications**.
+
+Where a passage is: offsets into its answer's rendered text, counting
+every character but white space and the words of citation pills
+(`lib/ai/threadMarks.ts`). A selection is measured in the page; the
+marks are made in the Markdown pipeline (a rehype plugin, as
+`<mark>` elements React renders) — and the two trees differ in white
+space (the renderer drops it between a table's rows) and in the pills
+(the tree being marked has the citation's link where the page draws
+"p. 12"), so neither is counted on either side. The marks reflow with
+the text, and a tap on one is an ordinary click.
+
+**Prompts.** Settings → AI → Prompts holds the explainer's, the
+look-up's and a clarification's questions as templates — text with tokens in it, shown as
 chips, for what is filled in as it is sent: the selection, and the
 work's title, authors and year (`lib/ai/prompts.ts`,
 `PromptSettings.tsx`). A token is dragged in from the row beneath (a

@@ -162,9 +162,38 @@ export function createChat(ask: PendingAsk): Chat {
   return chat;
 }
 
+/** What the backend answers `chat` as: its kind of conversation. An
+ *  explainer asked with its context (explain.ts) is answered about the
+ *  passage in its work. */
+function modeOf(chat: Chat): string | null {
+  return chat.mode === "explain" && chat.context ? "explain-context" : (chat.mode ?? null);
+}
+
+/** Ask the model `messages` over `chat`'s works (its context, its
+ *  mode): the answer as a message, with what it cost, and the model
+ *  that gave it. The conversation's own turns and its clarifications'
+ *  (threads.ts) both go through here. */
+export async function askModel(
+  chat: Chat,
+  messages: ChatMessage[],
+): Promise<{ answered: ChatMessage; model: string }> {
+  const reply = await invoke<ChatReply>("ai_chat", {
+    context: chat.context,
+    messages: messages.map((m) => ({ role: m.role, content: m.content })),
+    mode: modeOf(chat),
+  });
+  const costUsd = usageCost(reply.model, reply.usage);
+  return {
+    model: reply.model,
+    answered: { role: "assistant", content: reply.text, ts: Date.now(), usage: reply.usage, costUsd },
+  };
+}
+
 /** Ask the open chat a question. Appends the turn, calls the provider,
  *  appends the reply, and books what it cost. `display` is what the
- *  conversation shows of the question, when not the whole of it. */
+ *  conversation shows of the question, when not the whole of it. The
+ *  reply goes into the chat as it is when the reply comes, not as it
+ *  was asked: a clarification may have been asked meanwhile. */
 export async function sendChatMessage(
   chatId: string,
   question: string,
@@ -187,31 +216,17 @@ export async function sendChatMessage(
   store.setChatBusy(chatId);
 
   try {
-    const reply = await invoke<ChatReply>("ai_chat", {
-      context: working.context,
-      messages: working.messages.map((m) => ({
-        role: m.role,
-        content: m.content,
-      })),
-      // An explainer asked with its context (explain.ts) is answered
-      // about the passage in its work.
-      mode: working.mode === "explain" && working.context ? "explain-context" : (working.mode ?? null),
-    });
-    const cost = usageCost(reply.model, reply.usage);
-    const answered: ChatMessage = {
-      role: "assistant",
-      content: reply.text,
-      ts: Date.now(),
-      usage: reply.usage,
-      costUsd: cost,
-    };
+    const { answered, model } = await askModel(working, working.messages);
+    // Deleted while the request was in flight: nothing to put it in.
+    const now = useStore.getState().chats.find((c) => c.id === chatId);
+    if (!now) return;
     working = {
-      ...working,
+      ...now,
       // A model swapped in Settings mid-conversation applies from the
       // turn it was used on; the chat records what actually answered.
-      model: reply.model,
-      messages: [...working.messages, answered],
-      costUsd: working.costUsd + cost,
+      model,
+      messages: [...now.messages, answered],
+      costUsd: now.costUsd + (answered.costUsd ?? 0),
       lastCallMs: Date.now(),
     };
     useStore.getState().upsertChat(working);
@@ -226,7 +241,7 @@ export async function sendChatMessage(
     if (cur) {
       useStore
         .getState()
-        .upsertChat({ ...cur, messages: working.messages.slice(0, -1) });
+        .upsertChat({ ...cur, messages: cur.messages.filter((m) => m !== asked) });
     }
     throw e;
   } finally {

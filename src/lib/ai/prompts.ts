@@ -1,6 +1,7 @@
 // The prompts the reader's AI features ask with, as the reader has
-// written them (Settings → AI → Prompts): the explainer's first question
-// and the look-up's. Each is a template — text with tokens in it,
+// written them (Settings → AI → Prompts): the explainer's first question,
+// the look-up's, and a clarification's (a passage of an answer asked
+// about, lib/ai/threads.ts). Each is a template — text with tokens in it,
 // `{selection}` for the passage selected and `{title}`, `{authors}`,
 // `{year}` for the work it was read in — filled in as it is sent. The
 // system prompts around them (how long, in what form) stay the
@@ -8,7 +9,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
-export type PromptFeature = "explain" | "lookup";
+export type PromptFeature = "explain" | "lookup" | "clarify";
 
 export const PROMPT_FEATURES: { id: PromptFeature; label: string; hint: string }[] = [
   {
@@ -20,6 +21,11 @@ export const PROMPT_FEATURES: { id: PromptFeature; label: string; hint: string }
     id: "lookup",
     label: "Look up",
     hint: "The look-up's question (the magnifier over a selection): a definition of at most 50 words, kept in Words.",
+  },
+  {
+    id: "clarify",
+    label: "Clarify",
+    hint: "Asked of a passage selected in an answer (Clarify): answered in a column beside it. The column shows only the passage.",
   },
 ];
 
@@ -33,6 +39,7 @@ export const PROMPT_TOKENS: { id: string; label: string }[] = [
 export const DEFAULT_PROMPTS: Record<PromptFeature, string> = {
   explain: "What would the encyclopedia entry for “{selection}” be?",
   lookup: "Define “{selection}”",
+  clarify: "Clarify this part of your last answer: “{selection}”",
 };
 
 interface PromptStore {

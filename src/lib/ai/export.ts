@@ -5,9 +5,28 @@
 // it to a chat window elsewhere and the new model has exactly what this
 // one had.
 import { shareMarkdown } from "../share";
-import type { Chat } from "../types";
+import type { Chat, ChatThread } from "../types";
 import { plainCitations } from "./citations";
 import { formatUsd, modelLabel } from "./models";
+import { threadsIn } from "./threads";
+
+/** The clarifications asked in `parentId`'s answers, and in theirs, in
+ *  the order they were asked, each saying where it was asked. */
+function clarifications(chat: Chat, parentId: string | null, depth: number, lines: string[]): void {
+  for (const t of threadsIn(chat, parentId)) {
+    const where = parentId === null ? `answer ${answerNumber(chat.messages, t)}` : "the clarification above";
+    lines.push(`${"#".repeat(Math.min(3 + depth, 6))} Clarification of “${t.quote}”`, "", `_Asked of ${where}._`, "");
+    for (const m of t.messages) {
+      lines.push(`**${m.role === "user" ? "Question" : "Answer"}.** ${plainCitations(m.content).trim()}`, "");
+    }
+    clarifications(chat, t.id, depth + 1, lines);
+  }
+}
+
+/** Which answer, counting from 1, a clarification was asked of. */
+function answerNumber(messages: Chat["messages"], t: ChatThread): number {
+  return messages.slice(0, t.messageIndex + 1).filter((m) => m.role === "assistant").length;
+}
 
 const DEPTH_LABEL = {
   abstracts: "abstracts",
@@ -39,6 +58,10 @@ export function conversationMarkdown(chat: Chat): string {
     // [[cite:2:7]] means nothing outside this app; write it as prose so
     // the file reads properly wherever it ends up.
     lines.push(plainCitations(m.content).trim(), "");
+  }
+  if (chat.threads?.length) {
+    lines.push("## Clarifications", "", "_Passages of the answers above, asked about._", "");
+    clarifications(chat, null, 0, lines);
   }
 
   // Last, because it's the bulk: a reader scrolls past the exchange to

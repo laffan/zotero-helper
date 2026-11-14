@@ -30,6 +30,11 @@
      looked up, a dashed underline in pink. */
   --explain-underline: #8b5cf6;
   --explain-mark: #f06aa8;
+  /* A passage of an answer asked about (threads.css): a warm tint, and
+     the one whose column is open, stronger, with an edge in amber. */
+  --thread-mark: #f4e7c4;
+  --thread-mark-on: #ecd593;
+  --thread-mark-edge: #c8962a;
   /* The notepad's ink (notepad.css): black on the light theme's panel,
      white on the dark one's. */
   --notepad-ink: #000000;
@@ -55,6 +60,9 @@
     --warn: #c98f3d;
     --bad: #d05a4e;
     --notepad-ink: #ffffff;
+    --thread-mark: #4a3f24;
+    --thread-mark-on: #6b5627;
+    --thread-mark-edge: #d9a845;
   }
 }
 :root[data-theme="dark"] {
@@ -73,6 +81,9 @@
   --bad: #d05a4e;
   color-scheme: dark;
   --notepad-ink: #ffffff;
+  --thread-mark: #4a3f24;
+  --thread-mark-on: #6b5627;
+  --thread-mark-edge: #d9a845;
 }
 :root[data-theme="light"] {
   color-scheme: light;

@@ -15,15 +15,21 @@
 // dashed underline — and the tap that reopened it there — are gone. The
 // list's link back still finds the passage by its words and marks it
 // for the moment, as an answer's citation does.
+//
+// A passage of the answer can be selected and asked about all the same
+// (ThreadStrip.tsx): its clarification opens in a column to the right,
+// the window widening for it, and can be asked about in turn — but not
+// carried on, as the explanation itself isn't. Asking again with the
+// other context lets go of them with the answer they were asked of.
 import { useEffect, useRef, useState } from "react";
 import { persistChats, sendChatMessage } from "../lib/ai/chat";
 import { explainContext } from "../lib/ai/explain";
 import { formatUsd } from "../lib/ai/models";
 import { useStore } from "../lib/store";
 import type { Chat } from "../lib/types";
-import { Bubble } from "./ChatPanel";
 import { CloseIcon, QuestionIcon, Spinner } from "./Icons";
 import { readerPageCount } from "./ReaderPane";
+import { followRoot, ThreadStrip } from "./ThreadStrip";
 
 /** The question an explainer asks, and what it shows of it. */
 function questionOf(chat: Chat, fallback: { question?: string; display?: string } | null) {
@@ -44,6 +50,8 @@ export function ExplainChat() {
   const again = useRef<{ question?: string; display?: string } | null>(null);
 
   const close = () => useStore.getState().setExplain(null);
+  // How many columns the strip has open: the window widens for two.
+  const [columns, setColumns] = useState(1);
   const [confirmUnmark, setConfirmUnmark] = useState(false);
   useEffect(() => {
     if (!confirmUnmark) return;
@@ -87,14 +95,15 @@ export function ExplainChat() {
 
   useEffect(() => {
     const el = scrollRef.current;
-    if (el) el.scrollTop = el.scrollHeight;
+    if (el) followRoot(el);
   }, [chat?.messages.length, busy]);
 
   // Escape closes the window before it reaches reading mode's exit.
   useEffect(() => {
     if (!explain) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key !== "Escape") return;
+      // The Clarify bar, when it is up, is closed first (by itself).
+      if (e.key !== "Escape" || boxRef.current?.querySelector(".clarify-pop")) return;
       e.preventDefault();
       e.stopPropagation();
       close();
@@ -130,7 +139,8 @@ export function ExplainChat() {
     const cur = s.chats.find((c) => c.id === chat.id);
     if (!cur) return;
     // A four-characters-a-token estimate; the reply books the real cost.
-    s.upsertChat({ ...cur, context, contextTokens: Math.ceil(context.length / 4), messages: [] });
+    // The clarifications go with the answer they were asked of.
+    s.upsertChat({ ...cur, context, contextTokens: Math.ceil(context.length / 4), messages: [], threads: [] });
     void persistChats();
     await send(question, display);
   };
@@ -148,7 +158,12 @@ export function ExplainChat() {
 
   const waiting = busy || preparing;
   return (
-    <div className="explain-chat" role="dialog" aria-label="Explain the passage" ref={boxRef}>
+    <div
+      className={columns > 1 ? "explain-chat threaded" : "explain-chat"}
+      role="dialog"
+      aria-label="Explain the passage"
+      ref={boxRef}
+    >
       <div className="explain-head">
         <QuestionIcon size={13} />
         <span className="explain-title" title={chat.title}>
@@ -180,28 +195,34 @@ export function ExplainChat() {
           Context
         </button>
       </div>
-      <div className="explain-scroll chat-scroll" ref={scrollRef}>
-        {chat.messages.map((m, i) => (
-          <Bubble key={i} role={m.role} content={m.display ?? m.content} source={chat.source} />
-        ))}
-        {waiting && (
-          <div className="chat-msg chat-msg-assistant">
-            <div className="chat-msg-body chat-thinking">
-              <Spinner size={13} /> {preparing ? "reading the PDF…" : "thinking…"}
-            </div>
-          </div>
-        )}
-        {error && (
-          <div className="error-msg">
-            {error}{" "}
-            {!waiting && !chat.messages.some((m) => m.role === "assistant") && (
-              <button className="link-btn" onClick={askFirst}>
-                Try again
-              </button>
+      <ThreadStrip
+        chat={chat}
+        continuable={false}
+        className="explain-scroll"
+        scrollRef={scrollRef}
+        onColumns={setColumns}
+        rootAfter={
+          <>
+            {waiting && (
+              <div className="chat-msg chat-msg-assistant">
+                <div className="chat-msg-body chat-thinking">
+                  <Spinner size={13} /> {preparing ? "reading the PDF…" : "thinking…"}
+                </div>
+              </div>
             )}
-          </div>
-        )}
-      </div>
+            {error && (
+              <div className="error-msg">
+                {error}{" "}
+                {!waiting && !chat.messages.some((m) => m.role === "assistant") && (
+                  <button className="link-btn" onClick={askFirst}>
+                    Try again
+                  </button>
+                )}
+              </div>
+            )}
+          </>
+        }
+      />
       <div className="explain-meter">
         {marked && (
           <button

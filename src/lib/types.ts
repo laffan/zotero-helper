@@ -286,6 +286,35 @@ export interface Chat {
   /** An explainer's passage in its PDF — where it stays marked, a tap
    *  on it opening the explainer again (pdfviewer/passageMarks.ts). */
   passage?: { attKey: string; pageIndex: number; rects: number[][] };
+  /** Clarifications: passages of its answers asked about, each a thread
+   *  of its own in a column to the right (lib/ai/threads.ts). */
+  threads?: ChatThread[];
+}
+
+/** A clarification: a passage selected in an answer and asked about,
+ *  answered in a thread of its own — shown as a column to the right of
+ *  the one it was asked in, level with the passage, which stays marked
+ *  (components/ThreadStrip.tsx). Threads nest: one can be asked of an
+ *  answer in another. */
+export interface ChatThread {
+  id: string;
+  /** The thread it was asked in: null for the chat's own messages. */
+  parentId: string | null;
+  /** The answer asked about: its index in that thread's messages. */
+  messageIndex: number;
+  /** The passage, as it was selected… */
+  quote: string;
+  /** …and where it is in the answer: offsets in its rendered text,
+   *  counting every character but white space and citation pills
+   *  (lib/ai/threadMarks.ts). */
+  start: number;
+  end: number;
+  createdMs: number;
+  /** Its own exchange: the clarification asked, the answers, and — in a
+   *  Questions conversation — what was asked after. The first question
+   *  of one asked with the Clarify button alone has `display` "", and
+   *  isn't shown: the column's head shows the passage. */
+  messages: ChatMessage[];
 }
 
 /** Where a request is being started from. Everything the AI menu needs

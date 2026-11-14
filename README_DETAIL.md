@@ -36,6 +36,10 @@ Windows/Linux desktops too).
   without the work as context (kept in Explanations and underlined in
   the pages), or a word defined (kept in Words and underlined in the
   pages), with prompts you can edit, using Anthropic or OpenAI models.
+  A passage of any answer can be selected and clarified: the answer
+  opens in a column to its right, level with the passage, which stays
+  marked; clarifications nest, and in a conversation each can be
+  carried on as a thread of its own.
 - **Keyboard first** — rebindable shortcuts for moving between panes, the
   list, and the viewer's modes (Settings → Keyboard Shortcuts).
 - **Your look** — light, dark or system appearance and an adjustable UI font

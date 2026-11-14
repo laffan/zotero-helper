@@ -40,7 +40,7 @@ struct ContinueReadingView: View {
   @ViewBuilder
   private func content(_ pdfs: [RecentPDF]) -> some View {
     if pdfs.isEmpty {
-      EmptyShelf()
+      EmptyShelf(problem: entry.problem)
     } else if family == .systemSmall {
       cell(pdfs[0]).widgetURL(pdfs[0].openURL)
     } else if family == .systemMedium {
@@ -208,14 +208,17 @@ private struct PageCard: View {
   }
 }
 
-/// Nothing read yet.
+/// Nothing read yet — or, with a problem, why there is nothing to show.
 private struct EmptyShelf: View {
+  let problem: ShelfProblem?
+
   var body: some View {
     VStack(alignment: .leading, spacing: 6) {
       Heading()
-      Text("Open a PDF in Zotero Helper and it will be here, at the page you leave it on.")
+      Text(problem?.text ?? "Open a PDF in Zotero Helper and it will be here, at the page you leave it on.")
         .font(.system(size: 12))
         .foregroundColor(.secondary)
+        .minimumScaleFactor(0.8)
     }
   }
 }

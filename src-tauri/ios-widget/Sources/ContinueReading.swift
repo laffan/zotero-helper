@@ -69,11 +69,38 @@ private struct RecentFile: Decodable {
   let entries: [RecentPDF]
 }
 
+/// Why there is nothing to show, when it isn't simply that nothing has
+/// been read: what the empty widget says, so a setup that doesn't work
+/// says where it stops.
+enum ShelfProblem {
+  /// The widget's own signature lacks the app group: it can't see the
+  /// folder the app writes in.
+  case noGroup
+  /// The folder is there but the app has written nothing in it — it
+  /// hasn't run since the widget was added, or it can't reach the group.
+  case nothingWritten
+  /// The app's list is there but can't be read.
+  case unreadable
+
+  var text: String {
+    switch self {
+    case .noGroup:
+      return "The widget can't reach the app's shared folder: its signature lacks the App Groups entitlement."
+    case .nothingWritten:
+      return "Zotero Helper hasn't written anything for the widget yet. Open the app; if this stays, see its log."
+    case .unreadable:
+      return "The app's list of PDFs couldn't be read. Open Zotero Helper to write it again."
+    }
+  }
+}
+
 struct ReadingEntry: TimelineEntry {
   let date: Date
   let pdfs: [RecentPDF]
   /// Each PDF's page, by attKey (the page widget's only).
   let pages: [String: UIImage]
+  /// Why `pdfs` is empty, when it isn't for want of a PDF read.
+  var problem: ShelfProblem? = nil
 
   static let sample = ReadingEntry(
     date: Date(),
@@ -95,12 +122,15 @@ enum Shelf {
   }
 
   static func read(withPages: Bool) -> ReadingEntry {
-    guard
-      let folder = folder,
-      let data = try? Data(contentsOf: folder.appendingPathComponent("recent.json")),
-      let file = try? JSONDecoder().decode(RecentFile.self, from: data)
-    else {
-      return ReadingEntry(date: Date(), pdfs: [], pages: [:])
+    func nothing(_ problem: ShelfProblem) -> ReadingEntry {
+      ReadingEntry(date: Date(), pdfs: [], pages: [:], problem: problem)
+    }
+    guard let folder = folder else { return nothing(.noGroup) }
+    guard let data = try? Data(contentsOf: folder.appendingPathComponent("recent.json")) else {
+      return nothing(.nothingWritten)
+    }
+    guard let file = try? JSONDecoder().decode(RecentFile.self, from: data) else {
+      return nothing(.unreadable)
     }
     let pdfs = Array(file.entries.prefix(3))
     var pages: [String: UIImage] = [:]

@@ -12,7 +12,9 @@
 // picture is sent once; the native side keeps it (tauri-plugin-widget's
 // WidgetPlugin.swift, in the app group the widget reads) until its PDF
 // leaves the three. The list is sent when it changes: a PDF opened, a
-// page turned, a picture drawn.
+// page turned, a picture drawn. What came of it goes to the log, once
+// each time it changes: how many PDFs the widget lists, or why the
+// native side couldn't write them (`report`).
 //
 // The links: a tap on a PDF in the widget opens the app with
 // zoterohelper://open?item=…&att=…&page=…, which the plugin keeps until
@@ -122,15 +124,29 @@ async function send(): Promise<void> {
   const key = JSON.stringify(entries);
   if (key === lastSent && !Object.keys(thumbnails).length) return;
   try {
-    await invoke("plugin:widget|update", { payload: { entries, thumbnails } });
+    const written = await invoke<{ listed: number; folder: string }>("plugin:widget|update", {
+      payload: { entries, thumbnails },
+    });
     lastSent = key;
     for (const k of Object.keys(thumbnails)) {
       const p = pictures.get(k);
       if (p) p.sent = true;
     }
+    report("info", `Widget: ${written.listed} PDF${written.listed === 1 ? "" : "s"} listed, in ${written.folder}`, written.listed);
   } catch (e) {
-    appLog("debug", `Widget: could not update it: ${e}`);
+    report("warn", `Widget: could not update it: ${e}`);
   }
+}
+
+// What the log last said of the widget: said again only when it changes
+// (an update goes with every page turned), so a failure shows once, as
+// does the first update that works and any change in how many it lists.
+let lastReport = "";
+function report(level: "info" | "warn", message: string, listed?: number): void {
+  const said = level === "info" ? `ok ${listed}` : message;
+  if (said === lastReport) return;
+  lastReport = said;
+  appLog(level, message);
 }
 
 let sendTimer = 0;

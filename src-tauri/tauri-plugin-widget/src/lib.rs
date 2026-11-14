@@ -47,25 +47,37 @@ fn remember(url: String) {
     }
 }
 
-#[cfg(target_os = "ios")]
-#[derive(serde::Deserialize)]
-struct Empty {}
+/// What the native side wrote: how many PDFs the widget now lists, and
+/// the folder it wrote them in (the app group's), for the page's log.
+/// It answers with this rather than with nothing: a bare
+/// `invoke.resolve()` reaches Rust as `null`, which no struct decodes
+/// from, so every update that worked read as one that failed.
+#[derive(serde::Deserialize, serde::Serialize, Default)]
+struct Written {
+    listed: usize,
+    folder: String,
+}
 
 /// The widget's PDFs and any new thumbnails, as the page sends them:
 /// `{ entries: [{ itemKey, attKey, title, author, page, pageCount,
 /// openedMs }], thumbnails: { attKey: base64 JPEG } }`.
 #[tauri::command]
-async fn update<R: Runtime>(app: AppHandle<R>, payload: serde_json::Value) -> Result<(), String> {
+async fn update<R: Runtime>(
+    app: AppHandle<R>,
+    payload: serde_json::Value,
+) -> Result<Written, String> {
     #[cfg(target_os = "ios")]
-    {
-        let handle = &app.state::<Widget<R>>().0;
-        handle
-            .run_mobile_plugin::<Empty>("update", payload)
-            .map_err(|e| e.to_string())?;
-    }
+    let written = app
+        .state::<Widget<R>>()
+        .0
+        .run_mobile_plugin::<Written>("update", payload)
+        .map_err(|e| e.to_string())?;
     #[cfg(not(target_os = "ios"))]
-    let _ = (app, payload);
-    Ok(())
+    let written = {
+        let _ = (app, payload);
+        Written::default()
+    };
+    Ok(written)
 }
 
 /// The link the app was last opened with, once.

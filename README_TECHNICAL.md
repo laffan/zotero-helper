@@ -360,6 +360,32 @@ need a paid Apple Developer Program membership (not checked against an
 official statement). None of the native side could be built here (no
 Xcode); the page's side was checked in a browser with the plugin stubbed.
 
+When it shows nothing. Each part says where the chain stops. The app's
+log (the terminal) says, once each time it changes, how many PDFs the
+widget lists and the shared folder they were written in — or why they
+weren't: "The app group … isn't available to the app" means the app's
+own signature lacks the entitlement. (The native side answers `update`
+with `{ listed, folder }`. A bare `invoke.resolve()` reaches Rust as
+`null`, which `run_mobile_plugin` can't decode into a struct, so every
+update used to read as a failure, even one that had worked.) An empty
+widget says which case it is: the normal line when the app has listed
+no PDFs; "hasn't written anything for the widget yet" when the folder
+is there but holds no list (the app hasn't run since, or can't reach
+the group); "can't reach the app's shared folder" when the widget's own
+signature lacks the group; "couldn't be read" for a list it can't
+decode. Whether both signatures carry the group can be seen in the
+built `.ipa`, on the Mac:
+
+```sh
+IPA=$(ls -t src-tauri/gen/apple/build/*/*.ipa | head -n 1)
+rm -rf /tmp/zh-ipa && unzip -q "$IPA" -d /tmp/zh-ipa
+APP="/tmp/zh-ipa/Payload/Zotero Helper.app"
+codesign -d --entitlements - --xml "$APP" | grep -o 'group\.[a-z.]*'
+codesign -d --entitlements - --xml "$APP/PlugIns/ZoteroHelperWidget.appex" | grep -o 'group\.[a-z.]*'
+```
+
+Each should print `group.com.laffan.zoterohelper`.
+
 ### The library
 
 **Bare-bones Zotero browser** — your whole library (metadata only, no

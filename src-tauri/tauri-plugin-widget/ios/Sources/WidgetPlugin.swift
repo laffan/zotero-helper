@@ -17,7 +17,10 @@ import WidgetKit
 // last update. Each thumbnail is kept as `widget/<attKey>.jpg`, the
 // list as `widget/recent.json`; thumbnails of PDFs no longer listed are
 // let go. Then the widgets are drawn again — which, done while the app is
-// in front, doesn't count against WidgetKit's budget of reloads.
+// in front, doesn't count against WidgetKit's budget of reloads. The
+// answer says how many PDFs are listed and where (the page logs it);
+// without the app group (the App Groups entitlement missing from the
+// app's signature) the update is refused, saying so.
 
 let appGroup = "group.com.laffan.zoterohelper"
 
@@ -41,6 +44,12 @@ class WidgetPlugin: Plugin {
     let entries: [Entry]
   }
 
+  /// The answer: what the widget now lists, and the folder it reads.
+  struct Written: Encodable {
+    let listed: Int
+    let folder: String
+  }
+
   /// Zotero's keys are letters and digits: nothing else names a file.
   private func isKey(_ s: String) -> Bool {
     !s.isEmpty && s.allSatisfy { $0.isASCII && ($0.isLetter || $0.isNumber) }
@@ -53,7 +62,9 @@ class WidgetPlugin: Plugin {
         .containerURL(forSecurityApplicationGroupIdentifier: appGroup)?
         .appendingPathComponent("widget", isDirectory: true)
     else {
-      invoke.reject("The app group \(appGroup) isn't available: the App Groups capability is missing")
+      invoke.reject(
+        "The app group \(appGroup) isn't available to the app: its signature lacks the App Groups entitlement (com.apple.security.application-groups)"
+      )
       return
     }
     let files = FileManager.default
@@ -71,7 +82,7 @@ class WidgetPlugin: Plugin {
     let json = try JSONEncoder().encode(RecentFile(entries: entries))
     try json.write(to: dir.appendingPathComponent("recent.json"), options: .atomic)
     WidgetCenter.shared.reloadAllTimelines()
-    invoke.resolve()
+    invoke.resolve(Written(listed: entries.count, folder: dir.path))
   }
 }
 

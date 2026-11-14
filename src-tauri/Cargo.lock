@@ -3847,6 +3847,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "tauri-plugin-widget"
+version = "0.1.0"
+dependencies = [
+ "objc2",
+ "serde",
+ "serde_json",
+ "tauri",
+ "tauri-plugin",
+]
+
+[[package]]
 name = "tauri-runtime"
 version = "2.12.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5349,6 +5360,7 @@ dependencies = [
  "tauri-plugin-pencil",
  "tauri-plugin-share-sheet",
  "tauri-plugin-status-bar",
+ "tauri-plugin-widget",
  "thiserror 2.0.19",
  "tokio",
 ]

@@ -589,7 +589,7 @@ async fn close_capture_window(app: AppHandle, job_id: String) -> Result<()> {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    tauri::Builder::default()
+    let app = tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_capture_view::init())
@@ -597,6 +597,7 @@ pub fn run() {
         .plugin(tauri_plugin_keyboard_focus::init())
         .plugin(tauri_plugin_pencil::init())
         .plugin(tauri_plugin_status_bar::init())
+        .plugin(tauri_plugin_widget::init())
         .setup(|app| {
             let data_dir = app
                 .path()
@@ -683,6 +684,9 @@ pub fn run() {
             storage::storage_report,
             storage::clear_thumbnails,
         ])
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .build(tauri::generate_context!())
+        .expect("error while building tauri application");
+    // A link from the home-screen widget that launches the app.
+    tauri_plugin_widget::catch_launch_url();
+    app.run(|_, _| {});
 }

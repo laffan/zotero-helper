@@ -192,6 +192,13 @@ export function readerExtractPages(attKey: string, indices: number[]): Promise<U
   return active?.attKey === attKey ? active.viewer.extractPages(indices) : Promise.resolve(null);
 }
 
+/** Page `pageIndex` of `attKey`, when it is open, `width` pixels wide
+ *  with its highlights and ink: the home-screen widget's picture of it
+ *  (lib/widget.ts). Base64 JPEG. */
+export function readerPageImage(attKey: string, pageIndex: number, width: number): Promise<string | null> {
+  return active?.attKey === attKey ? active.viewer.pageImage(pageIndex, width) : Promise.resolve(null);
+}
+
 /** A region of a page of the open PDF as an image (the notepad's clip). */
 export function readerClipImage(pageIndex: number, box: [number, number, number, number]) {
   return active ? active.viewer.clipImage(pageIndex, box) : Promise.resolve(null);

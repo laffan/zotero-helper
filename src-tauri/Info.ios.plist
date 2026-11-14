@@ -33,6 +33,22 @@
   -->
   <key>UIApplicationSupportsIndirectInputEvents</key>
   <true/>
+  <!--
+    The app's own links, zoterohelper://open?item=…&att=…&page=…, which
+    the Continue Reading widget (src-tauri/ios-widget/) opens it with:
+    tauri-plugin-widget hands them to the page.
+  -->
+  <key>CFBundleURLTypes</key>
+  <array>
+    <dict>
+      <key>CFBundleURLName</key>
+      <string>com.laffan.zoterohelper</string>
+      <key>CFBundleURLSchemes</key>
+      <array>
+        <string>zoterohelper</string>
+      </array>
+    </dict>
+  </array>
   <key>UIApplicationSceneManifest</key>
   <dict>
     <key>UIApplicationSupportsMultipleScenes</key>

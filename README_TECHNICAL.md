@@ -109,6 +109,8 @@ src/            React + TypeScript UI (Vite, zustand, MiniSearch)
   lib/statusBar.ts
                 asking tauri-plugin-status-bar, at boot, whether the
                 status bar is hidden (the `status-bar-hidden` class)
+  lib/widget.ts the iOS home-screen widget's PDFs and page pictures,
+                sent to tauri-plugin-widget; the links it opens with
   components/   toolbar, sidebar, virtualized item list, metadata panel
                 and its tabs (Highlights, Notes — NotesPrompts is an
                 empty note's reading questions), reader pane (and
@@ -221,12 +223,16 @@ src-tauri/      Rust core (all networking + state)
   src/capture.rs   desktop capture-browser window (download interception)
   tauri-plugin-capture-view/, tauri-plugin-share-sheet/,
   tauri-plugin-keyboard-focus/, tauri-plugin-pencil/,
-  tauri-plugin-status-bar/
+  tauri-plugin-status-bar/, tauri-plugin-widget/
                    the app's own iOS plugins: the capture browser's
                    WKWebView, the share sheet, handing the web view
                    the hardware keyboard (first responder), the
-                   Apple Pencil's double-tap / squeeze, and the app
-                   full screen (the status bar hidden)
+                   Apple Pencil's double-tap / squeeze, the app
+                   full screen (the status bar hidden), and the
+                   home-screen widget's data and links
+  ios-widget/      the Continue Reading widgets (WidgetKit, SwiftUI),
+                   an app extension added to the generated Xcode
+                   project by scripts/ios-widget.mjs
   Info.ios.plist   keys merged into the generated iOS Info.plist
 ```
 
@@ -283,6 +289,76 @@ it changes and once more when the page asks at boot
 (`lib/statusBar.ts`); `base.css`, `readingmode.css` and `notepad.css`
 keep the band only under `.ipados:not(.status-bar-hidden)`. Off the iPad
 nothing changes.
+
+### Continue Reading: the home-screen widget (iOS)
+
+Two widgets for the iPad's (and iPhone's) home screen that pick up
+where the reader left off, each in three sizes — small: the PDF read
+last; medium: the last two, side by side; large: the last three,
+stacked (`src-tauri/ios-widget/`). **Continue Reading** shows each as
+text: its title, author and the page it was left on ("p. 12 of 30"),
+with a bar for how far through that is. **Continue Reading — Page**
+shows the page itself, as the app last drew it, the reader's highlights
+and ink on it: a card of the page with the title and page over its foot
+(small, medium), or the page beside the title, author and page (large).
+A tap opens the app on that PDF at that page — anywhere on a small
+widget, each PDF's own part of a larger one. Until something has been
+read, a line says so.
+
+Where the data comes from. A widget runs apart from the app and can't
+ask it anything, so the app writes what the widgets show into an app
+group both belong to (`group.com.laffan.zoterohelper`), and has them
+drawn again (`WidgetCenter.reloadAllTimelines`, which doesn't count
+against WidgetKit's budget while the app is in front). The page decides
+what (`lib/widget.ts`): Recent's first three PDFs still in the library,
+each with its title, creator summary, the page it was left on, and its
+page count once it has been open here (kept on this device,
+`zh-widget-page-counts`); and a picture of the open PDF's page, drawn
+afresh from the PDF 480px wide with the highlights and ink painted in
+(`pageImage` in `pdfviewer/excerpt.ts`), once a page has been read for
+4s with the pen at rest, after a highlight or drawing changes the
+library, and as the app goes to the background — the last chance to
+show the page it is left on. Each picture is sent once, the list
+whenever it changes. `tauri-plugin-widget` (its Swift side) writes them
+as `widget/recent.json` and `widget/<attKey>.jpg` in the group's folder,
+letting go of the pictures of PDFs no longer among the three; the
+widgets read them when WidgetKit asks (a timeline of one entry, never
+refreshed by itself). In the browser and off iOS none of this runs.
+
+The links. The widget opens `zoterohelper://open?item=…&att=…&page=…`
+(the scheme is in `Info.ios.plist`'s `CFBundleURLTypes`); the plugin
+keeps the last one until the page takes it (`take_open_url`) and says
+when one came (the `open-url` event); the page opens that PDF at that
+page (`openReaderAt`), waiting for the library if it hasn't loaded.
+A link that reaches the running app comes as tao's `Opened` event. A
+link that launches the app doesn't: under the scene lifecycle it comes
+in the new scene's connection options, which tao (0.37) reads nothing
+from. So `catch_launch_url`, called in `lib.rs` between building the app
+and running it — after tao has declared its `AppDelegate`, before UIKit
+asks it anything — wraps that delegate's
+`application:configurationForConnectingSceneSession:options:`, which
+UIKit calls with the same options before the scene connects: the links
+are kept, then tao's own answer is given (`objc2`, in the plugin's
+`launch` module).
+
+Setting it up. The extension is a target of its own in the Xcode
+project, which Tauri generates (`tauri ios init`) and the repository
+doesn't keep, so `scripts/ios-widget.mjs` (`npm run ios:widget`) adds it
+to the generated XcodeGen spec (`gen/apple/project.yml`) and makes the
+project again with XcodeGen: the `ZoteroHelperWidget` app extension
+(`<identifier>.widget`, iOS 15, built from `ios-widget/Sources`, its
+Info.plist and entitlements made by XcodeGen), the app embedding it, and
+the app group in both targets' entitlements. Making the project again
+would drop a signing team chosen in Xcode, so the script writes the
+team into the spec for both targets — `APPLE_DEVELOPMENT_TEAM`,
+tauri.conf.json's `bundle > iOS > developmentTeam`, or the one the
+project already had. `npm run ios:build` and `npm run ios:deploy` run it
+whenever the spec lacks the widget (after a fresh `tauri ios init`,
+which writes the spec anew). Signing needs the App Groups capability for
+the team, which automatic signing registers; this is generally said to
+need a paid Apple Developer Program membership (not checked against an
+official statement). None of the native side could be built here (no
+Xcode); the page's side was checked in a browser with the plugin stubbed.
 
 ### The library
 
@@ -2051,6 +2127,13 @@ the app's WebKit targets have it, but a test browser may need a polyfill.
 
   Keep `rust-toolchain.toml`: swift-rs still needs `llvm-tools` to build
   for iOS with Xcode 27.
+- The Continue Reading widget is an app extension added to the generated
+  project by `npm run ios:widget` (see Continue Reading, above), which
+  the build scripts run when it is missing; it needs XcodeGen (as
+  `tauri ios init` does) and the App Groups capability for the signing
+  team. If a build reports the app group missing from a provisioning
+  profile, open the project in Xcode once and let it register the group
+  (Signing & Capabilities, both targets).
 - Trackpad scrolling (Magic Keyboard) needs two keys in
   `src-tauri/Info.ios.plist`, as in Snorkle, where the same fault was
   found: in landscape, two-finger scrolls reached the web view turned a

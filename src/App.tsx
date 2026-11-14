@@ -17,6 +17,7 @@ import { MetadataPanel } from "./components/MetadataPanel";
 import { PdfRescueModal } from "./components/PdfRescueModal";
 import { ReaderPane } from "./components/ReaderPane";
 import { WordList } from "./components/WordList";
+import { startWidget } from "./lib/widget";
 import { WORDS } from "./lib/words";
 import { ReadingModeExit } from "./components/ReadingModeExit";
 import { SendToHushModal } from "./components/SendToHushModal";
@@ -66,7 +67,8 @@ export default function App() {
   const kbdPane = usePane((s) => (s.shown ? s.pane : undefined));
 
   useEffect(() => {
-    void bootstrap();
+    // The home-screen widget, once the library it names is loaded (iOS).
+    void bootstrap().then(startWidget);
     installShortcuts();
     installHoverFocus();
   }, []);

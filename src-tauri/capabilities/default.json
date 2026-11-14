@@ -10,6 +10,7 @@
     "opener:default",
     "capture-view:default",
     "pencil:default",
-    "status-bar:default"
+    "status-bar:default",
+    "widget:default"
   ]
 }

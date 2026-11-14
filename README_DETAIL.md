@@ -42,6 +42,9 @@ Windows/Linux desktops too).
   size (Settings → General).
 - **Full screen on iPad** — the status bar is hidden while the app fills
   the screen.
+- **Continue Reading widgets (iOS)** — home-screen widgets with the PDFs
+  read last and the page each was left on, as text or as the page itself
+  (highlights and ink included); a tap opens the PDF there.
 
 The full feature breakdown, architecture and contributor rules are in
 [README_TECHNICAL.md](README_TECHNICAL.md).
@@ -82,6 +85,9 @@ npm run ios:deploy       # build a signed .ipa AND install+launch it on a
                          # connected iPad/iPhone via ios-deploy
 npm run ios:build        # build only (development signing), no deploy
 npm run tauri ios build  # archive for TestFlight/App Store
+npm run ios:widget       # add the Continue Reading widget to the Xcode
+                         # project (ios:build and ios:deploy do it when
+                         # it is missing, e.g. after `tauri ios init`)
 ```
 
 `npm run ios:deploy` (see `scripts/ios-deploy.sh`) accepts, after `--`:

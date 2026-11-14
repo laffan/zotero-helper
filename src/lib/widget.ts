@@ -1,0 +1,209 @@
+// The iOS home-screen widget, Continue Reading (src-tauri/ios-widget/),
+// from the page's side: what it shows, and the links it opens the app
+// with. Only in the app on iOS; elsewhere `startWidget` does nothing.
+//
+// What it shows: the three PDFs opened last (Recent's first three that
+// are still in the library), each with its title, author, the page it
+// was left on and — once read here — its page count; and a picture of
+// each one's page, the reader's highlights and ink on it, drawn from the
+// open PDF (`readerPageImage`) once a page has been read a moment
+// (SETTLE_MS, and the pen at rest), and again as the app goes to the
+// background, the last chance to show the page it is left on. Each
+// picture is sent once; the native side keeps it (tauri-plugin-widget's
+// WidgetPlugin.swift, in the app group the widget reads) until its PDF
+// leaves the three. The list is sent when it changes: a PDF opened, a
+// page turned, a picture drawn.
+//
+// The links: a tap on a PDF in the widget opens the app with
+// zoterohelper://open?item=…&att=…&page=…, which the plugin keeps until
+// it is taken here — at once on starting (the link that launched the
+// app) and whenever the plugin says one came (`open-url`) — and the PDF
+// opens at that page, as from Recent.
+import { openReaderAt, readerPageCount, readerPageImage } from "../components/ReaderPane";
+import { creatorSummary, itemTitle } from "./collections";
+import { whenPenRested, WRITING_PAUSE_MS } from "./penActivity";
+import { lastPage, useRecent } from "./recent";
+import { appLog, useStore } from "./store";
+import { invoke, isTauri, on } from "./tauri";
+
+/** How many PDFs the largest widget shows. */
+const SHOWN = 3;
+/** How long a page is read before it is pictured, ms. */
+const SETTLE_MS = 4000;
+/** The picture's width, px: a medium widget's half at 3×. */
+const PICTURE_PX = 480;
+/** Each PDF's page count, once read here (the widget's "of 30"). */
+const COUNTS_KEY = "zh-widget-page-counts";
+
+interface WidgetPdf {
+  itemKey: string;
+  attKey: string;
+  title: string;
+  author: string;
+  page: number;
+  pageCount: number | null;
+  openedMs: number;
+}
+
+const onIos = () => isTauri && navigator.maxTouchPoints > 1 && /iPad|iPhone|Mac/.test(navigator.userAgent);
+
+function counts(): Record<string, number> {
+  try {
+    return JSON.parse(localStorage.getItem(COUNTS_KEY) ?? "{}") as Record<string, number>;
+  } catch {
+    return {};
+  }
+}
+
+function keepCount(attKey: string, n: number): void {
+  const all = counts();
+  if (all[attKey] === n) return;
+  all[attKey] = n;
+  try {
+    localStorage.setItem(COUNTS_KEY, JSON.stringify(all));
+  } catch {
+    /* storage unavailable: the widget goes without the count */
+  }
+}
+
+/** The PDFs to show, newest first. */
+function shelf(): WidgetPdf[] {
+  const items = useStore.getState().library.items;
+  const known = counts();
+  const out: WidgetPdf[] = [];
+  for (const r of useRecent.getState().opened) {
+    const item = items.find((i) => i.key === r.itemKey);
+    if (!item || !items.some((i) => i.key === r.attKey)) continue;
+    const pageCount = readerPageCount(r.attKey);
+    if (pageCount) keepCount(r.attKey, pageCount);
+    out.push({
+      itemKey: r.itemKey,
+      attKey: r.attKey,
+      title: itemTitle(item),
+      author: creatorSummary(item),
+      page: lastPage(r.attKey) ?? 1,
+      pageCount: pageCount ?? known[r.attKey] ?? null,
+      openedMs: r.ms,
+    });
+    if (out.length === SHOWN) break;
+  }
+  return out;
+}
+
+// Each PDF's picture: of which page, drawn from which library (a new
+// highlight is a new library), and whether the widget has it yet.
+const pictures = new Map<string, { page: number; library: object; data: string; sent: boolean }>();
+let lastSent = "";
+
+/** Picture the page of the PDF open, unless it is pictured as it is. */
+async function picture(): Promise<void> {
+  const st = useStore.getState();
+  const attKey = st.reading?.attKey;
+  if (!attKey) return;
+  const page = lastPage(attKey);
+  const had = pictures.get(attKey);
+  if (!page || (had && had.page === page && had.library === st.library)) return;
+  try {
+    const data = await readerPageImage(attKey, page - 1, PICTURE_PX);
+    if (data) pictures.set(attKey, { page, library: st.library, data, sent: false });
+  } catch (e) {
+    appLog("debug", `Widget: the page could not be pictured: ${e}`);
+  }
+}
+
+/** Send the shelf, and any picture the widget hasn't had. */
+async function send(): Promise<void> {
+  const entries = shelf();
+  const thumbnails: Record<string, string> = {};
+  for (const e of entries) {
+    const p = pictures.get(e.attKey);
+    if (p && !p.sent) thumbnails[e.attKey] = p.data;
+  }
+  const key = JSON.stringify(entries);
+  if (key === lastSent && !Object.keys(thumbnails).length) return;
+  try {
+    await invoke("plugin:widget|update", { payload: { entries, thumbnails } });
+    lastSent = key;
+    for (const k of Object.keys(thumbnails)) {
+      const p = pictures.get(k);
+      if (p) p.sent = true;
+    }
+  } catch (e) {
+    appLog("debug", `Widget: could not update it: ${e}`);
+  }
+}
+
+let sendTimer = 0;
+const sendSoon = (ms = 800) => {
+  window.clearTimeout(sendTimer);
+  sendTimer = window.setTimeout(() => void send(), ms);
+};
+
+// A page read a moment, the pen at rest: pictured, then sent.
+let settleTimer = 0;
+let waitPen: (() => void) | null = null;
+function pictureSoon(): void {
+  window.clearTimeout(settleTimer);
+  waitPen?.();
+  settleTimer = window.setTimeout(() => {
+    waitPen = whenPenRested(WRITING_PAUSE_MS, () => void picture().then(() => send()));
+  }, SETTLE_MS);
+}
+
+/** Once the library has loaded: a link may come before it does. */
+function libraryLoaded(): Promise<void> {
+  if (useStore.getState().library.items.length) return Promise.resolve();
+  return new Promise((resolve) => {
+    const off = useStore.subscribe((s) => {
+      if (!s.library.items.length) return;
+      off();
+      resolve();
+    });
+  });
+}
+
+/** The link the app was opened with, if any: its PDF, at its page. */
+async function openLink(): Promise<void> {
+  const url = await invoke<string | null>("plugin:widget|take_open_url").catch(() => null);
+  if (!url) return;
+  await libraryLoaded();
+  try {
+    const u = new URL(url);
+    const item = u.searchParams.get("item");
+    const att = u.searchParams.get("att");
+    const page = Number(u.searchParams.get("page")) || 1;
+    if (u.host !== "open" || !item || !att) return;
+    if (!useStore.getState().library.items.some((i) => i.key === att)) return;
+    appLog("info", `Widget: opening ${att} at p. ${page}`);
+    openReaderAt(item, att, page);
+  } catch (e) {
+    appLog("debug", `Widget: not a link to open (${url}): ${e}`);
+  }
+}
+
+let started = false;
+
+/** As the app starts (after bootstrap); once. */
+export function startWidget(): void {
+  if (started || !onIos()) return;
+  started = true;
+  void openLink();
+  void on("open-url", () => void openLink());
+  useRecent.subscribe((s, prev) => {
+    if (s.opened !== prev.opened) sendSoon();
+    if (s.pages !== prev.pages) {
+      sendSoon();
+      pictureSoon();
+    }
+  });
+  // A highlight or a drawing made: the page is pictured again.
+  useStore.subscribe((s, prev) => {
+    if (s.library !== prev.library && s.reading?.attKey) pictureSoon();
+  });
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState !== "hidden") return;
+    window.clearTimeout(settleTimer);
+    void picture().then(() => send());
+  });
+  sendSoon(0);
+}

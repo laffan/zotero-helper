@@ -4,6 +4,8 @@
 # One-time prerequisites (not handled here):
 #   npm run tauri ios init          # generates src-tauri/gen/apple
 #   open the Xcode project once and configure your signing team
+# The Continue Reading widget's target is added to that project here,
+# when it isn't there yet (scripts/ios-widget.mjs, npm run ios:widget).
 #   brew install ios-deploy         # (or: npm install -g ios-deploy)
 #
 # Usage:
@@ -69,6 +71,8 @@ if [[ $BUILD -eq 1 ]]; then
   # in step (near-instant no-op when nothing changed).
   echo "▸ npm install"
   npm install --no-audit --no-fund
+  # The widget's target, after a fresh 'tauri ios init' (a no-op once in).
+  node scripts/ios-widget.mjs --if-needed
   echo "▸ building (tauri ios build --export-method $EXPORT_METHOD)"
   npx --no-install tauri ios build --export-method "$EXPORT_METHOD"
 fi

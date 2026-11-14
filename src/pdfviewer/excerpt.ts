@@ -9,7 +9,8 @@
 // of its own — the page's raster on screen may be stretched, stale or
 // not drawn at all — with the reader's highlights painted in, as on the
 // pages; and a second time as dark pages draw it (darkPages.ts), for a
-// clip pinned in the dark theme.
+// clip pinned in the dark theme. And a whole page, small, as the iOS
+// home-screen widget shows it (lib/widget.ts), drawn the same way.
 import type { Annotation } from "../lib/highlights";
 import { darkPagesCopy } from "./darkPages";
 import { drawAnnotations } from "./paint";
@@ -84,5 +85,28 @@ export function createExcerpts(env: ExcerptEnv) {
     }
   }
 
-  return { extractPages, clipImage };
+  /** Page `pageIndex` `width` pixels wide, the reader's highlights and
+   *  ink painted in, as a JPEG in base64 (no data-URL prefix). */
+  async function pageImage(pageIndex: number, width: number): Promise<string | null> {
+    const doc = env.getPdfDoc();
+    const p = env.getPages()[pageIndex];
+    if (!doc || !p) return null;
+    const page = await doc.getPage(pageIndex + 1);
+    const norm = p.norm ?? 1;
+    const viewport = page.getViewport({ scale: (norm * width) / page.getViewport({ scale: norm }).width });
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.round(viewport.width);
+    canvas.height = Math.round(viewport.height);
+    try {
+      await page.render({ canvas, viewport, background: "#ffffff" }).promise;
+      const ctx = canvas.getContext("2d");
+      if (ctx) drawAnnotations(ctx, viewport, env.getAnnotations(), pageIndex);
+      const url = canvas.toDataURL("image/jpeg", 0.82);
+      return url.slice(url.indexOf(",") + 1);
+    } finally {
+      canvas.width = canvas.height = 0;
+    }
+  }
+
+  return { extractPages, clipImage, pageImage };
 }

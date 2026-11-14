@@ -1,9 +1,10 @@
 // The right panel's conversations tab (shown with an AI service
 // connected): the AI conversations about this entry alone, newest
-// first, and the two ways to start one — Ask Abstract, and Ask PDF,
-// which asks about the whole PDF, a section of it or a run of its pages
-// (AskPdf.tsx; with no PDF on record it goes straight to the popup
-// that offers to find one). Above them, the conversations
+// first, under Ask About, the one way to start one — a dropdown of what
+// to ask about: the abstract, or the whole PDF, a section of it, a run
+// of its pages or the pages in view (AskAbout.tsx; with no PDF on
+// record, the full text goes to the popup that offers to find one).
+// Above the list, the conversations
 // it was only part of (a selection or a folder asked about) are listed
 // as links, which open in Questions, the main conversations window.
 // The passages the reader has had explained (lib/ai/explain.ts) are
@@ -13,18 +14,18 @@
 // the way back above it), to be read beside the PDF; one started from
 // here with the PDF open opens here too (confirmAsk), and so does any
 // conversation whose citation opened the PDF (ChatPanel's eye).
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { startAsk } from "../lib/ai/chat";
 import { askTargetFor } from "../lib/ai/context";
 import { pdfAttachmentOf } from "../lib/collections";
 import { closeReader } from "../lib/notes";
 import { QUESTIONS, useStore } from "../lib/store";
-import type { Chat, PageSpan, ZItem } from "../lib/types";
-import { AskPdf } from "./AskPdf";
+import type { AskDepth, Chat, PageSpan, ZItem } from "../lib/types";
+import { AskAbout } from "./AskAbout";
 import { ChatPanel } from "./ChatPanel";
 import { ChatRow } from "./ChatList";
 import { ExplanationCard, isExplanation } from "./ExplanationList";
-import { ArrowLeftIcon, ChatIcon, PdfIcon, QuestionIcon, Sparkles } from "./Icons";
+import { ArrowLeftIcon, ChatIcon, QuestionIcon } from "./Icons";
 
 /** A conversation about this entry alone (not a selection or folder). */
 export const isAbout = (c: Chat, itemKey: string) =>
@@ -43,7 +44,6 @@ export function ItemChats({ item }: { item: ZItem }) {
   const selectedChatId = useStore((s) => s.selectedChatId);
   const askPreparing = useStore((s) => s.askPreparing);
   const pdf = useStore((s) => pdfAttachmentOf(s.library.items, item.key));
-  const [choosing, setChoosing] = useState(false);
   const mine = useMemo(() => allChats.filter((c) => isAbout(c, item.key)), [allChats, item.key]);
   const own = mine.filter((c) => !isExplanation(c));
   const explained = mine.filter(isExplanation);
@@ -69,30 +69,15 @@ export function ItemChats({ item }: { item: ZItem }) {
     );
   }
 
-  const ask = (depth: "abstracts" | "full", pages?: PageSpan) => {
+  const ask = (depth: AskDepth, pages?: PageSpan) => {
     const s = useStore.getState();
     const target = askTargetFor(s.library.items, s.library.collections, s.selectedCollection, [item.key]);
-    setChoosing(false);
     void startAsk(target, depth, pages);
   };
 
   return (
     <div className="item-chats">
-      <div className="item-chats-start">
-        <button className="meta-tab-action" disabled={askPreparing} onClick={() => ask("abstracts")}>
-          <Sparkles size={12} /> Ask Abstract
-        </button>
-        <button
-          className={`meta-tab-action ${choosing ? "active" : ""}`}
-          disabled={askPreparing}
-          onClick={() => (pdf ? setChoosing(!choosing) : ask("full"))}
-        >
-          <PdfIcon size={12} /> Ask PDF
-        </button>
-      </div>
-      {choosing && pdf && (
-        <AskPdf attKey={pdf.key} disabled={askPreparing} onAsk={(pages) => ask("full", pages)} onClose={() => setChoosing(false)} />
-      )}
+      <AskAbout key={pdf?.key ?? "none"} attKey={pdf?.key ?? null} disabled={askPreparing} onAsk={ask} />
       {shared.length > 0 && (
         <div className="item-chats-shared">
           <div className="item-chats-shared-head">Also part of</div>

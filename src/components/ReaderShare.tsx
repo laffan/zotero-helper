@@ -4,8 +4,9 @@
 // — or else the page at the view's centre; `pagesInView` in
 // pdfviewer/places.ts), a run of pages, or — when the PDF has an outline
 // that points into its pages — one of its sections.
-// Pages and Section unfold, in the menu, the same dropdowns Ask PDF's
-// chooser uses (PdfParts.tsx), and a Share link under them.
+// Pages and Section unfold, in the menu, the same dropdowns Ask About
+// uses (PdfParts.tsx), and a Share link under them. The visible pages
+// are kept as the pages come to rest (`useReaderVisiblePages`).
 //
 // The pages are cut out of the open document by pdf.js
 // (pdfviewer/excerpt.ts), so the text stays text, and handed to the
@@ -18,7 +19,7 @@ import { pdfBaseName, sharePdfData } from "../lib/share";
 import { appLog, useStore, type ReadingState } from "../lib/store";
 import { ArrowRightIcon } from "./Icons";
 import { PageRangeSelect, pagesLabel, SectionSelect, sectionIndexAt, useSectionSpans } from "./PdfParts";
-import { readerExtractPages, readerVisiblePages } from "./ReaderPane";
+import { readerExtractPages, readerVisiblePages, useReaderVisiblePages } from "./ReaderPane";
 
 type Anchor = { x: number; y: number };
 
@@ -49,7 +50,8 @@ export function ReaderShareItems({ reading, done }: Props) {
   const spans = useSectionSpans(shape);
   const total = shape?.pages ?? 0;
   const here = readerPageNow() || 1;
-  const visible = readerVisiblePages(attKey);
+  // Kept as the pages come to rest, should they scroll under the menu.
+  const visible = useReaderVisiblePages(attKey || null);
   const [open, setOpen] = useState<"pages" | "section" | null>(null);
   const [pick, setPick] = useState<number | null>(null);
   const section = spans[pick ?? sectionIndexAt(spans, here)];

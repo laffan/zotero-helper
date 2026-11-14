@@ -29,7 +29,7 @@ import {
 } from "../lib/highlights";
 import { addBookmark, bookmarksOf, removeBookmark, renameBookmark, useBookmarks } from "../lib/bookmarks";
 import { insertIntoNotes, readItem } from "../lib/notes";
-import { setOutline, setPageCount, setReaderPage, useOutline } from "../lib/outline";
+import { setOutline, setPageCount, setReaderPage, useOutline, useReaderPage } from "../lib/outline";
 import { flushSavedPage, lastPage, lastView, savePage } from "../lib/recent";
 import { appLog, useStore, type MetaTab } from "../lib/store";
 import { invoke } from "../lib/tauri";
@@ -149,6 +149,41 @@ export function currentReaderPage(attKey: string): number | null {
  *  open: Visible pages, to share or ask about. */
 export function readerVisiblePages(attKey: string): [number, number] | null {
   return active?.attKey === attKey && active.viewer.getPageCount() ? active.viewer.visiblePages() : null;
+}
+
+/** How long the pages rest after a scroll before they are measured. */
+const VISIBLE_SETTLE_MS = 150;
+
+/** The visible pages of `attKey`, kept as the pages move: measured again
+ *  once a scroll of the pages (a swipe, its momentum, a smooth scroll to
+ *  a page) or a resize has come to rest — not as the page number turns,
+ *  which happens mid-scroll, while only one page may be whole. */
+export function useReaderVisiblePages(attKey: string | null): [number, number] | null {
+  const [pages, setPages] = useState(() => (attKey ? readerVisiblePages(attKey) : null));
+  const page = useReaderPage();
+  useEffect(() => {
+    if (!attKey) return setPages(null);
+    let timer = 0;
+    const measure = () => {
+      const now = readerVisiblePages(attKey);
+      setPages((old) => (old && now && old[0] === now[0] && old[1] === now[1] ? old : now));
+    };
+    // Scrolls don't bubble; the scroll area's are caught on the way down.
+    const soon = (e: Event) => {
+      if (e.type === "scroll" && !(e.target as Element).classList?.contains("pdf-scroll-area")) return;
+      window.clearTimeout(timer);
+      timer = window.setTimeout(measure, VISIBLE_SETTLE_MS);
+    };
+    measure();
+    document.addEventListener("scroll", soon, true);
+    window.addEventListener("resize", soon);
+    return () => {
+      window.clearTimeout(timer);
+      document.removeEventListener("scroll", soon, true);
+      window.removeEventListener("resize", soon);
+    };
+  }, [attKey, page]);
+  return pages;
 }
 
 /** Pages of `attKey` (0-based) as a PDF of their own, when it is open

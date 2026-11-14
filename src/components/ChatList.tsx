@@ -1,17 +1,19 @@
-// The Questions folder's main-area list. One row per conversation:
-// what the model called it, when it started, and what it was about —
-// the three things you need to find a conversation again a week later.
+// The Questions folder's main-area list. One row per conversation: what
+// the model called it and what it was about — what you need to find a
+// conversation again a week later. When it started, its model, its size
+// and what it cost are at the head of the conversation (ChatPanel.tsx).
 import { useMemo } from "react";
 import { removeChat } from "../lib/ai/chat";
 import { depthLabel } from "../lib/ai/context";
-import { formatTokens, formatUsd, modelLabel } from "../lib/ai/models";
+import { formatUsd } from "../lib/ai/models";
 import { useStore } from "../lib/store";
 import type { Chat } from "../lib/types";
 import { isExplanation } from "./ExplanationList";
 import { ChatIcon, QuestionIcon, TrashIcon } from "./Icons";
 import { WorkTitles } from "./WorkTitles";
 
-function started(ms: number): string {
+/** When a conversation began: "Today 9:41am", "Nov 3, 2026 9:41am". */
+export function started(ms: number): string {
   const d = new Date(ms);
   const today = new Date();
   const sameDay = d.toDateString() === today.toDateString();
@@ -37,7 +39,6 @@ function contextLine(chat: Chat): string {
  *  (ItemChats). */
 export function ChatRow({ chat, selected }: { chat: Chat; selected: boolean }) {
   const selectChat = useStore((s) => s.selectChat);
-  const turns = chat.messages.filter((m) => m.role === "user").length;
 
   return (
     <div
@@ -54,14 +55,6 @@ export function ChatRow({ chat, selected }: { chat: Chat; selected: boolean }) {
           {contextLine(chat)}
         </div>
         <WorkTitles source={chat.source} />
-      </div>
-      <div className="chat-row-meta">
-        <span>{started(chat.createdMs)}</span>
-        <span>
-          {turns} question{turns === 1 ? "" : "s"} ·{" "}
-          {formatTokens(chat.contextTokens)} · {formatUsd(chat.costUsd)}
-        </span>
-        <span className="chat-row-model">{modelLabel(chat.model)}</span>
       </div>
       <button
         className="icon-btn chat-row-delete"

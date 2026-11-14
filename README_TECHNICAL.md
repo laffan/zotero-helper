@@ -117,8 +117,8 @@ src/            React + TypeScript UI (Vite, zustand, MiniSearch)
                 ExplanationList, the explanations as boxes, and the
                 sidebar's Explanations;
                 NotepadBody, a view of the notepad, and ReadingNotepad,
-                its floating or edge-docked window; AskPdf, Ask PDF's
-                chooser; ReaderShare, the Share menu's parts of the open
+                its floating or edge-docked window; AskAbout, the
+                conversations tab's way to start one; ReaderShare, the Share menu's parts of the open
                 PDF; PdfParts, the dropdowns both pick a section or pages
                 with), WordList (Words), terminal, import/rescue modals
   notepad/      the notepad: model (notes, links, storage, the pad
@@ -489,7 +489,7 @@ the viewer's `visiblePages`); a reading crop counts only what it
 leaves of a page, and when no page is whole (zoomed in, a page taller
 than the view) it is the page at the view's centre. They are measured
 again as the entry is pressed. Pages and Section unfold, in the menu,
-the dropdowns Ask PDF's chooser uses (`PdfParts.tsx`): a first and a
+the dropdowns Ask About uses (`PdfParts.tsx`): a first and a
 last page (the visible pages to begin with), or a section with its pages,
 and a Share link under them. The pages are cut out of the open document
 by pdf.js's `extractPages` (`pdfviewer/excerpt.ts`), so the text stays
@@ -1316,30 +1316,37 @@ remembered visit to Questions opens All Items instead.
 **The conversations tab.** With a service connected, one entry in the
 right panel gets a fourth tab (the conversation icon, with a count; Q
 from the keyboard): the Questions conversations about that entry alone
-(`isAbout`), newest first, with Ask Abstract / Ask PDF to start
-one (`ItemChats.tsx`). Ask PDF opens a small chooser beneath the
-buttons (`AskPdf.tsx`), headed Ask About, in two tiers of dropdowns:
-the first says what to ask about — Full text, Section, Pages or (with
-the PDF open) Visible pages, as the Share menu counts them (see
-Sharing) — and the second, beside it,
-says which, when that needs saying: a section of the outline (its
-headings that point into the pages, each with its pages, running to
-where the next heading at its level or above begins — `sectionSpans`
-in `lib/outline.ts`; Section is left out when the PDF has no outline,
-or one that resolves to no pages), or a first and a last page. Under
-them, one link — "Begin conversation with “Methods”" — starts it. The
-dropdowns are `PdfParts.tsx`'s, which the reader's Share menu uses too.
-The PDF's outline and page count are read as the
-chooser opens (the open PDF's come from the viewer; any other is read
-from the device, downloaded first if need be, as asking would). A part
+(`isAbout`), newest first (`ItemChats.tsx`), under **Ask About**,
+the one way to start one (`AskAbout.tsx`): two tiers of dropdowns, the
+first saying what to ask about — Abstract, Full text, Section, Pages
+or (with the PDF open) Visible pages, as the Share menu counts them
+(see Sharing), kept as the pages come to rest after a scroll
+(`useReaderVisiblePages` in `ReaderPane.tsx`, which measures again
+150ms after the scroll area's last scroll event, or a resize) — and
+the second, beside it, saying which, when that needs saying: a section
+of the outline (its headings that point into the pages, each with its
+pages, running to where the next heading at its level or above begins
+— `sectionSpans` in `lib/outline.ts`), or a first and a last page.
+Under them, one link — "Begin conversation with “Methods”" — starts
+it. The dropdowns are `PdfParts.tsx`'s, which the reader's Share menu
+uses too. The PDF's outline and page count are read at once for a PDF
+on this device (the open PDF's come from the viewer) and, for one that
+isn't, only once Section or Pages is picked, which downloads it, as
+asking would; Section is offered until the outline is known, then only
+if it points into the pages. A part
 goes to the model as its pages only, after their page markers, under
 a line saying which part of the work it is; the chat keeps it
 (`ChatSource.pages`, a `PageSpan`), so its lines say "section
 “Methods”, pp. 4–9" where a whole paper's say "full text", and a
 retrieval after the cost popup reads the same part again. With no PDF
-on record, Ask PDF goes straight to the popup that offers to find one. Conversations it was only part of — a selection
+on record, Abstract and Full text are the choices, and the full text
+goes to the popup that offers to find one. Conversations it was only part of — a selection
 or a folder asked about — are listed above as links, which open in
-Questions (leaving the PDF). A conversation opens in the tab, in place of the
+Questions (leaving the PDF). A conversation's row, here and in Questions, gives
+its name and what it is about; when it began, how many questions it
+has had, the size of the works it read, its cost and its model are at
+the head of the conversation itself (`ChatPanel.tsx`). A conversation
+opens in the tab, in place of the
 list, so it can be read beside the PDF; one started while a PDF is open
 opens there too, rather than moving the hidden library to Questions
 (`confirmAsk`).

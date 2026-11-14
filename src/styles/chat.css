@@ -96,29 +96,11 @@
 .work-titles-zotero:hover {
   color: var(--accent);
 }
-.chat-row-meta {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 2px;
-  font-size: calc(11px * var(--font-scale));
-  color: var(--text-dim);
-  white-space: nowrap;
-  font-variant-numeric: tabular-nums;
-}
-.chat-row-model {
-  opacity: 0.75;
-}
 .chat-row-delete {
   flex-shrink: 0;
   /* Pinned to the top so it doesn't drift down the row when the
      titles accordion is opened. */
   align-self: flex-start;
-}
-@media (max-width: 640px) {
-  .chat-row-meta {
-    display: none;
-  }
 }
 
 /* The chat scrolls its own message list, so the panel around it must
@@ -148,6 +130,14 @@
   font-size: calc(11px * var(--font-scale));
   color: var(--text-dim);
   margin-top: 3px;
+}
+/* When it began, its size, cost and model: quieter still. */
+.chat-head-meta {
+  margin-top: 2px;
+  font-size: calc(11px * var(--font-scale));
+  color: var(--text-dim);
+  opacity: 0.8;
+  font-variant-numeric: tabular-nums;
 }
 .chat-head-warn {
   font-size: calc(11px * var(--font-scale));
@@ -482,16 +472,6 @@
   display: flex;
   flex-direction: column;
 }
-.item-chats-start {
-  display: flex;
-  gap: 6px;
-  padding: 8px 12px 4px;
-  border-bottom: 1px solid var(--border);
-}
-/* The PDF tab button's look (tabs.css), here side by side. */
-.item-chats-start .meta-tab-action {
-  margin: 0 0 4px;
-}
 /* The conversations this entry was only part of: links into Questions. */
 .item-chats-shared {
   display: flex;
@@ -532,19 +512,6 @@
   flex: 1;
   min-height: 0;
   overflow-y: auto;
-}
-/* The panel is narrow: a row's figures go under its title. */
-.item-chats .chat-row {
-  flex-wrap: wrap;
-}
-.item-chats .chat-row-meta {
-  display: flex;
-  flex-direction: row;
-  flex-wrap: wrap;
-  gap: 2px 8px;
-  width: 100%;
-  text-align: left;
-  align-items: flex-start;
 }
 .item-chats-back {
   align-self: flex-start;

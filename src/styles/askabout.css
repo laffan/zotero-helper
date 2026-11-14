@@ -1,9 +1,10 @@
-/* Ask PDF's chooser (src/components/AskPdf.tsx), under the conversations
-   tab's buttons: what to ask about in a dropdown, which section or pages
-   in a second beside it when that needs saying, and a link that begins
-   the conversation. The dropdowns are PdfParts.tsx's, shared with the
-   reader's Share menu (toolbar.css). */
-.ask-pdf {
+/* Ask About (src/components/AskAbout.tsx), at the head of the
+   conversations tab: what to ask about in a dropdown — the abstract, or
+   the PDF or part of it — which section or pages in a second beside it
+   when that needs saying, and a link that begins the conversation. The
+   dropdowns are PdfParts.tsx's, shared with the reader's Share menu
+   (toolbar.css). */
+.ask-about {
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -15,7 +16,7 @@
   font-size: calc(12px * var(--font-scale));
   color: var(--text-dim);
 }
-.ask-pdf-head {
+.ask-about-head {
   display: flex;
   align-items: baseline;
   gap: 8px;
@@ -25,20 +26,14 @@
   letter-spacing: 0.04em;
   color: var(--text-dim);
 }
-.ask-pdf-close {
-  margin-left: auto;
-  align-self: center;
-  display: inline-flex;
-  color: var(--text-dim);
-}
-.ask-pdf-row {
+.ask-about-row {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 6px;
   min-width: 0;
 }
-.ask-pdf-note {
+.ask-about-note {
   display: inline-flex;
   align-items: center;
   gap: 5px;
@@ -48,7 +43,7 @@
   letter-spacing: 0;
 }
 /* The link that begins it, naming what it is about. */
-.ask-pdf-begin {
+.ask-about-begin {
   display: inline-flex;
   align-items: center;
   gap: 5px;
@@ -61,7 +56,7 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.ask-pdf-begin:disabled {
+.ask-about-begin:disabled {
   color: var(--text-dim);
   text-decoration: none;
   cursor: default;

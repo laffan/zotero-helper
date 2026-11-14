@@ -1,4 +1,8 @@
-// The conversation itself, in the details panel. Beneath the input sit
+// The conversation itself, in the details panel. Its head says what it
+// is about and, on a quieter line, when it began, how many questions it
+// has had, the size of the works it read, what it has cost and which
+// model answers (the list of conversations leaves those out). Beneath
+// the input sit
 // the two numbers that decide how you use this feature: what the chat
 // has cost so far, and how long the works stay in the provider's prompt
 // cache. Ask again inside that window and the papers are re-read at a
@@ -34,6 +38,7 @@ import {
   TrashIcon,
 } from "./Icons";
 import { openReaderAt } from "./ReaderPane";
+import { started } from "./ChatList";
 import { WorkTitles } from "./WorkTitles";
 
 /** mm:ss left on the provider's cache window, or null once it's gone.
@@ -258,15 +263,18 @@ export function ChatPanel({ chat }: { chat: Chat }) {
   };
 
   const n = chat.source.itemKeys.length;
+  const turns = chat.messages.filter((m) => m.role === "user").length;
 
   return (
     <div className="chat-panel">
       <div className="chat-head">
         <div className="chat-head-title">{chat.title}</div>
         <div className="chat-head-sub">
-          {n} work{n === 1 ? "" : "s"} ·{" "}
-          {chat.mode === "explain" ? "explainer" : depthLabel(chat.source)} ·{" "}
-          {formatTokens(chat.contextTokens)} tokens · {modelLabel(chat.model)}
+          {n} work{n === 1 ? "" : "s"} · {chat.mode === "explain" ? "explainer" : depthLabel(chat.source)}
+        </div>
+        <div className="chat-head-meta">
+          {started(chat.createdMs)} · {turns} question{turns === 1 ? "" : "s"} · {formatTokens(chat.contextTokens)} tokens ·{" "}
+          {formatUsd(chat.costUsd)} · {modelLabel(chat.model)}
         </div>
         {chat.source.missing.length > 0 && (
           <div

@@ -1,5 +1,5 @@
 // Picking a part of one PDF — a section of its outline, or a run of its
-// pages — as Ask PDF's chooser (AskPdf.tsx) and the reader's Share menu
+// pages — as Ask About (AskAbout.tsx) and the reader's Share menu
 // (ReaderShare.tsx) both do: the dropdowns that say which section, or
 // which pages. A section runs from its heading to where the next heading
 // at its level or above begins (`sectionSpans` in lib/outline.ts); only

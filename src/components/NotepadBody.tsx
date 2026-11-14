@@ -301,7 +301,10 @@ export function NotepadBody({ attKey, kind, onBarPointerDown, tools, trailing }:
     clipMode.current = startClipMode({
       clip: async (pageIndex, box) => {
         const img = await readerClipImage(pageIndex, box);
-        if (img) surfaceRef.current?.addLink({ kind: "place", pageIndex, top: img.top }, { image: img.src, w: img.width });
+        if (img) {
+          const clip = { image: img.src, imageDark: img.dark, w: img.width };
+          surfaceRef.current?.addLink({ kind: "place", pageIndex, top: img.top }, clip);
+        }
       },
       ended: () => {
         clipMode.current = null;

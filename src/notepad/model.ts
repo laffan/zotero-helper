@@ -41,9 +41,12 @@ export interface NoteLink {
   w?: number;
   h?: number;
   /** A link, a quote, or — with `image` — a clip of the page (clip.ts):
-   *  a JPEG data URL, its target the spot on the page it was cut from. */
+   *  a JPEG data URL, its target the spot on the page it was cut from.
+   *  `imageDark` is the clip as dark pages draw it (white on black),
+   *  shown instead while it is pinned in the dark theme. */
   target: PlaceTarget;
   image?: string;
+  imageDark?: string;
   /** Fixed by its pin (a quote, a clip): part of the pad's ground,
    *  drawn beneath the ink so it can be written over, and not moved. */
   fixed?: boolean;

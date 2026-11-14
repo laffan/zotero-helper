@@ -74,6 +74,34 @@
   pointer-events: none;
   -webkit-user-drag: none;
 }
+/* Which of a clip's images shows: as printed, but for one pinned in the
+   dark theme — written over in white ink — which shows white on black
+   (the dark pages' filter, drawn when it was clipped; a clip from before
+   there were two takes the filter here). The dark theme is read as
+   tokens.css reads it. */
+.notepad-clip-img.dark {
+  display: none;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .notepad-clip.fixed.has-dark .notepad-clip-img.light {
+    display: none;
+  }
+  :root:not([data-theme="light"]) .notepad-clip.fixed .notepad-clip-img.dark {
+    display: block;
+  }
+  :root:not([data-theme="light"]) .notepad-clip.fixed:not(.has-dark) .notepad-clip-img.light {
+    filter: invert(1) hue-rotate(180deg);
+  }
+}
+:root[data-theme="dark"] .notepad-clip.fixed.has-dark .notepad-clip-img.light {
+  display: none;
+}
+:root[data-theme="dark"] .notepad-clip.fixed .notepad-clip-img.dark {
+  display: block;
+}
+:root[data-theme="dark"] .notepad-clip.fixed:not(.has-dark) .notepad-clip-img.light {
+  filter: invert(1) hue-rotate(180deg);
+}
 .notepad-clip-foot {
   display: flex;
   align-items: center;

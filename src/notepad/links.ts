@@ -159,20 +159,29 @@ export function createLinkChips(host: HTMLElement, env: LinkChipEnv) {
     return grip;
   }
 
-  /** A clip: the image, and under it its pin and page. */
+  /** A clip: the image, and under it its pin and page. Both its images
+   *  are there — as printed, and white on black — and the theme and the
+   *  pin decide which shows (notepad-clips.css): white on black only
+   *  pinned in the dark theme, where the ink written over it is white. */
   function clipBody(l: NoteLink, el: HTMLElement): void {
-    const img = document.createElement("img");
-    img.className = "notepad-clip-img";
-    img.src = l.image ?? "";
-    img.alt = `Clip from page ${l.target.pageIndex + 1}`;
-    img.draggable = false;
+    const image = (src: string, cls: string) => {
+      const img = document.createElement("img");
+      img.className = `notepad-clip-img ${cls}`;
+      img.src = src;
+      img.alt = `Clip from page ${l.target.pageIndex + 1}`;
+      img.draggable = false;
+      el.appendChild(img);
+    };
+    image(l.image ?? "", "light");
+    if (l.imageDark) image(l.imageDark, "dark");
+    el.classList.toggle("has-dark", Boolean(l.imageDark));
     const foot = document.createElement("span");
     foot.className = "notepad-clip-foot";
     const page = document.createElement("span");
     page.className = "notepad-link-page";
     page.textContent = `p. ${l.target.pageIndex + 1}`;
     foot.append(pin(l), page);
-    el.append(img, foot);
+    el.appendChild(foot);
   }
 
   function chip(l: NoteLink): HTMLElement {

@@ -8,8 +8,10 @@
 // text stays text. A clip is drawn afresh from the PDF at a resolution
 // of its own — the page's raster on screen may be stretched, stale or
 // not drawn at all — with the reader's highlights painted in, as on the
-// pages.
+// pages; and a second time as dark pages draw it (darkPages.ts), for a
+// clip pinned in the dark theme.
 import type { Annotation } from "../lib/highlights";
+import { darkPagesCopy } from "./darkPages";
 import { drawAnnotations } from "./paint";
 import type { PageRecord, PDFDocumentProxy } from "./types";
 
@@ -19,8 +21,9 @@ const CLIP_SCALE = 3;
 const CLIP_MAX_PX = 1800;
 
 export interface ClipImage {
-  /** A JPEG, as a data URL. */
+  /** A JPEG, as a data URL — and the same white on black. */
   src: string;
+  dark: string;
   /** Its size in PDF points: how large it shows at first. */
   width: number;
   height: number;
@@ -72,7 +75,10 @@ export function createExcerpts(env: ExcerptEnv) {
       const ctx = canvas.getContext("2d");
       if (ctx) drawAnnotations(ctx, viewport, env.getAnnotations(), pageIndex);
       const top = Math.round(base.convertToPdfPoint(0, t * base.height)[1]);
-      return { src: canvas.toDataURL("image/jpeg", 0.9), width: Math.round(w), height: Math.round(h), top };
+      const inverted = darkPagesCopy(canvas);
+      const dark = inverted.toDataURL("image/jpeg", 0.9);
+      inverted.width = inverted.height = 0;
+      return { src: canvas.toDataURL("image/jpeg", 0.9), dark, width: Math.round(w), height: Math.round(h), top };
     } finally {
       canvas.width = canvas.height = 0;
     }

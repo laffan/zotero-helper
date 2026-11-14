@@ -543,7 +543,7 @@ export function createSurface(host: HTMLElement, env: SurfaceEnv) {
     },
     /** Add a link (or, with `image`, a clip `w` wide) at the middle of
      *  what this view shows. */
-    addLink(target: PlaceTarget, clip?: { image: string; w: number }): void {
+    addLink(target: PlaceTarget, clip?: { image: string; imageDark: string; w: number }): void {
       const pad = env.pad();
       const shift = (pad.links.length % 5) * 14;
       const half = clip ? Math.max(80, Math.min(clip.w, host.clientWidth * 0.7)) / 2 : 90;
@@ -552,7 +552,7 @@ export function createSurface(host: HTMLElement, env: SurfaceEnv) {
         x: Math.round(host.clientWidth / 2 - pan.x - half + shift),
         y: Math.round(host.clientHeight / 2 - pan.y - (clip ? 60 : 12) + shift),
         target,
-        ...(clip && { image: clip.image, w: Math.round(half * 2) }),
+        ...(clip && { image: clip.image, imageDark: clip.imageDark, w: Math.round(half * 2) }),
       };
       pad.links.push(link);
       history.push({ kind: "link", id: link.id });

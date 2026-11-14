@@ -1741,8 +1741,20 @@ target the spot on the page it came from — and clip mode ends; so do
 Escape, × and the scissors again. On the pad a clip is the image with
 its pin and page under it; it is dragged, tapped (to go back to its
 place), held for Delete and sized by its grip like a quote, keeping
-its proportions. The image is kept in the notepad's file, so a pad of
-many clips is a larger file to write. The menus' buttons act on the release of a press
+its proportions.
+
+A clip is made twice: as printed, and white on black, as dark pages
+draw it (`darkPagesCopy` in `pdfviewer/darkPages.ts`: the same
+`invert(1) hue-rotate(180deg)` drawn into a copy of the canvas through
+the context's `filter`, or pixel by pixel where a canvas has none — the
+two agree to within 1/255). The link keeps both (`image`,
+`imageDark`), and both are in the chip; CSS shows white on black only
+for a clip pinned in the dark theme, where the ink written over it is
+white, and the printed one otherwise — loose in either theme, pinned in
+the light one (`notepad-clips.css`, reading the theme as `tokens.css`
+does, so a change of theme needs no redraw). A clip made before there
+were two is given the filter in CSS instead. The images are kept in the
+notepad's file, so a pad of many clips is a larger file to write. The menus' buttons act on the release of a press
 (`onPress`): the canvas cancels its touches so a finger pans, and that
 cancelled the click a tap on them would have ended in — Delete did
 nothing on the iPad.

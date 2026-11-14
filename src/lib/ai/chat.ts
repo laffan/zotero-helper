@@ -21,6 +21,7 @@ import type {
 } from "../types";
 import { getAbstracts } from "./index";
 import { itemsForAsk, prepareAsk } from "./context";
+import { noteSent } from "./contextCache";
 import { usageCost } from "./models";
 
 interface ChatReply {
@@ -169,6 +170,18 @@ function modeOf(chat: Chat): string | null {
   return chat.mode === "explain" && chat.context ? "explain-context" : (chat.mode ?? null);
 }
 
+/** The messages as sent. An explainer asked with its context is told
+ *  in its question which page the passage is on — not in the context,
+ *  which stays the same for every passage of the PDF, so that the
+ *  provider's cache serves it to the next one (contextCache.ts). */
+function asSent(chat: Chat, messages: ChatMessage[]): { role: string; content: string }[] {
+  const page = chat.mode === "explain" && chat.context && chat.passage ? chat.passage.pageIndex + 1 : 0;
+  return messages.map((m, i) => ({
+    role: m.role,
+    content: page && i === 0 ? `${m.content}\n\n(The passage is on page ${page} of the PDF.)` : m.content,
+  }));
+}
+
 /** Ask the model `messages` over `chat`'s works (its context, its
  *  mode): the answer as a message, with what it cost, and the model
  *  that gave it. The conversation's own turns and its clarifications'
@@ -179,9 +192,12 @@ export async function askModel(
 ): Promise<{ answered: ChatMessage; model: string }> {
   const reply = await invoke<ChatReply>("ai_chat", {
     context: chat.context,
-    messages: messages.map((m) => ({ role: m.role, content: m.content })),
+    messages: asSent(chat, messages),
     mode: modeOf(chat),
   });
+  if (chat.mode === "explain" && chat.context && chat.contextPart) {
+    noteSent(chat.contextPart, reply.service === "openai" ? "openai" : "anthropic", reply.model, reply.usage);
+  }
   const costUsd = usageCost(reply.model, reply.usage);
   return {
     model: reply.model,
@@ -250,12 +266,16 @@ export async function sendChatMessage(
 }
 
 /** Name a chat from its opening exchange. A failure here is cosmetic —
- *  the chat keeps the source label it started with. */
-async function nameChat(chatId: string): Promise<void> {
+ *  the chat keeps the source label it started with. `as` "heading": an
+ *  explainer's heading (explain.ts), named from its passage and its
+ *  latest answer; its title is left alone. */
+export async function nameChat(chatId: string, as: "title" | "heading" = "title"): Promise<void> {
   const chat = useStore.getState().chats.find((c) => c.id === chatId);
-  if (!chat || chat.titled || chat.messages.length < 2) return;
-  const question = chat.messages[0]?.content ?? "";
-  const answer = chat.messages[1]?.content ?? "";
+  const first = chat?.messages[0];
+  const last = chat && [...chat.messages].reverse().find((m) => m.role === "assistant");
+  if (!chat || !first || !last || (as === "title" ? chat.titled : chat.heading)) return;
+  const question = as === "heading" ? (first.display ?? first.content) : first.content;
+  const answer = as === "heading" ? last.content : (chat.messages[1]?.content ?? "");
   try {
     const reply = await invoke<ChatReply>("ai_chat_title", {
       question,
@@ -269,8 +289,7 @@ async function nameChat(chatId: string): Promise<void> {
     if (!cur) return;
     useStore.getState().upsertChat({
       ...cur,
-      title,
-      titled: true,
+      ...(as === "heading" ? { heading: title } : { title, titled: true }),
       costUsd: cur.costUsd + cost,
     });
     await persistChats();

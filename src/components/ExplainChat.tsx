@@ -5,12 +5,14 @@
 // question names the work it was read in, but only the passage is
 // shown. There are no follow-ups: a toggle in its head says what goes
 // with the question instead — No Context (the default: the question
-// alone) or Context (the work, the page and the PDF's text around it) —
-// and switching asks again, the new answer in place of the old. ×,
+// alone) or In Context, whose menu (ExplainContextMenu.tsx) picks the
+// part of the PDF that goes with the work's title and authors: the
+// full text, the passage's section or the pages in view — and
+// switching asks again, the new answer in place of the old. ×,
 // Escape or a press anywhere outside closes the window; the explanation
 // is kept, under Explanations. Remove Underline, at its foot (a second
 // press confirms), unmarks the passage in the PDF: the explanation stays
-// under Explanations, its page still known (the Context toggle and the
+// under Explanations, its page still known (the In Context menu and the
 // list's link back go by it), but the passage's rects are let go, so the
 // dashed underline — and the tap that reopened it there — are gone. The
 // list's link back still finds the passage by its words and marks it
@@ -23,12 +25,13 @@
 // other context lets go of them with the answer they were asked of.
 import { useEffect, useRef, useState } from "react";
 import { persistChats, sendChatMessage } from "../lib/ai/chat";
-import { explainContext } from "../lib/ai/explain";
+import { partKey } from "../lib/ai/contextCache";
+import { explainContext, headExplanation } from "../lib/ai/explain";
 import { formatUsd } from "../lib/ai/models";
 import { useStore } from "../lib/store";
-import type { Chat } from "../lib/types";
-import { CloseIcon, QuestionIcon, Spinner } from "./Icons";
-import { readerPageCount } from "./ReaderPane";
+import type { Chat, ContextPart } from "../lib/types";
+import { ExplainContextMenu } from "./ExplainContextMenu";
+import { ChevronDown, CloseIcon, QuestionIcon, Spinner } from "./Icons";
 import { followRoot, ThreadStrip } from "./ThreadStrip";
 
 /** The question an explainer asks, and what it shows of it. */
@@ -52,6 +55,9 @@ export function ExplainChat() {
   const close = () => useStore.getState().setExplain(null);
   // How many columns the strip has open: the window widens for two.
   const [columns, setColumns] = useState(1);
+  // The In Context menu: which part of the PDF goes with the question.
+  const [menu, setMenu] = useState(false);
+  const inContext = useRef<HTMLButtonElement>(null);
   const [confirmUnmark, setConfirmUnmark] = useState(false);
   useEffect(() => {
     if (!confirmUnmark) return;
@@ -64,6 +70,8 @@ export function ExplainChat() {
     setError(null);
     try {
       await sendChatMessage(chat.id, text, display);
+      // A long passage is named, for the lists to head it by.
+      headExplanation(chat.id);
     } catch (e) {
       setError(String(e));
     }
@@ -102,8 +110,9 @@ export function ExplainChat() {
   useEffect(() => {
     if (!explain) return;
     const onKey = (e: KeyboardEvent) => {
-      // The Clarify bar, when it is up, is closed first (by itself).
-      if (e.key !== "Escape" || boxRef.current?.querySelector(".clarify-pop")) return;
+      // The Clarify bar or the In Context menu, when up, closes first
+      // (by itself).
+      if (e.key !== "Escape" || boxRef.current?.querySelector(".clarify-pop, .context-menu")) return;
       e.preventDefault();
       e.stopPropagation();
       close();
@@ -115,19 +124,23 @@ export function ExplainChat() {
   if (!explain || !chat) return null;
   const withContext = chat.context !== "";
 
-  /** Ask again, with the work as context or without: the new answer
-   *  takes the old one's place. */
-  const setContext = async (on: boolean) => {
-    if (busy || preparing || on === withContext) return;
+  const sameAs = (part: ContextPart | null) =>
+    part ? Boolean(chat.contextPart) && partKey(chat.contextPart!) === partKey(part) : !withContext;
+
+  /** Ask again, with a part of the work as context or without: the new
+   *  answer takes the old one's place. */
+  const setContext = async (part: ContextPart | null) => {
+    setMenu(false);
+    if (busy || preparing || sameAs(part)) return;
     const { question, display } = questionOf(chat, explain);
     if (!question) return;
     again.current = { question, display };
     setError(null);
     let context = "";
-    if (on) {
+    if (part) {
       setPreparing(true);
       try {
-        context = await explainContext(chat, readerPageCount(chat.passage?.attKey));
+        context = await explainContext(chat, part);
       } catch (e) {
         setError(`Couldn't read the PDF: ${e}`);
         return;
@@ -140,7 +153,14 @@ export function ExplainChat() {
     if (!cur) return;
     // A four-characters-a-token estimate; the reply books the real cost.
     // The clarifications go with the answer they were asked of.
-    s.upsertChat({ ...cur, context, contextTokens: Math.ceil(context.length / 4), messages: [], threads: [] });
+    s.upsertChat({
+      ...cur,
+      context,
+      contextPart: part ?? undefined,
+      contextTokens: Math.ceil(context.length / 4),
+      messages: [],
+      threads: [],
+    });
     void persistChats();
     await send(question, display);
   };
@@ -166,8 +186,8 @@ export function ExplainChat() {
     >
       <div className="explain-head">
         <QuestionIcon size={13} />
-        <span className="explain-title" title={chat.title}>
-          {chat.title}
+        <span className="explain-title" title={chat.heading ?? chat.title}>
+          {chat.heading ?? chat.title}
         </span>
         <button className="icon-btn" onClick={close} aria-label="Close" title="Close (Esc) — the explanation is kept">
           <CloseIcon size={12} />
@@ -179,22 +199,33 @@ export function ExplainChat() {
           aria-checked={!withContext}
           className={withContext ? "" : "on"}
           disabled={waiting}
-          onClick={() => void setContext(false)}
+          onClick={() => void setContext(null)}
           title="The question alone — the concept explained on its own terms"
         >
           No Context
         </button>
         <button
+          ref={inContext}
           role="radio"
           aria-checked={withContext}
+          aria-haspopup="menu"
+          aria-expanded={menu}
           className={withContext ? "on" : ""}
           disabled={waiting}
-          onClick={() => void setContext(true)}
-          title="With the work, the page and the PDF's text around it — what the passage means here"
+          onClick={() => setMenu(!menu)}
+          title="With the work and a part of its PDF — the full text, this section or the pages in view: what the passage means here"
         >
-          Context
+          In Context <ChevronDown size={9} />
         </button>
       </div>
+      {menu && inContext.current && (
+        <ExplainContextMenu
+          chat={chat}
+          anchor={inContext.current}
+          onPick={(part) => void setContext(part)}
+          onClose={() => setMenu(false)}
+        />
+      )}
       <ThreadStrip
         chat={chat}
         continuable={false}
@@ -234,7 +265,8 @@ export function ExplainChat() {
           </button>
         )}
         <span>
-          {withContext && `${Math.round(chat.contextTokens / 1000)}K tokens of context · `}
+          {withContext &&
+            `${chat.contextPart ? `${chat.contextPart.label} · ` : ""}${Math.round(chat.contextTokens / 1000)}K tokens · `}
           {formatUsd(chat.costUsd)} spent
         </span>
       </div>

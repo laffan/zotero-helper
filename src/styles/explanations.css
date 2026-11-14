@@ -73,6 +73,19 @@
   white-space: nowrap;
   word-break: normal;
 }
+/* A long passage, whole, when its box is unfolded (its head is a short
+   title): quoted, under the head, set in as the answer is. */
+.explanation-passage {
+  margin-top: 6px;
+  padding-left: 16px;
+  color: var(--text-dim);
+  font-size: calc(12.5px * var(--font-scale));
+  font-style: italic;
+  line-height: 1.45;
+}
+.explanation-list .explanation-passage {
+  max-width: 720px;
+}
 /* Set in as far as the passage's text, past its chevron (11px and the
    5px gap). */
 .explanation-answer {

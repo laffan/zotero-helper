@@ -11,7 +11,9 @@
 //! about a passage on its own terms, with no material at all
 //! ("explain"), or, when the reader asks for its context, about the
 //! passage as it is used in its work, with the work's metadata and the
-//! PDF's text around it as the material ("explain-context"); and a
+//! text of the part of its PDF the reader chose as the material — the same
+//! for every passage of that PDF, so the provider caches it; the passage's
+//! page comes in the question ("explain-context"); and a
 //! look-up ("define"), one question and one answer of at most 50 words,
 //! never kept as a conversation.
 
@@ -56,11 +58,12 @@ what the passage is doing there, unless asked. Keep the answer short: under 100 
 prose, no headings. Your reply is rendered as Markdown.";
 
 const EXPLAIN_CONTEXT_SYSTEM: &str = "You explain a concept, term or passage a scholar came across \
-while reading the work given below: its metadata, the page the passage was selected on, and text \
-extracted from its PDF, broken up by page markers written as [[page 7]] (everything after one \
-comes from that page). Explain what the passage means as it is used in this work — the idea \
-itself, briefly, then what the author does with it here — drawing on the text around the page it \
-was selected on. Ground what you say about the work in the text, and say so plainly when the \
+while reading the work given below: its metadata, and text extracted from its PDF — all of it, or \
+the part the scholar chose (a section, or the pages they were reading), as the metadata says — \
+broken up by page markers written as [[page 7]] (everything after one comes from that page). The \
+question says which page the passage was selected on. Explain what the passage means as it is \
+used in this work — the idea itself, briefly, then what the author does with it here — drawing \
+on the text around the page it was selected on. Ground what you say about the work in the text, and say so plainly when the \
 text doesn't settle a point. Extracted PDF text can carry artifacts (running heads, footnotes, \
 column breaks), so read around them. Keep the answer short: under 120 words, plain prose, no \
 headings, no page citations. Your reply is rendered as Markdown.";

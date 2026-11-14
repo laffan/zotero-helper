@@ -61,7 +61,9 @@ src/            React + TypeScript UI (Vite, zustand, MiniSearch)
                 catalog and its prices (models), gathering works to ask
                 about (context), conversations (chat), the reader's
                 explainer of a passage (explain) and look-up (lookup),
-                their editable prompts (prompts), export,
+                their editable prompts (prompts), export, the
+                explainer contexts the provider still has cached
+                (contextCache),
                 clarifications (threads: a passage of an answer asked
                 about, in a column of its own; threadMarks: where each
                 passage is in its answer, measured and marked)
@@ -118,7 +120,8 @@ src/            React + TypeScript UI (Vite, zustand, MiniSearch)
                 and its tabs (Highlights, Notes — NotesPrompts is an
                 empty note's reading questions), reader pane (and
                 ReadingModeExit, reading mode's way back and its
-                buttons; ExplainChat, the explainer's window;
+                buttons; ExplainChat, the explainer's window, and
+                ExplainContextMenu, its In Context menu;
                 ChatBubble, a question or an answer (Markdown, its
                 citations as pills, its passages asked about marked);
                 ThreadStrip, a conversation's columns — its own, then
@@ -203,7 +206,8 @@ src/            React + TypeScript UI (Vite, zustand, MiniSearch)
                 keyboard = the pane outline and sidebar cursor;
                 pdfviewer-dark = dark pages; explanations = the
                 explanation boxes; notepad-clips = the notepad's pins
-                and clips, and clip mode; threads = a conversation's
+                and clips, and clip mode; explainer = the explainer's
+                window and its In Context menu; threads = a conversation's
                 columns and the passages marked in its answers)
 src-tauri/      Rust core (all networking + state)
   src/zotero/      Zotero Web API v3: paginated sync (sync), versioned
@@ -1475,16 +1479,35 @@ a toggle under the window's head says what goes with the question.
 paper — answered under the backend's own system prompt, which explains
 the concept on its own terms, as an encyclopedia entry would, in under
 100 words (`ai_chat`'s `mode` "explain", `src-tauri/src/ai/chat.rs`);
-so there is no cost popup first. **Context**: the work's metadata, the
-page the passage was selected on and the text of its PDF, page markers
-and all (the whole PDF up to 80 pages, else the 80 pages around the
-passage, capped at 120,000 characters; `explainContext`, read with the
-same local parser as Ask Full Papers), answered about what the passage
-means in this work, in under 120 words ("explain-context"). Switching
-asks again, the new answer in place of the old (the cost of both is
-kept); the window's foot shows the context's size and what the
-explanation has cost. ×, Escape or a press outside it closes the
-window. Each is kept as a conversation about the entry (`mode`
+so there is no cost popup first. **In Context** opens a small menu of
+what goes with it (`ExplainContextMenu.tsx`): **Full text** (the whole
+PDF up to 80 pages, else the 80 pages around the passage), **This
+section** (the section of the PDF's outline the passage is in, from its
+heading to the next at its level or above — `sectionSpans`, as Ask
+About's; unavailable without an outline, or before its first heading)
+or **Visible pages** (the pages in view, as Ask About and Share count
+them). Each says what it covers, and the work's metadata — its title,
+authors, year and publication — goes with every one; the text of the
+part is read with the same local parser as Ask Full Papers, page
+markers and all, capped at 120,000 characters (`explainContext`), and
+a part says it is one. The answer is about what the passage means in
+this work, in under 120 words ("explain-context"). The passage's page
+goes with the question ("The passage is on page 12 of the PDF", added
+as it is sent, `askModel`), not in the context, so that every passage
+of a PDF asked about with the same part sends the same context, which
+the provider then serves from its prompt cache: a part sent within the
+cache's window (5 minutes on Anthropic, 30 on OpenAI, from its last
+use) — for this passage or another of the same PDF — says so in the
+menu, "Already sent — cached for 4:12 more" (`lib/ai/contextCache.ts`,
+kept on this device; counted only when the reply reports the cache
+written or read, or, on OpenAI, which caches by itself, a prompt of
+1024 tokens or more). The part asked with is ticked. Switching asks
+again, the new answer in place of the old (the cost of both is kept);
+the window's foot shows the part, the context's size and what the
+explanation has cost. The head, the switch and the foot keep their
+height however long the passage; what is between them scrolls. ×,
+Escape or a press outside it closes the window (Escape and a press
+outside close the menu first). Each is kept as a conversation about the entry (`mode`
 "explain", one question and its answer), named after its passage —
 but shown as what it is: under Explanations in the entry's
 conversations tab, and in **Explanations**, a row between Questions and
@@ -1492,21 +1515,29 @@ Words in the sidebar, never among Questions' conversations
 (`ExplanationList.tsx`). Each is a box: the passage as its head, in
 the text's own weight, a link that unfolds the answer beneath it, set
 in as far as the passage (folded to begin with, and drawn as a box,
-background and edge, only while unfolded); at its right, the page the
+background and edge, only while unfolded). A passage of more than six
+words is headed instead by a short title the model gives it
+(`Chat.heading`, asked of `ai_chat_title` with the passage and the
+answer, as a conversation is named — once the answer is in, and, for
+one from before, as its box first shows: `headExplanation`, one at a
+time, its cost added to the explanation's), its first six words until
+it has one; unfolded, the box shows the passage whole, quoted, above
+the answer. The explainer's head takes the title too; at its right, the page the
 passage was read on ("p. 12"), the link back to it — the PDF opened (or
 moved) there and the passage found and marked, as an answer's
 citations are — then an info button that shows when it was asked, by
-which model, what it cost, whether with its context and from which
-work, and a quieter trash can; the sidebar's list, every document's
+which model, what it cost, with which part of the work as context, if
+any, and from which work, and a quieter trash can; the sidebar's list, every document's
 explanations newest first, adds under each the work, a link back too,
 and a filter
-box at its top that narrows the list by passage, answer or work. The
+box at its top that narrows the list by passage, title, answer or
+work. The
 explained passage stays marked in the PDF with a dashed purple
 underline (`--explain-underline`, an overlay like a citation's,
 `passageMarks.ts`; where it is kept as the chat's `passage`), and a tap
 on it opens its explainer again — in reading mode too. The window's
 foot has **Remove Underline** (a second press confirms): the
-explanation is kept, and its page (the Context toggle and the list's
+explanation is kept, and its page (the In Context menu and the list's
 link back go by it), but the passage's rects are let go, so the
 underline and its tap are gone from the PDF. The way back from the
 list is kept all the same: it finds the passage by its words and marks

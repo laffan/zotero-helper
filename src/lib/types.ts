@@ -289,6 +289,26 @@ export interface Chat {
   /** Clarifications: passages of its answers asked about, each a thread
    *  of its own in a column to the right (lib/ai/threads.ts). */
   threads?: ChatThread[];
+  /** An explainer asked with its context: which part of the PDF went
+   *  with it (lib/ai/explain.ts). */
+  contextPart?: ContextPart;
+  /** An explainer of a long passage: a short title for it, made by the
+   *  model, that heads it in the lists in the passage's place. */
+  heading?: string;
+}
+
+/** The part of a PDF an explainer is asked with: all of it (a long one,
+ *  the 80 pages around the passage), the section the passage is in, or
+ *  the pages in view. 1-based, inclusive; `to` 0 for a whole PDF whose
+ *  length wasn't known. The work's metadata goes with each. */
+export interface ContextPart {
+  attKey: string;
+  kind: "full" | "section" | "visible";
+  from: number;
+  to: number;
+  /** "the full text", "section “Methods”, pp. 4–9", "the visible pages,
+   *  pp. 12–13". */
+  label: string;
 }
 
 /** A clarification: a passage selected in an answer and asked about,

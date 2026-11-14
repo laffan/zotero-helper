@@ -56,24 +56,6 @@ export async function extractPageSpan(
   return { text: text.slice(0, maxChars), truncated: text.length > maxChars };
 }
 
-/** The text around page `page` (1-based) of a `total`-page PDF, for an
- *  explainer asked with its context (lib/ai/explain.ts): the whole PDF
- *  when it is no longer than `span` pages, else the `span` pages
- *  centred on `page` — each after its page marker, and capped in length
- *  as the full text is. `from`–`to` are the pages it covers. */
-export async function extractTextAround(
-  data: ArrayBuffer,
-  page: number,
-  total: number,
-  span = 80,
-  maxChars = 120000,
-): Promise<{ text: string; truncated: boolean; from: number; to: number }> {
-  const from = total <= span ? 1 : Math.max(1, Math.min(page - Math.floor(span / 2), total - span + 1));
-  const to = Math.min(total, from + span - 1);
-  const text = await parsePages(data, span, maxChars + 1, true, total <= span ? undefined : [from, to]);
-  return { text: text.slice(0, maxChars), truncated: text.length > maxChars, from, to };
-}
-
 /** `range`: only these pages (1-based, inclusive), numbered so. */
 async function parsePages(
   data: ArrayBuffer,

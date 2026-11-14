@@ -1,0 +1,157 @@
+/* The reader's explainer (ExplainChat.tsx): a passage explained,
+   floating over the pages at the bottom right, reading mode included;
+   and its In Context menu (ExplainContextMenu.tsx). */
+.explain-chat {
+  position: fixed;
+  z-index: 70;
+  /* Beside a notepad docked at the right (ReadingNotepad.tsx). */
+  right: calc(16px + var(--notepad-dock-right, 0px));
+  bottom: calc(16px + env(safe-area-inset-bottom));
+  display: flex;
+  flex-direction: column;
+  width: min(380px, calc(100vw - 32px));
+  max-height: min(480px, 60vh);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg);
+  box-shadow: 0 10px 34px rgb(0 0 0 / 0.28);
+  overflow: hidden;
+}
+/* The head, the No Context / In Context switch and the foot keep their
+   height however long the passage: the conversation between them is
+   what scrolls. (The switch's rounded clip would otherwise let it be
+   squeezed to nothing.) */
+.explain-head,
+.explain-context,
+.explain-meter {
+  flex: none;
+}
+.explain-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 8px 7px 11px;
+  border-bottom: 1px solid var(--border);
+  background: var(--panel);
+  color: var(--accent);
+}
+.explain-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text);
+  font-size: calc(12px * var(--font-scale));
+  font-weight: 600;
+}
+.explain-scroll {
+  min-height: 80px;
+}
+/* No Context / In Context: what goes with the question, as a segmented
+   switch under the head; In Context opens its menu. */
+.explain-context {
+  display: flex;
+  align-self: flex-start;
+  margin: 8px 11px 4px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  overflow: hidden;
+}
+.explain-context button {
+  padding: 3px 10px;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  color: var(--text-dim);
+  font-size: calc(11px * var(--font-scale));
+}
+.explain-context button + button {
+  border-left: 1px solid var(--border);
+}
+.explain-context button.on {
+  background: var(--accent-soft);
+  color: var(--text);
+  font-weight: 600;
+}
+.explain-context button:disabled:not(.on) {
+  opacity: 0.5;
+}
+.explain-meter {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 6px 10px 7px;
+  border-top: 1px solid var(--border);
+  color: var(--text-dim);
+  font-size: calc(10px * var(--font-scale));
+}
+.explain-context button svg {
+  margin-left: 2px;
+  vertical-align: -1px;
+}
+
+/* In Context's menu: the part of the PDF to send, each with what it
+   covers and, when the provider still has it, for how much longer. */
+.context-menu {
+  position: fixed;
+  z-index: 75;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  padding: 4px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel);
+  box-shadow: 0 8px 26px rgb(0 0 0 / 0.26);
+}
+.context-menu-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 6px 8px 6px 4px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text);
+  text-align: left;
+}
+.context-menu-row:hover:not(:disabled),
+.context-menu-row.on {
+  background: var(--select);
+}
+.context-menu-row:disabled {
+  opacity: 0.5;
+}
+.context-menu-check {
+  flex: none;
+  width: 14px;
+  padding-top: 1px;
+  color: var(--accent);
+}
+.context-menu-text {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+.context-menu-title {
+  font-size: calc(12.5px * var(--font-scale));
+  font-weight: 600;
+}
+.context-menu-note,
+.context-menu-foot {
+  font-size: calc(11px * var(--font-scale));
+  color: var(--text-dim);
+  overflow-wrap: anywhere;
+}
+.context-menu-cached {
+  font-size: calc(11px * var(--font-scale));
+  color: var(--good);
+}
+.context-menu-foot {
+  padding: 4px 8px 3px 24px;
+  border-top: 1px solid var(--border);
+  margin-top: 2px;
+}

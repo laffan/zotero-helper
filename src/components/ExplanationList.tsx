@@ -11,10 +11,17 @@
 // (ItemChats.tsx) and, across every document, in the sidebar's
 // Explanations, where each also names the work it was read in (a link
 // back too), and a filter box narrows them by passage, answer or work.
+// A passage of more than a few words heads its box by a short title
+// instead — the model's (lib/ai/explain.ts: asked for once the answer
+// is in, and for an older one, as its box first shows), its first words
+// until there is one — and is shown whole, quoted, when the box is
+// unfolded, above the answer; so a long passage doesn't run down beside
+// the page, info and trash buttons.
 import { useEffect, useMemo, useRef, useState } from "react";
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { removeChat } from "../lib/ai/chat";
+import { firstWords, headExplanation, isLongPassage } from "../lib/ai/explain";
 import { formatTokens, formatUsd, modelLabel } from "../lib/ai/models";
 import { pdfAttachmentOf } from "../lib/collections";
 import { useStore } from "../lib/store";
@@ -66,7 +73,12 @@ function Details({ chat, onClose }: { chat: Chat; onClose: () => void }) {
     ["Asked", when(chat.createdMs)],
     ["Model", modelLabel(chat.model)],
     ["Cost", formatUsd(chat.costUsd)],
-    ["Context", chat.context ? `the work and its PDF (${formatTokens(chat.contextTokens)})` : "none"],
+    [
+      "Context",
+      chat.context
+        ? `${chat.contextPart ? `its title and authors, and ${chat.contextPart.label}` : "the work and its PDF"} (${formatTokens(chat.contextTokens)})`
+        : "none",
+    ],
     ["From", chat.source.label],
   ];
   return (
@@ -104,6 +116,11 @@ export function ExplanationCard({ chat, linked = false }: { chat: Chat; linked?:
   const [open, setOpen] = useState(false);
   const { question, answer } = exchange(chat);
   const goTo = useGoToPassage(chat);
+  const long = isLongPassage(question);
+  // An older long one is named as it first shows (once).
+  useEffect(() => {
+    if (long && !chat.heading && answer) headExplanation(chat.id);
+  }, [chat.id, long, Boolean(chat.heading), Boolean(answer)]);
   const page = chat.passage ? `p. ${chat.passage.pageIndex + 1}` : "Find";
   const work = chat.source.itemTitles[0] || chat.source.label;
   return (
@@ -116,7 +133,7 @@ export function ExplanationCard({ chat, linked = false }: { chat: Chat; linked?:
           title={open ? "Fold the answer" : "Show the answer"}
         >
           {open ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
-          <span>{question}</span>
+          <span title={long ? question : undefined}>{long ? (chat.heading ?? firstWords(question)) : question}</span>
         </button>
         <div className="explanation-actions">
           {goTo && (
@@ -144,6 +161,7 @@ export function ExplanationCard({ chat, linked = false }: { chat: Chat; linked?:
         </div>
         {info && <Details chat={chat} onClose={() => setInfo(false)} />}
       </div>
+      {open && long && <div className="explanation-passage">“{question}”</div>}
       {open && (
         <div className="explanation-answer chat-md">
           {answer ? <Markdown remarkPlugins={[remarkGfm]}>{answer}</Markdown> : <em>No answer yet.</em>}
@@ -165,7 +183,7 @@ export function ExplanationCard({ chat, linked = false }: { chat: Chat; linked?:
  *  its answer or the work it was read in? */
 function matches(chat: Chat, q: string): boolean {
   const { question, answer } = exchange(chat);
-  return [question, answer ?? "", chat.source.label].some((t) => t.toLowerCase().includes(q));
+  return [question, answer ?? "", chat.source.label, chat.heading ?? ""].some((t) => t.toLowerCase().includes(q));
 }
 
 /** The sidebar's Explanations: every explanation, newest first. */

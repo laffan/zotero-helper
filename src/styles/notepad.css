@@ -114,39 +114,56 @@
   background: var(--swatch, var(--notepad-ink));
   box-shadow: 0 0 0 1px color-mix(in srgb, var(--text-dim) 45%, transparent);
 }
-/* The quote button, at the bar's left: a disc of the highlight orange,
-   its quote marks in the pad's own colour; ringed while a link is drawn
-   out of it. */
-.notepad-quote-btn {
+/* The quote button and the scissors, at the bar's left: one pill of the
+   highlight orange split in two — round at its ends, square where the
+   halves meet, a hairline of the pad's colour between them — their
+   glyphs in the pad's own colour. A half is darker while its tool is at
+   work: a link being drawn out of the quote, clip mode on. */
+.notepad-from-pages {
   display: inline-flex;
   flex-shrink: 0;
+  margin: 0 6px 0 2px;
+  border-radius: 13px;
+  overflow: hidden;
+  background: #f19837;
+}
+.notepad-quote-btn,
+.notepad-clip-btn {
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 26px;
+  width: 30px;
   height: 26px;
-  margin: 0 2px;
   padding: 0;
   border: none;
-  border-radius: 50%;
-  background: #f19837;
+  border-radius: 0;
+  background: transparent;
   color: var(--panel);
-  cursor: grab;
-  touch-action: none;
   -webkit-touch-callout: none;
   -webkit-user-select: none;
   user-select: none;
 }
-.notepad-quote-btn svg {
+.notepad-quote-btn {
+  padding-left: 2px;
+  cursor: grab;
+  touch-action: none;
+}
+.notepad-clip-btn {
+  padding-right: 2px;
+  box-shadow: inset 1px 0 0 color-mix(in srgb, var(--panel) 55%, transparent);
+}
+.notepad-quote-btn svg,
+.notepad-clip-btn svg {
   width: 13px;
   height: 13px;
 }
-.notepad-quote-btn.linking {
-  box-shadow: 0 0 0 2px var(--panel), 0 0 0 3.5px #f19837;
+.notepad-quote-btn:hover,
+.notepad-clip-btn:hover {
+  background: rgb(0 0 0 / 0.08);
 }
-/* The scissors (clip mode): a tool like the others, lit while on. */
-.notepad-clip-btn svg {
-  width: 16px;
-  height: 16px;
+.notepad-quote-btn.on,
+.notepad-clip-btn.on {
+  background: rgb(0 0 0 / 0.22);
 }
 .notepad-undo {
   color: var(--accent);

@@ -20,13 +20,14 @@
 // colour picked with strokes selected recolours them too (and keeps the
 // tool as it was).
 //
-// The quote button is a disc in the highlight orange, its quote marks in
-// the pad's own colour: press it (the Pencil, a finger or the mouse) and
-// drag onto the pages, a dashed line running from it to the pointer, a
-// ring round it as it goes, and let go over a highlight or a spot on a
-// page: a link to it lands on the pad. The scissors beside it, a grey
-// tool like the map, lit while it is on, turn clip mode on and off
-// (notepad/clip.ts): a box drawn on a
+// The quote button and the scissors share one pill in the highlight
+// orange, split down the middle, their glyphs in the pad's own colour —
+// the two ways of bringing something in from the pages. Press the quote
+// (the Pencil, a finger or the mouse) and drag onto the pages, a dashed
+// line running from it to the pointer, its half darker as it goes, and
+// let go over a highlight or a spot on a page: a link to it lands on the
+// pad. The scissors, their half darker while it is on, turn clip mode on
+// and off (notepad/clip.ts): a box drawn on a
 // page, and Clip puts what it holds on the pad as an image, its page
 // under it (the clip's `top` its place, which a tap goes back to). At
 // the canvas's lower
@@ -353,24 +354,26 @@ export function NotepadBody({ attKey, kind, onBarPointerDown, tools, trailing }:
   return (
     <>
       <div className="notepad-bar">
-        <button
-          type="button"
-          className={linking ? "notepad-quote-btn linking" : "notepad-quote-btn"}
-          title="Quote — drag onto a highlight or a place on the page"
-          aria-label="Link to a highlight or a place in the PDF"
-          onPointerDown={startLink}
-        >
-          <QuoteIcon />
-        </button>
-        <button
-          type="button"
-          className={clipping ? "notepad-tool notepad-clip-btn active" : "notepad-tool notepad-clip-btn"}
-          title={clipping ? "Stop clipping (Esc)" : "Clip — draw a box on a page to put that part of it on the pad"}
-          aria-label="Clip part of a page"
-          aria-pressed={clipping}
-          onClick={toggleClip}
-          dangerouslySetInnerHTML={{ __html: SCISSORS_SVG }}
-        />
+        <div className="notepad-from-pages" role="group" aria-label="Bring in from the pages">
+          <button
+            type="button"
+            className={linking ? "notepad-quote-btn on" : "notepad-quote-btn"}
+            title="Quote — drag onto a highlight or a place on the page"
+            aria-label="Link to a highlight or a place in the PDF"
+            onPointerDown={startLink}
+          >
+            <QuoteIcon />
+          </button>
+          <button
+            type="button"
+            className={clipping ? "notepad-clip-btn on" : "notepad-clip-btn"}
+            title={clipping ? "Stop clipping (Esc)" : "Clip — draw a box on a page to put that part of it on the pad"}
+            aria-label="Clip part of a page"
+            aria-pressed={clipping}
+            onClick={toggleClip}
+            dangerouslySetInnerHTML={{ __html: SCISSORS_SVG }}
+          />
+        </div>
         {tools}
         <button
           type="button"

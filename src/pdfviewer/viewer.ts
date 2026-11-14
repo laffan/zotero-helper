@@ -42,11 +42,11 @@ import { attachTextLayer, createPageRecords } from "./pageTools";
 import { sampleTypicalPage } from "./pageSizes";
 import { changedPages, drawAnnotations } from "./paint";
 import { createNavigator } from "./navigate";
-import { attachPagedWheel, spreadOf } from "./paged";
+import { attachPagedWheel } from "./paged";
 import { getPdfjs } from "./pdfjs";
 import { attachPencilFinger } from "./pencilFinger";
 import { createPlaceKeeper } from "./place";
-import { placeAtPoint, placeInView } from "./places";
+import { pagesInView, placeAtPoint, placeInView } from "./places";
 import { createPageFinder } from "./readingProgress";
 import { createPageRenderer } from "./render";
 import { createPdfSearch } from "./search";
@@ -647,10 +647,11 @@ export function createPdfViewer(container: HTMLElement, opts: PdfViewerOptions =
       restorePendingFold();
       if (!list.length) pendingFoldAt = null; // nothing to fold back to
     },
-    /** The page in view, 1-based — and the spread it is in, first–last:
-     *  the paged view's set, or a row of pages side by side. */
+    /** The page in view, 1-based — and every page whole in view, first–
+     *  last (places.ts), or else that page alone. */
     currentPage: () => currentPage(),
-    spread: () => spreadOf(currentPage(), isPaged() || (!folded && layoutMode === "vertical") ? perSet() : 1, pages.length),
+    visiblePages: (): [number, number] =>
+      pagesInView(scrollArea, pages, currentPage() - 1, folded ? null : cropper.get()) ?? [currentPage(), currentPage()],
     /** Pages cut into a PDF of their own; a page's region as an image. */
     ...excerpts,
     /** The PDF's bookmarks, shown on their pages. */

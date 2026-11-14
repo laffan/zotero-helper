@@ -479,13 +479,18 @@ the system share sheet on iPad (via
 desktop.
 
 **Part of the open PDF.** While a PDF is open the menu adds, below a
-rule, **Share this page** — the spread in view: the paged view's set,
-the row of pages side by side in the vertical view, or else the page
-(`spread` in `viewer.ts`, `spreadOf` in `paged.ts`) — **Share pages…**
-and, when the PDF has an outline that points into its pages, **Share
-section…** (`ReaderShare.tsx`). The last two unfold, in the menu, the
-dropdowns Ask PDF's chooser uses (`PdfParts.tsx`): a first and a last
-page (the spread in view to begin with), or a section with its pages,
+rule, **Share visible pages**, **Share pages…** and, when the PDF has
+an outline that points into its pages, **Share section…**
+(`ReaderShare.tsx`). The visible pages are every page whose top and
+bottom are both in view, and at least half of it across — a spread of
+pages side by side, a paged set, the whole rows of a grid of them —
+from the first to the last (`pagesInView` in `pdfviewer/places.ts`,
+the viewer's `visiblePages`); a reading crop counts only what it
+leaves of a page, and when no page is whole (zoomed in, a page taller
+than the view) it is the page at the view's centre. They are measured
+again as the entry is pressed. Pages and Section unfold, in the menu,
+the dropdowns Ask PDF's chooser uses (`PdfParts.tsx`): a first and a
+last page (the visible pages to begin with), or a section with its pages,
 and a Share link under them. The pages are cut out of the open document
 by pdf.js's `extractPages` (`pdfviewer/excerpt.ts`), so the text stays
 text, sent to the Rust core as base64 (`stage_pdf_for_share` in
@@ -1315,7 +1320,8 @@ from the keyboard): the Questions conversations about that entry alone
 one (`ItemChats.tsx`). Ask PDF opens a small chooser beneath the
 buttons (`AskPdf.tsx`), headed Ask About, in two tiers of dropdowns:
 the first says what to ask about — Full text, Section, Pages or (with
-the PDF open) This page, the page in view — and the second, beside it,
+the PDF open) Visible pages, as the Share menu counts them (see
+Sharing) — and the second, beside it,
 says which, when that needs saying: a section of the outline (its
 headings that point into the pages, each with its pages, running to
 where the next heading at its level or above begins — `sectionSpans`

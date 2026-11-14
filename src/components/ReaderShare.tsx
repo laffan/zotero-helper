@@ -1,7 +1,9 @@
 // The Share menu's ways to share part of the open PDF, below its PDF /
-// abstract / Hush entries: the page in view (the whole spread — a paged
-// set, or the row of pages side by side), a run of pages, or — when the
-// PDF has an outline that points into its pages — one of its sections.
+// abstract / Hush entries: the visible pages (every page whose top and
+// bottom are both in view — a spread of pages side by side, a paged set
+// — or else the page at the view's centre; `pagesInView` in
+// pdfviewer/places.ts), a run of pages, or — when the PDF has an outline
+// that points into its pages — one of its sections.
 // Pages and Section unfold, in the menu, the same dropdowns Ask PDF's
 // chooser uses (PdfParts.tsx), and a Share link under them.
 //
@@ -16,7 +18,7 @@ import { pdfBaseName, sharePdfData } from "../lib/share";
 import { appLog, useStore, type ReadingState } from "../lib/store";
 import { ArrowRightIcon } from "./Icons";
 import { PageRangeSelect, pagesLabel, SectionSelect, sectionIndexAt, useSectionSpans } from "./PdfParts";
-import { readerExtractPages, readerSpread } from "./ReaderPane";
+import { readerExtractPages, readerVisiblePages } from "./ReaderPane";
 
 type Anchor = { x: number; y: number };
 
@@ -47,11 +49,11 @@ export function ReaderShareItems({ reading, done }: Props) {
   const spans = useSectionSpans(shape);
   const total = shape?.pages ?? 0;
   const here = readerPageNow() || 1;
-  const spread = readerSpread(attKey);
+  const visible = readerVisiblePages(attKey);
   const [open, setOpen] = useState<"pages" | "section" | null>(null);
   const [pick, setPick] = useState<number | null>(null);
   const section = spans[pick ?? sectionIndexAt(spans, here)];
-  const [range, setRange] = useState<[number, number]>(() => (spread ? spread : [here, here]));
+  const [range, setRange] = useState<[number, number]>(() => visible ?? [here, here]);
 
   const share = (from: number, to: number, part: string) => void sharePages(reading, attKey, from, to, part, done());
   const toggle = (which: "pages" | "section") => setOpen(open === which ? null : which);
@@ -59,13 +61,18 @@ export function ReaderShareItems({ reading, done }: Props) {
   return (
     <>
       <span className="menu-sep" />
-      <button className="menu-item" disabled={!spread} onClick={() => spread && share(spread[0], spread[1], pagesLabel(...spread))}>
-        <strong>Share this page</strong>
-        <span>
-          {spread && spread[1] > spread[0]
-            ? `The spread in view, ${pagesLabel(...spread)}, as a PDF`
-            : `${pagesLabel(spread?.[0] ?? here, spread?.[0] ?? here)} as a PDF`}
-        </span>
+      <button
+        className="menu-item"
+        disabled={!visible}
+        onClick={() => {
+          // As they are now: the menu may have stayed open while the
+          // pages scrolled beneath it.
+          const [f, t] = readerVisiblePages(attKey) ?? visible ?? [here, here];
+          share(f, t, pagesLabel(f, t));
+        }}
+      >
+        <strong>Share visible pages</strong>
+        <span>{visible ? `${pagesLabel(visible[0], visible[1])}, as a PDF` : "As a PDF"}</span>
       </button>
       <button className={`menu-item ${open === "pages" ? "unfolded" : ""}`} disabled={!total} onClick={() => toggle("pages")}>
         <strong>Share pages…</strong>

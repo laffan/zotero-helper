@@ -86,7 +86,7 @@
 /* The first tier: as wide as its longest choice. */
 .pdf-part-kind {
   flex: 0 0 auto;
-  width: 104px;
+  width: 118px;
 }
 .pdf-part-range {
   flex: 1 1 0;

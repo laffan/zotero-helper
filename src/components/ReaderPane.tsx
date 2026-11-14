@@ -145,9 +145,10 @@ export function currentReaderPage(attKey: string): number | null {
   return active?.attKey === attKey ? active.viewer.currentPage() : null;
 }
 
-/** The spread in view (1-based, first–last), when `attKey` is open. */
-export function readerSpread(attKey: string): [number, number] | null {
-  return active?.attKey === attKey && active.viewer.getPageCount() ? active.viewer.spread() : null;
+/** The pages wholly in view (1-based, first–last), when `attKey` is
+ *  open: Visible pages, to share or ask about. */
+export function readerVisiblePages(attKey: string): [number, number] | null {
+  return active?.attKey === attKey && active.viewer.getPageCount() ? active.viewer.visiblePages() : null;
 }
 
 /** Pages of `attKey` (0-based) as a PDF of their own, when it is open

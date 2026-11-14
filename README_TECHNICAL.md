@@ -117,15 +117,19 @@ src/            React + TypeScript UI (Vite, zustand, MiniSearch)
                 ExplanationList, the explanations as boxes, and the
                 sidebar's Explanations;
                 NotepadBody, a view of the notepad, and ReadingNotepad,
-                its floating or edge-docked window), WordList (Words),
-                terminal, import/rescue modals
+                its floating or edge-docked window; AskPdf, Ask PDF's
+                chooser; ReaderShare, the Share menu's parts of the open
+                PDF; PdfParts, the dropdowns both pick a section or pages
+                with), WordList (Words), terminal, import/rescue modals
   notepad/      the notepad: model (notes, links, storage, the pad
                 shared between views), surface (the Pencil writes, a
                 finger pans), ink (the strokes, on one canvas the size
                 of the view), geometry (paths, hit tests), links (the
-                links' chips, their sizing and menu), lasso (a long
-                press selects), follow (the part of the pad about a
-                page), minimap (the whole pad, small)
+                links' chips, their sizing, pins and menu, and clips),
+                lasso (a long press selects), follow (the part of the
+                pad about a page, and the glide there), noteLabels (each
+                note's page above it), clip (clip mode over the pages),
+                minimap (the whole pad, small)
   components/settings/
                 the settings page: SettingsView (section list, the
                 draft and Save) and one component per section —
@@ -150,7 +154,9 @@ src/            React + TypeScript UI (Vite, zustand, MiniSearch)
                 steps), crop (the paged view's trimmed reading),
                 citeMark (an AI citation's passage, marked), passageMarks
                 (the passages the AI explained, the words looked up),
-                darkPages (the pages white on black), pencilFinger
+                excerpt (pages cut into a PDF of their own, a page's
+                region as an image), darkPages (the pages white on
+                black), pencilFinger
                 (the Pencil out of ink mode, a finger), bookmarkHold
                 (reading mode's hold on a corner), places (where the
                 reader is, what is at a point — for the notepad), and
@@ -186,7 +192,8 @@ src/            React + TypeScript UI (Vite, zustand, MiniSearch)
   styles/       one stylesheet per UI region (tokens, base, toolbar, …;
                 keyboard = the pane outline and sidebar cursor;
                 pdfviewer-dark = dark pages; explanations = the
-                explanation boxes)
+                explanation boxes; notepad-clips = the notepad's pins
+                and clips, and clip mode)
 src-tauri/      Rust core (all networking + state)
   src/zotero/      Zotero Web API v3: paginated sync (sync), versioned
                    writes, and attachment files (files — create, upload
@@ -207,6 +214,9 @@ src-tauri/      Rust core (all networking + state)
   src/chats.rs     the Questions conversations on disk
   src/words.rs     the Words looked up, on disk
   src/notepads.rs  the notepads on disk, one per PDF
+  src/share.rs     staging files for the share sheet (an attachment, a
+                   text, a PDF made in the webview) and the desktop's
+                   exports
   src/bookmarks.rs the reader's bookmarks on disk (bookmarks.json)
   src/capture.rs   desktop capture-browser window (download interception)
   tauri-plugin-capture-view/, tauri-plugin-share-sheet/,
@@ -468,6 +478,21 @@ the system share sheet on iPad (via
 `src-tauri/tauri-plugin-share-sheet/`) and save/folder dialogs on
 desktop.
 
+**Part of the open PDF.** While a PDF is open the menu adds, below a
+rule, **Share this page** — the spread in view: the paged view's set,
+the row of pages side by side in the vertical view, or else the page
+(`spread` in `viewer.ts`, `spreadOf` in `paged.ts`) — **Share pages…**
+and, when the PDF has an outline that points into its pages, **Share
+section…** (`ReaderShare.tsx`). The last two unfold, in the menu, the
+dropdowns Ask PDF's chooser uses (`PdfParts.tsx`): a first and a last
+page (the spread in view to begin with), or a section with its pages,
+and a Share link under them. The pages are cut out of the open document
+by pdf.js's `extractPages` (`pdfviewer/excerpt.ts`), so the text stays
+text, sent to the Rust core as base64 (`stage_pdf_for_share` in
+`src-tauri/src/share.rs`) and shared as a PDF named after the entry's
+own and the part: "close-reading (pp. 4–9).pdf", "close-reading
+(Methods, pp. 4–9).pdf".
+
 ### Reading: the PDF viewer and notes
 
 **Reading notes** — every entry has a **Notes** tab holding its
@@ -517,7 +542,10 @@ was. The tab in front is not remembered: a PDF opens on Highlights
 citation, which keeps the conversation in front (`setReading`'s tab). When the PDF has an outline,
 a panel button at the left of the toolbar, before the name, shows it
 beside the pages: a folding tree of its headings, each a link to its
-place, with the section being read marked as you go. Beside its ×, a
+place, with the section being read marked as you go. With the thumbnail
+grid open beside it (G), a heading picked also scrolls the grid to its
+page and marks that page (`reveal` in `thumbnails.ts`, from the
+navigator's `positioned`). Beside its ×, a
 pair of chevrons opens every section, or, with every section open,
 folds them all (it is absent when the outline has no nested
 headings). Widen the notes
@@ -1285,12 +1313,17 @@ right panel gets a fourth tab (the conversation icon, with a count; Q
 from the keyboard): the Questions conversations about that entry alone
 (`isAbout`), newest first, with Ask Abstract / Ask PDF to start
 one (`ItemChats.tsx`). Ask PDF opens a small chooser beneath the
-buttons (`AskPdf.tsx`): the whole PDF, one section of its outline — a
-list of the outline's headings that point into the pages, each with
-its pages, running to where the next heading at its level or above
-begins (`sectionSpans` in `lib/outline.ts`; left out when the PDF has
-no outline, or one that resolves to no pages) — or a run of pages,
-"from" to "to". The PDF's outline and page count are read as the
+buttons (`AskPdf.tsx`), headed Ask About, in two tiers of dropdowns:
+the first says what to ask about — Full text, Section, Pages or (with
+the PDF open) This page, the page in view — and the second, beside it,
+says which, when that needs saying: a section of the outline (its
+headings that point into the pages, each with its pages, running to
+where the next heading at its level or above begins — `sectionSpans`
+in `lib/outline.ts`; Section is left out when the PDF has no outline,
+or one that resolves to no pages), or a first and a last page. Under
+them, one link — "Begin conversation with “Methods”" — starts it. The
+dropdowns are `PdfParts.tsx`'s, which the reader's Share menu uses too.
+The PDF's outline and page count are read as the
 chooser opens (the open PDF's come from the viewer; any other is read
 from the device, downloaded first if need be, as asking would). A part
 goes to the model as its pages only, after their page markers, under
@@ -1331,23 +1364,28 @@ window. Each is kept as a conversation about the entry (`mode`
 but shown as what it is: under Explanations in the entry's
 conversations tab, and in **Explanations**, a row between Questions and
 Words in the sidebar, never among Questions' conversations
-(`ExplanationList.tsx`). Each is a box: the passage as its head, a
-link that unfolds the answer beneath it (folded to begin with, and
-drawn as a box, background and edge, only while unfolded), an info button that shows when it was asked, by which
-model, what it cost, whether with its context and from which work, and
-a quieter trash can; the sidebar's list, every document's explanations
-newest first, adds under each the work and page, which opens the PDF
-there with the passage marked, as Words' source links do, and a filter
+(`ExplanationList.tsx`). Each is a box: the passage as its head, in
+the text's own weight, a link that unfolds the answer beneath it, set
+in as far as the passage (folded to begin with, and drawn as a box,
+background and edge, only while unfolded); at its right, the page the
+passage was read on ("p. 12"), the link back to it — the PDF opened (or
+moved) there and the passage found and marked, as an answer's
+citations are — then an info button that shows when it was asked, by
+which model, what it cost, whether with its context and from which
+work, and a quieter trash can; the sidebar's list, every document's
+explanations newest first, adds under each the work, a link back too,
+and a filter
 box at its top that narrows the list by passage, answer or work. The
-explained passage stays marked in the PDF with a dashed pink outline
-(`--explain-mark`, an overlay like a citation's, `passageMarks.ts`;
-where it is kept as the chat's `passage`), and a tap on it opens its
-explainer again — in reading mode too. The window's foot has
-**Remove Highlight** (a second press confirms): the explanation is
-kept, and its page (the Context toggle and the list's link back go by
-it), but the passage's rects are let go, so the outline and its tap
-are gone from the PDF, and going back from the list no longer marks
-the passage.
+explained passage stays marked in the PDF with a dashed purple
+underline (`--explain-underline`, an overlay like a citation's,
+`passageMarks.ts`; where it is kept as the chat's `passage`), and a tap
+on it opens its explainer again — in reading mode too. The window's
+foot has **Remove Underline** (a second press confirms): the
+explanation is kept, and its page (the Context toggle and the list's
+link back go by it), but the passage's rects are let go, so the
+underline and its tap are gone from the PDF. The way back from the
+list is kept all the same: it finds the passage by its words and marks
+it for the moment, as an answer's citation does (`citeMark.ts`).
 
 **Look up and Words.** The selection bar's magnifier (and the
 highlight editor's) asks for a definition of the selected word or
@@ -1357,7 +1395,7 @@ system prompt that keeps it to at most 50 words (`mode` "define"). The
 answer shows in a small box over the bar (`lookupPopup.ts`), a one-off
 that goes with the selection and is never part of a conversation
 (`lib/ai/lookup.ts`). A word looked up from a selection stays
-underlined in the pages — dashed, in the explained passages' pink — and
+underlined in the pages — dashed, in pink (`--explain-mark`) — and
 a tap on it shows its definition in the same box, above the word, until
 the next press elsewhere or a scroll (`passageMarks.ts`, kept as the
 word's `place`: its page and rects; a highlight's text looked up from
@@ -1548,19 +1586,22 @@ divider, dragged to share the height, with Hide Notepad at its middle.
 
 Either way it is one continuous surface in the panel's colour: a slim
 bar of tools over the canvas — a very faint dot grid, which pans with
-it. From the bar's left: the quote button, the host's own tools
-(auto-shift), the map, the scroll link (following the PDF), the empty
-middle; then, just before
+it. From the bar's left: the quote button, the scissors (clip mode),
+the host's own tools (auto-shift), the map, the scroll link (following
+the PDF), the empty middle; then, just before
 undo and the host's close, one switch of four parts saying what the
 Pencil does: write in the ink of the theme — black, white in the dark
 theme (`--notepad-ink`; such a stroke is kept with no colour, so it
 follows the appearance) — write in red, the reading-mode red
 (`RED_INK`, `#ff5f57`, kept with the stroke), erase, or lasso. The
 colour is this device's (`zh-notepad-pen-color`), shared by every view.
+With strokes selected (the lasso), a colour picked recolours them too,
+and the tool stays as it was (`setColor` in `surface.ts`; undone like
+anything else).
 
-The quote button is round, ringed (set a little in) in the highlight
-orange (`#f19837`); while a link is drawn out of it the ring is
-stronger and the button tinted.
+The quote button and the scissors are discs of the highlight orange
+(`#f19837`), their glyphs in the pad's own colour; a ring round one
+shows a link being drawn out of the quote, or clip mode on.
 
 On the canvas the Pencil writes — a tap is a dot — a finger pans, and a
 mouse writes with a drag (a Mac has no Pencil) while a wheel pans; each
@@ -1613,7 +1654,7 @@ pen, which is why that seemed to bring the pen back.)
 the mouse held still where it came down for 500ms turns that press
 into a lasso — the stroke begun is dropped, and the loop is drawn on
 from there, dashed. Let go, it selects the strokes with any point
-inside it and the links whose middle is. The selection is framed, with
+inside it and the links whose middle is (not those fixed by a pin). The selection is framed, with
 Delete above the frame; a drag that starts inside the frame moves it
 (any pointer), ⌫ deletes it, Escape lets go, and so does a tap on it
 or a press anywhere else — the Pencil then writes at once. Held, the
@@ -1655,7 +1696,39 @@ quote is sized by a small dotted circle at its lower right (the
 floating pad's grip, smaller): its width and height are kept with the
 link (`w`, `h`), the text wrapping to the width and clipped at the
 height. A link held (a long press, or a right-click) opens a small menu
-under it with Delete. The menus' buttons act on the release of a press
+under it with Delete.
+
+**Pins.** A quote has a pin under its link icon, at its lower left (a
+clip has one under its image, before its page). Pressed, it fixes the
+quote to the pad (`fixed` on the link): it moves to a layer that pans
+with the others but lies beneath the ink (surface.ts's `under`), so the
+Pencil writes over it, and it is flat, not dragged, sized, selected by
+the lasso or held for its menu — only its pin, now filled orange, takes
+a press, to let it go again. A tap on it otherwise is the canvas's,
+which goes to its target as a tap on a note goes to the note's place.
+Undo takes back a pin as it does a move.
+
+**Clips.** The scissors turn on clip mode (`notepad/clip.ts`): a
+transparent overlay is laid over the pages' scroll area, inside the
+viewer (as the thumbnail grid is), so every press — a finger, the
+Pencil, the mouse — goes to it rather than to the pages' many handlers
+(selection, ink, the sentence tool, highlights); a wheel or trackpad
+still scrolls the pages beneath, though a finger doesn't. A drag on a
+page draws a box, dashed red, the rest of the view dimmed a little,
+with **Clip** under it and × beside that; a press inside the box moves
+it, one on a corner sizes it, one anywhere else on a page starts
+another. The box is kept as fractions of its page and follows it as it
+scrolls. Clip draws the region afresh from the PDF (`clipImage` in
+`pdfviewer/excerpt.ts`: up to 3 pixels a point, at most 1800 on the
+longer side, the reader's highlights and ink painted in, a JPEG) and
+puts it on the pad as a link with an `image` — at the middle of the
+view, as wide as the region in points (at most 70% of the pad), its
+target the spot on the page it came from — and clip mode ends; so do
+Escape, × and the scissors again. On the pad a clip is the image with
+its pin and page under it; it is dragged, tapped (to go back to its
+place), held for Delete and sized by its grip like a quote, keeping
+its proportions. The image is kept in the notepad's file, so a pad of
+many clips is a larger file to write. The menus' buttons act on the release of a press
 (`onPress`): the canvas cancels its touches so a finger pans, and that
 cancelled the click a tap on them would have ended in — Delete did
 nothing on the iPad.
@@ -1672,7 +1745,8 @@ only when the pad changes (the surface's `watch`, at a pause in the
 writing) or the fit does. A faint trash can at
 the canvas's lower left clears the pad — strokes, notes and links —
 once "Clear the whole notepad?" is answered. Undo takes back the last
-stroke, erasing, link, move, deletion or clearing. Kept on this device
+stroke, erasing, link or clip, move, pin, recolouring, deletion or
+clearing. Kept on this device
 (`notepads/<attKey>.json`, `src-tauri/src/notepads.rs`), written a
 moment after each change; never sent to Zotero.
 

@@ -5,7 +5,9 @@
 
 use crate::state::AppState;
 use crate::{zotero, Error, Result};
+use base64::{engine::general_purpose::STANDARD, Engine as _};
 use std::path::{Path, PathBuf};
+use tauri::State;
 
 /// Keep a user-visible filename filesystem-safe without mangling
 /// ordinary titles ("Attention Is All You Need.pdf" stays readable).
@@ -50,6 +52,27 @@ pub async fn stage_attachment(
 pub fn stage_text(state: &AppState, file_name: &str, content: &str) -> Result<String> {
     let path = share_dir(state)?.join(sanitize_filename(file_name));
     std::fs::write(&path, content)?;
+    Ok(path.to_string_lossy().into_owned())
+}
+
+/// Write a PDF the webview made — pages cut out of the open one (the
+/// reader's Share this page / pages / section), sent as base64 — into
+/// the staging dir under a readable name; returns the staged path.
+#[tauri::command]
+pub async fn stage_pdf_for_share(
+    state: State<'_, AppState>,
+    file_name: String,
+    data: String,
+) -> Result<String> {
+    let bytes = STANDARD
+        .decode(data.as_bytes())
+        .map_err(|e| Error::msg(format!("Bad PDF data: {e}")))?;
+    let mut name = sanitize_filename(&file_name);
+    if !name.to_ascii_lowercase().ends_with(".pdf") {
+        name.push_str(".pdf");
+    }
+    let path = share_dir(&state)?.join(name);
+    std::fs::write(&path, bytes)?;
     Ok(path.to_string_lossy().into_owned())
 }
 

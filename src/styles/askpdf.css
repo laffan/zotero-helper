@@ -1,51 +1,103 @@
 /* Ask PDF's chooser (src/components/AskPdf.tsx), under the conversations
-   tab's buttons: the whole PDF, a section of its outline, or a run of
-   pages. */
+   tab's buttons: what to ask about in a dropdown, which section or pages
+   in a second beside it when that needs saying, and a link that begins
+   the conversation. The dropdowns are PdfParts.tsx's, shared with the
+   reader's Share menu (toolbar.css). */
 .ask-pdf {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  padding: 8px 12px 10px;
-  border-bottom: 1px solid var(--border);
+  gap: 8px;
+  margin: 8px 12px 4px;
+  padding: 9px 10px 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel);
   font-size: calc(12px * var(--font-scale));
   color: var(--text-dim);
 }
 .ask-pdf-head {
   display: flex;
-  align-items: center;
+  align-items: baseline;
+  gap: 8px;
+  font-size: calc(11px * var(--font-scale));
   font-weight: 600;
-  color: var(--text);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-dim);
 }
 .ask-pdf-close {
   margin-left: auto;
+  align-self: center;
   display: inline-flex;
   color: var(--text-dim);
 }
 .ask-pdf-row {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 6px;
   min-width: 0;
-}
-/* The tab's link-like buttons, in the rows rather than pushed right. */
-.ask-pdf-row .meta-tab-action {
-  margin: 0;
 }
 .ask-pdf-note {
   display: inline-flex;
   align-items: center;
   gap: 5px;
   font-size: calc(11px * var(--font-scale));
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: 0;
 }
-.ask-pdf-select {
-  flex: 1;
+/* The link that begins it, naming what it is about. */
+.ask-pdf-begin {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  align-self: flex-start;
+  max-width: 100%;
+  font-size: calc(12px * var(--font-scale));
+  font-weight: 500;
+  word-break: normal;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ask-pdf-begin:disabled {
+  color: var(--text-dim);
+  text-decoration: none;
+  cursor: default;
+}
+
+/* The dropdowns that pick a part of a PDF (PdfParts.tsx): compact, the
+   app's own chevron in place of the system's. */
+.pdf-part-select {
+  flex: 1 1 0;
   min-width: 0;
-  padding: 3px 6px;
+  height: 28px;
+  padding: 0 24px 0 8px;
+  border-radius: 6px;
   font-size: calc(12px * var(--font-scale));
+  -webkit-appearance: none;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' width='10' height='10' fill='none' stroke='%238a857d' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3.5 6L8 10.5 12.5 6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 8px center;
+  text-overflow: ellipsis;
 }
-.ask-pdf-page {
-  width: 4.2em;
-  padding: 3px 6px;
-  font-size: calc(12px * var(--font-scale));
-  text-align: center;
+/* The first tier: as wide as its longest choice. */
+.pdf-part-kind {
+  flex: 0 0 auto;
+  width: 104px;
+}
+.pdf-part-range {
+  flex: 1 1 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.pdf-part-range .pdf-part-select {
+  min-width: 64px;
+}
+.pdf-part-dash {
+  color: var(--text-dim);
 }

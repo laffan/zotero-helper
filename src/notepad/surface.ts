@@ -7,11 +7,14 @@
 // the same on a full pad as on an empty one — it reads no layout (the
 // canvas's box is read once, as a press begins) and nothing is drawn
 // again. Over the canvas, a layer that pans with it holds the notes'
-// labels, the links' chips and the lasso's loop and frame.
+// labels, the links' chips and the lasso's loop and frame; under it, a
+// layer that pans too holds what is fixed by its pin (a quote, a clip),
+// the pad's ground, written over (links.ts).
 //
 // The pen writes in the ink of the theme (`--notepad-ink`, kept as an
 // empty colour, so a stroke follows the appearance) or in red
-// (`RED_INK`); `setColor` picks which, for the strokes after it.
+// (`RED_INK`); `setColor` picks which, for the strokes after it — and,
+// with strokes selected, recolours them.
 //
 // Who does what: the Pencil (`pointerType` "pen") writes — a tap is a
 // dot — or, with the eraser on (the Pencil's double-tap, the bar's
@@ -26,7 +29,7 @@
 // written while the reader stays on one page are one note (model.ts),
 // which remembers the reader's place when it began; turning to another
 // page — even to come straight back — starts the next. Each note shows
-// its page, small, above it.
+// its page, small, above it (noteLabels.ts).
 //
 // What the pen sets off waits for it. Its gestures are reported to
 // lib/penActivity.ts, which holds the pages' renders (and the pad's
@@ -53,11 +56,12 @@
 import { penDown, penHeard, penUp } from "../lib/penActivity";
 import type { PagePlace, PlaceTarget } from "../pdfviewer/places";
 import { touches } from "./geometry";
-import { spotFor } from "./follow";
-import { createPadInk, strokeBox } from "./ink";
+import { createFollower } from "./follow";
+import { createPadInk } from "./ink";
 import { createLasso } from "./lasso";
 import { capture, createLinkChips } from "./links";
 import { newId, type Note, type Notepad, type NoteLink, type NoteStroke } from "./model";
+import { createNoteLabels } from "./noteLabels";
 
 const SVG_NS = "http://www.w3.org/2000/svg";
 const PEN_WIDTH = 2;
@@ -72,8 +76,6 @@ const STILL_PX = 4;
 const HOLD_MS = 500;
 /** A gesture that has heard nothing for this long has lost its end. */
 const STALE_MS = 1500;
-/** How long the pad takes to glide to the part about a page, ms. */
-const GLIDE_MS = 350;
 /** The eraser's reach, CSS px. */
 const ERASE_PX = 10;
 /** A pen's eraser button (PointerEvent.buttons). */
@@ -103,7 +105,9 @@ type Step =
   | { kind: "link"; id: string }
   | { kind: "erase"; strokes: NoteStroke[]; notes: Note[] }
   | { kind: "remove" | "clear"; strokes: NoteStroke[]; notes: Note[]; links: NoteLink[] }
-  | { kind: "move"; strokes: string[]; links: string[]; dx: number; dy: number };
+  | { kind: "move"; strokes: string[]; links: string[]; dx: number; dy: number }
+  | { kind: "fix"; link: NoteLink }
+  | { kind: "recolor"; was: [NoteStroke, string][] };
 
 /** What a minimap is told: the view moved, or the pad changed. */
 export type SurfaceChange = "view" | "content";
@@ -127,9 +131,12 @@ export function createSurface(host: HTMLElement, env: SurfaceEnv) {
   host.appendChild(layer);
 
   const ink = createPadInk(host, () => env.pad().strokes);
+  // What is fixed by its pin, beneath the ink.
+  const under = document.createElement("div");
+  under.className = "notepad-layer notepad-under";
+  host.prepend(under);
   const chips = new Map<string, HTMLElement>();
-  // Each note's page label, by note.
-  const noteLabels = new Map<string, HTMLElement>();
+  const noteLabels = createNoteLabels(env.pad);
   // What undo takes back, last first.
   const history: Step[] = [];
   // The note being written: the reader's visit to its page.
@@ -148,13 +155,21 @@ export function createSurface(host: HTMLElement, env: SurfaceEnv) {
   const showPan = () => {
     panFrame = 0;
     ink.setPan(pan.x, pan.y);
-    layer.style.transform = `translate(${pan.x}px, ${pan.y}px)`;
+    layer.style.transform = under.style.transform = `translate(${pan.x}px, ${pan.y}px)`;
     host.style.backgroundPosition = `${pan.x}px ${pan.y}px`;
     tell("view");
   };
   const applyPan = () => {
     if (!panFrame) panFrame = requestAnimationFrame(showPan);
   };
+  // Following the PDF (follow.ts): a glide to the part about a page.
+  const follower = createFollower({
+    pad: env.pad,
+    host,
+    pan: () => pan,
+    setPan: (x, y) => ((pan = { x, y }), applyPan()),
+    busy: () => g !== null,
+  });
   // The canvas's place in the window: read as a press begins and used
   // for all of it, so a sample reads no layout.
   let origin: { left: number; top: number } | null = null;
@@ -163,24 +178,6 @@ export function createSurface(host: HTMLElement, env: SurfaceEnv) {
     const r = origin ?? host.getBoundingClientRect();
     return [cx - r.left - pan.x, cy - r.top - pan.y];
   };
-
-  // Each note's top left corner, kept as its strokes arrive; forgotten
-  // (and measured again when asked for) at any other change.
-  const noteCorner = new Map<string, [number, number]>();
-  function cornerOf(id: string): [number, number] | null {
-    let c = noteCorner.get(id);
-    if (c) return c;
-    let [x0, y0] = [Infinity, Infinity];
-    for (const s of env.pad().strokes) {
-      if (s.note !== id) continue;
-      const b = strokeBox(s);
-      x0 = Math.min(x0, b[0]);
-      y0 = Math.min(y0, b[1]);
-    }
-    if (x0 === Infinity) return null;
-    noteCorner.set(id, (c = [x0, y0]));
-    return c;
-  }
 
   /** The notes left with no strokes go too; returned, for undo. */
   function dropEmptyNotes(): Note[] {
@@ -194,41 +191,25 @@ export function createSurface(host: HTMLElement, env: SurfaceEnv) {
     changed: () => env.changed(),
     goTo: (l) => env.goTo(l.target),
     remove: (l) => removeItems([], [l]),
+    toggleFixed: (l) => {
+      l.fixed = !l.fixed || undefined;
+      history.push({ kind: "fix", link: l });
+      drawLabels();
+      env.changed();
+    },
   });
-
-  /** A note's label, made or moved to the top left of its strokes;
-   *  null when it has none. */
-  function noteLabel(n: Note): HTMLElement | null {
-    const corner = cornerOf(n.id);
-    if (!corner) return null;
-    const [x0, y0] = corner;
-    let el = noteLabels.get(n.id);
-    if (!el) {
-      el = document.createElement("span");
-      el.className = "notepad-note-label";
-      el.textContent = `p. ${n.pageIndex + 1}`;
-      noteLabels.set(n.id, el);
-    }
-    el.style.left = `${x0}px`;
-    el.style.top = `${y0 - 16}px`;
-    return el;
-  }
 
   /** Each note's page, small, above its first line; and the links. */
   function drawLabels(): void {
     const pad = env.pad();
     labels.replaceChildren();
+    under.replaceChildren();
     chips.clear();
-    noteLabels.clear();
-    noteCorner.clear();
-    for (const n of pad.notes) {
-      const el = noteLabel(n);
-      if (el) labels.appendChild(el);
-    }
+    labels.append(...noteLabels.all());
     for (const l of pad.links) {
       const chip = linkChips.chip(l);
       chips.set(l.id, chip);
-      labels.appendChild(chip);
+      (l.fixed ? under : labels).appendChild(chip);
     }
     lasso.prune();
     tell("content");
@@ -354,7 +335,7 @@ export function createSurface(host: HTMLElement, env: SurfaceEnv) {
     e.preventDefault();
     capture(host, e.pointerId);
     dropPageSelection();
-    stopGlide();
+    follower.stop();
     origin = host.getBoundingClientRect();
     heardAt = performance.now();
     // A finger pans and taps; anything else writes, erases or selects.
@@ -430,10 +411,16 @@ export function createSurface(host: HTMLElement, env: SurfaceEnv) {
     return null;
   }
 
+  /** A tap goes to the note under it; else to what is fixed there. */
   function tapOn(cx: number, cy: number): void {
     const id = noteAt(cx, cy);
     const note = id ? env.pad().notes.find((n) => n.id === id) : null;
-    if (note) env.goTo({ kind: "place", pageIndex: note.pageIndex, top: note.top });
+    if (note) return env.goTo({ kind: "place", pageIndex: note.pageIndex, top: note.top });
+    const fixed = env.pad().links.find((l) => {
+      const r = l.fixed && chips.get(l.id)?.getBoundingClientRect();
+      return r && cx >= r.left && cx <= r.right && cy >= r.top && cy <= r.bottom;
+    });
+    if (fixed) env.goTo(fixed.target);
   }
 
   function onUp(e: PointerEvent): void {
@@ -504,51 +491,11 @@ export function createSurface(host: HTMLElement, env: SurfaceEnv) {
     const stroke: NoteStroke = { id: newId("s"), points: pts, width: PEN_WIDTH, color, note };
     pad.strokes.push(stroke);
     history.push({ kind: "stroke", id: stroke.id });
-    // Only this note's label moves (or appears), and by this stroke's
-    // box alone: rebuilding them all, and every link's chip, at each
-    // pen-up cost the next stroke its start on a full pad.
-    const box = strokeBox(stroke);
-    const corner = noteCorner.get(note);
-    if (corner) noteCorner.set(note, [Math.min(corner[0], box[0]), Math.min(corner[1], box[1])]);
-    const n = pad.notes.find((x) => x.id === note);
-    const el = n && noteLabel(n);
+    // Only this note's label moves (or appears) — noteLabels.ts.
+    const el = noteLabels.grew(stroke);
     if (el && !el.isConnected) labels.prepend(el);
     tell("content");
     env.changed();
-  }
-
-  // --- following the PDF ----------------------------------------------------
-  /** Pan, smoothly, to the part of the pad about `pageIndex` — its top a
-   *  little below the pad's top, its left in view. */
-  function follow(pageIndex: number): void {
-    const spot = spotFor(env.pad(), pageIndex);
-    if (!spot || g) return;
-    const margin = 28;
-    const y = margin - spot.y;
-    const x = spot.x + pan.x < 8 || spot.x + pan.x > host.clientWidth - 40 ? margin - spot.x : pan.x;
-    if (Math.abs(y - pan.y) < 2 && Math.abs(x - pan.x) < 2) return;
-    glideTo(x, y);
-  }
-
-  // A short glide (GLIDE_MS, easing out) to where the pad is going; a
-  // press on the pad stops it where it is.
-  let glide = 0;
-  function stopGlide(): void {
-    cancelAnimationFrame(glide);
-    glide = 0;
-  }
-  function glideTo(x: number, y: number): void {
-    stopGlide();
-    const from = { ...pan };
-    const t0 = performance.now();
-    const step = (now: number) => {
-      const t = Math.min(1, (now - t0) / GLIDE_MS);
-      const k = 1 - (1 - t) ** 3;
-      pan = { x: Math.round(from.x + (x - from.x) * k), y: Math.round(from.y + (y - from.y) * k) };
-      applyPan();
-      glide = t < 1 ? requestAnimationFrame(step) : 0;
-    };
-    glide = requestAnimationFrame(step);
   }
 
   function onWheel(e: WheelEvent): void {
@@ -579,30 +526,41 @@ export function createSurface(host: HTMLElement, env: SurfaceEnv) {
   return {
     /** Redraw from the pad (another view changed it). */
     render,
-    follow,
+    follow: follower.follow,
     tool: () => tool,
     setTool,
-    /** The pen's colour from now on ("" for the theme's ink). */
-    setColor(c: string): void {
+    /** The pen's colour from now on ("" for the theme's ink) — and the
+     *  selected strokes': true when there were any to recolour. */
+    setColor(c: string): boolean {
       color = c;
+      const picked = lasso.strokes().filter((s) => s.color !== c);
+      if (!picked.length) return lasso.strokes().length > 0;
+      history.push({ kind: "recolor", was: picked.map((s) => [s, s.color]) });
+      for (const s of picked) s.color = c;
+      ink.redraw();
+      env.changed();
+      return true;
     },
-    /** Add a link at the middle of what this view shows. */
-    addLink(target: PlaceTarget): void {
+    /** Add a link (or, with `image`, a clip `w` wide) at the middle of
+     *  what this view shows. */
+    addLink(target: PlaceTarget, clip?: { image: string; w: number }): void {
       const pad = env.pad();
       const shift = (pad.links.length % 5) * 14;
+      const half = clip ? Math.max(80, Math.min(clip.w, host.clientWidth * 0.7)) / 2 : 90;
       const link: NoteLink = {
         id: newId("link"),
-        x: Math.round(host.clientWidth / 2 - pan.x - 90 + shift),
-        y: Math.round(host.clientHeight / 2 - pan.y - 12 + shift),
+        x: Math.round(host.clientWidth / 2 - pan.x - half + shift),
+        y: Math.round(host.clientHeight / 2 - pan.y - (clip ? 60 : 12) + shift),
         target,
+        ...(clip && { image: clip.image, w: Math.round(half * 2) }),
       };
       pad.links.push(link);
       history.push({ kind: "link", id: link.id });
       drawLabels();
       env.changed();
     },
-    /** Take back the last stroke, link, erasing, move, deletion or
-     *  clearing made in this view. */
+    /** Take back the last stroke, link, erasing, move, pin, recolouring,
+     *  deletion or clearing made in this view. */
     undo(): void {
       const step = history.pop();
       if (!step) return;
@@ -610,6 +568,8 @@ export function createSurface(host: HTMLElement, env: SurfaceEnv) {
       const pad = env.pad();
       if (step.kind === "link") pad.links = pad.links.filter((l) => l.id !== step.id);
       else if (step.kind === "move") shift(step.strokes, step.links, -step.dx, -step.dy);
+      else if (step.kind === "fix") step.link.fixed = !step.link.fixed || undefined;
+      else if (step.kind === "recolor") for (const [st, c] of step.was) st.color = c;
       else if (step.kind === "stroke") {
         pad.strokes = pad.strokes.filter((s) => s.id !== step.id);
         dropEmptyNotes();
@@ -643,7 +603,7 @@ export function createSurface(host: HTMLElement, env: SurfaceEnv) {
     linkBoxes: () =>
       env.pad().links.map((l) => {
         const chip = chips.get(l.id);
-        const color = l.target.kind === "annotation" ? l.target.color || "#ffd400" : RED_INK;
+        const color = l.image ? "#9a958d" : l.target.kind === "annotation" ? l.target.color || "#ffd400" : RED_INK;
         return { x: l.x, y: l.y, w: chip?.offsetWidth ?? 120, h: chip?.offsetHeight ?? 24, color };
       }),
     panTo(x: number, y: number, done: boolean): void {
@@ -662,7 +622,7 @@ export function createSurface(host: HTMLElement, env: SurfaceEnv) {
         window.clearTimeout(g.hold);
         penUp(me);
       }
-      stopGlide();
+      follower.stop();
       cancelAnimationFrame(panFrame);
       ink.destroy();
       linkChips.closeMenu();
@@ -675,6 +635,7 @@ export function createSurface(host: HTMLElement, env: SurfaceEnv) {
       host.removeEventListener("touchstart", stopTouch);
       host.removeEventListener("touchmove", stopTouch);
       layer.remove();
+      under.remove();
     },
   };
 }

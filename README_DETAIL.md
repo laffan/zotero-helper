@@ -27,13 +27,15 @@ Windows/Linux desktops too).
   ⌘-click (or the sentence tool) selects a whole sentence, highlights
   can run across a page break and their ends can be dragged, and
   reading mode has a notepad for the Apple Pencil (in the theme's ink
-  or red) that links back into the pages.
+  or red) that links back into the pages and takes clips of them, which
+  can be pinned and written over. A page, a run of pages or a section
+  can be shared as a PDF of its own.
 - **AI helpers (optional)** — tidy metadata, extract abstracts, ask
-  questions of abstracts or full papers with page-cited answers, have a
-  selected passage explained in a few lines, with or without the work as
-  context (kept in Explanations), or a word defined (kept in Words and
-  underlined in the pages), with prompts you can edit, using Anthropic or
-  OpenAI models.
+  questions of abstracts, full papers or a part of one with page-cited
+  answers, have a selected passage explained in a few lines, with or
+  without the work as context (kept in Explanations and underlined in
+  the pages), or a word defined (kept in Words and underlined in the
+  pages), with prompts you can edit, using Anthropic or OpenAI models.
 - **Keyboard first** — rebindable shortcuts for moving between panes, the
   list, and the viewer's modes (Settings → Keyboard Shortcuts).
 - **Your look** — light, dark or system appearance and an adjustable UI font

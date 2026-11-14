@@ -38,7 +38,6 @@
   padding: 0;
   color: var(--text);
   font-size: calc(13px * var(--font-scale));
-  font-weight: 600;
   line-height: 1.4;
   text-align: left;
   word-break: normal;
@@ -52,6 +51,7 @@
 }
 .explanation-actions {
   display: flex;
+  align-items: center;
   gap: 2px;
   /* At the right edge, however short the passage; the buttons (28px)
      overhang the passage's first line rather than heighten the row. */
@@ -65,8 +65,19 @@
 .explanation-info.on {
   opacity: 1;
 }
+/* The page the passage was read on: the link back to it. */
+.explanation-page {
+  margin-right: 4px;
+  padding: 2px 4px;
+  font-size: calc(11.5px * var(--font-scale));
+  white-space: nowrap;
+  word-break: normal;
+}
+/* Set in as far as the passage's text, past its chevron (11px and the
+   5px gap). */
 .explanation-answer {
   margin-top: 6px;
+  padding-left: 16px;
   color: var(--text);
   font-size: calc(13px * var(--font-scale));
   line-height: 1.5;
@@ -120,7 +131,7 @@
 .explanation:not(.open) .explanation-source {
   margin-top: 2px;
 }
-/* The explainer window's Remove Highlight (ExplainChat.tsx), at the left
+/* The explainer window's Remove Underline (ExplainChat.tsx), at the left
    of its foot; red once a second press would remove it. */
 .explain-unmark {
   margin-right: auto;

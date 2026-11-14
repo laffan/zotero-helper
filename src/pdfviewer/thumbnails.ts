@@ -111,6 +111,20 @@ export function createThumbnailManager(root: HTMLElement, env: ThumbnailEnv) {
     for (const cell of Array.from(scroll.children)) observer.observe(cell);
   }
 
+  /** While the grid is open over the pages — not as the picker — bring
+   *  page `n` (1-based) to its top and mark it: an outline entry picked
+   *  beside the grid (OutlinePanel.tsx) shows where in it that is. */
+  function reveal(n: number): void {
+    const scroll = panel?.querySelector<HTMLElement>(".pdf-thumbnail-scroll");
+    if (!scroll || panel?.classList.contains("pdf-thumb-picker")) return;
+    const cell = scroll.children[n - 1];
+    if (!(cell instanceof HTMLElement)) return;
+    for (const c of scroll.querySelectorAll(".pdf-thumb-cell.current")) c.classList.remove("current");
+    cell.classList.add("current");
+    const top = scroll.scrollTop + cell.getBoundingClientRect().top - scroll.getBoundingClientRect().top;
+    scroll.scrollTo({ top: top - 20, behavior: "smooth" });
+  }
+
   function clearThumb(cell: HTMLElement): void {
     if (!cell.dataset.thumbRendered) return;
     delete cell.dataset.thumbRendered;
@@ -168,5 +182,5 @@ export function createThumbnailManager(root: HTMLElement, env: ThumbnailEnv) {
     visible = false;
   }
 
-  return { toggle, showPicker, close, destroy };
+  return { toggle, showPicker, close, reveal, destroy };
 }

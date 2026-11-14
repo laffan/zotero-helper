@@ -2,11 +2,13 @@
 // the Pencil, a finger or the mouse held still where it came down for a
 // moment — turns that press into a lasso. The loop is drawn on from
 // there, dashed, and when it is let go, what it encloses is selected: a
-// stroke with any point inside it, a link whose middle is. The
-// selection is framed, with Delete above the frame; a drag that starts
-// inside the frame moves it (the Pencil, a finger or the mouse alike),
-// ⌫ deletes it, Escape lets go of it, and so does a press anywhere else
-// — the Pencil then writes at once, as it does in Hush. Held, the lasso
+// stroke with any point inside it, a link whose middle is (but not one
+// fixed by its pin, which is the pad's ground). The selection is framed,
+// with Delete above the frame; a drag that starts inside the frame moves
+// it (the Pencil, a finger or the mouse alike), a pen colour picked
+// recolours its strokes, ⌫ deletes it, Escape lets go of it, and so does
+// a press anywhere else — the Pencil then writes at once, as it does in
+// Hush. Held, the lasso
 // is borrowed for the one press; the bar's switch also has it as a tool,
 // when every press of the Pencil or the mouse draws one.
 //
@@ -83,7 +85,9 @@ export function createLasso(layer: HTMLElement, svg: SVGSVGElement, env: LassoEn
       for (let i = 0; i + 1 < s.points.length; i += 2) if (inPolygon(s.points[i], s.points[i + 1], poly)) return true;
       return false;
     });
+    // A link fixed by its pin is the pad's ground: never selected.
     links = pad.links.filter((l) => {
+      if (l.fixed) return false;
       const chip = env.chipOf(l.id);
       return inPolygon(l.x + (chip?.offsetWidth ?? 0) / 2, l.y + (chip?.offsetHeight ?? 0) / 2, poly);
     });
@@ -185,6 +189,8 @@ export function createLasso(layer: HTMLElement, svg: SVGSVGElement, env: LassoEn
     finish,
     /** A loop is being drawn. */
     drawing: () => pts !== null,
+    /** The strokes selected (a colour picked recolours them). */
+    strokes: () => strokes,
     has: () => box !== null,
     /** Is a canvas point inside the selection's frame? */
     contains: (x: number, y: number) => Boolean(box && x >= box[0] && x <= box[2] && y >= box[1] && y <= box[3]),

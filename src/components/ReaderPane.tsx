@@ -145,6 +145,22 @@ export function currentReaderPage(attKey: string): number | null {
   return active?.attKey === attKey ? active.viewer.currentPage() : null;
 }
 
+/** The spread in view (1-based, first–last), when `attKey` is open. */
+export function readerSpread(attKey: string): [number, number] | null {
+  return active?.attKey === attKey && active.viewer.getPageCount() ? active.viewer.spread() : null;
+}
+
+/** Pages of `attKey` (0-based) as a PDF of their own, when it is open
+ *  (pdfviewer/excerpt.ts). */
+export function readerExtractPages(attKey: string, indices: number[]): Promise<Uint8Array | null> {
+  return active?.attKey === attKey ? active.viewer.extractPages(indices) : Promise.resolve(null);
+}
+
+/** A region of a page of the open PDF as an image (the notepad's clip). */
+export function readerClipImage(pageIndex: number, box: [number, number, number, number]) {
+  return active ? active.viewer.clipImage(pageIndex, box) : Promise.resolve(null);
+}
+
 type SearchRequest = { query: string; onStatus: (s: SearchStatus) => void; opts?: SearchOptions };
 /** A search asked for before `attKey`'s viewer was there — the one a
  *  PDF was left with, put back as it opens. */

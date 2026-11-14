@@ -185,6 +185,42 @@ export async function shareMarkdown(
   }
 }
 
+/** Share a PDF made here — pages cut out of the open one
+ *  (ReaderShare.tsx) — under `fileName`. */
+export async function sharePdfData(
+  fileName: string,
+  bytes: Uint8Array,
+  anchor: { x: number; y: number },
+): Promise<void> {
+  try {
+    const path = await invoke<string>("stage_pdf_for_share", {
+      fileName,
+      data: await base64Of(bytes),
+    });
+    await presentShare([path], anchor, fileName);
+  } catch (e) {
+    appLog("error", `Share “${fileName}” failed: ${e}`);
+  }
+}
+
+/** The name an entry's PDF is shared under, without ".pdf". */
+export function pdfBaseName(itemKey: string): string {
+  const item = allItems().find((i) => i.key === itemKey);
+  const att = pdfAttachmentOf(allItems(), itemKey);
+  if (!item || !att) return "document";
+  return pdfFileName(item, att).replace(/\.pdf$/i, "");
+}
+
+/** Bytes as base64, for the IPC (FileReader: no string built by hand). */
+function base64Of(bytes: Uint8Array): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(String(r.result).slice(String(r.result).indexOf(",") + 1));
+    r.onerror = () => reject(r.error);
+    r.readAsDataURL(new Blob([bytes], { type: "application/pdf" }));
+  });
+}
+
 function mdEscape(s: string): string {
   return s.replace(/([\[\]])/g, "\\$1");
 }

@@ -25,6 +25,8 @@ export interface NavigatorEnv {
   unfold: () => void;
   /** The reader is going somewhere: the scrolls that follow are theirs. */
   intend: () => void;
+  /** Gone to a place on page `pageIndex` (an outline entry's). */
+  positioned?: (pageIndex: number) => void;
 }
 
 export function createNavigator(env: NavigatorEnv) {
@@ -51,6 +53,7 @@ export function createNavigator(env: NavigatorEnv) {
     const p = env.getPages()[pageIndex];
     if (!p) return;
     env.intend();
+    env.positioned?.(pageIndex);
     if (top == null || env.isFolded() || env.horizontal() || env.isPaged()) goToPage(pageIndex + 1);
     else scrollToPagePoint(area, p, top);
   }

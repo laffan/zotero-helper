@@ -3,8 +3,8 @@
 // (ReadingNotepad.tsx) and the notes pane's lower half (NotesPanel.tsx)
 // are both this, sharing one pad.
 //
-// The toolbar, from its left: the quote button, then the host's own
-// tools (`tools` — reading mode's auto-shift), the map — a minimap of
+// The toolbar, from its left: the quote button and the scissors, then
+// the host's own tools (`tools` — reading mode's auto-shift), the map — a minimap of
 // the whole pad down the canvas's left (minimap.ts; off to begin with,
 // remembered for each view) — and the scroll link (an arrow up and down
 // with two bars across it): while it is on the pad follows the PDF,
@@ -16,13 +16,19 @@
 // is this device's choice, shared by every view, and the eraser is
 // shared with the pages' ink mode (lib/penTool.ts — the Pencil's
 // double-tap turns it on and off in both). A press held still borrows
-// the lasso, and the switch shows the lasso while its loop is drawn.
+// the lasso, and the switch shows the lasso while its loop is drawn. A
+// colour picked with strokes selected recolours them too (and keeps the
+// tool as it was).
 //
-// The quote button is round, ringed in the highlight orange: press it
-// (the Pencil, a finger or the mouse) and drag onto the pages, a dashed
-// line running from it to the pointer, its ring stronger as it goes,
-// and let go over a highlight or a spot on a page: a link to it lands
-// on the pad. At the canvas's lower
+// The quote button is a disc in the highlight orange, its quote marks in
+// the pad's own colour: press it (the Pencil, a finger or the mouse) and
+// drag onto the pages, a dashed line running from it to the pointer, a
+// ring round it as it goes, and let go over a highlight or a spot on a
+// page: a link to it lands on the pad. The scissors beside it, the same
+// disc, turn clip mode on and off (notepad/clip.ts): a box drawn on a
+// page, and Clip puts what it holds on the pad as an image, its page
+// under it (the clip's `top` its place, which a tap goes back to). At
+// the canvas's lower
 // left, a faint trash can clears the pad, once confirmed (undo brings it
 // back).
 //
@@ -42,10 +48,11 @@ import { readerPageNow, useReaderPage } from "../lib/outline";
 import { whenPenRested, WRITING_PAUSE_MS } from "../lib/penActivity";
 import { isErasing, setErasing, watchErasing } from "../lib/penTool";
 import { flushNotepad, notepadChanged, notepadFor, watchNotepad, type Notepad } from "../notepad/model";
+import { SCISSORS_SVG, startClipMode } from "../notepad/clip";
 import { createMinimap } from "../notepad/minimap";
 import { createSurface, RED_INK, type NotepadSurface, type PadTool } from "../notepad/surface";
 import type { PlaceTarget } from "../pdfviewer/places";
-import { goToReaderPosition, readerPlace, readerPlaceAt, showInReader } from "./ReaderPane";
+import { goToReaderPosition, readerClipImage, readerPlace, readerPlaceAt, showInReader } from "./ReaderPane";
 
 /** A quotation mark: drag it out to quote a highlight. */
 const QuoteIcon = () => (
@@ -182,6 +189,10 @@ export function NotepadBody({ attKey, kind, onBarPointerDown, tools, trailing }:
   const [color, setColor] = useState(storedColor);
   const [line, setLine] = useState<{ x1: number; y1: number; x2: number; y2: number } | null>(null);
   const [linking, setLinking] = useState(false);
+  // Clip mode, while it is on (notepad/clip.ts).
+  const clipMode = useRef<{ stop: () => void } | null>(null);
+  const [clipping, setClipping] = useState(false);
+  useEffect(() => () => clipMode.current?.stop(), []);
 
   // The PDF's pad (shared with any other view of it), then the canvas.
   useEffect(() => {
@@ -269,7 +280,8 @@ export function NotepadBody({ attKey, kind, onBarPointerDown, tools, trailing }:
     [],
   );
 
-  /** A colour dot: the pen writes in it from now on. */
+  /** A colour dot: the pen writes in it from now on — and strokes
+   *  selected take it, the tool left as it was. */
   const pickColor = (c: string) => {
     setColor(c);
     try {
@@ -278,8 +290,24 @@ export function NotepadBody({ attKey, kind, onBarPointerDown, tools, trailing }:
       /* storage unavailable */
     }
     const surface = surfaceRef.current;
-    surface?.setColor(c);
-    if (surface && surface.tool() !== "pen") surface.setTool("pen");
+    const recoloured = surface?.setColor(c);
+    if (surface && !recoloured && surface.tool() !== "pen") surface.setTool("pen");
+  };
+
+  /** The scissors: clip mode on, or off again. */
+  const toggleClip = () => {
+    if (clipMode.current) return clipMode.current.stop();
+    clipMode.current = startClipMode({
+      clip: async (pageIndex, box) => {
+        const img = await readerClipImage(pageIndex, box);
+        if (img) surfaceRef.current?.addLink({ kind: "place", pageIndex, top: img.top }, { image: img.src, w: img.width });
+      },
+      ended: () => {
+        clipMode.current = null;
+        setClipping(false);
+      },
+    });
+    setClipping(Boolean(clipMode.current));
   };
 
   function goTo(t: PlaceTarget): void {
@@ -330,6 +358,15 @@ export function NotepadBody({ attKey, kind, onBarPointerDown, tools, trailing }:
         >
           <QuoteIcon />
         </button>
+        <button
+          type="button"
+          className={clipping ? "notepad-quote-btn notepad-clip-btn linking" : "notepad-quote-btn notepad-clip-btn"}
+          title={clipping ? "Stop clipping (Esc)" : "Clip — draw a box on a page to put that part of it on the pad"}
+          aria-label="Clip part of a page"
+          aria-pressed={clipping}
+          onClick={toggleClip}
+          dangerouslySetInnerHTML={{ __html: SCISSORS_SVG }}
+        />
         {tools}
         <button
           type="button"

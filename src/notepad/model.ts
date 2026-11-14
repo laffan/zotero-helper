@@ -35,11 +35,18 @@ export interface NoteLink {
   /** Its place on the canvas (top left). */
   x: number;
   y: number;
-  /** Its size, once dragged by its grip (a highlight's quote); unset,
-   *  it is sized by its text. */
+  /** Its size, once dragged by its grip (a highlight's quote, a clip);
+   *  unset, it is sized by its text. A clip keeps its proportions, so
+   *  only its width counts. */
   w?: number;
   h?: number;
+  /** A link, a quote, or — with `image` — a clip of the page (clip.ts):
+   *  a JPEG data URL, its target the spot on the page it was cut from. */
   target: PlaceTarget;
+  image?: string;
+  /** Fixed by its pin (a quote, a clip): part of the pad's ground,
+   *  drawn beneath the ink so it can be written over, and not moved. */
+  fixed?: boolean;
 }
 
 export interface Notepad {

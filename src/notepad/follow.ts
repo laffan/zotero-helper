@@ -1,6 +1,7 @@
 // Following the PDF (surface.ts's `follow`, the bar's scroll link):
 // where on the pad the notes about a page are — on the supposition that
-// the pad is written from top to bottom as the PDF is read.
+// the pad is written from top to bottom as the PDF is read — and the
+// glide there.
 import { strokeBox } from "./ink";
 import type { Notepad } from "./model";
 
@@ -41,4 +42,52 @@ export function spotFor(pad: Notepad, pageIndex: number): { x: number; y: number
     return { x: Math.min(a.x0, b.x0), y: a.y1 + (b.y0 - a.y1) * t };
   }
   return a ? { x: a.x0, y: a.y1 + 20 } : { x: b!.x0, y: b!.y0 };
+}
+
+/** How long the pad takes to glide to the part about a page, ms. */
+const GLIDE_MS = 350;
+
+export interface FollowEnv {
+  pad: () => Notepad;
+  host: HTMLElement;
+  /** The view's pan, and moving it (once a frame). */
+  pan: () => { x: number; y: number };
+  setPan: (x: number, y: number) => void;
+  /** A gesture is under way: the pad stays put. */
+  busy: () => boolean;
+}
+
+/** Following the PDF: `follow` pans, smoothly, to the part of the pad
+ *  about a page — its top a little below the pad's top, its left in
+ *  view — in a short glide (GLIDE_MS, easing out), which `stop` (a
+ *  press on the pad) ends where it is. */
+export function createFollower(env: FollowEnv) {
+  let glide = 0;
+  function stop(): void {
+    cancelAnimationFrame(glide);
+    glide = 0;
+  }
+  function glideTo(x: number, y: number): void {
+    stop();
+    const from = env.pan();
+    const t0 = performance.now();
+    const step = (now: number) => {
+      const t = Math.min(1, (now - t0) / GLIDE_MS);
+      const k = 1 - (1 - t) ** 3;
+      env.setPan(Math.round(from.x + (x - from.x) * k), Math.round(from.y + (y - from.y) * k));
+      glide = t < 1 ? requestAnimationFrame(step) : 0;
+    };
+    glide = requestAnimationFrame(step);
+  }
+  function follow(pageIndex: number): void {
+    const spot = spotFor(env.pad(), pageIndex);
+    if (!spot || env.busy()) return;
+    const pan = env.pan();
+    const margin = 28;
+    const y = margin - spot.y;
+    const x = spot.x + pan.x < 8 || spot.x + pan.x > env.host.clientWidth - 40 ? margin - spot.x : pan.x;
+    if (Math.abs(y - pan.y) < 2 && Math.abs(x - pan.x) < 2) return;
+    glideTo(x, y);
+  }
+  return { follow, stop };
 }

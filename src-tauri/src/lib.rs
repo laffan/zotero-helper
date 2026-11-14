@@ -658,6 +658,7 @@ pub fn run() {
             thumbs::list_thumbnails,
             stage_attachment_for_share,
             stage_text_for_share,
+            share::stage_pdf_for_share,
             share_files,
             export_files,
             export_file,

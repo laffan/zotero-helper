@@ -144,6 +144,7 @@ export const CloseIcon = (p: IconProps = {}) =>
   svg(<path d="M4 4l8 8M12 4l-8 8" />, p);
 
 export const ArrowLeftIcon = (p: IconProps = {}) => svg(<path d="M13 8H3M7.5 3.5 3 8l4.5 4.5" />, p);
+export const ArrowRightIcon = (p: IconProps = {}) => svg(<path d="M3 8h10M8.5 3.5 13 8l-4.5 4.5" />, p);
 
 export const ChevronRight = (p: IconProps = {}) =>
   svg(<path d="M6 3.5L10.5 8 6 12.5" />, p);

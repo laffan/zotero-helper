@@ -82,7 +82,7 @@
   border-radius: 1px;
   animation: pdf-cite-arrive 1.2s ease-out;
 }
-/* Passages the AI explained (passageMarks.ts): a dashed pink outline
+/* Passages the AI explained (passageMarks.ts): a dashed purple underline
    that stays, and a tap on it reopens the explainer. Words looked up:
    a dashed pink underline, a tap on it showing the definition. */
 .pdf-word-marks,
@@ -94,8 +94,7 @@
 }
 .pdf-explain-mark {
   position: absolute;
-  outline: 1.5px dashed var(--explain-mark);
-  border-radius: 2px;
+  border-bottom: 1.5px dashed var(--explain-underline);
 }
 .pdf-word-mark {
   position: absolute;

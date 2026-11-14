@@ -77,3 +77,10 @@ export function attachPagedWheel(
     { passive: false },
   );
 }
+
+/** The spread page `page` (1-based) is in, first–last: with `n` pages
+ *  to a set or a row, the one it falls in (counted from page 1). */
+export function spreadOf(page: number, n: number, total: number): [number, number] {
+  const first = page - ((page - 1) % Math.max(1, n));
+  return [first, Math.min(total, first + Math.max(1, n) - 1)];
+}

@@ -1,8 +1,8 @@
 // Passages the app keeps marked in the pages, of two kinds: those the
-// AI has explained (lib/ai/explain.ts), in a dashed pink outline
-// (--explain-mark), a tap on one opening its explainer again; and words
-// looked up (lib/ai/lookup.ts), with a dashed pink underline, a tap on
-// one showing its definition above it. Both work in reading mode too,
+// AI has explained (lib/ai/explain.ts), underlined, dashed, in purple
+// (--explain-underline), a tap on one opening its explainer again; and
+// words looked up (lib/ai/lookup.ts), with a dashed pink underline
+// (--explain-mark), a tap on one showing its definition above it. Both work in reading mode too,
 // where there is no sidebar to find them in.
 //
 // The marks are drawn like an AI citation's (citeMark.ts): an overlay on

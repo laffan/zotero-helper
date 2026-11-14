@@ -1,12 +1,14 @@
 // The toolbar's Share and Sync menus. With the library showing they act
 // on the selection and the library; with a PDF open they act on that
-// PDF's entry alone, since nothing else is on screen.
+// PDF's entry alone, since nothing else is on screen — and Share adds
+// ways to share part of the PDF (ReaderShare.tsx).
 import { syncFolder, syncNow, syncReadingEntry } from "../lib/actions";
 import { itemTitle, pdfAttachmentOf, REAL_KEY } from "../lib/collections";
 import { cachePdf, cachedPdfIsStale } from "../lib/notes";
 import { shareAbstracts, sharePdfs } from "../lib/share";
 import { appLog, useStore, type ReadingState } from "../lib/store";
 import { Refresh, ShareIcon, Spinner } from "./Icons";
+import { ReaderShareItems } from "./ReaderShare";
 import { ToolbarMenu, useDropdown } from "./ToolbarMenu";
 
 export function ShareMenuButton({ reading }: { reading: ReadingState | null }) {
@@ -18,10 +20,13 @@ export function ShareMenuButton({ reading }: { reading: ReadingState | null }) {
 
   /** Runs a share action with the Share button's viewport position —
    *  the iPad share sheet is a popover and points its arrow there. */
-  const run = (action: (keys: string[], anchor: { x: number; y: number }) => Promise<void>) => {
+  const close = () => {
     setOpen(false);
     const r = ref.current?.getBoundingClientRect();
-    const anchor = r ? { x: r.left + r.width / 2, y: r.bottom } : { x: window.innerWidth / 2, y: 60 };
+    return r ? { x: r.left + r.width / 2, y: r.bottom } : { x: window.innerWidth / 2, y: 60 };
+  };
+  const run = (action: (keys: string[], anchor: { x: number; y: number }) => Promise<void>) => {
+    const anchor = close();
     void action(keys(), anchor);
   };
 
@@ -37,7 +42,7 @@ export function ShareMenuButton({ reading }: { reading: ReadingState | null }) {
         <span className="tool-label">Share ▾</span>
       </button>
       {open && (
-        <ToolbarMenu anchorRef={ref}>
+        <ToolbarMenu anchorRef={ref} width={reading ? 290 : 250}>
           <button className="menu-item" onClick={() => run(sharePdfs)}>
             <strong>{reading ? "Share PDF" : "Share PDFs"}</strong>
             <span>{reading ? "Share this PDF" : "Download the selected items’ PDFs and share them"}</span>
@@ -59,6 +64,7 @@ export function ShareMenuButton({ reading }: { reading: ReadingState | null }) {
             <strong>Send to Hush</strong>
             <span>Hush downloads the {reading ? "PDF" : "PDFs"} itself into a desk or project</span>
           </button>
+          {reading && <ReaderShareItems reading={reading} done={close} />}
         </ToolbarMenu>
       )}
     </div>

@@ -30,6 +30,7 @@ import { createCiteMark } from "./citeMark";
 import { createViewerCommands } from "./commands";
 import { createReadingCrop } from "./crop";
 import { attachDarkPages } from "./darkPages";
+import { createExcerpts } from "./excerpt";
 import { createFoldLayer } from "./folds";
 import { createInkTool } from "./ink";
 import { attachViewerKeys } from "./keys";
@@ -41,7 +42,7 @@ import { attachTextLayer, createPageRecords } from "./pageTools";
 import { sampleTypicalPage } from "./pageSizes";
 import { changedPages, drawAnnotations } from "./paint";
 import { createNavigator } from "./navigate";
-import { attachPagedWheel } from "./paged";
+import { attachPagedWheel, spreadOf } from "./paged";
 import { getPdfjs } from "./pdfjs";
 import { attachPencilFinger } from "./pencilFinger";
 import { createPlaceKeeper } from "./place";
@@ -139,6 +140,8 @@ export function createPdfViewer(container: HTMLElement, opts: PdfViewerOptions =
     horizontal: () => layoutMode === "horizontal",
     unfold: () => (exitFolded(), magnifier.reset()),
     intend: () => keeper.intend(),
+    // The thumbnail grid, if open, follows an outline entry picked.
+    positioned: (idx) => progress.revealThumb(idx + 1),
   });
   const linkMgr = createLinkLayerManager({
     getPdfDoc: () => pdfDoc,
@@ -265,6 +268,7 @@ export function createPdfViewer(container: HTMLElement, opts: PdfViewerOptions =
     currentPage: () => currentPage(),
     goToPosition: (idx, top) => goToPosition(idx, top),
   });
+  const excerpts = createExcerpts({ getPdfDoc: () => pdfDoc, getPages: () => pages, getAnnotations: () => annotLayer.getAnnotations() });
   const search = createPdfSearch({ getPdfDoc: () => pdfDoc, getPages: () => pages, isDestroyed: () => destroyed, reveal: revealPoint });
   const citeMark = createCiteMark({ getPdfDoc: () => pdfDoc, getPages: () => pages, reveal: revealPoint, goToPage: (n) => goToPage(n) });
 
@@ -643,8 +647,12 @@ export function createPdfViewer(container: HTMLElement, opts: PdfViewerOptions =
       restorePendingFold();
       if (!list.length) pendingFoldAt = null; // nothing to fold back to
     },
-    /** The page in view, 1-based. */
+    /** The page in view, 1-based — and the spread it is in, first–last:
+     *  the paged view's set, or a row of pages side by side. */
     currentPage: () => currentPage(),
+    spread: () => spreadOf(currentPage(), isPaged() || (!folded && layoutMode === "vertical") ? perSet() : 1, pages.length),
+    /** Pages cut into a PDF of their own; a page's region as an image. */
+    ...excerpts,
     /** The PDF's bookmarks, shown on their pages. */
     setPageBookmarks: (marks: PageBookmark[]) => {
       pageMarks = marks;

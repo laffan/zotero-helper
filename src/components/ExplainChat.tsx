@@ -8,12 +8,13 @@
 // alone) or Context (the work, the page and the PDF's text around it) —
 // and switching asks again, the new answer in place of the old. ×,
 // Escape or a press anywhere outside closes the window; the explanation
-// is kept, under Explanations. Remove Highlight, at its foot (a second
+// is kept, under Explanations. Remove Underline, at its foot (a second
 // press confirms), unmarks the passage in the PDF: the explanation stays
 // under Explanations, its page still known (the Context toggle and the
 // list's link back go by it), but the passage's rects are let go, so the
-// dashed outline — and the tap that reopened it there — are gone, and
-// going back from the list no longer marks the passage.
+// dashed underline — and the tap that reopened it there — are gone. The
+// list's link back still finds the passage by its words and marks it
+// for the moment, as an answer's citation does.
 import { useEffect, useRef, useState } from "react";
 import { persistChats, sendChatMessage } from "../lib/ai/chat";
 import { explainContext } from "../lib/ai/explain";
@@ -208,7 +209,7 @@ export function ExplainChat() {
             onClick={unmark}
             title="Take the dashed outline off this passage in the PDF — the explanation is kept"
           >
-            {confirmUnmark ? "Press again to remove" : "Remove Highlight"}
+            {confirmUnmark ? "Press again to remove" : "Remove Underline"}
           </button>
         )}
         <span>

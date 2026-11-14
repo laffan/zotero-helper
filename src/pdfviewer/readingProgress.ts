@@ -125,6 +125,8 @@ export function createPageFinder(body: HTMLElement, root: HTMLElement, indicator
       pill.set(text);
     },
     setOutline: (o: OutlineEntry[]) => (outline = o),
+    /** Page `n` (1-based) brought into the open thumbnail grid. */
+    revealThumb: (n: number) => thumbs.reveal(n),
     destroy(): void {
       thumbs.destroy();
       pill.destroy();

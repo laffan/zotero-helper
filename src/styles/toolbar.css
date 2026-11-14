@@ -267,6 +267,37 @@
   font-size: calc(11px * var(--font-scale));
   color: var(--text-dim);
 }
+/* An entry that unfolds fields beneath it (ReaderShare.tsx's Pages and
+   Section), shown as open while they are. */
+.menu-item.unfolded {
+  background: var(--panel-alt);
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+}
+.menu-fields {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 7px;
+  padding: 2px 8px 9px;
+  border-radius: 0 0 5px 5px;
+  background: var(--panel-alt);
+}
+.menu-fields > .pdf-part-select {
+  flex: 0 0 auto;
+}
+.menu-fields-go {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  align-self: flex-start;
+  max-width: 100%;
+  font-weight: 500;
+  word-break: normal;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 /* Divides a menu's groups — cleanup actions above, conversations below. */
 .menu-sep {
   display: block;

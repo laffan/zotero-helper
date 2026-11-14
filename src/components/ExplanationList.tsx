@@ -1,14 +1,16 @@
 // The reader's explanations (lib/ai/explain.ts), shown as what they are:
 // a question and its answer, not conversations to carry on. Each is a
 // box — the passage asked about as its head, a link that unfolds the
-// answer beneath it (folded to begin with) — with
-// an info button that shows the rest (when, which model, what it cost,
-// with or without its context) and a quieter trash can. They are listed
-// in the entry's conversations tab (ItemChats.tsx) and, across every
-// document, in the sidebar's Explanations, where each also links back to
-// its passage — the PDF opened at the page, the passage marked — as
-// Words' entries do, and a filter box narrows them by passage, answer
-// or work.
+// answer beneath it (folded to begin with, and set in as far as the
+// passage) — with, at its right, the page the passage was read on, a
+// link back to it (the PDF opened at the page, the passage found and
+// marked, as an answer's citations are — even once its underline is
+// removed from the pages), an info button that shows the rest (when,
+// which model, what it cost, with or without its context) and a quieter
+// trash can. They are listed in the entry's conversations tab
+// (ItemChats.tsx) and, across every document, in the sidebar's
+// Explanations, where each also names the work it was read in (a link
+// back too), and a filter box narrows them by passage, answer or work.
 import { useEffect, useMemo, useRef, useState } from "react";
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -79,31 +81,31 @@ function Details({ chat, onClose }: { chat: Chat; onClose: () => void }) {
   );
 }
 
-/** Where an explanation's passage was read, as a link back there. */
-function SourceLink({ chat }: { chat: Chat }) {
+/** The way back to an explanation's passage: the PDF opened (or moved)
+ *  at its page, and the passage found and marked there, as an answer's
+ *  citations are (lib/pdfQuote.ts, citeMark.ts) — whether or not it is
+ *  still underlined in the pages: Remove Highlight lets go of that
+ *  mark, not of this. Null without a PDF to go to. */
+function useGoToPassage(chat: Chat): (() => void) | null {
   const items = useStore((s) => s.library.items);
   const itemKey = chat.source.itemKeys[0];
   const attKey = chat.passage?.attKey ?? pdfAttachmentOf(items, itemKey)?.key;
-  if (!itemKey || !attKey) return <div className="explanation-source">{chat.source.label}</div>;
-  const page = (chat.passage?.pageIndex ?? 0) + 1;
+  if (!itemKey || !attKey) return null;
   const { question } = exchange(chat);
-  return (
-    <button
-      className="link-btn explanation-source"
-      onClick={() => openReaderAt(itemKey, attKey, page, { quote: chat.passage?.rects.length ? question : undefined })}
-      title={`Open the PDF at the passage — “${question}”`}
-    >
-      {chat.source.itemTitles[0] || chat.source.label}, p. {page}
-    </button>
-  );
+  return () => openReaderAt(itemKey, attKey, (chat.passage?.pageIndex ?? 0) + 1, { quote: question });
 }
 
-/** One explanation, its answer folded until its passage is pressed:
- *  `linked` adds the way back to the passage in the PDF. */
+/** One explanation, its answer folded until its passage is pressed, the
+ *  page it was read on at its right — the link back to the passage.
+ *  `linked` adds the work it was read in, under it (the sidebar's list,
+ *  across documents), a link back too. */
 export function ExplanationCard({ chat, linked = false }: { chat: Chat; linked?: boolean }) {
   const [info, setInfo] = useState(false);
   const [open, setOpen] = useState(false);
   const { question, answer } = exchange(chat);
+  const goTo = useGoToPassage(chat);
+  const page = chat.passage ? `p. ${chat.passage.pageIndex + 1}` : "Find";
+  const work = chat.source.itemTitles[0] || chat.source.label;
   return (
     <div className={open ? "explanation open" : "explanation"}>
       <div className="explanation-head">
@@ -117,6 +119,11 @@ export function ExplanationCard({ chat, linked = false }: { chat: Chat; linked?:
           <span>{question}</span>
         </button>
         <div className="explanation-actions">
+          {goTo && (
+            <button className="link-btn explanation-page" onClick={goTo} title={`Show the passage in the PDF — ${page}`}>
+              {page}
+            </button>
+          )}
           <button
             className={info ? "icon-btn explanation-info on" : "icon-btn explanation-info"}
             onClick={() => setInfo(!info)}
@@ -142,7 +149,14 @@ export function ExplanationCard({ chat, linked = false }: { chat: Chat; linked?:
           {answer ? <Markdown remarkPlugins={[remarkGfm]}>{answer}</Markdown> : <em>No answer yet.</em>}
         </div>
       )}
-      {linked && <SourceLink chat={chat} />}
+      {linked &&
+        (goTo ? (
+          <button className="link-btn explanation-source" onClick={goTo} title={`Open the PDF at the passage — “${question}”`}>
+            {work}
+          </button>
+        ) : (
+          <div className="explanation-source">{work}</div>
+        ))}
     </div>
   );
 }

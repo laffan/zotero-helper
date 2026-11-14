@@ -1,11 +1,20 @@
 // The links on the notepad (surface.ts): chips dragged onto the pad from
 // the pages — a link icon and the page, or the whole of a highlight's
-// text beside a bar in its colour and its page, faintly. A chip is
-// dragged to move it, tapped to go there, and held (or right-clicked)
-// for a small menu with Delete. A highlight's quote is also sized: a
-// small dotted circle at its lower right (the floating pad's own grip,
-// smaller) drags its width and height, the text wrapping to the width
-// and clipped at the height.
+// text beside a bar in its colour and its page, faintly — and clips, a
+// region of a page cut out as an image (clip.ts), its page beneath it. A
+// chip is dragged to move it, tapped to go there, and held (or
+// right-clicked) for a small menu with Delete. A highlight's quote is
+// also sized: a small dotted circle at its lower right (the floating
+// pad's own grip, smaller) drags its width and height, the text wrapping
+// to the width and clipped at the height; a clip's grip sizes its width,
+// the image keeping its proportions.
+//
+// A quote and a clip have a pin — under the quote's link icon, at its
+// lower left; before the clip's page — which fixes them: a fixed one is
+// part of the pad's ground, drawn beneath the ink (surface.ts) so the
+// Pencil writes over it, not dragged, sized or selected. Only its pin
+// takes a press (another toggles it back); a tap on it otherwise is the
+// canvas's, which goes to its target as it would on a note.
 //
 // The menu sits on the canvas, whose touches are cancelled so a finger
 // pans it (surface.ts `stopTouch`) — which also cancels the click a tap
@@ -22,6 +31,7 @@ const MAX_W = 640;
 const MIN_H = 24;
 
 const LINK_SVG = `<svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6.8 9.2a2.6 2.6 0 0 0 3.7 0l2.2-2.2a2.6 2.6 0 0 0-3.7-3.7l-1 1"/><path d="M9.2 6.8a2.6 2.6 0 0 0-3.7 0L3.3 9a2.6 2.6 0 0 0 3.7 3.7l1-1"/></svg>`;
+const PIN_SVG = `<svg viewBox="0 0 16 16" width="11" height="11" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 1.5h4l-.5 4 2 2.5H4.5l2-2.5z"/><path d="M8 8v6"/></svg>`;
 export const TRASH_SVG = `<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 4.5h11"/><path d="M6 4.5V3a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v1.5"/><path d="M4 4.5l.7 8.6a1 1 0 0 0 1 .9h4.6a1 1 0 0 0 1-.9l.7-8.6"/></svg>`;
 
 /** Keep a pointer's events coming to `el`, if it is still there. */
@@ -59,6 +69,8 @@ export interface LinkChipEnv {
   changed: () => void;
   goTo: (l: NoteLink) => void;
   remove: (l: NoteLink) => void;
+  /** Its pin was pressed: fixed, or loose again. */
+  toggleFixed: (l: NoteLink) => void;
 }
 
 export function createLinkChips(host: HTMLElement, env: LinkChipEnv) {
@@ -99,11 +111,23 @@ export function createLinkChips(host: HTMLElement, env: LinkChipEnv) {
     menu = { el, off: () => window.removeEventListener("pointerdown", away, true) };
   }
 
-  /** A quote's size, as kept. */
+  /** A quote's size, or a clip's width, as kept. */
   function applySize(l: NoteLink, el: HTMLElement): void {
     el.style.width = l.w ? `${l.w}px` : "";
-    el.style.height = l.h ? `${l.h}px` : "";
+    el.style.height = l.h && !l.image ? `${l.h}px` : "";
     el.classList.toggle("sized", Boolean(l.w || l.h));
+  }
+
+  /** The pin that fixes a quote or a clip to the pad (or lets it go). */
+  function pin(l: NoteLink): HTMLElement {
+    const b = document.createElement("span");
+    b.className = "notepad-link-pin";
+    b.setAttribute("role", "button");
+    b.setAttribute("aria-pressed", String(Boolean(l.fixed)));
+    b.title = l.fixed ? "Fixed — write over it; press to let it move again" : "Fix it to the pad, to write over it";
+    b.innerHTML = PIN_SVG;
+    onPress(b, () => env.toggleFixed(l));
+    return b;
   }
 
   /** The dotted circle at a quote's lower right: drag to size it. */
@@ -119,7 +143,7 @@ export function createLinkChips(host: HTMLElement, env: LinkChipEnv) {
       const from = { x: e.clientX, y: e.clientY, w: el.offsetWidth, h: el.offsetHeight };
       const move = (ev: PointerEvent) => {
         l.w = Math.round(Math.max(MIN_W, Math.min(MAX_W, from.w + ev.clientX - from.x)));
-        l.h = Math.round(Math.max(MIN_H, from.h + ev.clientY - from.y));
+        if (!l.image) l.h = Math.round(Math.max(MIN_H, from.h + ev.clientY - from.y));
         applySize(l, el);
       };
       const up = () => {
@@ -135,16 +159,55 @@ export function createLinkChips(host: HTMLElement, env: LinkChipEnv) {
     return grip;
   }
 
+  /** A clip: the image, and under it its pin and page. */
+  function clipBody(l: NoteLink, el: HTMLElement): void {
+    const img = document.createElement("img");
+    img.className = "notepad-clip-img";
+    img.src = l.image ?? "";
+    img.alt = `Clip from page ${l.target.pageIndex + 1}`;
+    img.draggable = false;
+    const foot = document.createElement("span");
+    foot.className = "notepad-clip-foot";
+    const page = document.createElement("span");
+    page.className = "notepad-link-page";
+    page.textContent = `p. ${l.target.pageIndex + 1}`;
+    foot.append(pin(l), page);
+    el.append(img, foot);
+  }
+
   function chip(l: NoteLink): HTMLElement {
     const quote = l.target.kind === "annotation";
     const el = document.createElement("button");
     el.type = "button";
-    el.className = quote ? "notepad-link notepad-link-quote" : "notepad-link";
+    el.className = `notepad-link${quote ? " notepad-link-quote" : ""}${l.image ? " notepad-clip" : ""}${l.fixed ? " fixed" : ""}`;
     el.dataset.link = l.id;
     el.style.left = `${l.x}px`;
     el.style.top = `${l.y}px`;
     if (l.target.kind === "annotation") el.style.setProperty("--link-color", l.target.color || "#ffd400");
-    el.innerHTML = LINK_SVG;
+    if (l.image) {
+      clipBody(l, el);
+      el.appendChild(sizeGrip(l, el));
+      applySize(l, el);
+    } else if (quote) {
+      // The link icon, and the pin beneath it.
+      const icons = document.createElement("span");
+      icons.className = "notepad-link-icons";
+      icons.innerHTML = LINK_SVG;
+      icons.appendChild(pin(l));
+      el.appendChild(icons);
+    } else el.innerHTML = LINK_SVG;
+    if (!l.image) chipText(l, el, quote);
+    el.title = l.image
+      ? `Go to the clip's place, p. ${l.target.pageIndex + 1}`
+      : quote
+        ? `Go to the highlight, p. ${l.target.pageIndex + 1}`
+        : `Go to page ${l.target.pageIndex + 1}`;
+    handlePresses(l, el);
+    return el;
+  }
+
+  /** A link's text: the page, or the quote with its page after it. */
+  function chipText(l: NoteLink, el: HTMLElement, quote: boolean): void {
     const text = document.createElement("span");
     text.className = "notepad-link-text";
     text.textContent = linkLabel(l.target);
@@ -160,13 +223,17 @@ export function createLinkChips(host: HTMLElement, env: LinkChipEnv) {
       el.appendChild(sizeGrip(l, el));
       applySize(l, el);
     }
-    el.title = quote ? `Go to the highlight, p. ${l.target.pageIndex + 1}` : `Go to page ${l.target.pageIndex + 1}`;
-    // Dragged to move; tapped to go; held, or right-clicked, for its menu.
+  }
+
+  /** Dragged to move; tapped to go; held, or right-clicked, for its
+   *  menu — unless it is fixed, when the canvas has its presses. */
+  function handlePresses(l: NoteLink, el: HTMLElement): void {
     el.addEventListener("contextmenu", (e) => {
       e.preventDefault();
       linkMenu(l, el);
     });
     el.addEventListener("pointerdown", (e) => {
+      if (l.fixed) return;
       e.stopPropagation();
       e.preventDefault();
       if (e.pointerType === "mouse" && e.button !== 0) return;
@@ -201,7 +268,6 @@ export function createLinkChips(host: HTMLElement, env: LinkChipEnv) {
       el.addEventListener("pointerup", up);
       el.addEventListener("pointercancel", up);
     });
-    return el;
   }
 
   return { chip, closeMenu };

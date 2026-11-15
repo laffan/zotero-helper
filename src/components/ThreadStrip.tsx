@@ -3,23 +3,25 @@
 // the right, a column for each clarification open (lib/ai/threads.ts).
 //
 // A passage of an answer selected and asked about (ClarifyPopover.tsx)
-// is answered in a new column right of the one it was asked in, its head
-// level with the passage: the columns share one vertical scroll, and
-// each is pushed down to where its passage is in the column before
-// (`tops`, measured after every layout and as the columns resize). The
-// passages asked about stay marked in their answers (threadMarks.ts),
-// the one whose column is open more strongly; a tap on one opens its
-// column, or closes it if open. One column is open to the right of
-// each, so the open ones are a path — the conversation, a clarification
-// of it, a clarification of that — and opening another from a column
-// closes those right of it. The strip scrolls sideways between them,
-// snapping to a column's edge; a new column is scrolled into view, and
-// its head's back arrow scrolls to the one it was asked in. Each column
-// is the strip's width when the strip is narrow (the details panel, the
-// explainer), half of it when there is room for two.
+// is answered in a new column right of the one it was asked in, headed
+// by the passage and a back arrow, which closes it. Each column starts
+// at the top and scrolls by itself; the strip scrolls sideways between
+// them, settling on a column's edge. The passages asked about stay
+// marked in their answers (threadMarks.ts), the one whose column is
+// open more strongly; a tap on one opens its column, or closes it if
+// open. One column is open to the right of each, so the open ones are a
+// path — the conversation, a clarification of it, a clarification of
+// that — and opening another from a column closes those right of it. A
+// column opened is scrolled into view, and closing one brings the
+// column it was asked in back. Each column is the strip's width when
+// the strip is narrow (the details panel, the explainer), half of it
+// when there is room for two. Clarifications are deleted with their
+// conversation, not one by one.
 //
 // `continuable`: a clarification has a box at its foot to carry it on (a
 // Questions conversation); an explainer's are answered and that's all.
+// `hideQuestion`: the conversation's first question isn't shown (the
+// explainer shows its passage above, `rootBefore`).
 import {
   useCallback,
   useEffect,
@@ -33,7 +35,6 @@ import {
 import type { ThreadMark } from "../lib/ai/threadMarks";
 import {
   continueThread,
-  removeThread,
   retryThread,
   startClarify,
   threadKey,
@@ -45,21 +46,18 @@ import {
 import type { Chat, ChatMessage, ChatSource, ChatThread } from "../lib/types";
 import { Bubble } from "./ChatBubble";
 import { ClarifyPopover, useClarifySelection } from "./ClarifyPopover";
-import { ArrowLeftIcon, CloseIcon, Spinner, TrashIcon } from "./Icons";
+import { ArrowLeftIcon, Spinner } from "./Icons";
 
-/** A column's padding at its top, px (threads.css): a column is pushed
- *  down so its head, under the padding, is level with its passage. */
-const PAD = 10;
 /** Wide enough for two columns side by side, px. */
 const TWO_COLUMNS = 640;
 
-/** The strip scrolled to its first column's foot — the conversation's
- *  latest — and back to its left edge. */
+/** The strip back at its first column, scrolled to its foot — the
+ *  conversation's latest. */
 export function followRoot(strip: HTMLElement): void {
   const root = strip.querySelector<HTMLElement>(".thread-col");
   if (!root) return;
   strip.scrollLeft = 0;
-  strip.scrollTop = Math.max(0, root.offsetTop + root.offsetHeight - strip.clientHeight);
+  root.scrollTop = root.scrollHeight;
 }
 
 /** A column's messages, each where a selection can find it. The
@@ -68,15 +66,17 @@ function Messages({
   messages,
   source,
   marks,
+  hideFirst = false,
 }: {
   messages: ChatMessage[];
   source: ChatSource;
   marks: Map<number, ThreadMark[]>;
+  hideFirst?: boolean;
 }) {
   return (
     <>
       {messages.map((m, i) =>
-        m.role === "user" && m.display === "" ? null : (
+        m.role === "user" && (m.display === "" || (hideFirst && i === 0)) ? null : (
           <div className="thread-msg" data-index={i} key={i}>
             <Bubble role={m.role} content={m.display ?? m.content} source={source} marks={marks.get(i)} />
           </div>
@@ -86,64 +86,41 @@ function Messages({
   );
 }
 
-/** One clarification's column: its passage at its head, its exchange,
- *  and — carried on — a box at its foot. */
+/** One clarification's column: the back arrow (which closes it) and its
+ *  passage at its head, its exchange, and — carried on — a box at its
+ *  foot. */
 function ThreadColumn({
   chat,
   thread,
   index,
-  top,
   marks,
   continuable,
   onBack,
-  onClose,
 }: {
   chat: Chat;
   thread: ChatThread;
   index: number;
-  top: number;
   marks: Map<number, ThreadMark[]>;
   continuable: boolean;
   onBack: () => void;
-  onClose: () => void;
 }) {
   const key = threadKey(chat.id, thread.id);
   const busy = useThreadBusy((s) => Boolean(s.busy[key]));
   const failed = useThreadBusy((s) => s.failed[key]);
   const [draft, setDraft] = useState("");
-  const [confirm, setConfirm] = useState(false);
-  useEffect(() => {
-    if (!confirm) return;
-    const t = window.setTimeout(() => setConfirm(false), 3000);
-    return () => window.clearTimeout(t);
-  }, [confirm]);
   const waiting = unanswered(thread);
   const send = () => {
     if (continueThread(chat.id, thread.id, draft)) setDraft("");
   };
   return (
-    <div className="thread-col thread-col-sub" data-col={index} data-thread={thread.id} style={{ marginTop: top }}>
+    <div className="thread-col thread-col-sub" data-col={index} data-thread={thread.id}>
       <div className="thread-head">
-        <button className="icon-btn" onClick={onBack} aria-label="Back to where it was asked" title="Back to where it was asked">
+        <button className="icon-btn" onClick={onBack} aria-label="Back" title="Back — close this clarification">
           <ArrowLeftIcon size={12} />
         </button>
         <span className="thread-quote" title={thread.quote}>
           “{thread.quote}”
         </span>
-        <button
-          className={confirm ? "icon-btn thread-delete confirm" : "icon-btn thread-delete"}
-          onClick={() => {
-            if (!confirm) return setConfirm(true);
-            removeThread(chat.id, thread.id);
-          }}
-          aria-label="Delete this clarification"
-          title={confirm ? "Press again to delete it, and the clarifications asked in it" : "Delete this clarification"}
-        >
-          <TrashIcon size={12} />
-        </button>
-        <button className="icon-btn" onClick={onClose} aria-label="Close" title="Close — it stays marked where it was asked">
-          <CloseIcon size={11} />
-        </button>
       </div>
       <Messages messages={thread.messages} source={chat.source} marks={marks} />
       {busy && (
@@ -187,6 +164,7 @@ export function ThreadStrip({
   scrollRef,
   rootBefore,
   rootAfter,
+  hideQuestion = false,
   className = "",
   onColumns,
 }: {
@@ -197,20 +175,21 @@ export function ThreadStrip({
   /** In the first column, before and after the conversation's messages. */
   rootBefore?: ReactNode;
   rootAfter?: ReactNode;
+  hideQuestion?: boolean;
   className?: string;
   /** How many columns are open, as it changes (the explainer widens). */
   onColumns?: (n: number) => void;
 }) {
   const ownRef = useRef<HTMLDivElement>(null);
   const stripRef = scrollRef ?? ownRef;
-  const colsRef = useRef<HTMLDivElement>(null);
   const [path, setPath] = useState<string[]>([]);
   const [wide, setWide] = useState(false);
-  const [tops, setTops] = useState<number[]>([]);
-  const reveal = useRef<string | null>(null);
+  // The column to bring into view once laid out: one just opened, or
+  // the one a closed column was asked in.
+  const reveal = useRef<number | null>(null);
 
-  // The columns open that are still there: a thread removed closes its
-  // column, and those right of it.
+  // The columns open that are still there: a thread gone (its
+  // explainer asked again) closes its column, and those right of it.
   const open = useMemo(() => {
     const out: string[] = [];
     let parent: string | null = null;
@@ -243,47 +222,30 @@ export function ThreadStrip({
     [markKey],
   );
 
-  /** Open thread `id` from column `k`, closing those right of it. */
+  /** Open thread `id` from column `k`, closing those right of it — or,
+   *  with null, close the column right of `k`. */
   const openFrom = useCallback(
     (k: number, id: string | null) => {
       setPath(id ? [...open.slice(0, k), id] : open.slice(0, k));
-      reveal.current = id;
+      reveal.current = id ? k + 1 : k;
     },
     [open],
   );
 
-  // Where each column starts: its passage's height in the column before,
-  // that column's own start added.
-  const measure = useCallback(() => {
-    const cols = colsRef.current;
-    const strip = stripRef.current;
-    if (!cols || !strip) return;
-    setWide(strip.clientWidth >= TWO_COLUMNS);
-    const els = [...cols.querySelectorAll<HTMLElement>(":scope > .thread-col")];
-    const next = [0];
-    for (let k = 1; k < els.length; k++) {
-      const id = els[k].dataset.thread ?? "";
-      const mark = els[k - 1].querySelector<HTMLElement>(`mark.thread-mark[data-thread="${CSS.escape(id)}"]`);
-      const rel = mark ? mark.getBoundingClientRect().top - els[k - 1].getBoundingClientRect().top : PAD;
-      next.push(Math.max(0, next[k - 1] + rel - PAD));
-    }
-    setTops((was) => (was.length === next.length && was.every((v, i) => Math.abs(v - next[i]) < 0.5) ? was : next));
-  }, [stripRef]);
-  useLayoutEffect(measure);
+  // Two columns side by side where they fit.
   useEffect(() => {
-    const cols = colsRef.current;
-    if (!cols || !stripRef.current) return;
-    const ro = new ResizeObserver(() => measure());
-    ro.observe(stripRef.current);
-    for (const el of cols.querySelectorAll(":scope > .thread-col")) ro.observe(el);
-    return () => ro.disconnect();
-  }, [measure, columns.length]);
-
-  // A column just opened is scrolled into view, sideways.
-  useLayoutEffect(() => {
-    const id = reveal.current;
     const strip = stripRef.current;
-    const col = id ? colsRef.current?.querySelector<HTMLElement>(`.thread-col[data-thread="${CSS.escape(id)}"]`) : null;
+    if (!strip) return;
+    const ro = new ResizeObserver(() => setWide(strip.clientWidth >= TWO_COLUMNS));
+    ro.observe(strip);
+    return () => ro.disconnect();
+  }, [stripRef]);
+
+  // The column to show, scrolled into view sideways.
+  useLayoutEffect(() => {
+    const k = reveal.current;
+    const strip = stripRef.current;
+    const col = k === null ? null : strip?.querySelector<HTMLElement>(`:scope > .thread-col[data-col="${k}"]`);
     if (!strip || !col) return;
     reveal.current = null;
     const right = col.offsetLeft + col.offsetWidth;
@@ -291,16 +253,9 @@ export function ThreadStrip({
     if (right > x + strip.clientWidth) x = right - strip.clientWidth;
     if (col.offsetLeft < x) x = col.offsetLeft;
     if (x !== strip.scrollLeft) strip.scrollTo({ left: x, behavior: "smooth" });
-  }, [open]);
+  }, [open, wide]);
 
-  /** Scroll to column `k` (the back arrow's way to where it was asked). */
-  const scrollToColumn = (k: number) => {
-    const strip = stripRef.current;
-    const col = colsRef.current?.querySelector<HTMLElement>(`.thread-col[data-col="${k}"]`);
-    if (strip && col) strip.scrollTo({ left: col.offsetLeft, behavior: "smooth" });
-  };
-
-  const [target, setTarget] = useClarifySelection(colsRef);
+  const [target, setTarget] = useClarifySelection(stripRef);
   const closeTarget = useCallback(() => setTarget(null), [setTarget]);
   const ask = (question?: string) => {
     if (!target) return;
@@ -319,33 +274,33 @@ export function ThreadStrip({
     if (k < 0 || !id) return;
     openFrom(k, open[k] === id ? null : id);
   };
+  // The Clarify bar is placed on the screen, under the passage: a scroll
+  // moves the passage from under it, so it goes — unless it is being
+  // typed in.
+  const onScroll = () => {
+    if (target && !document.activeElement?.closest(".clarify-pop")) setTarget(null);
+  };
 
   const classes = ["chat-scroll", "thread-strip", wide ? "wide" : "", columns.length ? "threaded" : "", className];
   return (
-    <div className={classes.filter(Boolean).join(" ")} ref={stripRef}>
-      <div className="thread-cols" ref={colsRef} onClick={onClick}>
-        <div className="thread-col" data-col={0} data-thread="">
-          {rootBefore}
-          <Messages messages={chat.messages} source={chat.source} marks={marks[0]} />
-          {rootAfter}
-        </div>
-        {columns.map((t, i) => (
-          <ThreadColumn
-            key={t.id}
-            chat={chat}
-            thread={t}
-            index={i + 1}
-            top={tops[i + 1] ?? 0}
-            marks={marks[i + 1]}
-            continuable={continuable}
-            onBack={() => scrollToColumn(i)}
-            onClose={() => openFrom(i, null)}
-          />
-        ))}
-        {target && stripRef.current && (
-          <ClarifyPopover target={target} strip={stripRef.current} onAsk={ask} onClose={closeTarget} />
-        )}
+    <div className={classes.filter(Boolean).join(" ")} ref={stripRef} onClick={onClick} onScrollCapture={onScroll}>
+      <div className="thread-col" data-col={0} data-thread="">
+        {rootBefore}
+        <Messages messages={chat.messages} source={chat.source} marks={marks[0]} hideFirst={hideQuestion} />
+        {rootAfter}
       </div>
+      {columns.map((t, i) => (
+        <ThreadColumn
+          key={t.id}
+          chat={chat}
+          thread={t}
+          index={i + 1}
+          marks={marks[i + 1]}
+          continuable={continuable}
+          onBack={() => openFrom(i, null)}
+        />
+      ))}
+      {target && <ClarifyPopover target={target} onAsk={ask} onClose={closeTarget} />}
     </div>
   );
 }

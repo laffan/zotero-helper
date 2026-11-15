@@ -1,28 +1,31 @@
 // The explainer's window: a passage of the open PDF explained, floating
 // over the pages at the bottom right (reading mode included) so the
-// passage stays in sight. It opens from the selection bar's AI button
-// (lib/ai/explain.ts) and asks its question by itself — the full
-// question names the work it was read in, but only the passage is
-// shown. There are no follow-ups: a toggle in its head says what goes
-// with the question instead — No Context (the default: the question
-// alone) or In Context, whose menu (ExplainContextMenu.tsx) picks the
-// part of the PDF that goes with the work's title and authors: the
-// full text, the passage's section or the pages in view — and
-// switching asks again, the new answer in place of the old. ×,
-// Escape or a press anywhere outside closes the window; the explanation
-// is kept, under Explanations. Remove Underline, at its foot (a second
-// press confirms), unmarks the passage in the PDF: the explanation stays
-// under Explanations, its page still known (the In Context menu and the
-// list's link back go by it), but the passage's rects are let go, so the
-// dashed underline — and the tap that reopened it there — are gone. The
-// list's link back still finds the passage by its words and marks it
-// for the moment, as an answer's citation does.
+// passage stays in sight. It opens from the selection bar's AI button,
+// or a highlight's (lib/ai/explain.ts), with the passage quoted and
+// nothing asked yet: a row says what goes with the question — No
+// Context (the default: the question alone) or In Context, whose menu
+// (ExplainContextMenu.tsx) picks the part of the PDF that goes with the
+// work's title and authors: the full text, the passage's section or the
+// pages in view — and Ask, at its right, asks. The full question names
+// the work it was read in, but only the passage is shown. There are no
+// follow-ups: a choice changed once there is an answer makes Ask ask
+// again, the new answer in place of the old (and, should that fail, the
+// old one back). ×, Escape or a press anywhere outside closes the
+// window; the explanation is kept, under Explanations — unless nothing
+// was asked, and then there is nothing to keep (explain.ts). Remove
+// Underline, at its foot (a second press confirms), unmarks the passage
+// in the PDF: the explanation stays under Explanations, its page still
+// known (the In Context menu and the list's link back go by it), but
+// the passage's rects are let go, so the dashed underline — and the tap
+// that reopened it there — are gone. The list's link back still finds
+// the passage by its words and marks it for the moment, as an answer's
+// citation does.
 //
 // A passage of the answer can be selected and asked about all the same
 // (ThreadStrip.tsx): its clarification opens in a column to the right,
 // the window widening for it, and can be asked about in turn — but not
-// carried on, as the explanation itself isn't. Asking again with the
-// other context lets go of them with the answer they were asked of.
+// carried on, as the explanation itself isn't. Asking again lets go of
+// them with the answer they were asked of.
 import { useEffect, useRef, useState } from "react";
 import { persistChats, sendChatMessage } from "../lib/ai/chat";
 import { partKey } from "../lib/ai/contextCache";
@@ -58,9 +61,9 @@ function ExplainWindow() {
   const [preparing, setPreparing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
-  const asked = useRef<string | null>(null);
-  // The question last asked again, should that fail (Try again).
-  const again = useRef<{ question?: string; display?: string } | null>(null);
+  // What goes with the question: null for nothing, a part of the PDF —
+  // or, until the reader picks, what the answer there was asked with.
+  const [choice, setChoice] = useState<ContextPart | null | undefined>(undefined);
 
   const close = () => useStore.getState().setExplain(null);
   // How many columns the strip has open: the window widens for two.
@@ -74,30 +77,6 @@ function ExplainWindow() {
     const t = window.setTimeout(() => setConfirmUnmark(false), 3000);
     return () => window.clearTimeout(t);
   }, [confirmUnmark]);
-
-  const send = async (text: string, display?: string) => {
-    if (!chat || !text.trim()) return;
-    setError(null);
-    try {
-      await sendChatMessage(chat.id, text, display);
-      // A long passage is named, for the lists to head it by.
-      headExplanation(chat.id);
-    } catch (e) {
-      setError(String(e));
-    }
-  };
-  const askFirst = () => {
-    if (!chat) return;
-    const q = questionOf(chat, again.current ?? explain);
-    if (q.question) void send(q.question, q.display);
-  };
-
-  // The question goes out as the window opens.
-  useEffect(() => {
-    if (!chat || !explain?.question || chat.messages.length || asked.current === chat.id) return;
-    asked.current = chat.id;
-    askFirst();
-  }, [chat?.id, explain?.question]);
 
   // A press anywhere outside the window closes it — and still does what
   // it was pressed for (a tap on another explained passage opens that).
@@ -133,18 +112,24 @@ function ExplainWindow() {
 
   if (!explain || !chat) return null;
   const withContext = chat.context !== "";
+  const asked = chat.messages.length > 0;
+  const answered = chat.messages.some((m) => m.role === "assistant");
+  const { question, display } = questionOf(chat, explain);
 
-  const sameAs = (part: ContextPart | null) =>
+  /** Is `part` what the question there was asked with? */
+  const sameAsAsked = (part: ContextPart | null) =>
     part ? Boolean(chat.contextPart) && partKey(chat.contextPart!) === partKey(part) : !withContext;
+  const chosenOn = choice === undefined ? withContext : choice !== null;
+  const waiting = busy || preparing;
+  const canAsk = !waiting && Boolean(question) && (!asked || (choice !== undefined && !sameAsAsked(choice)));
 
-  /** Ask again, with a part of the work as context or without: the new
-   *  answer takes the old one's place. */
-  const setContext = async (part: ContextPart | null) => {
+  /** Ask, with the part of the work chosen as context or none: once
+   *  there is an answer, the new one takes its place — or, should the
+   *  asking fail, the old one is put back. */
+  const ask = async () => {
+    if (!canAsk || !question) return;
+    const part = choice === undefined ? (withContext ? (chat.contextPart ?? null) : null) : choice;
     setMenu(false);
-    if (busy || preparing || sameAs(part)) return;
-    const { question, display } = questionOf(chat, explain);
-    if (!question) return;
-    again.current = { question, display };
     setError(null);
     let context = "";
     if (part) {
@@ -161,6 +146,13 @@ function ExplainWindow() {
     const s = useStore.getState();
     const cur = s.chats.find((c) => c.id === chat.id);
     if (!cur) return;
+    const before = {
+      context: cur.context,
+      contextPart: cur.contextPart,
+      contextTokens: cur.contextTokens,
+      messages: cur.messages,
+      threads: cur.threads,
+    };
     // A four-characters-a-token estimate; the reply books the real cost.
     // The clarifications go with the answer they were asked of.
     s.upsertChat({
@@ -172,7 +164,19 @@ function ExplainWindow() {
       threads: [],
     });
     void persistChats();
-    await send(question, display);
+    setChoice(undefined);
+    try {
+      await sendChatMessage(chat.id, question, display);
+      // A long passage is named, for the lists to head it by.
+      headExplanation(chat.id);
+    } catch (e) {
+      setError(String(e));
+      const now = useStore.getState().chats.find((c) => c.id === chat.id);
+      if (now && !now.messages.length && before.messages.length) {
+        useStore.getState().upsertChat({ ...now, ...before });
+        void persistChats();
+      }
+    }
   };
 
   /** Unmark the passage (the explanation stays). */
@@ -186,7 +190,6 @@ function ExplainWindow() {
   };
   const marked = Boolean(chat.passage?.rects.length);
 
-  const waiting = busy || preparing;
   return (
     <div
       className={columns > 1 ? "explain-chat threaded" : "explain-chat"}
@@ -199,49 +202,76 @@ function ExplainWindow() {
         <span className="explain-title" title={chat.heading ?? chat.title}>
           {chat.heading ?? chat.title}
         </span>
-        <button className="icon-btn" onClick={close} aria-label="Close" title="Close (Esc) — the explanation is kept">
+        <button className="icon-btn" onClick={close} aria-label="Close" title="Close (Esc)">
           <CloseIcon size={12} />
         </button>
       </div>
-      <div className="explain-context" role="radiogroup" aria-label="What goes with the question">
+      <div className="explain-controls">
+        <div className="explain-context" role="radiogroup" aria-label="What goes with the question">
+          <button
+            role="radio"
+            aria-checked={!chosenOn}
+            className={chosenOn ? "" : "on"}
+            disabled={waiting}
+            onClick={() => {
+              setMenu(false);
+              setChoice(null);
+            }}
+            title="The question alone — the concept explained on its own terms"
+          >
+            No Context
+          </button>
+          <button
+            ref={inContext}
+            role="radio"
+            aria-checked={chosenOn}
+            aria-haspopup="menu"
+            aria-expanded={menu}
+            className={chosenOn ? "on" : ""}
+            disabled={waiting}
+            onClick={() => setMenu(!menu)}
+            title="With the work and a part of its PDF — the full text, this section or the pages in view: what the passage means here"
+          >
+            In Context <ChevronDown size={9} />
+          </button>
+        </div>
         <button
-          role="radio"
-          aria-checked={!withContext}
-          className={withContext ? "" : "on"}
-          disabled={waiting}
-          onClick={() => void setContext(null)}
-          title="The question alone — the concept explained on its own terms"
+          className="tool-btn accent explain-ask"
+          disabled={!canAsk}
+          onClick={() => void ask()}
+          title={
+            canAsk
+              ? answered
+                ? "Ask again with this choice — the new answer takes the old one's place"
+                : "Ask the AI to explain the passage"
+              : answered
+                ? "Answered — choose another context to ask again"
+                : "Asking…"
+          }
         >
-          No Context
-        </button>
-        <button
-          ref={inContext}
-          role="radio"
-          aria-checked={withContext}
-          aria-haspopup="menu"
-          aria-expanded={menu}
-          className={withContext ? "on" : ""}
-          disabled={waiting}
-          onClick={() => setMenu(!menu)}
-          title="With the work and a part of its PDF — the full text, this section or the pages in view: what the passage means here"
-        >
-          In Context <ChevronDown size={9} />
+          {waiting ? <Spinner size={12} /> : null} {answered ? "Ask again" : "Ask"}
         </button>
       </div>
       {menu && inContext.current && (
         <ExplainContextMenu
           chat={chat}
+          chosen={choice === undefined ? (withContext ? (chat.contextPart ?? null) : null) : choice}
           anchor={inContext.current}
-          onPick={(part) => void setContext(part)}
+          onPick={(part) => {
+            setChoice(part);
+            setMenu(false);
+          }}
           onClose={() => setMenu(false)}
         />
       )}
       <ThreadStrip
         chat={chat}
         continuable={false}
+        hideQuestion
         className="explain-scroll"
         scrollRef={scrollRef}
         onColumns={setColumns}
+        rootBefore={display ? <blockquote className="explain-passage">“{display}”</blockquote> : null}
         rootAfter={
           <>
             {waiting && (
@@ -251,16 +281,7 @@ function ExplainWindow() {
                 </div>
               </div>
             )}
-            {error && (
-              <div className="error-msg">
-                {error}{" "}
-                {!waiting && !chat.messages.some((m) => m.role === "assistant") && (
-                  <button className="link-btn" onClick={askFirst}>
-                    Try again
-                  </button>
-                )}
-              </div>
-            )}
+            {error && <div className="error-msg">{error}</div>}
           </>
         }
       />

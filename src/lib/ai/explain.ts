@@ -1,8 +1,9 @@
-// The reader's explainer: the selection bar's AI button opens a small
-// window about the selected passage (ExplainChat.tsx), asking about it
-// straight away in the words of Settings → AI → Prompts ("What would the
-// encyclopedia entry for “…” be?" unless changed), of which the window
-// shows only the passage. It is kept as a conversation about the entry —
+// The reader's explainer: the selection bar's AI button (or a
+// highlight's) opens a small window about the selected passage
+// (ExplainChat.tsx), asking about it — once Ask is pressed — in the
+// words of Settings → AI → Prompts ("What would the encyclopedia entry
+// for “…” be?" unless changed), of which the window shows only the
+// passage. It is kept as a conversation about the entry —
 // one question and its answer, saved with the others and listed under
 // Explanations (the entry's conversations tab, and the sidebar's
 // Explanations) — answered by the backend under its own system prompt,
@@ -15,7 +16,9 @@
 // (ExplainContextMenu.tsx) — all of it, the section the passage is in,
 // or the pages in view (contextParts, explainContext) — so the answer
 // can say what the passage means in this work ("explain-context");
-// switching asks again, the new answer in place of the old. The passage
+// asking again with another, the new answer takes the old one's place.
+// One closed before anything was asked is let go of (dropUnasked). The
+// passage
 // stays marked in the PDF (`passage`), and a tap on it opens the
 // explainer again. A long passage is headed in the lists by a short
 // title the model gives it (headExplanation).
@@ -23,13 +26,32 @@ import { creatorSummary, itemTitle, yearOf } from "../collections";
 import { useStore } from "../store";
 import { invoke } from "../tauri";
 import type { Chat, ContextPart } from "../types";
-import { nameChat, persistChats } from "./chat";
+import { nameChat, persistChats, removeChat } from "./chat";
 import { heading as headingOf } from "./context";
 import { fillPrompt, promptTemplate } from "./prompts";
 
+// An explainer closed before anything was asked — no question in it,
+// nothing spent on it — is let go of with its window: it was never more
+// than its passage (and its underline). Watched from the store, so every
+// way the window goes counts: closed, another opened, the PDF closed.
+let watching = false;
+function dropUnasked(): void {
+  if (watching) return;
+  watching = true;
+  useStore.subscribe((s, prev) => {
+    const was = prev.explain?.chatId;
+    if (!was || was === s.explain?.chatId) return;
+    const chat = s.chats.find((c) => c.id === was);
+    if (chat && !chat.messages.length && !chat.costUsd && s.chatBusy !== was) void removeChat(was);
+  });
+}
+
 /** Start an explainer of `text`, on page `page` (1-based) of
- *  `itemKey`'s PDF; `passage` is where it is, to keep it marked. */
+ *  `itemKey`'s PDF; `passage` is where it is, to keep it marked. Its
+ *  window opens with the passage and asks nothing until Ask is pressed
+ *  (ExplainChat.tsx). */
 export function startExplain(itemKey: string, text: string, page: number, passage?: Chat["passage"]): void {
+  dropUnasked();
   const st = useStore.getState();
   const item = st.library.items.find((i) => i.key === itemKey);
   const settings = st.settings;

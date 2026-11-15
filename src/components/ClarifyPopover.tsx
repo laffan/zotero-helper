@@ -10,18 +10,21 @@
 // the selection's changes), and kept: a tap into the box lets go of the
 // selection itself. Only an answer's text counts — not a question, not
 // a column's head — and only one answer's at a time. A press anywhere
-// outside the bar, or Escape, closes it.
-import { useEffect, useRef, useState, type RefObject } from "react";
+// outside the bar, or Escape, closes it. It is placed on the screen
+// (fixed, under the passage, or over it where there is no room below),
+// so the explainer's rounded edge doesn't clip it.
+import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from "react";
 import type { ClarifyAt } from "../lib/ai/threads";
 import { passageOf } from "../lib/ai/threadMarks";
 import { SendIcon, Sparkles } from "./Icons";
 
-/** A passage to ask about, and where under it the bar goes (in the
- *  coordinates of the strip's columns). */
+/** A passage to ask about, and where it is on the screen: its left
+ *  edge, top and bottom. */
 export interface ClarifyTarget {
   at: ClarifyAt;
   x: number;
-  y: number;
+  top: number;
+  bottom: number;
 }
 
 /** How long the selection rests before the bar comes, ms. */
@@ -31,10 +34,10 @@ const WIDTH = 300;
 
 const elementOf = (n: Node) => (n.nodeType === Node.ELEMENT_NODE ? (n as Element) : n.parentElement);
 
-/** The passage selected in an answer within `colsRef`, as it comes to
+/** The passage selected in an answer within `stripRef`, as it comes to
  *  rest; null until there is one (and once the bar is closed). */
 export function useClarifySelection(
-  colsRef: RefObject<HTMLElement>,
+  stripRef: RefObject<HTMLElement>,
 ): [ClarifyTarget | null, (t: ClarifyTarget | null) => void] {
   const [target, setTarget] = useState<ClarifyTarget | null>(null);
   useEffect(() => {
@@ -42,22 +45,22 @@ export function useClarifySelection(
     let down = false;
     const check = () => {
       const sel = window.getSelection();
-      const cols = colsRef.current;
-      if (!sel || sel.isCollapsed || !sel.rangeCount || !cols) return;
+      const strip = stripRef.current;
+      if (!sel || sel.isCollapsed || !sel.rangeCount || !strip) return;
       const range = sel.getRangeAt(0);
       const msg = elementOf(range.startContainer)?.closest<HTMLElement>(".thread-msg[data-index]");
       const col = msg?.closest<HTMLElement>(".thread-col");
       const body = msg?.querySelector(".chat-msg-assistant .chat-md");
-      if (!msg || !col || !body || !cols.contains(col) || !body.contains(range.startContainer)) return;
+      if (!msg || !col || !body || !strip.contains(col) || !body.contains(range.startContainer)) return;
       const passage = passageOf(body, range);
       if (!passage) return;
-      const box = cols.getBoundingClientRect();
       const r = range.getBoundingClientRect();
-      const bottom = Math.min(r.bottom, body.getBoundingClientRect().bottom);
+      const b = body.getBoundingClientRect();
       setTarget({
         at: { parentId: col.dataset.thread || null, messageIndex: Number(msg.dataset.index), ...passage },
-        x: r.left - box.left,
-        y: bottom - box.top + 6,
+        x: r.left,
+        top: Math.max(r.top, b.top),
+        bottom: Math.min(r.bottom, b.bottom),
       });
     };
     const soon = (ms: number) => {
@@ -86,24 +89,29 @@ export function useClarifySelection(
       document.removeEventListener("pointerup", onUp, true);
       document.removeEventListener("pointercancel", onUp, true);
     };
-  }, [colsRef]);
+  }, [stripRef]);
   return [target, setTarget];
 }
 
-/** The bar itself, under the passage, kept inside the strip's view. */
+/** The bar itself, under the passage (over it, where there is no room
+ *  below), kept on the screen. */
 export function ClarifyPopover({
   target,
-  strip,
   onAsk,
   onClose,
 }: {
   target: ClarifyTarget;
-  strip: HTMLElement;
   onAsk: (question?: string) => void;
   onClose: () => void;
 }) {
   const [question, setQuestion] = useState("");
   const ref = useRef<HTMLDivElement>(null);
+  const [top, setTop] = useState(target.bottom + 6);
+  useLayoutEffect(() => {
+    const h = ref.current?.offsetHeight ?? 0;
+    const below = target.bottom + 6;
+    setTop(below + h > window.innerHeight - 8 ? Math.max(8, target.top - h - 6) : below);
+  }, [target]);
   useEffect(() => {
     const onDown = (e: PointerEvent) => {
       if (!ref.current?.contains(e.target as Node)) onClose();
@@ -122,9 +130,8 @@ export function ClarifyPopover({
     };
   }, [onClose]);
 
-  const width = Math.min(WIDTH, strip.clientWidth - 16);
-  const lo = strip.scrollLeft + 8;
-  const left = Math.max(lo, Math.min(target.x, lo + strip.clientWidth - 16 - width));
+  const width = Math.min(WIDTH, window.innerWidth - 16);
+  const left = Math.max(8, Math.min(target.x, window.innerWidth - 8 - width));
   const ask = (q?: string) => {
     window.getSelection()?.removeAllRanges();
     onAsk(q?.trim() || undefined);
@@ -133,7 +140,7 @@ export function ClarifyPopover({
     <div
       className="clarify-pop"
       ref={ref}
-      style={{ left, top: target.y, width }}
+      style={{ left, top, width }}
       role="dialog"
       aria-label="Ask about the selected passage"
     >

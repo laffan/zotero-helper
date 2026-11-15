@@ -1478,13 +1478,16 @@ opens there too, rather than moving the hidden library to Questions
 **The explainer.** The selection bar's sparkles (shown with a service
 connected), or a highlight editor's, open a small window about the
 selected passage — or the highlight's text — floating
-over the pages at the bottom right — reading mode included — and ask
-about it at once, in the words of Settings → AI → Prompts ("What would
-the encyclopedia entry for “…” be?" unless changed), of which the
-window shows only the passage (the message's `display`)
-(`lib/ai/explain.ts`, `ExplainChat.tsx`). There are no follow-ups
-(though a passage of the answer can be clarified — see Clarifications):
-a toggle under the window's head says what goes with the question.
+over the pages at the bottom right — reading mode included. It asks
+nothing by itself: under its head, a row says what goes with the
+question, with **Ask** at its right, and the passage is quoted beneath
+it. Ask asks, in the words of Settings → AI → Prompts ("What would the
+encyclopedia entry for “…” be?" unless changed), of which the window
+shows only the passage (the message's `display`, not shown as a
+question: the quote is above) (`lib/ai/explain.ts`,
+`ExplainChat.tsx`). There are no follow-ups (though a passage of the
+answer can be clarified — see Clarifications). What goes with the
+question:
 **No Context**, the default: nothing but the question — no page, no
 paper — answered under the backend's own system prompt, which explains
 the concept on its own terms, as an encyclopedia entry would, in under
@@ -1511,10 +1514,17 @@ use) — for this passage or another of the same PDF — says so in the
 menu, "Already sent — cached for 4:12 more" (`lib/ai/contextCache.ts`,
 kept on this device; counted only when the reply reports the cache
 written or read, or, on OpenAI, which caches by itself, a prompt of
-1024 tokens or more). The part asked with is ticked. Switching asks
-again, the new answer in place of the old (the cost of both is kept);
-the window's foot shows the part, the context's size and what the
-explanation has cost. The head, the switch and the foot keep their
+1024 tokens or more). Choosing — No Context, or a part from the menu
+(the one chosen is ticked) — asks nothing; once there is an answer, a
+different choice turns the button to **Ask again**, which asks, the new
+answer in place of the old (the cost of both is kept), its
+clarifications going with the old one. Should that fail, the old
+answer, its context and its clarifications are put back. The window's
+foot shows the part asked with, the context's size and what the
+explanation has cost. An explanation whose window closes before
+anything was asked — nothing in it, nothing spent — is let go of, its
+underline with it (watched from the store in `explain.ts`, so closing,
+opening another and closing the PDF all count). The head, the switch and the foot keep their
 height however long the passage; what is between them scrolls. ×,
 Escape or a press outside it closes the window (Escape and a press
 outside close the menu first). Each is kept as a conversation about the entry (`mode`
@@ -1589,18 +1599,19 @@ handles move), brings up a small bar under it (`ClarifyPopover.tsx`):
 the passage, quoted, then **Clarify** — which asks in the words of
 Settings → AI → Prompts ("Clarify this part of your last answer: “…”"
 unless changed) — and a box to ask a question of one's own about it
-instead. Either way the answer opens in a new column to the right of
-the one it was asked in, its head — the passage again, quoted — level
-with the passage (`ThreadStrip.tsx`). The columns share one vertical
-scroll, each pushed down to its passage's height in the column before
-(measured after every layout and whenever a column resizes), and the
-strip scrolls sideways between them, settling on a column's edge: each
-column is the strip's width where the strip is narrow (the details
-panel, as usual), half of it where two fit (640px and up), and the
-explainer's window widens to show two while one is open. A new column
-is scrolled into view; its head's back arrow scrolls to where it was
-asked, × closes it, and the trash can (pressed twice) deletes it and
-the clarifications asked in it. Every passage asked about stays marked
+instead. The bar is placed on the screen, under the passage (over
+it where there is no room below), and goes with a scroll unless it is
+being typed in. Either way the answer opens in a new column to the
+right of the one it was asked in, headed by a back arrow and the
+passage again, quoted (`ThreadStrip.tsx`). Each column starts at the
+top and scrolls by itself, and the strip scrolls sideways between them,
+settling on a column's edge: each column is the strip's width where
+the strip is narrow (the details panel, as usual), half of it where two
+fit (640px and up), and the explainer's window widens to show two while
+one is open. A new column is scrolled into view; its back arrow closes
+it, bringing back the column it was asked in. A clarification isn't
+deleted by itself: it goes with its conversation or explanation (or,
+for an explanation, when it is asked again). Every passage asked about stays marked
 in its answer, tinted (`--thread-mark`); the one whose column is open
 more strongly, with an amber edge under it. A tap on a passage opens
 its column, or closes it if open. One column is open to the right of

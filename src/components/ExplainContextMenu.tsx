@@ -5,8 +5,8 @@
 // Each choice says what it covers; one the provider still has in its
 // cache, sent for this passage or another of the same PDF, says so and
 // for how much longer (lib/ai/contextCache.ts), since asking with it
-// again costs a tenth as much. The one the explanation was asked with
-// is ticked.
+// again costs a tenth as much. The one chosen is ticked; picking one
+// only chooses it — the window's Ask asks.
 //
 // A small menu under the button, fixed to the window so the explainer's
 // rounded edge doesn't clip it; a press outside it or Escape closes it.
@@ -34,11 +34,14 @@ const clock = (ms: number) => {
 
 export function ExplainContextMenu({
   chat,
+  chosen,
   anchor,
   onPick,
   onClose,
 }: {
   chat: Chat;
+  /** The part chosen now, to tick. */
+  chosen: ContextPart | null;
   anchor: HTMLElement;
   onPick: (part: ContextPart) => void;
   onClose: () => void;
@@ -112,7 +115,7 @@ export function ExplainContextMenu({
 
   const row = (title: string, note: string, part: ContextPart | null) => {
     const left = part && model ? cachedFor(part, model) : 0;
-    const on = Boolean(part && chat.contextPart && partKey(chat.contextPart) === partKey(part));
+    const on = Boolean(part && chosen && partKey(chosen) === partKey(part));
     return (
       <button
         className={on ? "context-menu-row on" : "context-menu-row"}

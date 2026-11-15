@@ -1,9 +1,10 @@
 // Clarifications: a passage of an answer selected and asked about, in
 // a Questions conversation or an explainer. Each is a thread of its own
 // (`Chat.threads`), shown as a column to the right of the one it was
-// asked in, level with the passage, which stays marked there
-// (components/ThreadStrip.tsx); a thread's own answers can be asked
-// about in turn, as deep as the reader likes.
+// asked in, the passage staying marked there (components/
+// ThreadStrip.tsx); a thread's own answers can be asked about in turn,
+// as deep as the reader likes. Threads go with their conversation, or
+// with an explanation's answer when it is asked again.
 //
 // What the model is sent for one: the conversation as it stood when the
 // answer asked about was given — the chat's own messages up to that
@@ -111,8 +112,8 @@ async function answerThread(chatId: string, threadId: string): Promise<void> {
   setBusy(key, true);
   try {
     const { answered, model } = await askModel(chat, threadHistory(chat, threadId));
-    // Deleted, or the thread removed, while it was asked: nothing to
-    // put the answer in.
+    // The chat deleted, or the thread gone with an explanation asked
+    // again, while it was asked: nothing to put the answer in.
     const now = useStore.getState().chats.find((c) => c.id === chatId);
     if (!now || !threadOf(now, threadId)) return setBusy(key, false);
     useStore.getState().upsertChat({
@@ -190,24 +191,4 @@ export function continueThread(chatId: string, threadId: string, question: strin
 /** Ask again for the answer a thread's last try didn't bring. */
 export function retryThread(chatId: string, threadId: string): void {
   void answerThread(chatId, threadId);
-}
-
-/** Remove thread `threadId` and every thread asked in it. What they
- *  cost stays in the conversation's total: it was spent. */
-export function removeThread(chatId: string, threadId: string): void {
-  const st = useStore.getState();
-  const chat = st.chats.find((c) => c.id === chatId);
-  if (!chat?.threads) return;
-  const gone = new Set([threadId]);
-  for (let grew = true; grew; ) {
-    grew = false;
-    for (const t of chat.threads) {
-      if (t.parentId && gone.has(t.parentId) && !gone.has(t.id)) {
-        gone.add(t.id);
-        grew = true;
-      }
-    }
-  }
-  st.upsertChat({ ...chat, threads: chat.threads.filter((t) => !gone.has(t.id)) });
-  void persistChats();
 }

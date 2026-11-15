@@ -361,7 +361,13 @@ to the generated XcodeGen spec (`gen/apple/project.yml`) and makes the
 project again with XcodeGen: the `ZoteroHelperWidget` app extension
 (`<identifier>.widget`, iOS 15, built from `ios-widget/Sources`, its
 Info.plist and entitlements made by XcodeGen), the app embedding it, and
-the app group in both targets' entitlements. Making the project again
+the app group in both targets' entitlements — in the spec, as each
+target's `entitlements: properties`: XcodeGen writes a target's
+entitlements file from those properties every time it makes the
+project, so an app group written into the app's file itself (as the
+script first did) was wiped by its own `xcodegen generate`, and the app
+was signed without it. `--if-needed` runs it again when either the
+widget or the app's group is missing from the spec. Making the project again
 would drop a signing team chosen in Xcode, so the script writes the
 team into the spec for both targets — `APPLE_DEVELOPMENT_TEAM`,
 tauri.conf.json's `bundle > iOS > developmentTeam`, or the one the
@@ -397,7 +403,9 @@ codesign -d --entitlements - --xml "$APP" | grep -o 'group\.[a-z.]*'
 codesign -d --entitlements - --xml "$APP/PlugIns/ZoteroHelperWidget.appex" | grep -o 'group\.[a-z.]*'
 ```
 
-Each should print `group.com.laffan.zoterohelper`.
+Each should print `group.com.laffan.zoterohelper`. `npm run ios:deploy`
+makes this check itself after building, and says which of the two was
+signed without the group.
 
 ### The library
 

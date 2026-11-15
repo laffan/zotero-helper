@@ -12,15 +12,21 @@
 // - the app embedding it;
 // - the app group (`group.<identifier>`) in the app's own entitlements,
 //   so the app and the widget share a folder (tauri-plugin-widget writes
-//   the widget's data there);
+//   the widget's data there). It goes in the spec, as the app target's
+//   `entitlements: properties`: XcodeGen writes each target's
+//   entitlements file from those properties every time it makes the
+//   project, so the file itself can't be edited — Tauri's spec names
+//   the file with no properties, and an app group written into it was
+//   wiped by the `xcodegen generate` below (the app was then signed
+//   without it, and couldn't reach the folder);
 // - the signing team kept: making the project again would drop a team
 //   set in Xcode, so the one the project has (or APPLE_DEVELOPMENT_TEAM,
 //   or tauri.conf.json's bundle > iOS > developmentTeam) is written into
 //   the spec, for the app and the widget alike.
 //
 // Run again after `tauri ios init` (which writes project.yml afresh);
-// npm run ios:deploy does it when the widget is missing. With
-// --if-needed it does nothing when the spec already has the widget.
+// npm run ios:deploy does it when the widget or the app's group is
+// missing. With --if-needed it does nothing when the spec has both.
 // Usage: npm run ios:widget [-- --if-needed]
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
@@ -43,11 +49,26 @@ const conf = JSON.parse(fs.readFileSync(path.join(ROOT, "src-tauri", "tauri.conf
 const identifier = conf.identifier;
 const group = `group.${identifier}`;
 let spec = fs.readFileSync(SPEC, "utf8");
-const had = spec.includes(`\n  ${WIDGET}:\n`);
-if (had && ifNeeded) process.exit(0);
-
 const appName = spec.match(/^ {2}(\S+)_iOS:\s*$/m)?.[1];
 if (!appName) fail("no <app>_iOS target in project.yml — is it Tauri's?");
+const APP = `${appName}_iOS`;
+
+/** The app target's part of the spec: [start, end) — its line up to the
+ *  next target, or the next key at the top level. */
+function appBlock(text) {
+  const start = text.indexOf(`\n  ${APP}:\n`) + 1;
+  const rest = text.slice(start + APP.length + 4);
+  const next = rest.search(/^ {0,2}\S/m);
+  return [start, next < 0 ? text.length : start + APP.length + 4 + next];
+}
+const appHasGroup = (text) => {
+  const [a, b] = appBlock(text);
+  return text.slice(a, b).includes(`- ${group}`);
+};
+
+const had = spec.includes(`\n  ${WIDGET}:\n`);
+const hadGroup = appHasGroup(spec);
+if (had && hadGroup && ifNeeded) process.exit(0);
 
 // The signing team: the environment's, the config's, the project's.
 const pbxproj = path.join(APPLE, `${appName}.xcodeproj`, "project.pbxproj");
@@ -110,29 +131,34 @@ ${team ? `        DEVELOPMENT_TEAM: ${team}\n` : ""}        SWIFT_VERSION: "5.0"
 }
 fs.writeFileSync(SPEC, spec);
 
-// The app's own entitlements: the app group, beside whatever is there.
-const ent = path.join(APPLE, `${appName}_iOS`, `${appName}_iOS.entitlements`);
-let plist = fs.existsSync(ent)
-  ? fs.readFileSync(ent, "utf8")
-  : `<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">\n<plist version="1.0">\n<dict>\n</dict>\n</plist>\n`;
-if (!plist.includes(`<string>${group}</string>`)) {
-  plist = plist.replace("<dict/>", "<dict>\n</dict>");
-  const entry = plist.includes("com.apple.security.application-groups")
-    ? null
-    : `\t<key>com.apple.security.application-groups</key>\n\t<array>\n\t\t<string>${group}</string>\n\t</array>\n`;
-  if (entry) {
-    const end = plist.lastIndexOf("</dict>");
-    plist = `${plist.slice(0, end)}${entry}${plist.slice(end)}`;
+// The app's own entitlements: the app group, in the spec's properties
+// for them (see above), beside any already there.
+if (!hadGroup) {
+  const [a, b] = appBlock(spec);
+  let block = spec.slice(a, b);
+  const item = `          - ${group}\n`;
+  const key = "        com.apple.security.application-groups:\n";
+  if (/\n {4}entitlements:\n/.test(block)) {
+    const ent = block.indexOf("\n    entitlements:\n") + 1;
+    const after = block.slice(ent + "    entitlements:\n".length);
+    const len = after.search(/^ {0,4}\S/m);
+    let body = len < 0 ? after : after.slice(0, len);
+    if (body.includes(key)) body = body.replace(key, `${key}${item}`);
+    else if (/^ {6}properties:\n/m.test(body)) body = body.replace(/^( {6}properties:\n)/m, `$1${key}${item}`);
+    else body = `${body}      properties:\n${key}${item}`;
+    block = `${block.slice(0, ent)}    entitlements:\n${body}${len < 0 ? "" : after.slice(len)}`;
   } else {
-    plist = plist.replace(
-      /(<key>com\.apple\.security\.application-groups<\/key>\s*<array>)/,
-      `$1\n\t\t<string>${group}</string>`,
-    );
+    // No entitlements at all: a file of its own, beside the Info.plist.
+    const ent = `    entitlements:\n      path: ${APP}/${APP}.entitlements\n      properties:\n${key}${item}`;
+    const at = block.search(/^ {4}(scheme|settings|dependencies):/m);
+    block = at < 0 ? `${block}${ent}` : `${block.slice(0, at)}${ent}${block.slice(at)}`;
   }
-  fs.writeFileSync(ent, plist);
+  spec = `${spec.slice(0, a)}${block}${spec.slice(b)}`;
+  fs.writeFileSync(SPEC, spec);
 }
 
-console.log(`▸ ${had ? "project.yml already has the widget" : `added ${WIDGET} to project.yml`}; app group ${group}`);
+console.log(`▸ ${had ? "project.yml already has the widget" : `added ${WIDGET} to project.yml`}`);
+console.log(`▸ app group ${group}: ${hadGroup ? "already in" : "added to"} the app's entitlements (project.yml)`);
 if (!team) console.log("  ! no signing team found: set it for both targets in Xcode, or set APPLE_DEVELOPMENT_TEAM and run this again.");
 console.log("▸ xcodegen generate");
 try {

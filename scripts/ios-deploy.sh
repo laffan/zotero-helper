@@ -86,6 +86,24 @@ if [[ -z "$IPA" ]]; then
   exit 1
 fi
 
+# The app and its widget share a folder through the app group, so both
+# have to be signed with it, or the widget has nothing to show
+# (scripts/ios-widget.mjs). Said now, rather than found as an empty widget.
+GROUP="group.$(node -p "require('./src-tauri/tauri.conf.json').identifier")"
+CHECK_DIR=$(mktemp -d)
+unzip -q "$IPA" -d "$CHECK_DIR"
+for APP_DIR in "$CHECK_DIR"/Payload/*.app; do
+  for SIGNED in "$APP_DIR" "$APP_DIR/PlugIns/ZoteroHelperWidget.appex"; do
+    [[ -d "$SIGNED" ]] || continue
+    if codesign -d --entitlements - --xml "$SIGNED" 2>/dev/null | grep -q "$GROUP"; then
+      echo "▸ $(basename "$SIGNED"): signed with the app group $GROUP"
+    else
+      echo "! $(basename "$SIGNED"): signed WITHOUT the app group $GROUP — the widget will stay empty" >&2
+    fi
+  done
+done
+rm -rf "$CHECK_DIR"
+
 echo "▸ installing '$IPA' via ios-deploy"
 # shellcheck disable=SC2086  # LAUNCH_FLAG is intentionally a single optional token
 ios-deploy ${DEVICE_ARGS[@]+"${DEVICE_ARGS[@]}"} $LAUNCH_FLAG --bundle "$IPA"

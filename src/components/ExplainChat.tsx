@@ -40,7 +40,17 @@ function questionOf(chat: Chat, fallback: { question?: string; display?: string 
   return { question: first?.content ?? fallback?.question, display: first?.display ?? fallback?.display };
 }
 
+/** The explainer open, if any: a window of its own for each
+ *  explanation, so nothing of one carries over to the next — the
+ *  question last asked again (which a new explanation, having no
+ *  messages yet, would otherwise have asked in place of its own
+ *  passage), an error, the menu, the columns open. */
 export function ExplainChat() {
+  const id = useStore((s) => s.explain?.chatId);
+  return id ? <ExplainWindow key={id} /> : null;
+}
+
+function ExplainWindow() {
   const explain = useStore((s) => s.explain);
   const chat = useStore((s) => s.chats.find((c) => c.id === s.explain?.chatId));
   const busyId = useStore((s) => s.chatBusy);

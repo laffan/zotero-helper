@@ -285,7 +285,14 @@ export interface Chat {
   mode?: "explain";
   /** An explainer's passage in its PDF — where it stays marked, a tap
    *  on it opening the explainer again (pdfviewer/passageMarks.ts). */
-  passage?: { attKey: string; pageIndex: number; rects: number[][] };
+  passage?: {
+    attKey: string;
+    pageIndex: number;
+    rects: number[][];
+    /** Asked from a highlight's popover: the highlight (and no rects —
+     *  the highlight marks the passage). */
+    annotationKey?: string;
+  };
   /** Clarifications: passages of its answers asked about, each a thread
    *  of its own in a column to the right (lib/ai/threads.ts). */
   threads?: ChatThread[];

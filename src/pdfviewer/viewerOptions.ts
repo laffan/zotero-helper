@@ -25,7 +25,14 @@ export interface PdfViewerOptions {
   /** Ask the AI about selected text (the selection bar's sparkles),
    *  offered while `canExplain` says a service is connected; `place` is
    *  the passage on its page (PDF rects), to mark it by. */
-  onExplain?: (text: string, page: number, place?: { pageIndex: number; rects: number[][] }) => void;
+  /** `place`: where the passage is, to keep it marked — or, for a
+   *  highlight's text (`annotationKey`), no rects: the highlight marks
+   *  it. */
+  onExplain?: (
+    text: string,
+    page: number,
+    place?: { pageIndex: number; rects: number[][]; annotationKey?: string },
+  ) => void;
   canExplain?: () => boolean;
   /** Look up the selected word or phrase (the selection bar's
    *  magnifier), read in the sentence `context`; resolves with its

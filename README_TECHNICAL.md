@@ -176,7 +176,7 @@ src/            React + TypeScript UI (Vite, zustand, MiniSearch)
                 annotating (the pieces below, put together):
                 selectionBar (colours over a selection),
                 annotate (selection → Zotero position, tap hit-test),
-                annotPopover (colour / comment / delete),
+                annotPopover (colour / comment / Explain / delete),
                 lookupPopup (a look-up's definition, over the bar),
                 highlightHandles (a highlight's ends, dragged),
                 sentenceMark (⌘-click or the sentence tool selects a
@@ -1037,8 +1037,9 @@ dismisses the selection and its bar as the finger lifts (the
 browser alone ignores taps on the unselectable parts of a page, and
 on iPad clears a selection only after its tap gestures settle).
 Tapping a highlight or underline opens a
-small editor: colour, comment, the same Copy / Add to notes / Look up
-icons, and *Delete* (a second press confirms) — and puts a handle at each end of the passage,
+small editor: colour, comment, the same Copy / Add to notes / Look up /
+Explain icons (the last two with an AI service connected; Explain as
+under AI), and *Delete* (a second press confirms) — and puts a handle at each end of the passage,
 a bar the height of the line with a knob above the start and below the
 end, as the system's selection handles look. Dragging one moves that
 end through the text by words, the other end staying put, with the new
@@ -1467,7 +1468,8 @@ opens there too, rather than moving the hidden library to Questions
 (`confirmAsk`).
 
 **The explainer.** The selection bar's sparkles (shown with a service
-connected) open a small window about the selected passage, floating
+connected), or a highlight editor's, open a small window about the
+selected passage — or the highlight's text — floating
 over the pages at the bottom right — reading mode included — and ask
 about it at once, in the words of Settings → AI → Prompts ("What would
 the encyclopedia entry for “…” be?" unless changed), of which the
@@ -1535,7 +1537,15 @@ work. The
 explained passage stays marked in the PDF with a dashed purple
 underline (`--explain-underline`, an overlay like a citation's,
 `passageMarks.ts`; where it is kept as the chat's `passage`), and a tap
-on it opens its explainer again — in reading mode too. The window's
+on it opens its explainer again — in reading mode too. One asked from a
+highlight's editor isn't underlined (the highlight marks the passage,
+and keeps its tap, which opens the editor); it is kept with the
+highlight's key (`passage.annotationKey`), and the editor's Explain
+opens it again while the highlight's text is unchanged, rather than
+asking anew. The window is made afresh for each explanation
+(`ExplainChat` keys its `ExplainWindow` by the chat), so nothing of one
+— the question last asked again, an error, the menu, the columns open —
+reaches the next. The window's
 foot has **Remove Underline** (a second press confirms): the
 explanation is kept, and its page (the In Context menu and the list's
 link back go by it), but the passage's rects are let go, so the

@@ -108,6 +108,15 @@ export function createAnnotating(env: AnnotatingEnv) {
               return opts.onLookup!(a.text, page, a.text);
             }
           : undefined,
+        // A highlight's text explained: no underline of its own (the
+        // highlight keeps its tap, which opens this popover, and its
+        // Explain then opens that explanation again).
+        onExplain: opts.onExplain
+          ? (a) => {
+              const pageIndex = annotationPosition(a)?.pageIndex ?? 0;
+              opts.onExplain!(a.text, pageIndex + 1, { pageIndex, rects: [], annotationKey: a.key });
+            }
+          : undefined,
         canLookup: opts.canExplain,
         onOpen: (a) => handles?.show(a),
         onClose: () => handles?.hide(),

@@ -1,13 +1,14 @@
 // The popover for one annotation: its colour, its comment, the
-// selection bar's three icons — Copy, Add to notes, Look up (with an AI
-// service connected; the definition shows above the popover) — and
+// selection bar's icons — Copy, Add to notes, and with an AI service
+// connected Look up (the definition shows above the popover) and
+// Explain (the explainer's window, about the annotation's text) — and
 // Delete. It opens on a tap on a highlight or underline in
 // the pages, with handles on the passage to change its extent
 // (highlightHandles.ts, through onOpen / onClose). Changes go out as
 // they are made — a colour at once, the comment after a pause in typing
 // and when the popover closes.
 import { ANNOTATION_COLORS, type Annotation } from "../lib/highlights";
-import { COPY_ICON, LOOKUP_ICON, NOTE_ICON } from "./icons";
+import { COPY_ICON, LOOKUP_ICON, NOTE_ICON, SPARKLES_ICON } from "./icons";
 import { createLookupPopup } from "./lookupPopup";
 
 export interface AnnotationEditHandlers {
@@ -17,6 +18,10 @@ export interface AnnotationEditHandlers {
   onInsert?: (a: Annotation) => void;
   /** Look the annotation's text up; shown while `canLookup`. */
   onLookup?: (a: Annotation) => Promise<string>;
+  /** Have the annotation's text explained, as the selection bar's
+   *  Explain does a selection's; shown, as Look up is, while
+   *  `canLookup`. */
+  onExplain?: (a: Annotation) => void;
   canLookup?: () => boolean;
   /** It opened on `a`, and it closed. */
   onOpen?: (a: Annotation) => void;
@@ -54,6 +59,8 @@ export function createAnnotationPopover(root: HTMLElement, handlers: AnnotationE
   const copy = icon(COPY_ICON, "Copy");
   const insert = icon(NOTE_ICON, "Add to notes — a quote with a link back to the page");
   const lookup = icon(LOOKUP_ICON, "Look up — a short definition");
+  const explain = icon(SPARKLES_ICON, "Ask the AI to explain this passage");
+  explain.className = "pdf-selection-explain";
   const definition = createLookupPopup(root);
   const del = document.createElement("button");
   del.type = "button";
@@ -113,6 +120,11 @@ export function createAnnotationPopover(root: HTMLElement, handlers: AnnotationE
     if (!current || !handlers.onLookup) return;
     definition.show(current.text, handlers.onLookup(current), el.getBoundingClientRect());
   });
+  explain.addEventListener("click", () => {
+    const a = current;
+    close();
+    if (a) handlers.onExplain?.(a);
+  });
 
   // Delete asks once more before it goes: a second press within a few
   // seconds confirms.
@@ -146,7 +158,9 @@ export function createAnnotationPopover(root: HTMLElement, handlers: AnnotationE
     paintColors();
     insert.style.display = handlers.onInsert && a.text ? "" : "none";
     copy.style.display = a.text ? "" : "none";
-    lookup.style.display = handlers.onLookup && a.text && handlers.canLookup?.() !== false ? "" : "none";
+    const ai = Boolean(a.text) && handlers.canLookup?.() !== false;
+    lookup.style.display = handlers.onLookup && ai ? "" : "none";
+    explain.style.display = handlers.onExplain && ai ? "" : "none";
     definition.hide();
     el.style.display = "";
     const host = root.getBoundingClientRect();

@@ -142,7 +142,11 @@ src/            React + TypeScript UI (Vite, zustand, MiniSearch)
                 lasso (a long press selects), follow (the part of the
                 pad about a page, and the glide there), noteLabels (each
                 note's page above it), clip (clip mode over the pages),
-                minimap (the whole pad, small)
+                minimap (the whole pad, small), texts (notes typed in
+                Markdown: the editor, the double-tap, a note's taps),
+                markdown (their Markdown, read as Hush reads a text
+                shape, set as DOM), history (what undo takes back, and
+                taking it back)
   components/settings/
                 the settings page: SettingsView (section list, the
                 draft and Save) and one component per section —
@@ -206,7 +210,8 @@ src/            React + TypeScript UI (Vite, zustand, MiniSearch)
                 keyboard = the pane outline and sidebar cursor;
                 pdfviewer-dark = dark pages; explanations = the
                 explanation boxes; notepad-clips = the notepad's pins
-                and clips, and clip mode; explainer = the explainer's
+                and clips, and clip mode; notepad-texts = its text
+                notes and their editor; explainer = the explainer's
                 window and its In Context menu; threads = a conversation's
                 columns and the passages marked in its answers)
 src-tauri/      Rust core (all networking + state)
@@ -1851,7 +1856,8 @@ work: a link being drawn out of the quote, or clip mode on.
 
 On the canvas the Pencil writes — a tap is a dot — a finger pans, and a
 mouse writes with a drag (a Mac has no Pencil) while a wheel pans; each
-view pans on its own. The ink is one canvas the size of the view
+view pans on its own. Two taps of a finger, or a double-click, on the
+bare canvas begin a typed note (**Text notes**, below). The ink is one canvas the size of the view
 (`ink.ts`), under a layer that pans with it and holds the notes'
 labels, the links' chips and the lasso; there is no React render under
 the pen (`surface.ts`). A sample draws one curve from the last sample
@@ -1991,6 +1997,52 @@ notepad's file, so a pad of many clips is a larger file to write. The menus' but
 cancelled the click a tap on them would have ended in — Delete did
 nothing on the iPad.
 
+**Text notes** (`notepad/texts.ts`, `markdown.ts`,
+`notepad-texts.css`). A double-tap with a finger, or a double-click, on
+the bare canvas — two taps within 400ms and 24px, not on a note or a
+pinned link — opens an editor there; the Pencil's taps stay dots. What
+is typed is a note in Markdown, set as Hush sets a notebook's text
+shapes (its `markdown.ts`, ported): no box round the words, 16px type
+(scaled by the UI font size) with lines 1.3 apart, as wide as its words
+up to 350px; `#`, `##`, `###` headings at 1.8, 1.4 and 1.15 times the
+size in the accent colour (Hush's heading colour), not bold; `**bold**`,
+`*italic*` or `_italic_`, `[links](url)` underlined in the accent,
+`==highlights==` in yellow; a `> ` quote in italic at 80%, a rule down
+its left; `- [ ]` / `- [x]` tasks with a box; `-`, `*`, `+` and `1.`
+lists hanging from their markers, a level for every two spaces. Each
+line stands on its own, as in Hush — a blank line is a blank line —
+and Hush's wikilinks, flags and YOUAREHERE, which have nothing to
+point at here, are left out. Runs are set as text, never as HTML. The
+editor is a bare textarea at the note's place, the Markdown raw in the
+same face and size, with a blinking bar while it is empty and Hush's
+⌘B, ⌘I, ⌘= and ⌘K (bold, italic, a highlight, a link). Escape or ⌘↩
+ends it, and so do a press anywhere else on the pad (heard before the
+canvas or a chip has it), the focus leaving it (150ms on, as in Hush),
+the view closing, undo, clearing, and the app being put away (which
+writes the pad at once) — the words kept each time. A new note left
+empty is dropped; a note emptied is deleted. One begun nearer the
+view's right edge than 350px wraps to the room there (120px at
+least), so it starts out in view.
+
+A text note is a link (`text` on it, `model.ts`) whose target is where
+in the PDF the reader was when it was begun, so it is all that a link
+is: dragged, held (or right-clicked) for its menu — Edit, then Delete —
+selected and moved by the lasso, undone, a grey bar on the minimap, and
+found by the scroll link. Its page is shown small above it, as a
+handwritten note's is, and a tap on it goes there once the double-tap
+window is out; a second tap within it opens the note's editor. A tap
+on a task's box ticks it, and on a link opens it — Zotero's link to a
+place in the PDF open in the reader goes there, other web, mail and
+Zotero links go to the system (`openLink` in `NotepadBody.tsx`). Its
+grip, fainter than a quote's, sets the width it wraps at (`w`). A
+change to its words draws its chip alone again (`redrawChip` in
+`surface.ts`): the press that ends the editing may be on another chip,
+and a full redraw would have pulled that chip out from under it. The
+canvas is `overflow: clip` where WebKit knows it, and any scroll of it
+or of a box round it within the pad is put back at once: WebKit
+scrolls a box to follow a caret even when its overflow is hidden,
+which left Hush's canvas shifted in its pane with no way back.
+
 The map icon shows a minimap, a 60px column down the canvas's left
 (`minimap.ts`; off to begin with, remembered for each view): the whole
 pad small — strokes, and links as bars in their colours — with the part
@@ -2003,8 +2055,9 @@ only when the pad changes (the surface's `watch`, at a pause in the
 writing) or the fit does. A faint trash can at
 the canvas's lower left clears the pad — strokes, notes and links —
 once "Clear the whole notepad?" is answered. Undo takes back the last
-stroke, erasing, link or clip, move, pin, recolouring, deletion or
-clearing. Kept on this device
+stroke, erasing, link or clip, text note or change to one's words,
+move, pin, recolouring, deletion or clearing (`history.ts`); a note
+being typed is ended first, so undo takes that back. Kept on this device
 (`notepads/<attKey>.json`, `src-tauri/src/notepads.rs`), written a
 moment after each change; never sent to Zotero.
 

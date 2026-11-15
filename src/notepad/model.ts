@@ -1,6 +1,7 @@
 // The notepad, as kept: one per PDF — the Pencil's strokes on it,
 // grouped into notes (each remembering where in the PDF the reader was
-// when it was written), and the links dragged onto it from the pages.
+// when it was written), the links dragged onto it from the pages, and
+// the notes typed on it (a kind of link, texts.ts).
 // Stored on this device (src-tauri/src/notepads.rs,
 // `notepads/<attKey>.json`), loaded once and shared by every view of it
 // (reading mode's floating pad, the notes pane's half), and written a
@@ -50,6 +51,11 @@ export interface NoteLink {
   /** Fixed by its pin (a quote, a clip): part of the pad's ground,
    *  drawn beneath the ink so it can be written over, and not moved. */
   fixed?: boolean;
+  /** A text note (texts.ts): its words, in Markdown, typed on the pad.
+   *  Its `target` is the place in the PDF the reader was at when it
+   *  was begun, and `w` the width it wraps at, once set — by its grip,
+   *  or by the room the view had for it. */
+  text?: string;
 }
 
 export interface Notepad {

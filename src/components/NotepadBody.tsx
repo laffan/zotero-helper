@@ -38,14 +38,20 @@
 // joins the note being written only during the same visit
 // (surface.ts).
 //
+// A double-tap (or double-click) on the bare canvas types a note there,
+// in Markdown (notepad/texts.ts); a link in one opens as a link in the
+// notes does — a Zotero link to this PDF in the reader, others outside.
+//
 // A change made in the other view redraws this one in full, so while
 // the Pencil writes it waits for the pause (lib/penActivity.ts): the
 // other view is out of sight then (reading mode hides the notes pane),
 // and the redraw, at each pen-up, cost the next stroke its start.
 // What else the host puts in the bar (a close button) goes at its right;
 // the bar's empty middle is the host's to drag the pad by.
+import { openUrl } from "@tauri-apps/plugin-opener";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { parsePdfLink } from "../lib/highlights";
 import { readerPageNow, useReaderPage } from "../lib/outline";
 import { whenPenRested, WRITING_PAUSE_MS } from "../lib/penActivity";
 import { isErasing, setErasing, watchErasing } from "../lib/penTool";
@@ -227,6 +233,7 @@ export function NotepadBody({ attKey, kind, onBarPointerDown, tools, trailing }:
           return p && { ...p, visit: visit.current };
         },
         goTo,
+        openLink,
         toolChanged: (t) => {
           setTool(t);
           setErasing(t === "eraser");
@@ -318,6 +325,16 @@ export function NotepadBody({ attKey, kind, onBarPointerDown, tools, trailing }:
   function goTo(t: PlaceTarget): void {
     if (t.kind === "annotation") showInReader(attKey, t.pageIndex + 1, t.key);
     else goToReaderPosition(t.pageIndex, t.top);
+  }
+
+  /** A text note's link: Zotero's link to a place in the PDF open in the
+   *  reader goes there; a web, mail or Zotero link opens outside. */
+  function openLink(href: string): void {
+    const pdf = parsePdfLink(href);
+    if (pdf && showInReader(pdf.attKey, pdf.page, pdf.annotation)) return;
+    const url = /^[a-z][a-z\d+.-]*:/i.test(href) ? href : `https://${href}`;
+    if (!/^(https?|mailto|zotero):/i.test(url)) return;
+    openUrl(url).catch(() => window.open(url, "_blank"));
   }
 
   /** LINK: follow the drag, a dashed line from the button to the

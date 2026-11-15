@@ -43,6 +43,11 @@
 // the open one has heard nothing for STALE_MS. Otherwise a lost
 // pointer-up left the pad deaf to the Pencil until it was closed.
 //
+// Two taps of a finger, or two clicks, on the bare canvas begin a note
+// typed in Markdown there (texts.ts) — a link with words instead of a
+// target's label, so all that a link is, it is. A change to its words
+// draws its chip alone again, since a press on another may be under way.
+//
 // Following the PDF (`follow`, the bar's branch): as the reader turns
 // pages, the pad pans to the part of it about that page — its notes and
 // links, or, for a page with none, where they would fall between those
@@ -57,11 +62,13 @@ import { penDown, penHeard, penUp } from "../lib/penActivity";
 import type { PagePlace, PlaceTarget } from "../pdfviewer/places";
 import { touches } from "./geometry";
 import { createFollower } from "./follow";
+import { dropEmpty, shiftItems, takeBack, type Step } from "./history";
 import { createPadInk } from "./ink";
 import { createLasso } from "./lasso";
 import { capture, createLinkChips } from "./links";
 import { newId, type Note, type Notepad, type NoteLink, type NoteStroke } from "./model";
 import { createNoteLabels } from "./noteLabels";
+import { createTextNotes } from "./texts";
 
 const SVG_NS = "http://www.w3.org/2000/svg";
 const PEN_WIDTH = 2;
@@ -93,21 +100,14 @@ export interface SurfaceEnv {
   place: () => (PagePlace & { visit: number }) | null;
   /** Go to a note's place, or a link's target. */
   goTo: (t: PlaceTarget) => void;
+  /** A link in a text note was tapped. */
+  openLink: (href: string) => void;
   /** The tool changed (the double-tap, the eraser end). */
   toolChanged?: (t: PadTool) => void;
   /** A press held still has borrowed the lasso (on), or let it go —
    *  for the bar's switch to show while the loop is drawn. */
   lassoBorrowed?: (on: boolean) => void;
 }
-
-type Step =
-  | { kind: "stroke"; id: string }
-  | { kind: "link"; id: string }
-  | { kind: "erase"; strokes: NoteStroke[]; notes: Note[] }
-  | { kind: "remove" | "clear"; strokes: NoteStroke[]; notes: Note[]; links: NoteLink[] }
-  | { kind: "move"; strokes: string[]; links: string[]; dx: number; dy: number }
-  | { kind: "fix"; link: NoteLink }
-  | { kind: "recolor"; was: [NoteStroke, string][] };
 
 /** What a minimap is told: the view moved, or the pad changed. */
 export type SurfaceChange = "view" | "content";
@@ -180,12 +180,7 @@ export function createSurface(host: HTMLElement, env: SurfaceEnv) {
   };
 
   /** The notes left with no strokes go too; returned, for undo. */
-  function dropEmptyNotes(): Note[] {
-    const pad = env.pad();
-    const gone = pad.notes.filter((n) => !pad.strokes.some((s) => s.note === n.id));
-    pad.notes = pad.notes.filter((n) => !gone.includes(n));
-    return gone;
-  }
+  const dropEmptyNotes = () => dropEmpty(env.pad());
 
   const linkChips = createLinkChips(host, {
     changed: () => env.changed(),
@@ -197,6 +192,33 @@ export function createSurface(host: HTMLElement, env: SurfaceEnv) {
       drawLabels();
       env.changed();
     },
+    tapText: (l, on, cx, cy) => texts.tap(l, on, cx, cy),
+    edit: (l) => texts.edit(l),
+  });
+
+  // Text notes (texts.ts): new ones, changed words, emptied ones.
+  const texts = createTextNotes({
+    host,
+    layer,
+    pad: env.pad,
+    pan: () => pan,
+    place: env.place,
+    chipOf: (id) => chips.get(id),
+    add: (l) => {
+      env.pad().links.push(l);
+      history.push({ kind: "link", id: l.id });
+      redrawChip(l);
+      env.changed();
+    },
+    retext: (l, text) => {
+      history.push({ kind: "text", link: l, was: l.text ?? "" });
+      l.text = text;
+      redrawChip(l);
+      env.changed();
+    },
+    remove: (l) => removeItems([], [l]),
+    goTo: (l) => env.goTo(l.target),
+    openLink: env.openLink,
   });
 
   /** Each note's page, small, above its first line; and the links. */
@@ -211,6 +233,20 @@ export function createSurface(host: HTMLElement, env: SurfaceEnv) {
       chips.set(l.id, chip);
       (l.fixed ? under : labels).appendChild(chip);
     }
+    // The note being typed into shows only as its editor.
+    chips.get(texts.editing() ?? "")?.classList.add("editing");
+    lasso.prune();
+    tell("content");
+  }
+
+  /** One link's chip drawn again (or for the first time), the others
+   *  left as they are. */
+  function redrawChip(l: NoteLink): void {
+    const old = chips.get(l.id);
+    const chip = linkChips.chip(l);
+    chips.set(l.id, chip);
+    if (old?.isConnected) old.replaceWith(chip);
+    else (l.fixed ? under : labels).appendChild(chip);
     lasso.prune();
     tell("content");
   }
@@ -230,16 +266,7 @@ export function createSurface(host: HTMLElement, env: SurfaceEnv) {
 
   /** Move strokes and links by (dx, dy) on the canvas. */
   function shift(strokeIds: string[], linkIds: string[], dx: number, dy: number): void {
-    const pad = env.pad();
-    for (const s of pad.strokes) {
-      if (!strokeIds.includes(s.id)) continue;
-      s.points = s.points.map((v, i) => Math.round((v + (i % 2 ? dy : dx)) * 10) / 10);
-    }
-    for (const l of pad.links) {
-      if (!linkIds.includes(l.id)) continue;
-      l.x = Math.round(l.x + dx);
-      l.y = Math.round(l.y + dy);
-    }
+    shiftItems(env.pad(), strokeIds, linkIds, dx, dy);
     ink.redraw();
     drawLabels();
   }
@@ -411,7 +438,9 @@ export function createSurface(host: HTMLElement, env: SurfaceEnv) {
     return null;
   }
 
-  /** A tap goes to the note under it; else to what is fixed there. */
+  /** A tap goes to the note under it; else to what is fixed there; else,
+   *  on the bare canvas, it may be the first of two that begin a text
+   *  note. */
   function tapOn(cx: number, cy: number): void {
     const id = noteAt(cx, cy);
     const note = id ? env.pad().notes.find((n) => n.id === id) : null;
@@ -421,6 +450,7 @@ export function createSurface(host: HTMLElement, env: SurfaceEnv) {
       return r && cx >= r.left && cx <= r.right && cy >= r.top && cy <= r.bottom;
     });
     if (fixed) env.goTo(fixed.target);
+    else texts.bareTap(cx, cy);
   }
 
   function onUp(e: PointerEvent): void {
@@ -508,9 +538,9 @@ export function createSurface(host: HTMLElement, env: SurfaceEnv) {
 
   // The Pencil and a finger mustn't scroll or select anything beneath —
   // except on the menus' buttons (links.ts, lasso.ts), whose taps would
-  // be cancelled with them.
+  // be cancelled with them, and in a text note's editor (texts.ts).
   const stopTouch = (e: TouchEvent) => {
-    if (!(e.target as Element).closest?.(".notepad-link-menu, .notepad-selection-menu")) e.preventDefault();
+    if (!(e.target as Element).closest?.(".notepad-link-menu, .notepad-selection-menu, .notepad-text-editor")) e.preventDefault();
   };
   host.addEventListener("pointerdown", onDown);
   // Heard on the window, so the end of a gesture always arrives.
@@ -559,25 +589,15 @@ export function createSurface(host: HTMLElement, env: SurfaceEnv) {
       drawLabels();
       env.changed();
     },
-    /** Take back the last stroke, link, erasing, move, pin, recolouring,
-     *  deletion or clearing made in this view. */
+    /** Take back the last stroke, link, text note or change to one,
+     *  erasing, move, pin, recolouring, deletion or clearing made in this
+     *  view — a note being typed is ended first, and so taken back. */
     undo(): void {
+      texts.commit();
       const step = history.pop();
       if (!step) return;
       lasso.clear();
-      const pad = env.pad();
-      if (step.kind === "link") pad.links = pad.links.filter((l) => l.id !== step.id);
-      else if (step.kind === "move") shift(step.strokes, step.links, -step.dx, -step.dy);
-      else if (step.kind === "fix") step.link.fixed = !step.link.fixed || undefined;
-      else if (step.kind === "recolor") for (const [st, c] of step.was) st.color = c;
-      else if (step.kind === "stroke") {
-        pad.strokes = pad.strokes.filter((s) => s.id !== step.id);
-        dropEmptyNotes();
-      } else {
-        pad.strokes.push(...step.strokes);
-        pad.notes.push(...step.notes);
-        if (step.kind !== "erase") pad.links.push(...step.links);
-      }
+      takeBack(env.pad(), step);
       ink.redraw();
       drawLabels();
       env.changed();
@@ -586,6 +606,7 @@ export function createSurface(host: HTMLElement, env: SurfaceEnv) {
     /** Empty the pad: its strokes, notes and links (undo brings them
      *  back). */
     clear(): void {
+      texts.commit();
       const pad = env.pad();
       if (!pad.strokes.length && !pad.links.length) return;
       history.push({ kind: "clear", strokes: pad.strokes, notes: pad.notes, links: pad.links });
@@ -603,7 +624,8 @@ export function createSurface(host: HTMLElement, env: SurfaceEnv) {
     linkBoxes: () =>
       env.pad().links.map((l) => {
         const chip = chips.get(l.id);
-        const color = l.image ? "#9a958d" : l.target.kind === "annotation" ? l.target.color || "#ffd400" : RED_INK;
+        const color =
+          l.text !== undefined ? "#8a857d" : l.image ? "#9a958d" : l.target.kind === "annotation" ? l.target.color || "#ffd400" : RED_INK;
         return { x: l.x, y: l.y, w: chip?.offsetWidth ?? 120, h: chip?.offsetHeight ?? 24, color };
       }),
     panTo(x: number, y: number, done: boolean): void {
@@ -618,6 +640,7 @@ export function createSurface(host: HTMLElement, env: SurfaceEnv) {
       return () => watchers.delete(fn);
     },
     destroy(): void {
+      texts.destroy();
       if (g) {
         window.clearTimeout(g.hold);
         penUp(me);

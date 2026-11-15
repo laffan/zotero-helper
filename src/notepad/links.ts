@@ -16,9 +16,16 @@
 // takes a press (another toggles it back); a tap on it otherwise is the
 // canvas's, which goes to its target as it would on a note.
 //
+// A text note (texts.ts) is a link too, drawn as its words — Markdown,
+// set by markdown.ts, with no chip round them — and its page, small,
+// above it, as a handwritten note's is. It is dragged and held like the
+// others; its grip sets the width it wraps at; its menu has Edit; and
+// its taps are texts.ts's (a double-tap edits it).
+//
 // The menu sits on the canvas, whose touches are cancelled so a finger
 // pans it (surface.ts `stopTouch`) — which also cancels the click a tap
 // would end in, so the menu's buttons act on the press's release.
+import { renderText } from "./markdown";
 import { linkLabel, type NoteLink } from "./model";
 
 /** How long a press on a link is held for its menu, ms. */
@@ -33,6 +40,7 @@ const MIN_H = 24;
 const LINK_SVG = `<svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6.8 9.2a2.6 2.6 0 0 0 3.7 0l2.2-2.2a2.6 2.6 0 0 0-3.7-3.7l-1 1"/><path d="M9.2 6.8a2.6 2.6 0 0 0-3.7 0L3.3 9a2.6 2.6 0 0 0 3.7 3.7l1-1"/></svg>`;
 const PIN_SVG = `<svg viewBox="0 0 16 16" width="11" height="11" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 1.5h4l-.5 4 2 2.5H4.5l2-2.5z"/><path d="M8 8v6"/></svg>`;
 export const TRASH_SVG = `<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 4.5h11"/><path d="M6 4.5V3a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v1.5"/><path d="M4 4.5l.7 8.6a1 1 0 0 0 1 .9h4.6a1 1 0 0 0 1-.9l.7-8.6"/></svg>`;
+const EDIT_SVG = `<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.8 2.7l2.5 2.5L6 12.5l-3.2.7.7-3.2z"/><path d="M9.3 4.2l2.5 2.5"/></svg>`;
 
 /** Keep a pointer's events coming to `el`, if it is still there. */
 export function capture(el: Element, id: number): void {
@@ -71,6 +79,10 @@ export interface LinkChipEnv {
   remove: (l: NoteLink) => void;
   /** Its pin was pressed: fixed, or loose again. */
   toggleFixed: (l: NoteLink) => void;
+  /** A text note: tapped (at a client point, on what was pressed in
+   *  it), or its menu's Edit (texts.ts). */
+  tapText: (l: NoteLink, on: Element | null, cx: number, cy: number) => void;
+  edit: (l: NoteLink) => void;
 }
 
 export function createLinkChips(host: HTMLElement, env: LinkChipEnv) {
@@ -82,19 +94,25 @@ export function createLinkChips(host: HTMLElement, env: LinkChipEnv) {
     menu = null;
   }
 
-  /** Under the link (above it near the pad's foot): Delete. */
+  /** Under the link (above it near the pad's foot): Delete — and, for a
+   *  text note, Edit before it. */
   function linkMenu(l: NoteLink, chip: HTMLElement): void {
     closeMenu();
     const el = document.createElement("div");
     el.className = "notepad-link-menu";
-    const del = document.createElement("button");
-    del.type = "button";
-    del.innerHTML = `${TRASH_SVG}<span>Delete</span>`;
-    onPress(del, () => {
-      closeMenu();
-      env.remove(l);
-    });
-    el.appendChild(del);
+    const item = (icon: string, label: string, act: () => void) => {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.innerHTML = `${icon}<span>${label}</span>`;
+      onPress(b, () => {
+        closeMenu();
+        act();
+      });
+      el.appendChild(b);
+      return b;
+    };
+    if (l.text !== undefined) item(EDIT_SVG, "Edit", () => env.edit(l)).className = "notepad-menu-edit";
+    item(TRASH_SVG, "Delete", () => env.remove(l));
     // Its own presses aren't the canvas's.
     el.addEventListener("pointerdown", (e) => e.stopPropagation());
     host.appendChild(el);
@@ -111,8 +129,13 @@ export function createLinkChips(host: HTMLElement, env: LinkChipEnv) {
     menu = { el, off: () => window.removeEventListener("pointerdown", away, true) };
   }
 
-  /** A quote's size, or a clip's width, as kept. */
+  /** A quote's size, a clip's width, or the width a text note wraps at
+   *  (it is as wide as its words, up to that), as kept. */
   function applySize(l: NoteLink, el: HTMLElement): void {
+    if (l.text !== undefined) {
+      el.style.maxWidth = l.w ? `${l.w}px` : "";
+      return;
+    }
     el.style.width = l.w ? `${l.w}px` : "";
     el.style.height = l.h && !l.image ? `${l.h}px` : "";
     el.classList.toggle("sized", Boolean(l.w || l.h));
@@ -132,9 +155,10 @@ export function createLinkChips(host: HTMLElement, env: LinkChipEnv) {
 
   /** The dotted circle at a quote's lower right: drag to size it. */
   function sizeGrip(l: NoteLink, el: HTMLElement): HTMLElement {
+    const text = l.text !== undefined;
     const grip = document.createElement("span");
     grip.className = "notepad-link-size";
-    grip.title = "Drag to size the quote";
+    grip.title = text ? "Drag to set the width the note wraps at" : "Drag to size the quote";
     grip.addEventListener("pointerdown", (e) => {
       e.stopPropagation();
       e.preventDefault();
@@ -143,13 +167,17 @@ export function createLinkChips(host: HTMLElement, env: LinkChipEnv) {
       const from = { x: e.clientX, y: e.clientY, w: el.offsetWidth, h: el.offsetHeight };
       const move = (ev: PointerEvent) => {
         l.w = Math.round(Math.max(MIN_W, Math.min(MAX_W, from.w + ev.clientX - from.x)));
-        if (!l.image) l.h = Math.round(Math.max(MIN_H, from.h + ev.clientY - from.y));
+        if (!l.image && !text) l.h = Math.round(Math.max(MIN_H, from.h + ev.clientY - from.y));
         applySize(l, el);
+        // A text note follows the pointer while it is sized, then is as
+        // wide as its words again, up to the width.
+        if (text) el.style.width = `${l.w}px`;
       };
       const up = () => {
         grip.removeEventListener("pointermove", move);
         grip.removeEventListener("pointerup", up);
         grip.removeEventListener("pointercancel", up);
+        if (text) el.style.width = "";
         env.changed();
       };
       grip.addEventListener("pointermove", move);
@@ -184,7 +212,25 @@ export function createLinkChips(host: HTMLElement, env: LinkChipEnv) {
     el.appendChild(foot);
   }
 
+  /** A text note: its page, small, above it, and its words. */
+  function textChip(l: NoteLink): HTMLElement {
+    const el = document.createElement("div");
+    el.className = "notepad-text";
+    el.dataset.link = l.id;
+    el.style.left = `${l.x}px`;
+    el.style.top = `${l.y}px`;
+    const page = document.createElement("span");
+    page.className = "notepad-note-label";
+    page.textContent = `p. ${l.target.pageIndex + 1}`;
+    el.append(page, renderText(l.text ?? ""), sizeGrip(l, el));
+    applySize(l, el);
+    el.title = `Go to page ${l.target.pageIndex + 1} (double-click to edit)`;
+    handlePresses(l, el);
+    return el;
+  }
+
   function chip(l: NoteLink): HTMLElement {
+    if (l.text !== undefined) return textChip(l);
     const quote = l.target.kind === "annotation";
     const el = document.createElement("button");
     el.type = "button";
@@ -234,8 +280,9 @@ export function createLinkChips(host: HTMLElement, env: LinkChipEnv) {
     }
   }
 
-  /** Dragged to move; tapped to go; held, or right-clicked, for its
-   *  menu — unless it is fixed, when the canvas has its presses. */
+  /** Dragged to move; tapped to go (a text note's tap is texts.ts's);
+   *  held, or right-clicked, for its menu — unless it is fixed, when the
+   *  canvas has its presses. */
   function handlePresses(l: NoteLink, el: HTMLElement): void {
     el.addEventListener("contextmenu", (e) => {
       e.preventDefault();
@@ -246,6 +293,9 @@ export function createLinkChips(host: HTMLElement, env: LinkChipEnv) {
       e.stopPropagation();
       e.preventDefault();
       if (e.pointerType === "mouse" && e.button !== 0) return;
+      // What was pressed: once the chip has the pointer, its events are
+      // all the chip's.
+      const on = e.target instanceof Element ? e.target : null;
       const from = { x: e.clientX, y: e.clientY, lx: l.x, ly: l.y };
       let moved = false;
       let held = false;
@@ -271,7 +321,9 @@ export function createLinkChips(host: HTMLElement, env: LinkChipEnv) {
         el.removeEventListener("pointercancel", up);
         if (held) return;
         if (moved) env.changed();
-        else if (ev.type === "pointerup") env.goTo(l);
+        else if (ev.type !== "pointerup") return;
+        else if (l.text !== undefined) env.tapText(l, on, ev.clientX, ev.clientY);
+        else env.goTo(l);
       };
       el.addEventListener("pointermove", move);
       el.addEventListener("pointerup", up);

@@ -28,7 +28,9 @@ Windows/Linux desktops too).
   can run across a page break and their ends can be dragged, and
   reading mode has a notepad for the Apple Pencil (in the theme's ink
   or red) that links back into the pages and takes clips of them, which
-  can be pinned and written over. A page, a run of pages or a section
+  can be pinned and written over; a double-tap on the notepad (or a
+  double-click) types a note there in Markdown, set as Hush's notebooks
+  set text. A page, a run of pages or a section
   can be shared as a PDF of its own.
 - **AI helpers (optional)** — tidy metadata, extract abstracts, ask
   questions of abstracts, full papers or a part of one with page-cited

@@ -266,3 +266,35 @@
 .hl-actions .link-btn.danger {
   color: var(--bad);
 }
+
+/* --- the reader's sections among the outline's (DividerHeading.tsx) ---
+   A heading like the outline's, over a dashed rule in the accent, as the
+   line on the page is drawn; a click goes there. Its Rename and Delete
+   show as a row's actions do. */
+.hl-divider {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-bottom: 3px;
+  border-bottom: 1.5px dashed color-mix(in srgb, var(--accent) 70%, transparent);
+  color: var(--accent);
+  cursor: pointer;
+  white-space: normal;
+}
+.hl-divider-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hl-divider .hl-actions {
+  font-weight: 400;
+}
+.hl-divider:not([data-hover], .shown, :focus-within) .hl-actions {
+  visibility: hidden;
+}
+@media (hover: none) and (any-hover: none) {
+  .hl-divider .hl-actions {
+    visibility: visible;
+  }
+}

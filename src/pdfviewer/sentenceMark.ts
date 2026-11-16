@@ -10,6 +10,10 @@
 // lets go of that selection (selectionBar.ts dismisses it): the next tap
 // selects, so a stray tap doesn't swap one sentence for another.
 //
+// A press something else has already answered — reading mode's notepad
+// sliding to the other page (auto-shift) — is spared (`spareFromSentence`):
+// its tap doesn't select too, unless it is a ⌘-click.
+//
 // ⌘ is read from its own keydown / keyup, as the reading crop reads ⌃
 // (crop.ts): iPadOS doesn't report modifiers on pointer events
 // reliably. A key-up can go missing there (an app switch, a system
@@ -98,6 +102,17 @@ export function sentenceAround(range: Range): string {
   return t.text.slice(from, to).replace(/\s+/g, " ").trim();
 }
 
+// Presses answered elsewhere, heard before the pages hear them (a
+// window listener in the capture phase): the tool lets their taps be.
+const spared = new WeakSet<Event>();
+
+/** The tap this press begins is another's: the sentence tool doesn't
+ *  select on it. Call it while the press's pointerdown is on its way to
+ *  the pages. */
+export function spareFromSentence(e: PointerEvent): void {
+  spared.add(e);
+}
+
 export interface SentenceMarkEnv {
   /** A plain tap selects too (the sentence tool is on). */
   latched: () => boolean;
@@ -133,18 +148,18 @@ export function attachSentenceMarks(scrollArea: HTMLElement, env: SentenceMarkEn
 
   // A drag is a selection, not a click on a sentence. Whether something
   // in the pages was selected as the press began: if so, the tool's tap
-  // is the one that deselects.
-  let down: { x: number; y: number; selected: boolean } | null = null;
+  // is the one that deselects. And whether the press was another's.
+  let down: { x: number; y: number; selected: boolean; spared: boolean } | null = null;
   const onDown = (e: PointerEvent) => {
     const sel = window.getSelection();
     const selected = Boolean(sel && !sel.isCollapsed && sel.anchorNode && scrollArea.contains(sel.anchorNode));
-    down = { x: e.clientX, y: e.clientY, selected };
+    down = { x: e.clientX, y: e.clientY, selected, spared: spared.has(e) };
   };
   const onClick = (e: MouseEvent) => {
     const command = held || e.metaKey || (!APPLE && e.ctrlKey);
     if (!(command || env.latched()) || !env.enabled()) return;
     if (down && Math.hypot(e.clientX - down.x, e.clientY - down.y) > 6) return;
-    if (!command && down?.selected) return;
+    if (!command && (down?.selected || down?.spared)) return;
     const target = e.target as Element;
     if (target.closest("a, button, input, textarea")) return;
     if (!command && env.claimed(target, e.clientX, e.clientY)) return;

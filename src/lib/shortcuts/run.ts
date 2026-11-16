@@ -115,6 +115,7 @@ export const RUN: Record<string, () => void> = {
   pdfContinuous: viewer("continuous"),
   pdfInk: viewer("ink"),
   pdfSentence: viewer("sentence"),
+  pdfSection: viewer("section"),
   pdfReadingMode: viewer("readingMode"),
   pdfNext: viewer("next"),
   pdfPrev: viewer("prev"),

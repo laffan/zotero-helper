@@ -12,6 +12,9 @@ export const READING_ICON = `<svg viewBox="0 0 16 16" width="14" height="14" fil
 /** Dark pages (darkPages.ts): a light bulb. */
 export const BULB_ICON = `<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"><path d="M5.6 10.6C4.4 9.7 3.6 8.3 3.6 6.8a4.4 4.4 0 0 1 8.8 0c0 1.5-.8 2.9-2 3.8v1.4H5.6z"/><path d="M6.2 14.2h3.6"/></svg>`;
 
+/** Add Section: a page with a dashed line across it, a tab at its left. */
+export const SECTION_ICON = `<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="1.5" width="11" height="13" rx="1"/><path d="M4.5 9h7" stroke-dasharray="1.6 1.4"/><path d="M4.5 5.5h3"/></svg>`;
+
 export const FIT_ONE_ICON = `<svg viewBox="0 0 16 16" width="14" height="14"><rect x="3" y="1" width="10" height="14" rx="1" fill="none" stroke="currentColor" stroke-width="1.2"/></svg>`;
 
 export const FIT_TWO_ICON = `<svg viewBox="0 0 16 16" width="14" height="14"><rect x="1" y="2" width="6" height="12" rx="1" fill="none" stroke="currentColor" stroke-width="1.1"/><rect x="9" y="2" width="6" height="12" rx="1" fill="none" stroke="currentColor" stroke-width="1.1"/></svg>`;

@@ -24,10 +24,13 @@
 // makes the pad keep out of the way: a press on the pages on
 // the pad's side of the window — the Pencil's or a finger's — slides it
 // to the same place on the other side (a docked pad changes edges, once
-// the press is over, since the pages are laid out again). One pad per
+// the press is over, since the pages are laid out again). That press is
+// the pad's: with the sentence tool on, its tap selects nothing
+// (`spareFromSentence`). One pad per
 // PDF (src/notepad/model.ts), the same one the notes pane can show.
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useStore } from "../lib/store";
+import { spareFromSentence } from "../pdfviewer/sentenceMark";
 import { CloseIcon } from "./Icons";
 import { NotepadBody } from "./NotepadBody";
 
@@ -75,8 +78,9 @@ const topBand = () => {
   return c.contains("ipados") && !c.contains("status-bar-hidden") ? 34 : 10;
 };
 /** The icon's home: the next place down reading mode's buttons, after
- *  the ×, the sentence tool and the pen (readingmode.css), 56px apart. */
-const homeSpot = (): Spot => ({ left: 10, top: topBand() + 168 });
+ *  the ×, the sentence tool, Add Section and the pen (readingmode.css),
+ *  56px apart. */
+const homeSpot = (): Spot => ({ left: 10, top: topBand() + 224 });
 const storedIcon = () =>
   stored<Spot>(ICON_KEY, (s) => Number.isFinite(s.left) && Number.isFinite(s.top), () => ({
     left: window.innerWidth - ICON - 10,
@@ -244,6 +248,8 @@ export function ReadingNotepad({ attKey }: { attKey: string }) {
       const mid = window.innerWidth / 2;
       const padLeft = dock.side ? dock.side === "left" : box.left + box.width / 2 < mid;
       if (e.clientX < mid !== padLeft) return;
+      // The tap that moves the pad isn't also the sentence tool's.
+      spareFromSentence(e);
       if (dock.side) {
         // Once the press is over: the pages are laid out again.
         const side: Side = dock.side === "left" ? "right" : "left";

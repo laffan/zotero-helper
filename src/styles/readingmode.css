@@ -63,8 +63,10 @@
   transform: rotate(-45deg) scale(1.15);
 }
 
-/* The sentence tool and the pen (ReadingModeExit.tsx): red icons the
-   ×'s size, down the left at the spacing the × and the first keep; filled (white on red) while on. */
+/* The sentence tool, Add Section and the pen (ReadingModeExit.tsx): red
+   icons the ×'s size, down the left at the spacing the × and the first
+   keep (56px); filled (white on red) while on. The notepad's icon is at
+   home in the next place down (ReadingNotepad.tsx `homeSpot`). */
 .reading-mode-tool {
   position: fixed;
   z-index: 60;
@@ -100,14 +102,20 @@
 .reading-mode-sentence {
   top: 66px;
 }
-.reading-mode-pen {
+.reading-mode-section {
   top: 122px;
+}
+.reading-mode-pen {
+  top: 178px;
 }
 .ipados:not(.status-bar-hidden) .reading-mode-sentence {
   top: calc(max(env(safe-area-inset-top), 30px) + 60px);
 }
-.ipados:not(.status-bar-hidden) .reading-mode-pen {
+.ipados:not(.status-bar-hidden) .reading-mode-section {
   top: calc(max(env(safe-area-inset-top), 30px) + 116px);
+}
+.ipados:not(.status-bar-hidden) .reading-mode-pen {
+  top: calc(max(env(safe-area-inset-top), 30px) + 172px);
 }
 /* Held, a button shows no menu of the system's and selects nothing. */
 .reading-mode-tool {
@@ -131,7 +139,7 @@
 .reading-mode-pen-colors {
   position: fixed;
   z-index: 61;
-  top: 125px;
+  top: 181px;
   left: calc(var(--notepad-dock-left, 0px) + 58px);
   display: flex;
   gap: 4px;
@@ -149,7 +157,7 @@
   margin: 0 4px 0 0;
 }
 .ipados:not(.status-bar-hidden) .reading-mode-pen-colors {
-  top: calc(max(env(safe-area-inset-top), 30px) + 119px);
+  top: calc(max(env(safe-area-inset-top), 30px) + 175px);
 }
 .reading-mode-pen-color {
   width: 28px;

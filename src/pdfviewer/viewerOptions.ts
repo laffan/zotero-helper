@@ -1,5 +1,6 @@
 // What the viewer is given by its host (ReaderPane): the callbacks that
-// connect it to the notes, the bookmarks and Zotero, and the writer for
+// connect it to the notes, the bookmarks, the reader's sections and
+// Zotero, and the writer for
 // annotations made in it.
 import type { Annotation } from "../lib/highlights";
 import type { AnnotationDraft } from "./annotate";
@@ -20,6 +21,15 @@ export interface PdfViewerOptions {
   holdToBookmark?: () => boolean;
   onRenameBookmark?: (id: string, name: string) => void;
   onRemoveBookmark?: (id: string) => void;
+  /** Add a section (Add Section, dividers.ts): a named line across page
+   *  `pageIndex` at height `top` (PDF units); absent hides the tool. */
+  onAddSection?: (pageIndex: number, top: number, name: string, pageLabel?: string) => void;
+  /** A section's line dragged to height `top` of its page. */
+  onMoveSection?: (id: string, top: number) => void;
+  onRenameSection?: (id: string, name: string) => void;
+  onRemoveSection?: (id: string) => void;
+  /** Add Section is readied (the next tap places a line), or done. */
+  onSectionTool?: (on: boolean) => void;
   /** Quote selected text into the notes. */
   onQuote?: (text: string, page: number) => void;
   /** Ask the AI about selected text (the selection bar's sparkles),

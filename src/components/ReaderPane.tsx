@@ -5,7 +5,8 @@
 // this component only mounts it, feeds it the cached PDF and the
 // entry's Zotero annotations, and routes what it hands back: a selected
 // passage or a highlight into the notes, a page's bookmark to
-// lib/bookmarks.ts, new or edited highlights to Zotero
+// lib/bookmarks.ts, a section added on a page to lib/dividers.ts, new or
+// edited highlights to Zotero
 // (lib/annotationEdits.ts), and a passage to explain to the AI
 // (lib/ai/explain.ts, shown in ExplainChat).
 import { useEffect, useRef, useState } from "react";
@@ -28,6 +29,7 @@ import {
   type Annotation,
 } from "../lib/highlights";
 import { addBookmark, bookmarksOf, removeBookmark, renameBookmark, useBookmarks } from "../lib/bookmarks";
+import { addDivider, dividersOf, moveDivider, removeDivider, renameDivider, useDividers } from "../lib/dividers";
 import { insertIntoNotes, readItem } from "../lib/notes";
 import { setOutline, setPageCount, setReaderPage, useOutline, useReaderPage } from "../lib/outline";
 import { flushSavedPage, lastPage, lastView, savePage } from "../lib/recent";
@@ -278,6 +280,12 @@ export function ReaderPane() {
           holdToBookmark: () => useStore.getState().readingMode,
           onRenameBookmark: renameBookmark,
           onRemoveBookmark: removeBookmark,
+          onAddSection: (pageIndex, top, name, pageLabel) =>
+            addDivider({ attKey, itemKey, pageIndex, top, name, pageLabel }),
+          onMoveSection: moveDivider,
+          onRenameSection: renameDivider,
+          onRemoveSection: removeDivider,
+          onSectionTool: (on) => useStore.getState().setViewerTools({ sectionTool: on }),
           onQuote: (text, page) => addToNotes(`> ${text}\n\n— ${cite(page)}`),
           onExplain: (text, page, place) => startExplain(itemKey, text, page, place && { attKey, ...place }),
           onLookup: (text, page, context, place) => lookUp(itemKey, attKey, text, page, context, place),
@@ -370,7 +378,7 @@ export function ReaderPane() {
       cancelled = true;
       if (active?.viewer === viewer) active = null;
       // The next viewer starts with its tools off.
-      useStore.getState().setViewerTools({ sentenceTool: false, inkMode: false, twoUp: false });
+      useStore.getState().setViewerTools({ sentenceTool: false, sectionTool: false, inkMode: false, twoUp: false });
       viewerRef.current = null;
       // Destroying reports the view one last time; then it is written.
       void viewer?.destroy();
@@ -422,6 +430,12 @@ export function ReaderPane() {
       viewerRef.current?.setPageBookmarks(bookmarksOf(bookmarks, attKey));
     }
   }, [bookmarks, attKey, state]);
+
+  // The reader's sections, as lines across their pages.
+  const dividers = useDividers((s) => s.list);
+  useEffect(() => {
+    if (state === "ready" && attKey) viewerRef.current?.setSections(dividersOf(dividers, attKey));
+  }, [dividers, attKey, state]);
 
   // The passages explained in this PDF stay marked; a tap reopens one.
   const chats = useStore((s) => s.chats);

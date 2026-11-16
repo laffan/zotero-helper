@@ -83,6 +83,9 @@ export interface LinkChipEnv {
    *  it), or its menu's Edit (texts.ts). */
   tapText: (l: NoteLink, on: Element | null, cx: number, cy: number) => void;
   edit: (l: NoteLink) => void;
+  /** Is it in the lasso's selection? Then a press on it is the
+   *  canvas's, which moves the whole selection (lasso.ts). */
+  selected: (l: NoteLink) => boolean;
 }
 
 export function createLinkChips(host: HTMLElement, env: LinkChipEnv) {
@@ -281,15 +284,15 @@ export function createLinkChips(host: HTMLElement, env: LinkChipEnv) {
   }
 
   /** Dragged to move; tapped to go (a text note's tap is texts.ts's);
-   *  held, or right-clicked, for its menu — unless it is fixed, when the
-   *  canvas has its presses. */
+   *  held, or right-clicked, for its menu — unless it is fixed, or
+   *  selected, when the canvas has its presses. */
   function handlePresses(l: NoteLink, el: HTMLElement): void {
     el.addEventListener("contextmenu", (e) => {
       e.preventDefault();
       linkMenu(l, el);
     });
     el.addEventListener("pointerdown", (e) => {
-      if (l.fixed) return;
+      if (l.fixed || env.selected(l)) return;
       e.stopPropagation();
       e.preventDefault();
       if (e.pointerType === "mouse" && e.button !== 0) return;

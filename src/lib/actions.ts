@@ -5,6 +5,7 @@ import { itemTitle, REAL_KEY } from "./collections";
 import { loadChats } from "./ai/chat";
 import { startAnnotationSync } from "./annotationEdits";
 import { loadBookmarks } from "./bookmarks";
+import { loadDividers } from "./dividers";
 import { loadWords } from "./words";
 import { captureFinished, downloadForJob } from "./importer";
 import { pushNote, refreshCachedPdfs, startNotesSync } from "./notes";
@@ -92,6 +93,7 @@ export async function bootstrap(): Promise<void> {
   // Zotero credentials are in place yet.
   await loadChats();
   await loadBookmarks();
+  await loadDividers();
   await loadWords();
   await refreshCachedPdfs();
   startNotesSync();

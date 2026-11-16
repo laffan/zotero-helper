@@ -18,12 +18,17 @@
 // bookmark entry in the colour column to show only them. While
 // the PDF is open beside the panel, clicking a highlight scrolls the
 // viewer to it. A PDF with an outline (lib/outline.ts) has its
-// highlights filed under the section headings they fall in. The
+// highlights filed under the section headings they fall in — and so does
+// one the reader has divided with Add Section (lib/dividers.ts): those
+// sections join the outline's headings (or stand alone, with no outline),
+// each a DividerHeading that goes to its line and can be renamed or
+// deleted. The
 // search, the colours picked and the scroll are the open PDF's, kept
 // for it (lib/readerUi.ts); browsing the library, they are the panel's.
 import { useMemo, useRef, useState } from "react";
 import { openInZotero, syncNow } from "../lib/actions";
 import { BOOKMARK_FILTER, bookmarkEntry, isBookmark, useBookmarks, type Bookmark } from "../lib/bookmarks";
+import { dividerIdOf, dividersOf, useDividers, withDividers } from "../lib/dividers";
 import { attachmentName, itemTitle } from "../lib/collections";
 import {
   annotatableAttachments,
@@ -40,6 +45,7 @@ import { usePdfUi, usePdfUiScroll } from "../lib/readerUi";
 import { useStore } from "../lib/store";
 import type { ZItem } from "../lib/types";
 import { BookmarkRow } from "./BookmarkRow";
+import { DividerHeading } from "./DividerHeading";
 import { BookmarkIcon, CopyIcon, ExternalIcon, QuoteIcon, Refresh, Spinner } from "./Icons";
 import { showInReader } from "./ReaderPane";
 
@@ -107,6 +113,7 @@ export function HighlightsPanel({ items }: { items: ZItem[] }) {
   const canAdd = items.length === 1;
 
   const bookmarks = useBookmarks((s) => s.list);
+  const dividers = useDividers((s) => s.list);
   const groups = useMemo(() => highlightGroups(library, items, bookmarks), [library, items, bookmarks]);
   const outlines = useOutlines(groups.map((g) => g.att.key));
   const all = useMemo(() => groups.flatMap((g) => g.list), [groups]);
@@ -172,7 +179,7 @@ export function HighlightsPanel({ items }: { items: ZItem[] }) {
   const hovered = useRef<HTMLElement | null>(null);
   const hoverRow = (e: React.PointerEvent) => {
     if (e.pointerType !== "mouse") return;
-    const over = e.type === "pointerleave" ? null : (e.target as Element).closest<HTMLElement>(".hl-row");
+    const over = e.type === "pointerleave" ? null : (e.target as Element).closest<HTMLElement>(".hl-row, .hl-divider");
     if (over === hovered.current) return;
     hovered.current?.removeAttribute("data-hover");
     over?.setAttribute("data-hover", "");
@@ -255,10 +262,11 @@ export function HighlightsPanel({ items }: { items: ZItem[] }) {
     </div>
   );
 
-  // With the PDF's outline known, highlights file under the heading
-  // they fall in; headings with none aren't shown.
+  // With the PDF's outline known, or sections added to it, highlights
+  // file under the heading they fall in; the outline's headings with none
+  // aren't shown, the reader's are (unless the list is narrowed).
   const bySection = (g: Group): { section: Section | null; list: Annotation[] }[] => {
-    const sections = sectionsOf(outlines.get(g.att.key) ?? []);
+    const sections = withDividers(sectionsOf(outlines.get(g.att.key) ?? []), dividersOf(dividers, g.att.key));
     if (!sections.length) return [{ section: null, list: g.list }];
     const parts = new Map<number, Annotation[]>();
     for (const a of g.list) {
@@ -267,6 +275,7 @@ export function HighlightsPanel({ items }: { items: ZItem[] }) {
       if (list) list.push(a);
       else parts.set(i, [a]);
     }
+    if (!q && !active.length) sections.forEach((s, i) => dividerIdOf(s) && !parts.has(i) && parts.set(i, []));
     return [...parts.keys()]
       .sort((x, y) => x - y)
       .map((i) => ({ section: i < 0 ? null : sections[i], list: parts.get(i)! }));
@@ -340,7 +349,17 @@ export function HighlightsPanel({ items }: { items: ZItem[] }) {
               )}
               {bySection(g).map((part, i) => (
                 <div key={part.section?.id ?? `pre-${i}`}>
-                  {part.section && (
+                  {part.section && dividerIdOf(part.section) ? (
+                    <DividerHeading
+                      section={part.section}
+                      id={dividerIdOf(part.section)!}
+                      itemKey={g.item.key}
+                      attKey={g.att.key}
+                      open={g.att.key === openAttKey}
+                      shown={shownKey === part.section.id}
+                      onShown={() => setShownKey(part.section!.id)}
+                    />
+                  ) : part.section && (
                     <div
                       className="hl-section"
                       style={{ paddingLeft: Math.min(part.section.depth, 3) * 10 }}

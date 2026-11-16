@@ -1,11 +1,13 @@
 // Reading mode's controls, the only things on screen besides the pages:
 // a red × at the window's top left (and Escape) leaves it; below it, the
 // same size and spacing, a caret toggles the sentence tool (a tap
-// selects the sentence under it, as a ⌘-click does) and a pen toggles
-// ink mode — the Pencil writing, or selecting and highlighting like a
-// finger. Both are the viewer's own, toggled through its commands and
-// shown filled while on (the store's `sentenceTool` / `inkMode`, which
-// the viewer reports). With ink mode on, holding the pen a moment
+// selects the sentence under it, as a ⌘-click does), a page with a
+// dashed line readies Add Section (the next tap on a page draws a
+// section's line there, to name), and a pen toggles ink mode — the
+// Pencil writing, or selecting and highlighting like a finger. All
+// three are the viewer's own, toggled through its commands and shown
+// filled while on (the store's `sentenceTool` / `sectionTool` /
+// `inkMode`, which the viewer reports). With ink mode on, holding the pen a moment
 // (HOLD_MS) opens a flyout of the pen's colours beside it — the bottom
 // bar's colour chip, which reading mode hides — and a dot on the pen
 // shows the colour it writes in; the flyout also has the notepad's
@@ -31,6 +33,14 @@ const CARET = (
     <path d="M6.4 8h3.2" />
   </svg>
 );
+/** A page with a dashed line across it, a tab at its left. */
+const SECTION = (
+  <svg viewBox="0 0 16 16" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <rect x="2.5" y="1.5" width="11" height="13" rx="1" />
+    <path d="M4.5 9h7" strokeDasharray="1.6 1.6" />
+    <path d="M4.5 5.5h3" />
+  </svg>
+);
 const ERASER = (
   <svg viewBox="0 0 16 16" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
     <path d="M6.2 13.5L2.4 9.7a1 1 0 0 1 0-1.4l5.9-5.9a1 1 0 0 1 1.4 0l3.8 3.8a1 1 0 0 1 0 1.4l-6 5.9z" />
@@ -48,6 +58,7 @@ const PEN = (
 export function ReadingModeExit() {
   const leave = () => useStore.getState().setReadingMode(false);
   const sentenceTool = useStore((s) => s.sentenceTool);
+  const sectionTool = useStore((s) => s.sectionTool);
   const inkMode = useStore((s) => s.inkMode);
   const inkTool = useStore((s) => s.inkTool);
   const erasing = inkMode && inkTool === "eraser";
@@ -83,6 +94,16 @@ export function ReadingModeExit() {
         onClick={() => readerCommand("sentence")}
       >
         {CARET}
+      </button>
+      <button
+        type="button"
+        className={sectionTool ? "reading-mode-tool reading-mode-section on" : "reading-mode-tool reading-mode-section"}
+        title={sectionTool ? "Add Section: tap a page where the section begins (again to cancel)" : "Add Section: tap a page to draw a line across it and name it"}
+        aria-label="Add Section"
+        aria-pressed={sectionTool}
+        onClick={() => readerCommand("section")}
+      >
+        {SECTION}
       </button>
       <button
         type="button"

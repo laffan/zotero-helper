@@ -80,6 +80,7 @@ export const ACTIONS: ShortcutAction[] = [
   a("pdf", "pdfContinuous", "Continuous view", "c"),
   a("pdf", "pdfInk", "Draw (ink mode) on / off", "i"),
   a("pdf", "pdfSentence", "Select sentences (a tap selects the sentence under it) on / off", "s"),
+  a("pdf", "pdfSection", "Add Section (the next tap on a page draws a section's line)", "a"),
   a("pdf", "pdfReadingMode", "Reading mode on / off (Esc also leaves it)", "r"),
   a("pdf", "pdfNext", "Next page (next fold, when folded)", "arrowright", "arrowdown"),
   a("pdf", "pdfPrev", "Previous page (previous fold, when folded)", "arrowleft", "arrowup"),

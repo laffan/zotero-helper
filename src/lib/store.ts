@@ -81,10 +81,12 @@ interface UiPrefs {
    *  panels or bottom bar (App.tsx, readingmode.css). This session's
    *  only, and over when the PDF closes. */
   readingMode: boolean;
-  /** The open viewer's sentence tool and ink mode, as it reports them —
-   *  for reading mode's buttons (ReadingModeExit.tsx), which toggle them
-   *  through the viewer's own commands. */
+  /** The open viewer's sentence tool, Add Section (placing a section's
+   *  line) and ink mode, as it reports them — for reading mode's buttons
+   *  (ReadingModeExit.tsx), which toggle them through the viewer's own
+   *  commands. */
   sentenceTool: boolean;
+  sectionTool: boolean;
   inkMode: boolean;
   /** Ink mode's tool, which reading mode's pen button shows. */
   inkTool: "pen" | "eraser" | "select";
@@ -235,6 +237,7 @@ interface AppStore extends UiPrefs {
   setReadingMode: (b: boolean) => void;
   setViewerTools: (t: {
     sentenceTool?: boolean;
+    sectionTool?: boolean;
     inkMode?: boolean;
     inkTool?: "pen" | "eraser" | "select";
     twoUp?: boolean;
@@ -292,6 +295,7 @@ export const useStore = create<AppStore>()(
       outlineOpen: false,
       readingMode: false,
       sentenceTool: false,
+      sectionTool: false,
       inkMode: false,
       inkTool: "pen",
       twoUp: false,
@@ -475,7 +479,7 @@ export const useStore = create<AppStore>()(
         set(
           reading
             ? { reading, metaTab: tab, sidebarOpen: false, metaOpen: false }
-            : { reading, readingMode: false, sentenceTool: false, inkMode: false, explain: null },
+            : { reading, readingMode: false, sentenceTool: false, sectionTool: false, inkMode: false, explain: null },
         );
       },
       setCachedPdfs: (list) =>

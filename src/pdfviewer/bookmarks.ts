@@ -1,11 +1,17 @@
-// The page bookmark button's naming box, and what a bookmarked page
-// shows. Pressing a page's bookmark button opens a small box beside it:
-// on a page without one, the name filled in ("p. 12") and selected —
-// Enter (or Add) makes the bookmark; on a page with one, that bookmark's
-// name, to rename it (Save) or Remove it. Escape or a press elsewhere
-// drops the box. The bookmarks themselves are the app's
-// (lib/bookmarks.ts).
+// The pages' bookmarks: the button at each page's top right, its naming
+// box, and what a bookmarked page shows. Pressing a page's bookmark
+// button opens a small box beside it (nameBox.ts): on a page without
+// one, the name filled in ("p. 12") and selected — Enter (or Add) makes
+// the bookmark; on a page with one, that bookmark's name, to rename it
+// (Save) or Remove it. Escape or a press elsewhere drops the box. In
+// reading mode, where the buttons are hidden, holding a page's corner
+// opens it instead (bookmarkHold.ts). The bookmarks themselves are the
+// app's (lib/bookmarks.ts); `createPageBookmarks` is what the viewer
+// wires up.
+import { attachBookmarkHold } from "./bookmarkHold";
+import { createNameBox } from "./nameBox";
 import type { PageRecord } from "./types";
+import type { PdfViewerOptions } from "./viewerOptions";
 
 /** A bookmark as a page shows it. */
 export interface PageBookmark {
@@ -14,64 +20,54 @@ export interface PageBookmark {
   name: string;
 }
 
-interface PromptActions {
-  create: (pageIndex: number, name: string) => void;
-  rename: (id: string, name: string) => void;
-  remove: (id: string) => void;
+interface PageBookmarksEnv {
+  root: HTMLElement;
+  scrollArea: HTMLElement;
+  opts: PdfViewerOptions;
+  getPages: () => PageRecord[];
+  getPageLabels: () => string[] | null;
 }
 
-export function createBookmarkPrompt(host: HTMLElement, act: PromptActions) {
-  let box: HTMLFormElement | null = null;
+/** The viewer's bookmarks: `onBookmarkPage` for the pages' buttons
+ *  (pageTools.ts), `set` for the PDF's bookmarks. */
+export function createPageBookmarks(env: PageBookmarksEnv) {
+  const { opts } = env;
+  const box = createNameBox(env.root);
+  let marks: PageBookmark[] = [];
+  const detachHold = opts.onBookmark && opts.holdToBookmark ? attachBookmarkHold(env.scrollArea, opts.holdToBookmark) : null;
 
-  function close(): void {
-    box?.remove();
-    box = null;
-    document.removeEventListener("pointerdown", onOutside, true);
-  }
-  function onOutside(e: PointerEvent): void {
-    if (box && !box.contains(e.target as Node)) close();
-  }
-
-  /** `existing`: the page's bookmark, to rename or remove. */
-  function open(pageIndex: number, button: HTMLElement, defaultName: string, existing?: PageBookmark): void {
-    close();
-    const form = document.createElement("form");
-    form.className = "pdf-bookmark-box";
-    form.innerHTML =
-      `<input type="text" aria-label="Bookmark name" /><button type="submit">${existing ? "Save" : "Add"}</button>` +
-      (existing ? `<button type="button" class="pdf-bookmark-remove">Remove</button>` : "");
-    const input = form.querySelector("input")!;
-    input.value = existing?.name ?? defaultName;
-    form.addEventListener("submit", (e) => {
-      e.preventDefault();
-      const name = input.value.trim() || existing?.name || defaultName;
-      close();
-      if (existing) act.rename(existing.id, name);
-      else act.create(pageIndex, name);
+  /** Page `page`'s (1-based) button was pressed. */
+  function onBookmarkPage(page: number, button: HTMLElement): void {
+    const idx = page - 1;
+    const existing = marks.find((m) => m.pageIndex === idx);
+    const label = env.getPageLabels()?.[idx];
+    box.open({
+      anchor: button,
+      align: "right",
+      label: "Bookmark name",
+      name: existing?.name ?? `p. ${label ?? page}`,
+      existing: Boolean(existing),
+      // The page's top in PDF space (its viewport may be scaled).
+      save: (name) =>
+        existing
+          ? opts.onRenameBookmark?.(existing.id, name)
+          : opts.onBookmark?.(idx, env.getPages()[idx]?.viewport.viewBox[3] ?? 0, name, label),
+      remove: existing ? () => opts.onRemoveBookmark?.(existing.id) : undefined,
     });
-    form.querySelector(".pdf-bookmark-remove")?.addEventListener("click", () => {
-      close();
-      if (existing) act.remove(existing.id);
-    });
-    input.addEventListener("keydown", (e) => {
-      if (e.key !== "Escape") return;
-      e.preventDefault();
-      close();
-    });
-    host.appendChild(form);
-    box = form;
-    // Under the button, its right edges lined up, kept inside the viewer.
-    const h = host.getBoundingClientRect();
-    const b = button.getBoundingClientRect();
-    const left = Math.max(8, Math.min(b.right - h.left - form.offsetWidth, h.width - form.offsetWidth - 8));
-    form.style.left = `${left}px`;
-    form.style.top = `${Math.max(8, b.bottom - h.top + 6)}px`;
-    input.focus();
-    input.select();
-    document.addEventListener("pointerdown", onOutside, true);
   }
 
-  return { open, close, destroy: close };
+  return {
+    onBookmarkPage: opts.onBookmark ? onBookmarkPage : undefined,
+    /** The PDF's bookmarks, shown on their pages. */
+    set(list: PageBookmark[]): void {
+      marks = list;
+      markBookmarkedPages(env.getPages(), list);
+    },
+    destroy(): void {
+      box.close();
+      detachHold?.();
+    },
+  };
 }
 
 /** Fill the bookmark button on pages that have a bookmark, and put the

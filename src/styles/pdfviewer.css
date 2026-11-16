@@ -506,6 +506,7 @@
   min-width: 3.4em;
 }
 .pdf-sentence-btn.active,
+.pdf-section-btn.active,
 .pdf-fold-btn.active {
   background: rgb(128 128 128 / 0.22);
   border-color: rgb(128 128 128 / 0.4);

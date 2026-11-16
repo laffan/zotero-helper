@@ -194,6 +194,7 @@ export function createSurface(host: HTMLElement, env: SurfaceEnv) {
     },
     tapText: (l, on, cx, cy) => texts.tap(l, on, cx, cy),
     edit: (l) => texts.edit(l),
+    selected: (l) => lasso.hasLink(l),
   });
 
   // Text notes (texts.ts): new ones, changed words, emptied ones.

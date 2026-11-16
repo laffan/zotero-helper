@@ -8,14 +8,19 @@
 // it (the Pencil, a finger or the mouse alike), a pen colour picked
 // recolours its strokes, ⌫ deletes it, Escape lets go of it, and so does
 // a press anywhere else — the Pencil then writes at once, as it does in
-// Hush. Held, the lasso
+// Hush. "Anywhere else" is the window, not only the canvas (`away`): the
+// pages, reading mode's buttons, a link's chip not in the selection. The
+// pad's own bar keeps it, since its colours recolour it. Held, the lasso
 // is borrowed for the one press; the bar's switch also has it as a tool,
 // when every press of the Pencil or the mouse draws one.
 //
 // What is selected and then leaves the pad by any other way — erased,
 // undone, cleared, changed in another view — leaves the selection too
 // (`prune`, after every change); with nothing left, the frame and its
-// Delete go.
+// Delete go. The frame shows only while something is selected: a drag
+// whose selection was let go of on the way (Escape, undo, a redraw from
+// the other view) used to show it again where it was as it dropped,
+// with a Delete that had nothing to delete.
 import { bounds, inPolygon, pathD } from "./geometry";
 import { onPress, TRASH_SVG } from "./links";
 import type { Notepad, NoteLink, NoteStroke } from "./model";
@@ -94,11 +99,14 @@ export function createLasso(layer: HTMLElement, svg: SVGSVGElement, env: LassoEn
     if (!strokes.length && !links.length) return false;
     showFrame();
     window.addEventListener("keydown", onKey);
+    window.addEventListener("pointerdown", away, true);
     return true;
   }
 
-  /** Frame what is selected, from where it is now. */
+  /** Frame what is selected, from where it is now — or, with nothing
+   *  selected, let go. */
   function showFrame(): void {
+    if (!strokes.length && !links.length) return clear();
     let [x0, y0, x1, y1] = [Infinity, Infinity, -Infinity, -Infinity];
     for (const s of strokes) {
       const [a, b, c, d] = bounds(s.points);
@@ -129,6 +137,25 @@ export function createLasso(layer: HTMLElement, svg: SVGSVGElement, env: LassoEn
     box = null;
     frame.style.display = "none";
     window.removeEventListener("keydown", onKey);
+    window.removeEventListener("pointerdown", away, true);
+  }
+
+  /** A press the canvas won't hear lets go of the selection: one outside
+   *  the pad, or on a link's chip that isn't selected (the chip keeps its
+   *  presses). The canvas's own presses are surface.ts's to judge, and
+   *  the pad's bar and the selection's Delete keep it. */
+  function away(e: PointerEvent): void {
+    const t = e.target as Element | null;
+    if (!t || frame.contains(t)) return;
+    const canvas = layer.parentElement;
+    if (canvas?.contains(t)) {
+      // A pinned link is the pad's ground: its presses are the canvas's.
+      const id = t.closest<HTMLElement>("[data-link]")?.dataset.link;
+      const l = id ? env.pad().links.find((x) => x.id === id) : undefined;
+      if (l && !l.fixed && !links.includes(l)) clear();
+      return;
+    }
+    if (!canvas?.closest(".notepad")?.contains(t)) clear();
   }
 
   /** Keep to what is still on the pad: frame it again, or let go. */
@@ -172,13 +199,15 @@ export function createLasso(layer: HTMLElement, svg: SVGSVGElement, env: LassoEn
     frame.style.transform = t;
   }
 
-  /** The drag let go: move the selection by (dx, dy). */
+  /** The drag let go: move the selection by (dx, dy) — unless it was
+   *  let go of on the way, when nothing moves. */
   function drop(dx: number, dy: number): void {
     env.lift(null, 0, 0);
     for (const l of links) {
       const chip = env.chipOf(l.id);
       if (chip) chip.style.transform = "";
     }
+    if (!box) return;
     if (Math.abs(dx) >= 0.5 || Math.abs(dy) >= 0.5) env.moved(strokes, links, dx, dy);
     showFrame();
   }
@@ -191,6 +220,8 @@ export function createLasso(layer: HTMLElement, svg: SVGSVGElement, env: LassoEn
     drawing: () => pts !== null,
     /** The strokes selected (a colour picked recolours them). */
     strokes: () => strokes,
+    /** Is this link selected? A press on its chip moves the selection. */
+    hasLink: (l: NoteLink) => links.includes(l),
     has: () => box !== null,
     /** Is a canvas point inside the selection's frame? */
     contains: (x: number, y: number) => Boolean(box && x >= box[0] && x <= box[2] && y >= box[1] && y <= box[3]),

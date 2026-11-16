@@ -72,6 +72,11 @@ src/            React + TypeScript UI (Vite, zustand, MiniSearch)
                 the reader's bookmarks: the store, its file (through
                 src-tauri/src/bookmarks.rs), and each as an entry for
                 the Highlights tab
+  lib/dividers.ts
+                the sections the reader adds (Add Section): the store,
+                its file (through src-tauri/src/dividers.rs), and
+                withDividers, which puts them among the outline's
+                headings for the Highlights tab
   lib/highlights.ts, lib/notes.ts
                 annotations out of the library cache; NOTES.md load /
                 save / periodic push, the PDF cache
@@ -174,8 +179,12 @@ src/            React + TypeScript UI (Vite, zustand, MiniSearch)
                 excerpt (pages cut into a PDF of their own, a page's
                 region as an image), darkPages (the pages white on
                 black), pencilFinger
-                (the Pencil out of ink mode, a finger), bookmarkHold
-                (reading mode's hold on a corner), places (where the
+                (the Pencil out of ink mode, a finger), bookmarks (the
+                pages' bookmark buttons and marks), bookmarkHold
+                (reading mode's hold on a corner), nameBox (the box
+                that names a bookmark or a section), dividers (Add
+                Section: a section's line placed, drawn, dragged,
+                renamed), places (where the
                 reader is, what is at a point — for the notepad), and
                 annotating (the pieces below, put together):
                 selectionBar (colours over a selection),
@@ -208,7 +217,8 @@ src/            React + TypeScript UI (Vite, zustand, MiniSearch)
                 (the reading questions and the "?" menu)
   styles/       one stylesheet per UI region (tokens, base, toolbar, …;
                 keyboard = the pane outline and sidebar cursor;
-                pdfviewer-dark = dark pages; explanations = the
+                pdfviewer-dark = dark pages; pdfviewer-sections =
+                the reader's sections on the pages; explanations = the
                 explanation boxes; notepad-clips = the notepad's pins
                 and clips, and clip mode; notepad-texts = its text
                 notes and their editor; explainer = the explainer's
@@ -238,6 +248,7 @@ src-tauri/      Rust core (all networking + state)
                    text, a PDF made in the webview) and the desktop's
                    exports
   src/bookmarks.rs the reader's bookmarks on disk (bookmarks.json)
+  src/dividers.rs  the reader's sections on disk (sections.json)
   src/capture.rs   desktop capture-browser window (download interception)
   tauri-plugin-capture-view/, tauri-plugin-share-sheet/,
   tauri-plugin-keyboard-focus/, tauri-plugin-pencil/,
@@ -695,7 +706,8 @@ screen (fit one / two / three; four and five from the keyboard only,
 4 and 5 — the three-page button is lit then, the number over its
 last page, `.pdf-fit-more`), scroll direction, paged / continuous,
 folding, zoom (−, the zoom or fit, and + as one bordered group), the
-sentence tool and the pen — and, at its right, where the reader is:
+sentence tool and Add Section (see Sections, below), the pen — and, at
+its right, where the reader is:
 "54% | 7 of 13 | 1:33pm" (the share of the document up to the page in
 view, then the page, or the set's range, "7–9 of 13", then the time).
 A press on the place shows every page at a glance, the thumbnail grid
@@ -878,12 +890,14 @@ to the pages too. A red × at the top left
 (below that band on the iPad) — or Escape — brings everything back as
 it was (`ReadingModeExit.tsx`). Below it, down the left at the same
 size and spacing, a red caret toggles the sentence tool (a tap selects
-the sentence under it — see Highlighting) and a red pen toggles ink
-mode (the Pencil writes, or selects and highlights like a finger); both
+the sentence under it — see Highlighting), a red page with a dashed
+line across it readies Add Section (the next tap on a page draws a
+section's line there — see Sections) and a red pen toggles ink mode
+(the Pencil writes, or selects and highlights like a finger); all three
 show white on red while on — the same 28px square behind each, whatever
 its glyph's size — and are the viewer's own state (its
-`onSentenceTool` / `onInkMode`, reflected in the store), so the bottom
-bar's buttons and the keys agree with them. With ink mode on, a dot on
+`onSentenceTool` / `onSectionTool` / `onInkMode`, reflected in the
+store), so the bottom bar's buttons and the keys agree with them. With ink mode on, a dot on
 the pen shows the colour it writes in, and holding the pen a moment
 (450ms) opens a flyout of the pen's colours beside it — Zotero's eight
 and black, the bottom bar's colour chip, which reading mode hides; a
@@ -1083,7 +1097,10 @@ already selected, the tool's tap — inside the selection or out — only
 lets go of it, as any tap on the pages does (`selectionBar.ts`); the
 next tap selects, so a stray tap never swaps one sentence for another
 (`down.selected` in `sentenceMark.ts`; a ⌘-click still selects at
-once). A sentence runs between two ".", "!" or "?" followed by a space
+once). A tap that something else has already answered selects nothing
+either: the press that slides reading mode's notepad to the other page
+(Auto-shift, under The notepad) is marked as it reaches the window
+(`spareFromSentence`), and the tool lets its tap be. A sentence runs between two ".", "!" or "?" followed by a space
 and a capital, a digit or an opening quote, so "e.g." and "3.5" don't
 end one, nor do common abbreviations or initials; it never runs past
 its page or more than 800 characters either way. ⌘ is read from its
@@ -1430,7 +1447,9 @@ under a heading per PDF. When the PDF has an outline (and is open, or
 downloaded to this device, where its outline is read from the cached
 file), its highlights are filed under the outline's section headings
 — the deepest heading at or above each highlight — and headings with
-no highlights are left out.
+no highlights are left out. The sections the reader adds (Sections,
+below) join those headings, or divide the highlights alone in a PDF
+with no outline.
 
 ### AI
 
@@ -1754,7 +1773,8 @@ button at the top right of each page in the reader (a bookmark; it
 replaced an earlier "cite this page in the notes" pencil) opens a small
 box to name it, filled in with the page ("p. 12") and selected: Enter
 or Add makes it, Escape or a press elsewhere drops it
-(`src/pdfviewer/bookmarks.ts`). On a page that already has one, the
+(`src/pdfviewer/bookmarks.ts`; the box is `nameBox.ts`, shared with
+Sections). On a page that already has one, the
 button opens that bookmark instead — its name, to rename (Save) or
 Remove. The button shows only with the pointer within 100px of the
 page's top-right corner (always on a screen with no hovering pointer at
@@ -1776,6 +1796,57 @@ open PDF, or opening it there (`openReaderAt` in `ReaderPane.tsx`) —
 and offers Rename, Note (a link to the page, into the notes) and Delete
 (a second press confirms). A selection with bookmarks but no highlights
 still gets the Highlights tab.
+
+### Sections
+
+The Highlights tab files highlights under the PDF's outline, which many
+PDFs lack or get wrong; **Add Section** lets the reader divide a PDF
+themselves. The button sits beside the sentence tool in the bottom bar
+(a page with a dashed line across it), below the caret among reading
+mode's buttons, and on A. Pressed, it readies the tool: the pages take
+a crosshair, and a faint dashed guide follows a mouse or a hovering
+Pencil across the page under it. The next tap on a page draws a
+section's line across it there and opens the naming box under its
+label (the bookmarks' box, `nameBox.ts`), filled with the line of text
+just below — usually the heading the section begins at — and selected,
+so typing replaces it ("Section" when there is no text there). Add, or
+Enter, keeps it; Escape or a press elsewhere drops it. Either way the
+tool is done: it draws one line per press of the button, and a second
+press, or Escape, puts it away unused. While ready it has every press on
+the pages to itself — heard on the window before anything in them (the
+sentence tool, highlights, ink, the Pencil's own handling), the click
+that ends the tap too — so the tap selects nothing and draws nothing; a
+finger's drag still scrolls, and only a tap draws. It leaves the folded
+view, which shows strips of pages.
+
+On the page, a section is a dashed line across it in the accent colour,
+its name on a tab at the left, sitting on the line (a little
+see-through, since it may cover the end of a line of text, until it is
+pointed at). The tab is the section's handle: a tap opens the box to
+rename it or Remove it, a drag moves the line up or down its page (a
+finger's drag too — the tab takes no scrolling). The lines are an
+overlay on each page in percentages of the page, like the explained
+passages', so they follow every zoom and need no raster; under a
+reading crop the tab moves in to what is shown, and while the crop is
+adjusted they are hidden (`src/pdfviewer/dividers.ts`,
+`pdfviewer-sections.css`).
+
+In the Highlights tab the sections join the outline's headings in
+document order (`withDividers` in `src/lib/dividers.ts`): a highlight
+files under the nearest heading above it, the PDF's or the reader's,
+and a section sits a level under the outline heading it falls in (at
+the top level with no outline). A section's heading is drawn over a
+dashed rule in the accent, as its line is; a click goes to the line —
+in the open PDF, or opening it at the page — and Rename and Delete (a
+second press confirms) show as a row's actions do
+(`DividerHeading.tsx`). Unlike the outline's headings, a section with
+no highlights under it still shows, unless the search or a colour
+narrows the list. They are kept like the bookmarks: `sections.json` in
+the app's data folder (`src-tauri/src/dividers.rs`, opaque JSON; the
+shape is `Divider` in `src/lib/dividers.ts`), on this device only, never
+sent to Zotero. (In the code they are dividers, to keep them apart from
+the outline's sections.) Not yet done: sections among the outline
+panel's headings, and the Share and Ask PDF menus' choice of a section.
 
 ### The notepad
 
@@ -1826,7 +1897,9 @@ the pad's half of the window — the Pencil's or a finger's; not on the
 pad itself — slides the pad to the same place on the other half
 (`left` mirrored, a 0.3s slide), so it keeps to the page not being
 worked on. A docked pad changes edges instead, once the press is over,
-since the pages are laid out again.
+since the pages are laid out again. That press is the pad's alone: with
+the sentence tool on, its tap doesn't also select a sentence
+(`spareFromSentence` in `sentenceMark.ts`) — the next tap does.
 
 **Under the notes**, from **View Notepad** at the pane's foot
 (`NotesPanel.tsx`) — the bar between the notes and the pad is the
@@ -1909,7 +1982,12 @@ from there, dashed. Let go, it selects the strokes with any point
 inside it and the links whose middle is (not those fixed by a pin). The selection is framed, with
 Delete above the frame; a drag that starts inside the frame moves it
 (any pointer), ⌫ deletes it, Escape lets go, and so does a tap on it
-or a press anywhere else — the Pencil then writes at once. Held, the
+or a press anywhere else — the Pencil then writes at once. Anywhere
+else means the window, not just the canvas (`away` in `lasso.ts`): the
+pages, reading mode's buttons, a link's chip not in the selection. The
+pad's own bar keeps the selection, since its colours recolour it, and a
+press on a chip that is in the selection moves the whole selection.
+Held, the
 lasso is borrowed for the one press; the switch's fourth part makes it
 the tool, when every press of the Pencil or the mouse draws one at
 once. While a held press's loop is being drawn the switch shows the
@@ -1918,7 +1996,11 @@ lasso — the only sign, before the Pencil moves, that it has become one
 Strokes or links selected and then gone some other way — erased,
 undone, cleared, changed in another view — leave the selection too
 (`prune`, after every change), and with nothing left the frame and its
-Delete go.
+Delete go. The frame and its Delete show only while something is
+selected: a drag whose selection was let go of on the way (Escape,
+undo, a redraw from the other view) used to put the frame back where it
+had been as the drag ended, with a Delete that had nothing left to
+delete.
 
 Strokes written while the reader stays on one page are one note;
 turning to another page — even to come straight back — starts the next
@@ -2208,6 +2290,7 @@ doesn't cost the role, so there is nothing to reclaim.
 | PDF viewer | Paged / continuous view | P / C |
 | PDF viewer | Draw (ink mode) on / off | I |
 | PDF viewer | Sentence tool (a tap selects a sentence) on / off | S |
+| PDF viewer | Add Section (the next tap on a page draws a section's line) | A |
 | PDF viewer | Reading mode on / off (Esc also leaves it) | R |
 | PDF viewer | Next page (next fold, when folded) | → or ↓ |
 | PDF viewer | Previous page (previous fold, when folded) | ← or ↑ |

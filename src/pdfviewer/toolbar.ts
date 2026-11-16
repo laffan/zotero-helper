@@ -15,6 +15,7 @@ import {
   FOLD_ICON,
   HORIZONTAL_ICON,
   READING_ICON,
+  SECTION_ICON,
   VERTICAL_ICON,
 } from "./icons";
 import { PEN_ICON } from "./ink/icons";
@@ -106,6 +107,9 @@ export function buildPdfToolbar() {
   // The sentence tool: a tap selects the sentence under it
   // (sentenceMark.ts), as a ⌘-click does.
   const sentenceBtn = svgBtn("pdf-zoom-btn pdf-sentence-btn", "Select sentences — a tap selects the sentence under it", CARET_ICON, "pdfSentence");
+  // Add Section: the next tap on a page puts a named line there
+  // (dividers.ts), dividing the highlights.
+  const sectionBtn = svgBtn("pdf-zoom-btn pdf-section-btn", "Add Section — tap a page to draw a line across it and name it", SECTION_ICON, "pdfSection");
 
   // Ink mode: draw with the Pencil (or a mouse), as Zotero's pen does.
   const inkBtn = svgBtn("pdf-zoom-btn pdf-ink-btn", "Draw — the Pencil writes, a finger scrolls", PEN_ICON, "pdfInk");
@@ -115,14 +119,15 @@ export function buildPdfToolbar() {
 
   // Sections, spaced apart by the bar (pdfviewer.css): reading mode and
   // dark pages; pages per screen; scroll direction; fixed / continuous;
-  // folding; zoom; drawing (ink mode's tools join the bar after it,
-  // ink/bar.ts); then where the reader is.
+  // folding; zoom; the sentence tool and Add Section; drawing (ink
+  // mode's tools join the bar after it, ink/bar.ts); then where the
+  // reader is.
   toolbar.append(
     group("pdf-toolbar-section", readingBtn, darkBtn),
     fitToggleWrap, scrollToggleWrap,
     pageModeWrap, foldWrap,
     zoomWrap,
-    sentenceBtn,
+    group("pdf-toolbar-section", sentenceBtn, sectionBtn),
     inkBtn,
     pageIndicator, zoteroLink,
   );
@@ -134,7 +139,7 @@ export function buildPdfToolbar() {
     fitOneBtn, fitTwoBtn, fitThreeBtn, fitFourBtn, fitFiveBtn, fitToggleWrap,
     pageModeWrap, fixedBtn, continuousBtn,
     foldBtn, foldFilterBtn,
-    pageIndicator, zoteroLink, readingBtn, darkBtn, sentenceBtn, inkBtn,
+    pageIndicator, zoteroLink, readingBtn, darkBtn, sentenceBtn, sectionBtn, inkBtn,
   };
 }
 export type PdfToolbar = ReturnType<typeof buildPdfToolbar>;

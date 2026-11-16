@@ -1,0 +1,80 @@
+/* The sections the reader adds to the pages (src/pdfviewer/dividers.ts):
+   a dashed line across the page in the accent colour, its name in a tab
+   at the left, sitting on the line. The tab is the section's handle — a
+   tap renames it, a drag moves the line — so it takes presses (and a
+   finger's drag doesn't scroll from it); the line itself takes none.
+   While Add Section is ready, a fainter line (the guide) follows the
+   pointer across the page under it. */
+.pdf-dividers {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 4;
+}
+.pdf-divider {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 0;
+  border-top: 1.5px dashed var(--accent);
+  pointer-events: none;
+  z-index: 4;
+}
+/* The tab sits on the line, in what is usually the gap above a heading;
+   it may still cover the end of a line of text there, so it is a little
+   see-through until it is pointed at or held. */
+.pdf-divider-label {
+  position: absolute;
+  bottom: 1px;
+  left: 8px;
+  max-width: 70%;
+  padding: 0 7px;
+  opacity: 0.88;
+  border: none;
+  border-radius: 6px 6px 0 0;
+  background: var(--accent);
+  color: #fff;
+  font-size: calc(11px * var(--font-scale));
+  font-weight: 600;
+  line-height: 1.45;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: ns-resize;
+  pointer-events: auto;
+  touch-action: none;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+.pdf-divider-label:hover,
+.pdf-divider.dragging .pdf-divider-label,
+.pdf-divider-guide .pdf-divider-label {
+  opacity: 1;
+}
+.pdf-divider-label:empty {
+  display: none;
+}
+.pdf-divider.dragging {
+  border-top-style: solid;
+}
+/* Under a reading crop the tab moves in to what is shown of the page. */
+.pdf-cropped .pdf-divider-label {
+  left: calc(var(--crop-l, 0) * 100% + 8px);
+}
+/* Add Section ready: the pages take a crosshair, and the guide is the
+   line it would draw. */
+.pdf-divider-placing .pdf-page-wrapper {
+  cursor: crosshair;
+}
+.pdf-divider-guide {
+  border-top-color: color-mix(in srgb, var(--accent) 70%, transparent);
+}
+.pdf-divider-guide .pdf-divider-label {
+  cursor: default;
+  pointer-events: none;
+}
+/* Adjusting the reading crop shows the pages whole: no tabs in the way. */
+.pdf-crop-editing .pdf-dividers {
+  display: none;
+}

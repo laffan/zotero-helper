@@ -31,7 +31,10 @@ Windows/Linux desktops too).
   can be pinned and written over; a double-tap on the notepad (or a
   double-click) types a note there in Markdown, set as Hush's notebooks
   set text. A page, a run of pages or a section
-  can be shared as a PDF of its own.
+  can be shared as a PDF of its own. **Add Section** (beside the
+  sentence tool) draws a labelled dashed line across a page, and the
+  Highlights tab files the highlights under these sections — among the
+  PDF's own outline headings, or on their own where it has none.
 - **AI helpers (optional)** — tidy metadata, extract abstracts, ask
   questions of abstracts, full papers or a part of one with page-cited
   answers, have a selected passage explained in a few lines, with or

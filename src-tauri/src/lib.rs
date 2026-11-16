@@ -3,6 +3,7 @@ mod annotations;
 mod bookmarks;
 mod capture;
 mod chats;
+mod dividers;
 mod error;
 mod hush;
 mod notepads;
@@ -646,6 +647,8 @@ pub fn run() {
             save_chats,
             bookmarks::load_bookmarks,
             bookmarks::save_bookmarks,
+            dividers::load_dividers,
+            dividers::save_dividers,
             words::load_words,
             words::save_words,
             notepads::load_notepad,

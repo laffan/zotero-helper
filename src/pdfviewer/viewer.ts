@@ -24,8 +24,8 @@ import {
 } from "./anchor";
 import { createAnnotating, type DefinedWord } from "./annotating";
 import { createAnnotationLayer } from "./annotations";
-import { attachBookmarkHold } from "./bookmarkHold";
-import { createBookmarkPrompt, markBookmarkedPages, type PageBookmark } from "./bookmarks";
+import { createPageBookmarks, type PageBookmark } from "./bookmarks";
+import { createDividers, type PageDivider } from "./dividers";
 import { createCiteMark } from "./citeMark";
 import { createViewerCommands } from "./commands";
 import { createReadingCrop } from "./crop";
@@ -165,6 +165,7 @@ export function createPdfViewer(container: HTMLElement, opts: PdfViewerOptions =
       void linkMgr.attach(idx, page);
       ink.pageRendered(idx);
       annotating.pageRendered(idx);
+      dividers.pageRendered(idx);
       if (opts.onQuote || opts.annotate) void attachTextLayer(pages[idx], page);
     },
     onUpdate: () => updatePageIndicator(),
@@ -201,14 +202,10 @@ export function createPdfViewer(container: HTMLElement, opts: PdfViewerOptions =
     },
     (v) => opts.onViewChange?.(currentPage(), v),
   );
-  let pageMarks: PageBookmark[] = [];
-  const bookmarkPrompt = createBookmarkPrompt(root, {
-    // The page's top in PDF space (its viewport may be scaled).
-    create: (idx, name) => opts.onBookmark?.(idx, pages[idx]?.viewport.viewBox[3] ?? 0, name, pageLabels?.[idx]),
-    rename: (id, name) => opts.onRenameBookmark?.(id, name),
-    remove: (id) => opts.onRemoveBookmark?.(id),
-  });
-  const detachBookmarkHold = opts.onBookmark && opts.holdToBookmark ? attachBookmarkHold(scrollArea, opts.holdToBookmark) : null;
+  const pageEnv = { root, scrollArea, opts, getPages: () => pages, getPageLabels: () => pageLabels };
+  const bookmarks = createPageBookmarks(pageEnv);
+  // Add Section draws on whole pages, so it leaves the folded view.
+  const dividers = createDividers({ ...pageEnv, button: tb.sectionBtn, onStart: () => exitFolded() });
   // The reading crop: adjusting it shows the pages whole, ending the
   // adjustment lays them out trimmed — at the same place.
   const cropper = createReadingCrop({
@@ -551,10 +548,7 @@ export function createPdfViewer(container: HTMLElement, opts: PdfViewerOptions =
     typical = sample.typical;
     pages = createPageRecords(scrollArea, doc.numPages, sample.typical, sample.known, {
       onOpenInZotero: opts.onOpenInZotero,
-      onBookmarkPage: opts.onBookmark
-        ? (page, button) =>
-            bookmarkPrompt.open(page - 1, button, `p. ${pageLabels?.[page - 1] ?? page}`, pageMarks.find((m) => m.pageIndex === page - 1))
-        : undefined,
+      onBookmarkPage: bookmarks.onBookmarkPage,
     });
     const scale = getEffectiveZoom();
     const state = layoutState();
@@ -608,8 +602,8 @@ export function createPdfViewer(container: HTMLElement, opts: PdfViewerOptions =
     keys.detach();
     magnifier.destroy();
     cropper.destroy();
-    bookmarkPrompt.destroy();
-    detachBookmarkHold?.();
+    bookmarks.destroy();
+    dividers.destroy();
     foldLayer.destroy();
     progress.destroy();
     renderer.destroy();
@@ -654,11 +648,10 @@ export function createPdfViewer(container: HTMLElement, opts: PdfViewerOptions =
       pagesInView(scrollArea, pages, currentPage() - 1, folded ? null : cropper.get()) ?? [currentPage(), currentPage()],
     /** Pages cut into a PDF of their own; a page's region as an image. */
     ...excerpts,
-    /** The PDF's bookmarks, shown on their pages. */
-    setPageBookmarks: (marks: PageBookmark[]) => {
-      pageMarks = marks;
-      markBookmarkedPages(pages, marks);
-    },
+    /** The PDF's bookmarks, and the reader's sections, shown on their
+     *  pages. */
+    setPageBookmarks: (marks: PageBookmark[]) => bookmarks.set(marks),
+    setSections: (list: PageDivider[]) => dividers.set(list),
     /** A keyboard command (lib/shortcuts/): a mode, a page or fold step. */
     command,
     /** Ink mode's pen: its colour, and the colours it takes. */

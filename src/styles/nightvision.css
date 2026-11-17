@@ -19,3 +19,67 @@
   background: #f00;
   mix-blend-mode: multiply;
 }
+
+/* The colours look alike in night vision, so each colour dot shows its
+   letter (colorLetter, lib/highlights.ts): the selection bar's and the
+   highlight editor's dots, the pen's, the Highlights tab's filters and
+   reading mode's pen colours. The letter is sized to its dot, which the
+   UI font size doesn't change, so it follows the font size only a
+   little way. */
+html.night-vision .hl-swatch[data-letter] {
+  position: relative;
+}
+html.night-vision :is(.pdf-mark-swatch, .hl-swatch)[data-letter]::before,
+html.night-vision .reading-mode-pen-color[data-letter]::after {
+  content: attr(data-letter);
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: calc(8.5px * min(var(--font-scale), 1.1));
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.02em;
+  /* A capital's box is mostly above its baseline: down a touch to look
+     centred in the dot. */
+  padding-top: 0.12em;
+  color: #000;
+  pointer-events: none;
+}
+html.night-vision .reading-mode-pen-color[data-letter]::after {
+  font-size: calc(12px * min(var(--font-scale), 1.1));
+}
+/* Underlining, the dot is a bar under an empty square: the letter sits
+   above the bar in the text's colour. */
+html.night-vision .pdf-selection-bar.underline .pdf-mark-swatch[data-letter]::before {
+  bottom: 4px;
+  color: var(--text);
+}
+
+/* Each highlight's flag on the page (pdfviewer/colorFlags.ts), drawn
+   only while night vision is on. */
+.pdf-color-flags {
+  display: none;
+}
+html.night-vision .pdf-color-flags {
+  display: block;
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 3;
+}
+.pdf-color-flag {
+  position: absolute;
+  overflow: visible;
+}
+.pdf-color-flag path {
+  stroke: rgb(0 0 0 / 0.55);
+  stroke-width: 0.5;
+}
+/* In the flag's own units (its viewBox is 10 high), so the letter grows
+   and shrinks with the flag, which the page's zoom sizes. */
+.pdf-color-flag text {
+  font: 700 7.4px system-ui, -apple-system, sans-serif;
+  fill: #000;
+}

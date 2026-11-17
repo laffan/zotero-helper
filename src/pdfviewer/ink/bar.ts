@@ -9,7 +9,7 @@
 //
 // The choices are this device's (`localStorage`), like the selection
 // bar's highlight / underline switch.
-import { ANNOTATION_COLORS } from "../../lib/highlights";
+import { ANNOTATION_COLORS, colorLetter } from "../../lib/highlights";
 import { DEFAULT_ERASER_SIZE, DEFAULT_PEN_WIDTH, ERASER_SIZES, INK_EXTRA_COLORS, PEN_WIDTHS } from "./geometry";
 import { ERASER_ICON, PEN_ICON, REDO_ICON, SELECT_ICON, TRASH_ICON, UNDO_ICON } from "./icons";
 import type { InkTool } from "./input";
@@ -129,6 +129,8 @@ export function createInkBar(popupHost: HTMLElement, handlers: InkBarHandlers) {
     const s = button("pdf-mark-swatch", "", "", () => handlers.color(c));
     s.style.setProperty("--swatch", c);
     s.dataset.color = c;
+    // Night vision's letter, for Zotero's colours (not the extra black).
+    if (ANNOTATION_COLORS.includes(c)) s.dataset.letter = colorLetter(c);
     return s;
   });
   const colors = group("pdf-ink-colors", ...swatches);

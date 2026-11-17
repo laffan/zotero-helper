@@ -20,6 +20,7 @@
 // — App.tsx gives the app the `reading-mode` class, and readingmode.css
 // hides the rest.
 import { useEffect, useRef, useState } from "react";
+import { ANNOTATION_COLORS, colorLetter } from "../lib/highlights";
 import { useStore } from "../lib/store";
 import { LassoIcon } from "./NotepadBody";
 import { readerCommand, readerPen } from "./ReaderPane";
@@ -179,6 +180,7 @@ export function ReadingModeExit() {
               aria-label={`Colour ${c}`}
               className={c === pen.color ? "reading-mode-pen-color on" : "reading-mode-pen-color"}
               style={{ "--swatch": c } as React.CSSProperties}
+              data-letter={ANNOTATION_COLORS.includes(c) ? colorLetter(c) : undefined}
               onClick={() => pen.choose(c)}
             />
           ))}

@@ -10,7 +10,7 @@
 // filter leaves out; the map dims it.
 import { useMemo } from "react";
 import { BOOKMARK_FILTER, isBookmark } from "../lib/bookmarks";
-import { colorsOf, type Annotation } from "../lib/highlights";
+import { colorLetter, colorsOf, type Annotation } from "../lib/highlights";
 import { usePdfUi } from "../lib/readerUi";
 import { BookmarkIcon } from "./Icons";
 
@@ -61,6 +61,7 @@ export function ColorSwatches({ filter, row = false }: { filter: HighlightFilter
           key={c}
           className={`hl-swatch ${active.includes(c) ? "active" : ""}`}
           style={{ backgroundColor: c }}
+          data-letter={colorLetter(c)}
           onClick={(e) => pick(c, e)}
           title="Only this colour (⌘-click to pick several)"
         />

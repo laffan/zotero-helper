@@ -107,8 +107,9 @@ function toRuns(items: any[]): TextRun[] {
  *  have. Where it's missing the call throws before a single item is
  *  read, on every page, and the page looks exactly like a scan. So a
  *  failure falls back to pumping the same stream through a reader,
- *  which is plain ES2018 and works anywhere. */
-async function textItems(page: any): Promise<any[]> {
+ *  which is plain ES2018 and works anywhere. Also night vision's colour
+ *  flags' (pdfviewer/colorFlags.ts). */
+export async function textItems(page: any): Promise<any[]> {
   try {
     const content = await page.getTextContent();
     return content.items ?? [];

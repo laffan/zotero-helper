@@ -238,6 +238,7 @@ export function createPdfViewer(container: HTMLElement, opts: PdfViewerOptions =
     scrollArea,
     root,
     opts,
+    getPdfDoc: () => pdfDoc,
     getPages: () => pages,
     getPageLabels: () => pageLabels,
     getAnnotations: () => annotLayer.getAnnotations(),

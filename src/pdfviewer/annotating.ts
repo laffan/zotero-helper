@@ -4,18 +4,20 @@
 // (highlightHandles.ts), the ⌘-click (or the sentence tool) that
 // selects a whole sentence (sentenceMark.ts), and the passages the app
 // keeps marked — those the AI has explained, and the words looked up,
-// whose definition a tap shows (passageMarks.ts). The viewer hands over
+// whose definition a tap shows (passageMarks.ts) — and, in night vision,
+// each highlight's colour flag (colorFlags.ts). The viewer hands over
 // its pages and the writer; absent a writer, a selection can only be
 // quoted.
 import { annotationPosition, type Annotation } from "../lib/highlights";
 import { annotationAtPoint, attachAnnotationTaps, draftFromRange, pageBoxAt } from "./annotate";
 import { createAnnotationPopover } from "./annotPopover";
+import { createColorFlags } from "./colorFlags";
 import { createHighlightHandles } from "./highlightHandles";
 import { createLookupPopup } from "./lookupPopup";
 import { createPassageMarks, type ExplainMark, type WordMark } from "./passageMarks";
 import { createSelectionBar, type MarkType } from "./selectionBar";
 import { attachSentenceMarks, sentenceAround } from "./sentenceMark";
-import type { PageRecord } from "./types";
+import type { PageRecord, PDFDocumentProxy } from "./types";
 import type { PdfViewerOptions } from "./viewerOptions";
 
 export interface AnnotatingEnv {
@@ -23,6 +25,8 @@ export interface AnnotatingEnv {
   root: HTMLElement;
   opts: PdfViewerOptions;
   getPages: () => PageRecord[];
+  /** The open PDF (its text places night vision's colour flags). */
+  getPdfDoc: () => PDFDocumentProxy | null;
   getPageLabels: () => string[] | null;
   getAnnotations: () => Annotation[];
   isFolded: () => boolean;
@@ -192,6 +196,13 @@ export function createAnnotating(env: AnnotatingEnv) {
       })
     : null;
 
+  // Night vision's colour flags (colorFlags.ts).
+  const flags = createColorFlags({
+    getPages: env.getPages,
+    getPdfDoc: env.getPdfDoc,
+    getAnnotations: env.getAnnotations,
+  });
+
   return {
     /** The pages scrolled: the editor is placed beside what it edits,
      *  so once that has moved away it closes (but not while its
@@ -211,13 +222,16 @@ export function createAnnotating(env: AnnotatingEnv) {
     pageRendered(idx: number): void {
       explained.pageRendered(idx);
       words.pageRendered(idx);
+      flags.pageRendered(idx);
     },
     /** The annotations changed. */
     sync(list: Annotation[]): void {
       popover?.sync(list);
       handles?.sync(list);
+      flags.sync();
     },
     destroy(): void {
+      flags.destroy();
       selection?.destroy();
       popover?.destroy();
       handles?.destroy();

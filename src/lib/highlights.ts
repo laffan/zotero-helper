@@ -52,6 +52,39 @@ export const ANNOTATION_COLORS: ReadonlyArray<string> = [
   "#aaaaaa", // gray
 ];
 
+/** Each colour's letter, for night vision (lib/nightVision.ts), where
+ *  the app is drawn in red alone and the colours look alike: shown in
+ *  the colour dots and on a flag by each highlight (colorFlags.ts). The
+ *  first letter; gray takes two, since G is green's. */
+const COLOR_LETTERS: Record<string, string> = {
+  "#ffd400": "Y",
+  "#ff6666": "R",
+  "#5fb236": "G",
+  "#2ea8e5": "B",
+  "#a28ae5": "P",
+  "#e56eee": "M",
+  "#f19837": "O",
+  "#aaaaaa": "Gy",
+};
+
+/** The letter of `color` — one of Zotero's, or else the nearest of
+ *  them (a colour another client chose). */
+export function colorLetter(color: string): string {
+  const c = color.toLowerCase();
+  if (COLOR_LETTERS[c]) return COLOR_LETTERS[c];
+  const rgb = (h: string) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
+  if (!/^#[0-9a-f]{6}$/.test(c)) return COLOR_LETTERS[ANNOTATION_COLORS[0]];
+  const [r, g, b] = rgb(c);
+  let best = ANNOTATION_COLORS[0];
+  let bestD = Infinity;
+  for (const p of ANNOTATION_COLORS) {
+    const [pr, pg, pb] = rgb(p);
+    const d = (r - pr) ** 2 + (g - pg) ** 2 + (b - pb) ** 2;
+    if (d < bestD) [best, bestD] = [p, d];
+  }
+  return COLOR_LETTERS[best];
+}
+
 /** PDF text extraction puts a line break at every visual line, mid-
  *  sentence or not, and a soft-hyphenated word comes out as "hyphen-
  *  ated". Collapse both so a highlight reads as the sentence it was. */

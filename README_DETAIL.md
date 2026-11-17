@@ -63,7 +63,9 @@ Windows/Linux desktops too).
 - **Your look** — light, dark or system appearance and an adjustable UI font
   size (Settings → General); and night vision (the eye beside Settings),
   which draws the whole app in red only, with no blue light, for
-  working in the dark.
+  working in the dark; the colour dots then show each colour's letter
+  (Y, R, G, B, P, M, O, Gy), and each highlight on the page a tiny flag
+  with it, kept in the margin where it can be.
 - **Full screen on iPad** — the status bar is hidden while the app fills
   the screen.
 - **Continue Reading widgets (iOS)** — home-screen widgets with the PDFs

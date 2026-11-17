@@ -25,7 +25,7 @@
 // bar keeps its distance from the passage (`TOUCH_GAP`), and its
 // buttons act on the release of a press rather than on the click
 // (`onRelease`). The system's menu is dismissed from lib/pencil.ts.
-import { ANNOTATION_COLORS } from "../lib/highlights";
+import { ANNOTATION_COLORS, colorLetter } from "../lib/highlights";
 import { rangeText } from "./annotate";
 import { COPY_ICON, HIGHLIGHT_ICON, LOOKUP_ICON, NOTE_ICON, SPARKLES_ICON, UNDERLINE_ICON } from "./icons";
 import { createLookupPopup } from "./lookupPopup";
@@ -168,6 +168,7 @@ export function createSelectionBar(
     for (const color of ANNOTATION_COLORS) {
       const s = button("pdf-mark-swatch");
       s.style.setProperty("--swatch", color);
+      s.dataset.letter = colorLetter(color);
       onRelease(s, () => {
         if (current) handlers.onAnnotate?.(current.range, mode, color);
         window.getSelection()?.removeAllRanges();

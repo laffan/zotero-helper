@@ -7,7 +7,7 @@
 // (highlightHandles.ts, through onOpen / onClose). Changes go out as
 // they are made — a colour at once, the comment after a pause in typing
 // and when the popover closes.
-import { ANNOTATION_COLORS, type Annotation } from "../lib/highlights";
+import { ANNOTATION_COLORS, colorLetter, type Annotation } from "../lib/highlights";
 import { COPY_ICON, LOOKUP_ICON, NOTE_ICON, SPARKLES_ICON } from "./icons";
 import { createLookupPopup } from "./lookupPopup";
 
@@ -77,6 +77,7 @@ export function createAnnotationPopover(root: HTMLElement, handlers: AnnotationE
     b.type = "button";
     b.className = "pdf-mark-swatch";
     b.style.setProperty("--swatch", color);
+    b.dataset.letter = colorLetter(color);
     b.addEventListener("click", () => {
       if (!current) return;
       handlers.update(current.key, { color });

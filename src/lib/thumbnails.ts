@@ -74,7 +74,7 @@ function firstPageAnnotations(attKey: string): ThumbAnnotation[] {
   for (const i of useStore.getState().library.items) {
     const d = i.data as Record<string, unknown> | undefined;
     if (!d || d.parentItem !== attKey || d.itemType !== "annotation") continue;
-    let pos: { pageIndex?: number; rects?: number[][]; paths?: number[][] } = {};
+    let pos: { pageIndex?: number; rects?: number[][]; paths?: number[][]; zhPostIt?: { color?: unknown; rect?: unknown } } = {};
     const raw = d.annotationPosition;
     try {
       pos = typeof raw === "string" ? JSON.parse(raw) : ((raw as typeof pos) ?? {});
@@ -88,6 +88,9 @@ function firstPageAnnotations(attKey: string): ThumbAnnotation[] {
       pageIndex: 0,
       rects: Array.isArray(pos.rects) ? pos.rects : [],
       paths: Array.isArray(pos.paths) ? pos.paths : [],
+      ...(typeof pos.zhPostIt?.color === "string" && Array.isArray(pos.zhPostIt.rect)
+        ? { postIt: { color: pos.zhPostIt.color, rect: pos.zhPostIt.rect as number[] } }
+        : {}),
     });
   }
   return out;
@@ -103,7 +106,7 @@ function firstPageAnnotations(attKey: string): ThumbAnnotation[] {
 function annotationSignature(marks: ThumbAnnotation[]): string {
   if (!marks.length) return "0x0";
   const text = marks
-    .map((m) => `${m.type}|${m.color}|${JSON.stringify(m.rects)}|${JSON.stringify(m.paths)}`)
+    .map((m) => `${m.type}|${m.color}|${JSON.stringify(m.rects)}|${JSON.stringify(m.paths)}${m.postIt ? `|${m.postIt.color}` : ""}`)
     .sort()
     .join("\n");
   // FNV-1a, 32-bit: enough to tell one page's marks from another's.

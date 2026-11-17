@@ -31,9 +31,11 @@ const PUSH_EVERY_MS = 2 * 60 * 1000;
 const MAX_TEXT = 7500;
 const MAX_PAGE_LABEL = 50;
 
-/** What the reader hands over for a new highlight, underline or ink
- *  drawing. Ink carries no text (Zotero refuses it there) and comes
- *  with its key, which the viewer gave it as it was drawn. */
+/** What the reader hands over for a new highlight, underline, ink
+ *  drawing or text box. Ink and text carry no text (Zotero refuses it
+ *  there) and come with their keys, which the viewer gave them as they
+ *  were made; a text box's words are its comment. A position may carry
+ *  more than Zotero reads (a post-it's record, lib/postits.ts). */
 export type NewAnnotation = {
   attKey: string;
   color: string;
@@ -45,7 +47,8 @@ export type NewAnnotation = {
       text: string;
       position: { pageIndex: number; rects: number[][]; nextPageRects?: number[][] };
     }
-  | { type: "ink"; key: string; position: { pageIndex: number; width: number; paths: number[][] } }
+  | { type: "ink"; key: string; position: { pageIndex: number; width: number; paths: number[][] } & Record<string, unknown> }
+  | { type: "text"; key: string; comment: string; position: { pageIndex: number; rects: number[][] } & Record<string, unknown> }
 );
 
 export interface AnnotationPatch {
@@ -157,17 +160,18 @@ export function notePenActivity(): void {
   penAt = performance.now();
 }
 
-/** Create a highlight, underline or ink drawing. Returns its key. */
+/** Create a highlight, underline, ink drawing or text box. Returns its
+ *  key. */
 export function createAnnotation(n: NewAnnotation): string {
-  const key = n.type === "ink" ? n.key : newItemKey();
+  const key = n.type === "ink" || n.type === "text" ? n.key : newItemKey();
   const data: Record<string, unknown> = {
     key,
     version: 0,
     itemType: "annotation",
     parentItem: n.attKey,
     annotationType: n.type,
-    ...(n.type === "ink" ? {} : { annotationText: n.text.slice(0, MAX_TEXT) }),
-    annotationComment: "",
+    ...(n.type === "highlight" || n.type === "underline" ? { annotationText: n.text.slice(0, MAX_TEXT) } : {}),
+    annotationComment: n.type === "text" ? n.comment : "",
     annotationColor: n.color.toLowerCase(),
     annotationPageLabel: n.pageLabel.slice(0, MAX_PAGE_LABEL),
     annotationSortIndex: n.sortIndex,

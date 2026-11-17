@@ -6,8 +6,8 @@
 // entry's Zotero annotations, and routes what it hands back: a selected
 // passage or a highlight into the notes, a page's bookmark to
 // lib/bookmarks.ts, a section added on a page to lib/dividers.ts, new or
-// edited highlights to Zotero
-// (lib/annotationEdits.ts), and a passage to explain to the AI
+// edited highlights to Zotero (lib/annotationEdits.ts), post-its too
+// (lib/postits.ts), and a passage to explain to the AI
 // (lib/ai/explain.ts, shown in ExplainChat).
 import { useEffect, useRef, useState } from "react";
 import { openInZotero } from "../lib/actions";
@@ -31,11 +31,13 @@ import {
 import { addBookmark, bookmarksOf, removeBookmark, renameBookmark, useBookmarks } from "../lib/bookmarks";
 import { addDivider, dividersOf, moveDivider, removeDivider, renameDivider, useDividers } from "../lib/dividers";
 import { insertIntoNotes, readItem } from "../lib/notes";
+import { deletePostIt, savePostIt } from "../lib/postits";
 import { setOutline, setPageCount, setReaderPage, useOutline, useReaderPage } from "../lib/outline";
 import { flushSavedPage, lastPage, lastView, savePage } from "../lib/recent";
 import { appLog, useStore, type MetaTab } from "../lib/store";
 import { invoke } from "../lib/tauri";
 import { useWords } from "../lib/words";
+import { mapCardTarget } from "../highlightmap/drop";
 import type { ViewerCommand } from "../pdfviewer/commands";
 import type { SearchOptions, SearchStatus } from "../pdfviewer/search";
 import type { PdfViewer } from "../pdfviewer/viewer";
@@ -129,12 +131,14 @@ export function readerPen() {
 }
 
 /** Where the open viewer is, and what is at a client point — for the
- *  reading-mode notepad (src/notepad/). */
+ *  reading-mode notepad (src/notepad/) and the notes' link icon: a
+ *  card of the Highlight Map (highlightmap/drop.ts), else the pages. */
 export function readerPlace() {
   return active?.viewer.place() ?? null;
 }
 export function readerPlaceAt(x: number, y: number) {
-  return active?.viewer.placeAt(x, y) ?? null;
+  if (!active) return null;
+  return mapCardTarget(x, y, active.attKey) ?? active.viewer.placeAt(x, y);
 }
 
 /** How many pages `attKey` has, when it is the PDF open. */
@@ -286,6 +290,13 @@ export function ReaderPane() {
           onRenameSection: renameDivider,
           onRemoveSection: removeDivider,
           onSectionTool: (on) => useStore.getState().setViewerTools({ sectionTool: on }),
+          postIts: {
+            save: (p) => savePostIt({ ...p, attKey }),
+            remove: deletePostIt,
+            canEdit: (p) => p.parts.every((a) => canEditAnnotation(a, settings())),
+            writing: notePenActivity,
+          },
+          onPostItTool: (on) => useStore.getState().setViewerTools({ postItTool: on }),
           onQuote: (text, page) => addToNotes(`> ${text}\n\n— ${cite(page)}`),
           onExplain: (text, page, place) => startExplain(itemKey, text, page, place && { attKey, ...place }),
           onLookup: (text, page, context, place) => lookUp(itemKey, attKey, text, page, context, place),
@@ -378,7 +389,7 @@ export function ReaderPane() {
       cancelled = true;
       if (active?.viewer === viewer) active = null;
       // The next viewer starts with its tools off.
-      useStore.getState().setViewerTools({ sentenceTool: false, sectionTool: false, inkMode: false, twoUp: false });
+      useStore.getState().setViewerTools({ sentenceTool: false, sectionTool: false, postItTool: false, inkMode: false, twoUp: false });
       viewerRef.current = null;
       // Destroying reports the view one last time; then it is written.
       void viewer?.destroy();

@@ -3,7 +3,8 @@
 // in Questions — the open conversation.
 //
 // With a selection it has tabs: Details (Summary for several items),
-// Highlights when the selection has any (or bookmarks), Notes, always,
+// Highlights when the selection has any (or bookmarks), Post-its when it
+// has any (PostItsPanel.tsx), Notes, always,
 // and — for one entry, with an AI service connected — its AI
 // conversations; the entry's PDF button (Download / View / Close PDF)
 // sits at the right end.
@@ -24,6 +25,7 @@ import { isAbout, ItemChats } from "./ItemChats";
 import { ItemEditor } from "./ItemEditor";
 import { NotesPanel } from "./NotesPanel";
 import { PdfTabButton } from "./PdfTabButton";
+import { postItGroups, PostItsPanel } from "./PostItsPanel";
 import { SummaryView } from "./SummaryView";
 
 /** Past this width (px) the open PDF's highlights are a map instead of
@@ -69,6 +71,10 @@ export function MetadataPanel() {
     () => highlightGroups(items, selected, bookmarks).reduce((n, g) => n + g.list.length, 0),
     [items, selected, bookmarks],
   );
+  const postItCount = useMemo(
+    () => postItGroups(items, selected).reduce((n, g) => n + g.list.length, 0),
+    [items, selected],
+  );
 
   const chatMode =
     !reading && collectionKey === QUESTIONS && chats.some((c) => c.id === selectedChatId);
@@ -79,9 +85,10 @@ export function MetadataPanel() {
     selected.length === 1 ? s.chats.filter((c) => isAbout(c, selected[0].key)).length : 0,
   );
   // A tab that has nothing to show falls back to Details — or, for a
-  // PDF with no highlights (which opens on Highlights), to its notes.
+  // PDF with no highlights (which opens on Highlights) or post-its, to
+  // its notes.
   const tab: MetaTab =
-    metaTab === "highlights" && highlightCount === 0
+    (metaTab === "highlights" && highlightCount === 0) || (metaTab === "postits" && postItCount === 0)
       ? reading
         ? "notes"
         : "details"
@@ -125,6 +132,7 @@ export function MetadataPanel() {
       <div className="meta-tabs" role="tablist">
         {tabButton("details", one ? "Details" : "Summary")}
         {highlightCount > 0 && tabButton("highlights", `${map ? "Highlight Map" : "Highlights"} ${highlightCount}`)}
+        {postItCount > 0 && tabButton("postits", `Post-its ${postItCount}`)}
         {tabButton("notes", "Notes")}
         {one && aiOn &&
           tabButton(
@@ -151,6 +159,8 @@ export function MetadataPanel() {
       content = <ItemChats item={one} />;
     } else if (tab === "highlights") {
       content = <HighlightsPanel items={selected} map={map} />;
+    } else if (tab === "postits") {
+      content = <PostItsPanel items={selected} />;
     } else if (!one) {
       content = <SummaryView items={selected} />;
     } else {

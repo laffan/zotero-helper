@@ -21,6 +21,9 @@
 // colour picked with strokes selected recolours them too (and keeps the
 // tool as it was).
 //
+// Over the Highlight Map the scissors are off (disabled): the map, not
+// the pages, is what the pad lies beside there.
+//
 // The quote button and the scissors share one pill in the highlight
 // orange, split down the middle, their glyphs in the pad's own colour —
 // the two ways of bringing something in from the pages. Press the quote
@@ -388,9 +391,16 @@ export function NotepadBody({ attKey, kind, onBarPointerDown, tools, trailing }:
           <button
             type="button"
             className={clipping ? "notepad-clip-btn on" : "notepad-clip-btn"}
-            title={clipping ? "Stop clipping (Esc)" : "Clip — draw a box on a page to put that part of it on the pad"}
+            title={
+              kind === "map"
+                ? "Clipping is for the pages — off while the notepad is over the Highlight Map"
+                : clipping
+                  ? "Stop clipping (Esc)"
+                  : "Clip — draw a box on a page to put that part of it on the pad"
+            }
             aria-label="Clip part of a page"
             aria-pressed={clipping}
+            disabled={kind === "map"}
             onClick={toggleClip}
             dangerouslySetInnerHTML={{ __html: SCISSORS_SVG }}
           />

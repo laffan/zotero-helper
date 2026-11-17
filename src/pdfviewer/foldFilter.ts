@@ -9,8 +9,9 @@ const TYPE_LABELS: Record<string, string> = {
   note: "Notes",
   image: "Areas",
   text: "Text boxes",
+  postit: "Post-its",
 };
-const TYPE_ORDER = ["highlight", "underline", "ink", "note", "image", "text"];
+const TYPE_ORDER = ["highlight", "underline", "ink", "postit", "note", "image", "text"];
 
 export interface FoldFilterSource {
   /** Every type:colour pair present, with its type, colour and count. */

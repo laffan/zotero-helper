@@ -1,0 +1,264 @@
+/* Post-its (src/pdfviewer/postits.ts) — squares of coloured paper over
+   the pages, sized in the page's points (`--pk`, CSS px per point, set
+   as each one's box changes), so the paper, its type and its writing
+   follow every zoom. Paper is paper in either theme: the colours and the
+   black ink stay; dark pages only dim it a little. */
+.pdf-postits {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  pointer-events: none;
+}
+.pdf-postit {
+  position: absolute;
+  box-sizing: border-box;
+  overflow: hidden;
+  pointer-events: auto;
+  background: var(--postit-color, #fff59d);
+  box-shadow: 0 calc(var(--pk, 1px) * 1.5) calc(var(--pk, 1px) * 5) rgb(0 0 0 / 0.28);
+  color: #1a1a1a;
+  font-family: -apple-system, system-ui, sans-serif;
+  /* lib/postits.ts's POSTIT_FONT and POSTIT_LINE. */
+  font-size: calc(var(--pk, 1px) * 11);
+  line-height: 1.3;
+  cursor: crosshair;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+.pdf-postit.readonly {
+  cursor: default;
+}
+/* The grip: the band across the top it is dragged by (POSTIT_GRIP). A
+   finger there drags it rather than scrolling the page. */
+.pdf-postit-grip {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: calc(var(--pk, 1px) * 18);
+  background: rgb(0 0 0 / 0.07);
+  cursor: grab;
+  touch-action: none;
+}
+.pdf-postit.readonly .pdf-postit-grip {
+  cursor: default;
+  touch-action: auto;
+}
+.pdf-postit.dragging {
+  box-shadow: 0 calc(var(--pk, 1px) * 4) calc(var(--pk, 1px) * 14) rgb(0 0 0 / 0.32);
+}
+.pdf-postit.dragging .pdf-postit-grip {
+  cursor: grabbing;
+}
+/* The words, inside the margins (POSTIT_PAD) below the grip. */
+.pdf-postit-text,
+.pdf-postit-editor {
+  position: absolute;
+  top: calc(var(--pk, 1px) * 22);
+  left: calc(var(--pk, 1px) * 8);
+  right: calc(var(--pk, 1px) * 8);
+  bottom: calc(var(--pk, 1px) * 8);
+  overflow: hidden;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.pdf-postit-text {
+  pointer-events: none;
+}
+.pdf-postit.editing .pdf-postit-text,
+.pdf-postit.editing .pdf-postit-hint {
+  visibility: hidden;
+}
+.pdf-postit-editor {
+  box-sizing: border-box;
+  width: auto;
+  height: auto;
+  margin: 0;
+  padding: 0;
+  border: none;
+  outline: none;
+  resize: none;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  line-height: inherit;
+  cursor: text;
+  -webkit-user-select: text;
+  user-select: text;
+}
+.pdf-postit-ink,
+.pdf-postit-live {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+.pdf-postit-ink {
+  overflow: visible;
+}
+/* An empty post-it says what it takes. */
+.pdf-postit-hint {
+  display: none;
+  position: absolute;
+  inset: calc(var(--pk, 1px) * 18) calc(var(--pk, 1px) * 10) 0;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  font-size: calc(var(--pk, 1px) * 9);
+  color: rgb(0 0 0 / 0.35);
+  pointer-events: none;
+}
+.pdf-postit.empty:not(.readonly) .pdf-postit-hint {
+  display: flex;
+}
+.pdf-dark-pages .pdf-postit {
+  filter: brightness(0.82);
+}
+
+/* The tool, ready: the pages take a crosshair, and a dashed square of
+   the paper follows a mouse or a hovering Pencil. */
+.pdf-postit-placing .pdf-page-wrapper {
+  cursor: crosshair;
+}
+.pdf-postit-guide {
+  position: absolute;
+  z-index: 5;
+  box-sizing: border-box;
+  border: 2px dashed rgb(0 0 0 / 0.35);
+  background: color-mix(in srgb, var(--postit-color, #fff59d) 55%, transparent);
+  pointer-events: none;
+}
+
+/* The menu a tap on the grip opens (postitEdit.ts): the colours, Type
+   and Delete. */
+.pdf-postit-menu {
+  position: absolute;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 8px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--panel);
+  box-shadow: 0 6px 20px rgb(0 0 0 / 0.18);
+}
+.pdf-postit-swatch {
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 2px solid transparent;
+  border-radius: 50%;
+  background: transparent;
+  position: relative;
+  cursor: pointer;
+}
+.pdf-postit-swatch::before {
+  content: "";
+  position: absolute;
+  inset: 2px;
+  border-radius: 50%;
+  background: var(--swatch);
+  box-shadow: inset 0 0 0 1px rgb(0 0 0 / 0.18);
+}
+.pdf-postit-swatch.on {
+  border-color: var(--text);
+}
+.pdf-postit-action {
+  padding: 3px 8px;
+  border-radius: var(--radius);
+  color: var(--text);
+  font-size: calc(12px * var(--font-scale));
+  font-weight: 600;
+}
+.pdf-postit-action:hover {
+  background: var(--select);
+}
+.pdf-postit-delete {
+  color: var(--bad);
+}
+.pdf-postit-delete.confirm {
+  background: var(--bad);
+  color: #fff;
+}
+@media (hover: none) {
+  .pdf-postit-swatch {
+    width: 30px;
+    height: 30px;
+  }
+  .pdf-postit-action {
+    padding: 6px 10px;
+  }
+}
+
+/* The Post-its tab (PostItsPanel.tsx): each as it looks on its page,
+   smaller, its page under it. `--pk` is set on each card. */
+.postit-list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 10px 12px 16px;
+}
+.postit-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, calc(180px * var(--font-scale)));
+  gap: 16px 14px;
+}
+.postit-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: calc(180px * var(--font-scale));
+  padding: 0;
+  border: none;
+  background: none;
+  text-align: left;
+  cursor: pointer;
+}
+.postit-card-paper {
+  position: relative;
+  display: block;
+  width: 100%;
+  overflow: hidden;
+  background: var(--postit-color, #fff59d);
+  box-shadow: 0 1px 4px rgb(0 0 0 / 0.25);
+  color: #1a1a1a;
+  font-family: -apple-system, system-ui, sans-serif;
+}
+.postit-card-paper::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: calc(var(--pk) * 18);
+  background: rgb(0 0 0 / 0.07);
+}
+.postit-card:hover .postit-card-paper {
+  box-shadow: 0 2px 8px rgb(0 0 0 / 0.3);
+}
+.postit-card-text {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  overflow: hidden;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.postit-card-ink {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  fill: none;
+  stroke: #000;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.postit-card-page {
+  font-size: calc(11px * var(--font-scale));
+  color: var(--text-dim);
+}

@@ -1,20 +1,21 @@
 // Reading mode's controls, the only things on screen besides the pages:
 // a red × at the window's top left (and Escape) leaves it; below it, the
-// same size and spacing, a caret toggles the sentence tool (a tap
-// selects the sentence under it, as a ⌘-click does), a page with a
-// dashed line readies Add Section (the next tap on a page draws a
-// section's line there, to name), and a pen toggles ink mode — the
-// Pencil writing, or selecting and highlighting like a finger. All
-// three are the viewer's own, toggled through its commands and shown
-// filled while on (the store's `sentenceTool` / `sectionTool` /
-// `inkMode`, which the viewer reports). With ink mode on, holding the pen a moment
+// same size and spacing, a page with a dashed line readies Add Section
+// (the next tap on a page draws a section's line there, to name), a
+// caret toggles the sentence tool (a tap selects the sentence under it,
+// as a ⌘-click does), a pen toggles ink mode — the Pencil writing, or
+// selecting and highlighting like a finger — and a square of paper
+// readies Post-it (the next tap on a page sticks one there). All four
+// are the viewer's own, toggled through its commands and shown filled
+// while on (the store's `sectionTool` / `sentenceTool` / `inkMode` /
+// `postItTool`, which the viewer reports). With ink mode on, holding the pen a moment
 // (HOLD_MS) opens a flyout of the pen's colours beside it — the bottom
 // bar's colour chip, which reading mode hides — and a dot on the pen
 // shows the colour it writes in; the flyout also has the notepad's
 // switch of tools — pen, eraser, lasso — and the pen button shows the
 // tool in force: the pen, an eraser (the eraser is shared with the
-// notepad, lib/penTool.ts) or a lasso. The
-// notepad's icon is ReadingNotepad.tsx's. Reading mode itself is the
+// notepad, lib/penTool.ts) or a lasso. The notepad's icon, next down,
+// is ReadingNotepad.tsx's. Reading mode itself is the
 // store's `readingMode`
 // — App.tsx gives the app the `reading-mode` class, and readingmode.css
 // hides the rest.
@@ -31,6 +32,14 @@ const CARET = (
     <path d="M8 4.3v7.4" />
     <path d="M5.5 13.5c1.4 0 2.5-.6 2.5-1.8 0 1.2 1.1 1.8 2.5 1.8" />
     <path d="M6.4 8h3.2" />
+  </svg>
+);
+/** Post-it: a square of paper, its lower right corner turned up. */
+const POSTIT = (
+  <svg viewBox="0 0 16 16" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" aria-hidden="true">
+    <path d="M2.5 2.5h11v7l-4 4h-7z" />
+    <path d="M13.5 9.5h-4v4" />
+    <path d="M2.5 5h11" strokeOpacity="0.55" />
   </svg>
 );
 /** A page with a dashed line across it, a tab at its left. */
@@ -59,6 +68,7 @@ export function ReadingModeExit() {
   const leave = () => useStore.getState().setReadingMode(false);
   const sentenceTool = useStore((s) => s.sentenceTool);
   const sectionTool = useStore((s) => s.sectionTool);
+  const postItTool = useStore((s) => s.postItTool);
   const inkMode = useStore((s) => s.inkMode);
   const inkTool = useStore((s) => s.inkTool);
   const erasing = inkMode && inkTool === "eraser";
@@ -87,16 +97,6 @@ export function ReadingModeExit() {
       />
       <button
         type="button"
-        className={sentenceTool ? "reading-mode-tool reading-mode-sentence on" : "reading-mode-tool reading-mode-sentence"}
-        title={sentenceTool ? "Sentence tool on: a tap selects its sentence" : "Sentence tool: a tap selects its sentence"}
-        aria-label="Sentence tool"
-        aria-pressed={sentenceTool}
-        onClick={() => readerCommand("sentence")}
-      >
-        {CARET}
-      </button>
-      <button
-        type="button"
         className={sectionTool ? "reading-mode-tool reading-mode-section on" : "reading-mode-tool reading-mode-section"}
         title={sectionTool ? "Add Section: tap a page where the section begins (again to cancel)" : "Add Section: tap a page to draw a line across it and name it"}
         aria-label="Add Section"
@@ -104,6 +104,16 @@ export function ReadingModeExit() {
         onClick={() => readerCommand("section")}
       >
         {SECTION}
+      </button>
+      <button
+        type="button"
+        className={sentenceTool ? "reading-mode-tool reading-mode-sentence on" : "reading-mode-tool reading-mode-sentence"}
+        title={sentenceTool ? "Sentence tool on: a tap selects its sentence" : "Sentence tool: a tap selects its sentence"}
+        aria-label="Sentence tool"
+        aria-pressed={sentenceTool}
+        onClick={() => readerCommand("sentence")}
+      >
+        {CARET}
       </button>
       <button
         type="button"
@@ -124,6 +134,16 @@ export function ReadingModeExit() {
       >
         {erasing ? ERASER : lassoing ? <LassoIcon size={20} /> : PEN}
         {inkMode && inkTool === "pen" && pen.color && <span className="reading-mode-pen-dot" style={{ background: pen.color }} />}
+      </button>
+      <button
+        type="button"
+        className={postItTool ? "reading-mode-tool reading-mode-postit on" : "reading-mode-tool reading-mode-postit"}
+        title={postItTool ? "Post-it: tap a page to stick it there (again to cancel)" : "Post-it: tap a page to stick a post-it there"}
+        aria-label="Post-it"
+        aria-pressed={postItTool}
+        onClick={() => readerCommand("postit")}
+      >
+        {POSTIT}
       </button>
       {pen.open && (
         <div className="reading-mode-pen-colors" role="menu" aria-label="Pen colour and tool" ref={pen.menuRef}>

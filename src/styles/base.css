@@ -102,6 +102,18 @@ select:focus {
 .pane-resizer:active {
   background: var(--accent-soft);
 }
+/* A finger's reach: the edge takes presses 10px either side of it. */
+@media (pointer: coarse) {
+  .pane-resizer {
+    position: relative;
+    z-index: 5;
+  }
+  .pane-resizer::before {
+    content: "";
+    position: absolute;
+    inset: 0 -10px;
+  }
+}
 
 /* --- iPadOS 26 windowed mode --- */
 /* Apple's window-control pill overlays the top-left of the content when
@@ -130,6 +142,11 @@ select:focus {
     display: none;
   }
 }
+@media (max-width: 599px) {
+  .pane-resizer.notes-edge {
+    display: none;
+  }
+}
 
 /* --- narrow-screen drawers (sidebar / metadata become slide-overs) --- */
 .drawer-scrim {
@@ -137,7 +154,9 @@ select:focus {
 }
 
 @media (max-width: 900px) {
-  .pane-resizer {
+  /* The panels are drawers here — but the notes beside a PDF stay in
+     the row down to 600px (notes.css), and keep their edge. */
+  .pane-resizer:not(.notes-edge) {
     display: none;
   }
   .sidebar,

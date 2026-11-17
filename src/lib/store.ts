@@ -27,9 +27,10 @@ export type ModalState =
   | { kind: "capture"; jobId: string };
 
 /** The right panel's tabs. "details" is the record for one item and the
- *  summary cards for several; "chats" is one item's AI conversations,
- *  shown only with an AI service connected. */
-export type MetaTab = "details" | "highlights" | "notes" | "chats";
+ *  summary cards for several; "postits" the post-its on its PDFs
+ *  (PostItsPanel.tsx), shown when there are any; "chats" is one item's
+ *  AI conversations, shown only with an AI service connected. */
+export type MetaTab = "details" | "highlights" | "postits" | "notes" | "chats";
 
 /** An open PDF: the viewer replaces the sidebar and item list,
  *  and the right panel holds the notes being written. */
@@ -66,8 +67,11 @@ interface UiPrefs {
   folderViews: Record<string, FolderView>;
   metaTab: MetaTab;
   /** Right panel width while taking notes — wider than the details
-   *  panel, since it is where the writing happens. */
+   *  panel, since it is where the writing happens. A tablet-sized
+   *  window (600–900px, the iPad's half of the screen) keeps its own,
+   *  null until the panel's edge is dragged there (45% of the window). */
   notesWidth: number;
+  notesWidthNarrow: number | null;
   /** Wide windows: the sidebar / right panel folded away by the
    *  toolbar's panel buttons. (Narrow ones use the drawers instead.) */
   sidebarHidden: boolean;
@@ -79,11 +83,12 @@ interface UiPrefs {
    *  only, and over when the PDF closes. */
   readingMode: boolean;
   /** The open viewer's sentence tool, Add Section (placing a section's
-   *  line) and ink mode, as it reports them — for reading mode's buttons
-   *  (ReadingModeExit.tsx), which toggle them through the viewer's own
-   *  commands. */
+   *  line), Post-it (sticking one) and ink mode, as it reports them —
+   *  for reading mode's buttons (ReadingModeExit.tsx), which toggle them
+   *  through the viewer's own commands. */
   sentenceTool: boolean;
   sectionTool: boolean;
+  postItTool: boolean;
   inkMode: boolean;
   /** Ink mode's tool, which reading mode's pen button shows. */
   inkTool: "pen" | "eraser" | "select";
@@ -227,6 +232,7 @@ interface AppStore extends UiPrefs {
 
   setMetaTab: (t: MetaTab) => void;
   setNotesWidth: (w: number) => void;
+  setNotesWidthNarrow: (w: number) => void;
   setSidebarHidden: (b: boolean) => void;
   setMetaHidden: (b: boolean) => void;
   setOutlineOpen: (b: boolean) => void;
@@ -234,6 +240,7 @@ interface AppStore extends UiPrefs {
   setViewerTools: (t: {
     sentenceTool?: boolean;
     sectionTool?: boolean;
+    postItTool?: boolean;
     inkMode?: boolean;
     inkTool?: "pen" | "eraser" | "select";
     twoUp?: boolean;
@@ -285,12 +292,14 @@ export const useStore = create<AppStore>()(
       folderViews: {},
       metaTab: "details" as MetaTab,
       notesWidth: 420,
+      notesWidthNarrow: null,
       sidebarHidden: false,
       metaHidden: false,
       outlineOpen: false,
       readingMode: false,
       sentenceTool: false,
       sectionTool: false,
+      postItTool: false,
       inkMode: false,
       inkTool: "pen",
       twoUp: false,
@@ -456,6 +465,7 @@ export const useStore = create<AppStore>()(
 
       setMetaTab: (metaTab) => set({ metaTab }),
       setNotesWidth: (notesWidth) => set({ notesWidth }),
+      setNotesWidthNarrow: (notesWidthNarrow) => set({ notesWidthNarrow }),
       setSidebarHidden: (sidebarHidden) => set({ sidebarHidden }),
       setMetaHidden: (metaHidden) => set({ metaHidden }),
       setOutlineOpen: (outlineOpen) => set({ outlineOpen }),
@@ -473,7 +483,7 @@ export const useStore = create<AppStore>()(
         set(
           reading
             ? { reading, metaTab: tab, sidebarOpen: false, metaOpen: false }
-            : { reading, readingMode: false, sentenceTool: false, sectionTool: false, inkMode: false, explain: null },
+            : { reading, readingMode: false, sentenceTool: false, sectionTool: false, postItTool: false, inkMode: false, explain: null },
         );
       },
       setCachedPdfs: (list) =>
@@ -547,6 +557,7 @@ export const useStore = create<AppStore>()(
         folderViews: s.folderViews,
         metaTab: s.metaTab,
         notesWidth: s.notesWidth,
+        notesWidthNarrow: s.notesWidthNarrow,
         sidebarHidden: s.sidebarHidden,
         metaHidden: s.metaHidden,
         outlineOpen: s.outlineOpen,

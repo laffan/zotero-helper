@@ -28,6 +28,7 @@ import { dividerIdOf, dividersOf, useDividers, withDividers } from "../lib/divid
 import { attachmentName, itemTitle } from "../lib/collections";
 import { annotatableAttachments, annotationIndexFor, matchesQuery, type Annotation } from "../lib/highlights";
 import { sectionIndexOf, sectionsOf, useOutlines, type Section } from "../lib/outline";
+import { isPostItPart } from "../lib/postits";
 import { usePdfUi, usePdfUiScroll } from "../lib/readerUi";
 import { useStore } from "../lib/store";
 import type { ZItem } from "../lib/types";
@@ -52,7 +53,8 @@ export function highlightGroups(library: ZItem[], items: ZItem[], bookmarks: Boo
   for (const item of items) {
     for (const att of annotatableAttachments(library, item)) {
       const marks = bookmarks.filter((b) => b.attKey === att.key).map(bookmarkEntry);
-      const annots = index.get(att.key) ?? [];
+      // Post-its are parts of annotations too, listed in their own tab.
+      const annots = (index.get(att.key) ?? []).filter((a) => !isPostItPart(a));
       const list = marks.length
         ? [...marks, ...annots].sort((a, b) => (a.sortIndex < b.sortIndex ? -1 : a.sortIndex > b.sortIndex ? 1 : 0))
         : annots;

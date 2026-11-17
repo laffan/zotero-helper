@@ -8,7 +8,8 @@
 //
 // The double-tap (lib/pencil.ts's "zh-pencil", kind "tap", or a
 // squeeze set to switch to the eraser) is heard here, once, while
-// something is there to erase with: ink mode on, or a notepad shown.
+// something is there to erase with: ink mode on, a notepad shown, or a
+// post-it on the pages (pdfviewer/postitInk.ts erases with it too).
 const KEY = "zh-erasing";
 
 function stored(): boolean {
@@ -45,7 +46,7 @@ if (typeof window !== "undefined") {
   window.addEventListener("zh-pencil", (e) => {
     const { kind, action } = (e as CustomEvent<{ kind?: string; action?: string }>).detail ?? {};
     if (kind !== "tap" && action !== "switchEraser") return;
-    if (!document.querySelector(".pdf-ink-active, .notepad-canvas")) return;
+    if (!document.querySelector(".pdf-ink-active, .notepad-canvas, .pdf-postit:not(.readonly)")) return;
     setErasing(!erasing);
   });
 }

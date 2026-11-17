@@ -63,10 +63,11 @@
   transform: rotate(-45deg) scale(1.15);
 }
 
-/* The sentence tool, Add Section and the pen (ReadingModeExit.tsx): red
-   icons the ×'s size, down the left at the spacing the × and the first
-   keep (56px); filled (white on red) while on. The notepad's icon is at
-   home in the next place down (ReadingNotepad.tsx `homeSpot`). */
+/* Add Section, the sentence tool, the pen and Post-it
+   (ReadingModeExit.tsx), in that order below the ×: red icons the ×'s
+   size, down the left at the spacing the × and the first keep (56px);
+   filled (white on red) while on. The notepad's icon is at home in the
+   next place down (ReadingNotepad.tsx `homeSpot`). */
 .reading-mode-tool {
   position: fixed;
   z-index: 60;
@@ -99,23 +100,29 @@
   background: #ff5f57;
   color: #fff;
 }
-.reading-mode-sentence {
+.reading-mode-section {
   top: 66px;
 }
-.reading-mode-section {
+.reading-mode-sentence {
   top: 122px;
 }
 .reading-mode-pen {
   top: 178px;
 }
-.ipados:not(.status-bar-hidden) .reading-mode-sentence {
-  top: calc(max(env(safe-area-inset-top), 30px) + 60px);
+.reading-mode-postit {
+  top: 234px;
 }
 .ipados:not(.status-bar-hidden) .reading-mode-section {
+  top: calc(max(env(safe-area-inset-top), 30px) + 60px);
+}
+.ipados:not(.status-bar-hidden) .reading-mode-sentence {
   top: calc(max(env(safe-area-inset-top), 30px) + 116px);
 }
 .ipados:not(.status-bar-hidden) .reading-mode-pen {
   top: calc(max(env(safe-area-inset-top), 30px) + 172px);
+}
+.ipados:not(.status-bar-hidden) .reading-mode-postit {
+  top: calc(max(env(safe-area-inset-top), 30px) + 228px);
 }
 /* Held, a button shows no menu of the system's and selects nothing. */
 .reading-mode-tool {

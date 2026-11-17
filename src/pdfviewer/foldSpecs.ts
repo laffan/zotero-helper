@@ -3,6 +3,7 @@
 // merged with its neighbours on the page. Pure geometry — the folds
 // themselves (drawing, scrolling, the filter's state) are folds.ts's.
 import { annotationPosition, pagesOf, rectsOnPage, type Annotation } from "../lib/highlights";
+import { postItMeta } from "../lib/postits";
 import { pdfPointToViewport } from "./annotations";
 import type { PageRecord, PageViewport } from "./types";
 
@@ -18,16 +19,25 @@ export interface FoldSpec {
 
 export type Combo = { type: string; color: string; count: number };
 
-/** The filter's key for an annotation: its type and colour. */
-export const comboKey = (a: Annotation) => `${a.type}:${(a.color || "").toLowerCase()}`;
+/** The filter's key for an annotation: its type and colour — a
+ *  post-it's parts (lib/postits.ts), "postit" and its paper's colour. */
+export function comboKey(a: Annotation): string {
+  const m = postItMeta(a);
+  return m ? `postit:${m.color}` : `${a.type}:${(a.color || "").toLowerCase()}`;
+}
 
-/** Every type:colour pair present on a page, with how many of each. */
+/** Every type:colour pair present on a page, with how many of each (a
+ *  post-it counted once, whatever its parts). */
 export function availableCombos(annotations: Annotation[]): Map<string, Combo> {
   const map = new Map<string, Combo>();
+  const postIts = new Set<string>();
   for (const a of annotations) {
     if (typeof annotationPosition(a)?.pageIndex !== "number") continue;
+    const m = postItMeta(a);
+    if (m && postIts.has(m.id)) continue;
+    if (m) postIts.add(m.id);
     const key = comboKey(a);
-    const entry = map.get(key) || { type: a.type, color: (a.color || "").toLowerCase(), count: 0 };
+    const entry = map.get(key) || { type: m ? "postit" : a.type, color: m ? m.color : (a.color || "").toLowerCase(), count: 0 };
     entry.count++;
     map.set(key, entry);
   }
@@ -55,12 +65,14 @@ export function annotationExtent(annot: Annotation, viewport: PageViewport, page
     top = Math.min(top, vy);
     bottom = Math.max(bottom, vy);
   };
-  for (const r of (pageIndex === undefined ? pos.rects : rectsOnPage(pos, pageIndex)) ?? []) {
+  // A post-it's part folds with all of its paper.
+  const paper = postItMeta(annot)?.rect;
+  for (const r of paper ? [paper] : ((pageIndex === undefined ? pos.rects : rectsOnPage(pos, pageIndex)) ?? [])) {
     if (!Array.isArray(r) || r.length < 4) continue;
     take(r[0], r[1]);
     take(r[2], r[3]);
   }
-  for (const path of onNext ? [] : (pos.paths ?? [])) {
+  for (const path of onNext || paper ? [] : (pos.paths ?? [])) {
     if (!Array.isArray(path)) continue;
     for (let i = 1; i < path.length; i += 2) take(path[i - 1], path[i]);
   }

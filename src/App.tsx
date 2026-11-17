@@ -29,9 +29,12 @@ import { TaskTray } from "./components/TaskTray";
 
 /** A pane edge's width (base.css's .pane-resizer). */
 const RESIZER_PX = 5;
+/** Up to this window width the notes keep a width of their own
+ *  (notes.css): the iPad's half of the screen. */
+const TABLET_PX = 900;
 
 function PaneResizer({ side }: { side: "left" | "right" }) {
-  const { leftWidth, rightWidth, notesWidth, setPaneSizes, setNotesWidth } = useStore();
+  const { leftWidth, rightWidth, notesWidth, setPaneSizes, setNotesWidth, setNotesWidthNarrow } = useStore();
   const reading = useStore((s) => s.reading);
 
   const start = (e: React.PointerEvent) => {
@@ -39,20 +42,28 @@ function PaneResizer({ side }: { side: "left" | "right" }) {
     // While taking notes the right edge resizes the notes, which may
     // take the whole window but the edge itself, to drag them back by.
     const notes = side === "right" && reading !== null;
-    const startW = side === "left" ? leftWidth : notes ? notesWidth : rightWidth;
+    // The notes from the width they show, which the window may hold
+    // below the one kept (notes.css).
+    const shown = (e.currentTarget as HTMLElement).nextElementSibling as HTMLElement | null;
+    const startW = side === "left" ? leftWidth : notes ? (shown?.offsetWidth ?? notesWidth) : rightWidth;
     trackPointerDrag(e, (ev) => {
       const delta = ev.clientX - startX;
       if (side === "left") {
         setPaneSizes({ leftWidth: Math.min(420, Math.max(150, startW + delta)) });
       } else if (notes) {
-        setNotesWidth(Math.min(window.innerWidth - RESIZER_PX, Math.max(260, startW - delta)));
+        const w = Math.min(window.innerWidth - RESIZER_PX, Math.max(260, startW - delta));
+        if (window.innerWidth <= TABLET_PX) setNotesWidthNarrow(w);
+        else setNotesWidth(w);
       } else {
         setPaneSizes({ rightWidth: Math.min(520, Math.max(200, startW - delta)) });
       }
     });
   };
 
-  return <div className="pane-resizer" onPointerDown={start} />;
+  // The notes' edge stays on a tablet-sized window (600–900px — the
+  // iPad's half of the screen), where the panels are otherwise drawers.
+  const cls = side === "right" && reading !== null ? "pane-resizer notes-edge" : "pane-resizer";
+  return <div className={cls} onPointerDown={start} />;
 }
 
 export default function App() {
@@ -61,7 +72,7 @@ export default function App() {
   const setModal = useStore((s) => s.setModal);
   const selectedCollection = useStore((s) => s.selectedCollection);
   const reading = useStore((s) => s.reading);
-  const { leftWidth, rightWidth, notesWidth } = useStore();
+  const { leftWidth, rightWidth, notesWidth, notesWidthNarrow } = useStore();
   const sidebarHidden = useStore((s) => s.sidebarHidden);
   const metaHidden = useStore((s) => s.metaHidden);
   // Reading mode: the open PDF fills the window (readingmode.css).
@@ -98,6 +109,7 @@ export default function App() {
               "--left-w": `${leftWidth}px`,
               "--right-w": `${rightWidth}px`,
               "--notes-w": `${notesWidth}px`,
+              ...(notesWidthNarrow ? { "--notes-w-narrow": `${notesWidthNarrow}px` } : {}),
             } as React.CSSProperties
           }
         >

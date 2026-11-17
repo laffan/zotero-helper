@@ -165,6 +165,14 @@
 .notepad-clip-btn.on {
   background: rgb(0 0 0 / 0.22);
 }
+/* Off over the Highlight Map (NotepadBody.tsx): its glyph faded. */
+.notepad-clip-btn:disabled {
+  cursor: default;
+  background: transparent;
+}
+.notepad-clip-btn:disabled svg {
+  opacity: 0.4;
+}
 .notepad-undo {
   color: var(--accent);
   opacity: 0.8;

@@ -116,6 +116,8 @@ export const RUN: Record<string, () => void> = {
   pdfInk: viewer("ink"),
   pdfSentence: viewer("sentence"),
   pdfSection: viewer("section"),
+  pdfPostIt: viewer("postit"),
+  pdfPostIts: () => showTab("postits"),
   pdfReadingMode: viewer("readingMode"),
   pdfNext: viewer("next"),
   pdfPrev: viewer("prev"),

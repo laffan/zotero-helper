@@ -34,12 +34,18 @@ Windows/Linux desktops too).
   can be shared as a PDF of its own. **Add Section** (beside the
   sentence tool) draws a labelled dashed line across a page, and the
   Highlights tab files the highlights under these sections — among the
-  PDF's own outline headings, or on their own where it has none. Widen
+  PDF's own outline headings, or on their own where it has none.
+  **Post-its** stick a square of coloured paper on a page, to write on
+  with the Pencil or type on; they drag about their page, show in the
+  thumbnails and a Post-its tab of their own, and reach Zotero as its
+  own text and ink annotations, so Zotero shows their words and writing
+  too. Widen
   the notes panel and the Highlights tab becomes a **Highlight Map**: the
   highlights on a canvas that pans and zooms (a finger, a pinch, the
   trackpad), in rows for the chapters and columns for the sections within
   them; its search goes from match to match, and the search and colours
-  fade the rest. View Notepad lays the PDF's notepad over the map.
+  fade the rest. View Notepad lays the PDF's notepad over the map, and
+  its quote button links to the map's cards.
 - **AI helpers (optional)** — tidy metadata, extract abstracts, ask
   questions of abstracts, full papers or a part of one with page-cited
   answers, have a selected passage explained in a few lines, with or

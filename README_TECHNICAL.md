@@ -77,6 +77,10 @@ src/            React + TypeScript UI (Vite, zustand, MiniSearch)
                 its file (through src-tauri/src/dividers.rs), and
                 withDividers, which puts them among the outline's
                 headings for the Highlights tab and its map
+  lib/postits.ts
+                post-its: read out of a PDF's annotations (each one's
+                Zotero text and ink annotations, tied by the record in
+                their positions), kept by writing those, their colours
   lib/highlights.ts, lib/notes.ts
                 annotations out of the library cache; NOTES.md load /
                 save / periodic push, the PDF cache
@@ -126,6 +130,7 @@ src/            React + TypeScript UI (Vite, zustand, MiniSearch)
                 HighlightFilters, the colours and the search's marks,
                 both shared with HighlightMap, the wide panel's map,
                 and MapNotepad, the notepad over it —
+                PostItsPanel, the Post-its tab —
                 Notes — NotesPrompts is an
                 empty note's reading questions), reader pane (and
                 ReadingModeExit, reading mode's way back and its
@@ -158,8 +163,9 @@ src/            React + TypeScript UI (Vite, zustand, MiniSearch)
                 taking it back)
   highlightmap/ the Highlight Map: layout (a PDF's highlights in rows
                 for its chapters and columns for what each is divided
-                into) and view (the canvas, panned and zoomed: a finger,
-                the mouse, a wheel, a pinch; the glide to a card)
+                into), view (the canvas, panned and zoomed: a finger,
+                the mouse, a wheel, a pinch; the glide to a card) and
+                drop (a link let go over a card)
   components/settings/
                 the settings page: SettingsView (section list, the
                 draft and Save) and one component per section —
@@ -192,7 +198,11 @@ src/            React + TypeScript UI (Vite, zustand, MiniSearch)
                 (reading mode's hold on a corner), nameBox (the box
                 that names a bookmark or a section), dividers (Add
                 Section: a section's line placed, drawn, dragged,
-                renamed), places (where the
+                renamed), postits (post-its: placed, drawn on their
+                pages, dragged, their presses), postitInk (writing and
+                erasing on one), postitEdit (a post-it's menu and its
+                text editor), postitPaint (post-its painted into the
+                thumbnails, folds and clips), places (where the
                 reader is, what is at a point — for the notepad), and
                 annotating (the pieces below, put together):
                 selectionBar (colours over a selection),
@@ -227,7 +237,8 @@ src/            React + TypeScript UI (Vite, zustand, MiniSearch)
                 keyboard = the pane outline and sidebar cursor;
                 highlightmap = the Highlight Map;
                 pdfviewer-dark = dark pages; pdfviewer-sections =
-                the reader's sections on the pages; explanations = the
+                the reader's sections on the pages; postits = post-its,
+                on the pages and in their tab; explanations = the
                 explanation boxes; notepad-clips = the notepad's pins
                 and clips, and clip mode; notepad-texts = its text
                 notes and their editor; notepad-notes = the pad under
@@ -706,7 +717,14 @@ folds them all (it is absent when the outline has no nested
 headings). The notes panel's left edge widens it as far as the reader
 likes — up to the whole window but the edge itself, to drag it back by
 (`PaneResizer` in `App.tsx`; it is held to the window's width when the
-window shrinks). Widen it past 600px and the Highlights tab becomes the
+window shrinks). A tablet-sized window, 600–900px wide — the iPad's half
+of the screen, where the library's panels are drawers — keeps the notes
+in the row with their edge (it used to hide the edge there, so the
+panel couldn't be sized at all): 45% of the window until the edge is
+dragged, then the width it was dragged to, kept apart from a wider
+window's (`notesWidthNarrow`, per PDF like the other), so going between
+full and half screen finds each as it was left. Where fingers point the
+edge takes presses 10px either side of it. Widen it past 600px and the Highlights tab becomes the
 **Highlight Map** (see Highlights, below); narrow it again and it is the
 list. The
 viewer's bottom toolbar draws its own tooltips — after a moment's
@@ -719,7 +737,8 @@ screen (fit one / two / three; four and five from the keyboard only,
 4 and 5 — the three-page button is lit then, the number over its
 last page, `.pdf-fit-more`), scroll direction, paged / continuous,
 folding, zoom (−, the zoom or fit, and + as one bordered group), the
-sentence tool and Add Section (see Sections, below), the pen — and, at
+sentence tool, Post-it and Add Section (see Post-its and Sections,
+below), the pen — and, at
 its right, where the reader is:
 "54% | 7 of 13 | 1:33pm" (the share of the document up to the page in
 view, then the page, or the set's range, "7–9 of 13", then the time).
@@ -885,7 +904,8 @@ written; pressing it heads the line with the page in view —
 there). Pressed and dragged out onto the pages instead (`startPress` in
 `citeGutter.ts`), a dashed line runs from the icon to the pointer — the
 notepad's quote button's line, see The notepad — and let go over a
-highlight or a spot on a page, the line is headed with a link to that:
+highlight or a spot on a page, or a card of the Highlight Map, the line
+is headed with a link to that:
 the highlight itself (`…?page=22&annotation=KEY`, so the pill takes its
 colour and following it selects the highlight), or the page the spot is
 on; let go anywhere else, nothing is added. Page pills move the open viewer rather than leaving for
@@ -902,15 +922,18 @@ window controls (when there is one — see Full screen on the iPad) goes
 to the pages too. A red × at the top left
 (below that band on the iPad) — or Escape — brings everything back as
 it was (`ReadingModeExit.tsx`). Below it, down the left at the same
-size and spacing, a red caret toggles the sentence tool (a tap selects
-the sentence under it — see Highlighting), a red page with a dashed
-line across it readies Add Section (the next tap on a page draws a
-section's line there — see Sections) and a red pen toggles ink mode
-(the Pencil writes, or selects and highlights like a finger); all three
+size and spacing: a red page with a dashed line across it readies Add
+Section (the next tap on a page draws a section's line there — see
+Sections), a red caret toggles the sentence tool (a tap selects the
+sentence under it — see Highlighting), a red pen toggles ink mode (the
+Pencil writes, or selects and highlights like a finger) and a red square
+of paper, its corner turned up, readies Post-it (the next tap on a page
+sticks one there — see Post-its); then the notepad's icon. All four
 show white on red while on — the same 28px square behind each, whatever
 its glyph's size — and are the viewer's own state (its
-`onSentenceTool` / `onSectionTool` / `onInkMode`, reflected in the
-store), so the bottom bar's buttons and the keys agree with them. With ink mode on, a dot on
+`onSectionTool` / `onSentenceTool` / `onInkMode` / `onPostItTool`,
+reflected in the store), so the bottom bar's buttons and the keys agree
+with them. With ink mode on, a dot on
 the pen shows the colour it writes in, and holding the pen a moment
 (450ms) opens a flyout of the pen's colours beside it — Zotero's eight
 and black, the bottom bar's colour chip, which reading mode hides; a
@@ -922,7 +945,7 @@ mode's select tool) — and a colour picked there goes back to the pen.
 The pen button shows the tool in force: the pen (with the colour dot),
 an eraser (the eraser is shared with the notepad, `lib/penTool.ts`) or
 a lasso (the store's `inkTool`, from the viewer's `onInkTool`). Below
-the pen, in the next place down the left, a filled red rectangle is
+Post-it, in the next place down the left, a filled red rectangle is
 the notepad's icon, dragged anywhere, which opens it (see The notepad).
 The pages'
 bookmark buttons are hidden in reading mode (a bookmarked page still
@@ -1116,7 +1139,20 @@ either: the press that slides reading mode's notepad to the other page
 (`spareFromSentence`), and the tool lets its tap be. A sentence runs between two ".", "!" or "?" followed by a space
 and a capital, a digit or an opening quote, so "e.g." and "3.5" don't
 end one, nor do common abbreviations or initials; it never runs past
-its page or more than 800 characters either way. ⌘ is read from its
+its page or more than 800 characters either way. A note's number set
+above the line after a sentence's end — an endnote or footnote mark —
+belongs to the sentence it ends: the text layer reads "…as he
+argued.¹² The next" as "argued.12 The next", with no space after the
+".", so the two sentences used to run together (or, with a space, the
+next began with the number). The marks are found by their shape
+(`noteMarks`: a text node of digits or a note's symbols — `*`, `†`,
+`‡`, `§`, `¶`, with commas and dashes between — under 85% of the height
+of the text beside it and raised above its middle, measured from the
+text's own boxes, not its span's) and, where that can't tell, by their
+place: a word's "." (or its closing quote) followed at once by one to
+three digits, a space and a capital. Such a mark is taken into the end
+of its sentence and left off the start of the next, and a tap on the
+mark selects the sentence it ends. ⌘ is read from its
 own key events, as the reading crop reads ⌃ (`sentenceMark.ts`). A
 mark shows at once; the write goes into
 an outbox on the device (`annotations-outbox.json`) and is pushed a
@@ -1462,7 +1498,9 @@ file), its highlights are filed under the outline's section headings
 — the deepest heading at or above each highlight — and headings with
 no highlights are left out. The sections the reader adds (Sections,
 below) join those headings, or divide the highlights alone in a PDF
-with no outline.
+with no outline. Post-its, which Zotero keeps as text and ink
+annotations, are left out (`isPostItPart` in `highlightGroups`): they
+have a tab of their own (Post-its, below).
 
 **The Highlight Map.** With the PDF open and the notes panel wider
 than 600px (`MAP_WIDTH` in `MetadataPanel.tsx`), the Highlights tab —
@@ -1538,7 +1576,14 @@ red notepad page with a white arrow pointing left across it, lit while
 the pane is open) opens the PDF's notepad as a pane over the canvas's
 right, full height — a view of the same pad (see The
 notepad), so what is gathered on the map can be written down beside it;
-its × or the button again closes it. It lies over the map rather than beside
+its × or the button again closes it. Its scissors are off there (shown
+faded): clipping is for the pages, and the map is what the pane lies
+beside. Its quote button links to the map's cards as well as to the
+pages: let go over a card (`highlightmap/drop.ts`, which
+`readerPlaceAt` in `ReaderPane.tsx` asks before the pages), a link to
+that highlight lands on the pad, as over the highlight on its page (a
+bookmark's card, a link to its place); the notes' link icon does the
+same. It lies over the map rather than beside
 it: the map keeps its size, but what it fits, keeps in view and glides
 a match to is the part the pane leaves (`covered` in `view.ts`). Its
 inner edge sizes it — a strip as thick as the bar that divides the notes
@@ -1897,9 +1942,9 @@ still gets the Highlights tab.
 
 The Highlights tab files highlights under the PDF's outline, which many
 PDFs lack or get wrong; **Add Section** lets the reader divide a PDF
-themselves. The button sits beside the sentence tool in the bottom bar
-(a page with a dashed line across it), below the caret among reading
-mode's buttons, and on A. Pressed, it readies the tool: the pages take
+themselves. The button sits after the sentence tool and Post-it in the
+bottom bar (a page with a dashed line across it), first below the ×
+among reading mode's buttons, and on A. Pressed, it readies the tool: the pages take
 a crosshair, and a faint dashed guide follows a mouse or a hovering
 Pencil across the page under it. The next tap on a page draws a
 section's line across it there and opens the naming box under its
@@ -1945,6 +1990,123 @@ shape is `Divider` in `src/lib/dividers.ts`), on this device only, never
 sent to Zotero. (In the code they are dividers, to keep them apart from
 the outline's sections.) Not yet done: sections among the outline
 panel's headings, and the Share and Ask PDF menus' choice of a section.
+
+### Post-its
+
+**Post-it** sticks a square of coloured paper on a page, to write on
+with the Pencil or type on — a little notepad that stays where it was
+put. The button is in the bottom bar between the sentence tool and Add
+Section (a square of paper, its corner turned up), among reading mode's
+buttons below the pen, and on T. Pressed, it readies the tool as Add
+Section does: the pages take a crosshair, a dashed square of the paper
+(in the colour it will be) follows a mouse or a hovering Pencil over the
+page under it, and the next tap on a page sticks a post-it there,
+centred on the tap and kept inside the page. One post-it per press; a
+second press, or Escape, puts the tool away unused. While ready it has
+every press on the pages to itself, heard on the window before anything
+in them; a finger's drag still scrolls (`src/pdfviewer/postits.ts`).
+
+A new post-it is 200 × 200 points — 200 × 200 CSS px at 100% zoom —
+and, like the paper it stands for, belongs to its page: it is an
+overlay on its page wrapper placed in percentages of the page, as the
+sections' lines are, so it grows and shrinks with the page through
+every zoom, fit and reading crop, with no raster. Its type (11pt, lines
+1.3 apart) and its writing scale with it: each post-it's `--pk`, CSS px
+per point, is set as its box changes (a ResizeObserver). Its colour is
+one of five — yellow, pink, blue, green and orange — the one picked last
+on this device to begin with (`zh-postit-color`). The paper keeps its
+colours and black ink in the dark theme; dark pages only dim it a
+little (`postits.css`).
+
+Across its top is its grip, a shade darker: a drag there (any pointer;
+a finger there doesn't scroll) moves the post-it about its page — not
+onto another — and a tap opens its menu above it (`postitEdit.ts`): the
+five colours, **Type** and **Delete** (a second press confirms). On the
+paper the Pencil writes, and so does a mouse dragged (a click alone
+writes nothing); two taps of a finger, or a double-click, type on it.
+A finger otherwise scrolls the pages as anywhere else. Typing is a bare
+textarea over the paper below the grip, in the paper's own face and
+size, the words raw; Escape or ⌘↩ ends it, and so do a press anywhere
+else, the focus leaving it and the app being put away — the words kept
+each time. An empty post-it says "Write here, or double-tap to type".
+
+Writing on one follows the pages' ink (`postitInk.ts`): the kept strokes
+are an `<svg>` in the paper's own points, stretched with it; the stroke
+under the pen is drawn on a canvas over the paper, a segment a sample,
+with nothing read from the layout after the box at pen-down; at pen-up
+the stroke is smoothed as Zotero smooths ink (`smoothPath`) and kept,
+staying on the canvas until the pen has rested 600ms, when the strokes
+of a word join the SVG together. The canvas is in the paper and moves
+with the page, so a scroll needs no settling. The eraser — the one ink
+mode and the notepad share (`lib/penTool.ts`, the Pencil's double-tap,
+which now listens while a post-it is on the pages too), or a pen's
+eraser end — takes out every stroke it passes over. The writing is one
+pen, black, 1.4pt. Every gesture reports to `lib/penActivity.ts`, so
+page renders and the push wait for the pen as they do for ink mode.
+
+A post-it's presses are its own: one listener on the scroll area,
+registered before ink mode's and the rest and stopping them there
+(`stopImmediatePropagation`), so the Pencil on a post-it never draws on
+the page beneath — ink mode on or off — and a tap on one never selects a
+sentence or opens a highlight. A finger's press goes on to scroll
+natively: only the Pencil's touches are cancelled, by a non-passive
+listener on the post-its' own layer, so scrolling elsewhere stays on the
+fast path. The click that ends such a press is the post-it's too. While
+Add Section is ready, or the reading crop is being adjusted, a press on
+a post-it is theirs.
+
+**In Zotero.** Zotero has no post-its, so each is kept as the
+annotations of Zotero's own that come nearest (`src/lib/postits.ts`):
+its words as a **text** annotation — Zotero's text box, the words in its
+comment, `fontSize` 11, its rect the paper's inside its margins and
+below its grip, in black — and its writing as **ink** annotations, the
+strokes as paths in PDF points at 1.4pt, in black; one ink annotation,
+or more should the writing outgrow one's position (65,535 characters).
+So Zotero desktop, iOS and the web library show the words and the
+writing where they are on the page (without the paper). Each part
+carries, in its position beside what Zotero reads, the post-it's own
+record, `zhPostIt`: its id (tying its parts together), its paper's
+colour and its rect. Zotero's server keeps a position as it is given,
+and its reader keeps unknown keys when a text box is resized; moving one
+there writes a new position without them, and the part becomes an
+ordinary text box or drawing again — drawn as such here too.
+
+A post-it always has at least one part: its text annotation while it
+has words, or while it has no writing either (an empty post-it is an
+empty text box, so that it is kept); its ink while it has writing.
+`savePostIt` brings the parts in line with what the post-it holds —
+creating, updating and deleting as needed — through
+`lib/annotationEdits.ts` (which now makes text annotations too), so the
+same outbox and push as the highlights, offline included; Delete
+deletes every part. A post-it someone else made in a group library is
+shown, not changed. Writing is written once the pen has rested 2s (past
+the pause between words); a move, a colour, the words typed, at once.
+Until then — and while it is being written on, typed on or dragged — a
+post-it is the layer's own, and the copy that comes back through the
+store doesn't overwrite it. Post-its are read back out of the library's
+annotations wherever they show (`postItsOf`), so they come back on
+another device with the next sync.
+
+**Elsewhere.** The pages' own rasters leave post-its out (they are the
+overlay), but the thumbnail grid, the folded view's strips and the
+notepad's clips paint them in, as they look on the page
+(`postitPaint.ts`, through `drawAnnotations` in `paint.ts`), as do the
+library's first-page thumbnails (their paper and writing). The folded
+view folds round the whole of a post-it, and its filter lists post-its
+as **Post-its** by paper colour (`comboKey` in `foldSpecs.ts`), counted
+once each whatever their parts. Ink mode leaves their ink alone (it
+neither draws nor erases nor selects it), and the Highlights tab and the
+Highlight Map leave them out.
+
+**The Post-its tab** (`PostItsPanel.tsx`), beside Highlights when the
+selection has any post-its (⇧T): each as it looks on its page, smaller —
+the paper, its words and its writing — in reading order, with its page
+under it; several PDFs list under a heading each. With the PDF open a
+click goes to the post-it on its page; otherwise it opens the PDF there.
+
+Not yet done: undo for a post-it's writing, sizing a post-it, moving one
+to another page, the Pencil's colours on one, and pages with a /Rotate
+(where a post-it's writing would be drawn turned).
 
 ### The notepad
 
@@ -2133,7 +2295,8 @@ each view remembers its own.
 
 The quote button makes a link (`links.ts`): pressed and dragged out onto
 the pages, a dashed line running from it to the pointer, and let go
-over a highlight or a spot on a page (`placeAtPoint`), it puts a link on
+over a highlight or a spot on a page (`placeAtPoint`) — or a card of
+the Highlight Map (see Highlights) — it puts a link on
 the pad — a link icon and "p. 12", or the whole of the highlight's text
 beside a bar in its colour, its page after it at half opacity — to be
 dragged where it belongs and tapped to go back there. A highlight's
@@ -2153,7 +2316,8 @@ a press, to let it go again. A tap on it otherwise is the canvas's,
 which goes to its target as a tap on a note goes to the note's place.
 Undo takes back a pin as it does a move.
 
-**Clips.** The scissors turn on clip mode (`notepad/clip.ts`): a
+**Clips.** The scissors (off in the pane over the Highlight Map) turn
+on clip mode (`notepad/clip.ts`): a
 transparent overlay is laid over the pages' scroll area, inside the
 viewer (as the thumbnail grid is), so every press — a finger, the
 Pencil, the mouse — goes to it rather than to the pages' many handlers
@@ -2402,6 +2566,8 @@ doesn't cost the role, so there is nothing to reclaim.
 | PDF viewer | Draw (ink mode) on / off | I |
 | PDF viewer | Sentence tool (a tap selects a sentence) on / off | S |
 | PDF viewer | Add Section (the next tap on a page draws a section's line) | A |
+| PDF viewer | Post-it (the next tap on a page sticks a post-it there) | T |
+| PDF viewer | Show post-its | ⇧T |
 | PDF viewer | Reading mode on / off (Esc also leaves it) | R |
 | PDF viewer | Next page (next fold, when folded) | → or ↓ |
 | PDF viewer | Previous page (previous fold, when folded) | ← or ↑ |

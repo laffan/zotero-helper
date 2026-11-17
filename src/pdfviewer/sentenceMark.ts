@@ -26,6 +26,17 @@
 // end one. Common abbreviations and single initials don't either. It
 // never runs past its page, nor further than MAX_REACH characters
 // either way, so a page with no punctuation can't be selected whole.
+//
+// A note's number set above the line after a sentence's end — an
+// endnote or footnote mark, "…as he argued.¹² The next…" — belongs to
+// the sentence it follows: the text layer has it as "argued.12 The",
+// which read plainly is no end at all (no space after the "."), so two
+// sentences ran together, or the next began with the number. The marks
+// are found by their shape (`noteMarks`: a run of digits or a note's
+// symbols, smaller than the text beside it and raised above its middle)
+// and, where that can't tell, by their place — a word's "." followed at
+// once (or after a closing quote) by one to three digits, a space and
+// a capital.
 import { APPLE } from "../lib/shortcuts/bindings";
 import { indexOf, layerText, rangeOf, textPositionAt } from "./textHit";
 
@@ -37,11 +48,35 @@ const ABBREVIATIONS = new Set([
 const CLOSERS = "\"'”’)]»";
 const OPENERS = "\"'“‘([«";
 
-function endsSentence(s: string, i: number): boolean {
+/** Is character `i` part of a raised note mark? */
+type Marks = (i: number) => boolean;
+const NO_MARKS: Marks = () => false;
+
+/** Where the note mark that starts at `j` ends, spaces before it
+ *  allowed; `j` when none does. After a word's "." (`afterWord`; `j` is
+ *  past any closing quote), a run of digits straight after it with a
+ *  space and a capital beyond counts as one too. */
+function pastMark(s: string, j: number, marks: Marks, afterWord: boolean): number {
+  let k = j;
+  while (k < s.length && /\s/.test(s[k])) k++;
+  if (k < s.length && marks(k)) {
+    while (k < s.length && marks(k)) k++;
+    return k;
+  }
+  if (afterWord) {
+    const m = /^\d{1,3}(?=\s+[\p{Lu}"“‘(\[])/u.exec(s.slice(j, j + 12));
+    if (m) return j + m[0].length;
+  }
+  return j;
+}
+
+function endsSentence(s: string, i: number, marks: Marks = NO_MARKS): boolean {
   if (!".!?".includes(s[i])) return false;
   let j = i + 1;
   while (j < s.length && CLOSERS.includes(s[j])) j++;
-  if (j < s.length && !/\s/.test(s[j])) return false;
+  const k = pastMark(s, j, marks, /\p{L}/u.test(s[i - 1] ?? ""));
+  if (k === j && j < s.length && !/\s/.test(s[j])) return false;
+  j = k;
   while (j < s.length && /\s/.test(s[j])) j++;
   if (j < s.length && !/[\p{Lu}\d]/u.test(s[j]) && !OPENERS.includes(s[j])) return false;
   if (s[i] === ".") {
@@ -52,26 +87,74 @@ function endsSentence(s: string, i: number): boolean {
   return true;
 }
 
-/** [from, to) of the sentence around index `at` of `s`, trimmed. */
-export function sentenceBounds(s: string, at: number): [number, number] {
+/** [from, to) of the sentence around index `at` of `s`, trimmed — a
+ *  note mark after its end taken in, one before its start left out. */
+export function sentenceBounds(s: string, at: number, marks: Marks = NO_MARKS): [number, number] {
+  // A tap on a note mark is a tap on the sentence it ends.
+  if (marks(at)) {
+    while (at > 0 && (marks(at) || /\s/.test(s[at]))) at--;
+    while (at > 0 && CLOSERS.includes(s[at])) at--;
+  }
   let from = Math.max(0, at - MAX_REACH);
   for (let i = Math.min(at, s.length) - 1; i >= from; i--) {
-    if (endsSentence(s, i)) {
-      from = i + 1;
-      break;
-    }
+    if (!endsSentence(s, i, marks)) continue;
+    // The start: past the last sentence's closing quotes and its note
+    // mark — digits that may be read as plain ones.
+    from = i + 1;
+    while (from < at && CLOSERS.includes(s[from])) from++;
+    from = Math.min(at, pastMark(s, from, marks, /\p{L}/u.test(s[i - 1] ?? "")));
+    break;
   }
   let to = Math.min(s.length, at + MAX_REACH);
   for (let i = Math.max(at, from); i < to; i++) {
-    if (endsSentence(s, i)) {
+    if (endsSentence(s, i, marks)) {
       to = i + 1;
       while (to < s.length && CLOSERS.includes(s[to])) to++;
+      to = pastMark(s, to, marks, /\p{L}/u.test(s[i - 1] ?? ""));
       break;
     }
   }
-  while (from < to && /\s/.test(s[from])) from++;
+  while (from < to && (/\s/.test(s[from]) || marks(from))) from++;
   while (to > from && /\s/.test(s[to - 1])) to--;
   return [from, to];
+}
+
+/** What a note mark looks like as the text layer has it: digits, or a
+ *  note's symbols, with commas and dashes between ("1", "12", "3–5",
+ *  "*", "†"). */
+const MARK_TEXT = /^\s*[\d*†‡§¶][\d*†‡§¶,\-–]*\s*$/;
+
+/** The note marks in a layer's text: each text node that reads as one
+ *  and is set smaller than the text before it (or after it) and raised
+ *  above that text's middle. Measured from the text's own boxes — a
+ *  span's box is taller than its text on a touch screen. */
+export function noteMarks(t: ReturnType<typeof layerText>): Marks {
+  const box = (n: Text) => {
+    const r = document.createRange();
+    r.selectNodeContents(n);
+    return r.getBoundingClientRect();
+  };
+  const isText = (i: number) => t.nodes[i] && t.nodes[i].data.trim() && !MARK_TEXT.test(t.nodes[i].data);
+  const at = new Set<number>();
+  t.nodes.forEach((node, i) => {
+    if (!MARK_TEXT.test(node.data)) return;
+    let ref = i - 1;
+    while (ref >= 0 && !isText(ref)) ref--;
+    if (ref < 0) for (ref = i + 1; ref < t.nodes.length && !isText(ref); ref++);
+    if (!t.nodes[ref]) return;
+    const m = box(node);
+    const r = box(t.nodes[ref]);
+    if (!m.height || !r.height) return;
+    const raised = m.top + m.height / 2 < r.top + r.height / 2 - r.height * 0.1;
+    if (m.height < r.height * 0.85 && raised) at.add(i);
+  });
+  if (!at.size) return NO_MARKS;
+  const marked = new Uint8Array(t.text.length);
+  for (const i of at) {
+    const node = t.nodes[i];
+    for (let k = 0; k < node.length; k++) if (!/\s/.test(node.data[k])) marked[t.starts[i] + k] = 1;
+  }
+  return (i) => marked[i] === 1;
 }
 
 /** The sentence under a client point, as a Range in the page's text
@@ -85,7 +168,7 @@ export function sentenceAt(target: Element, x: number, y: number): Range | null 
   const t = layerText(layer);
   const at = indexOf(t, pos);
   if (at < 0) return null;
-  const [from, to] = sentenceBounds(t.text, at);
+  const [from, to] = sentenceBounds(t.text, at, noteMarks(t));
   return to > from ? rangeOf(t, from, to) : null;
 }
 
@@ -98,7 +181,7 @@ export function sentenceAround(range: Range): string {
   const t = layerText(layer);
   const at = indexOf(t, { node, offset: range.startOffset });
   if (at < 0) return "";
-  const [from, to] = sentenceBounds(t.text, at);
+  const [from, to] = sentenceBounds(t.text, at, noteMarks(t));
   return t.text.slice(from, to).replace(/\s+/g, " ").trim();
 }
 

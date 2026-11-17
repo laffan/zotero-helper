@@ -11,7 +11,9 @@
 // transform maps PDF user space straight to canvas pixels, honouring a
 // CropBox origin that isn't (0,0) and any /Rotate.
 import { annotationPosition, pagesOf, rectsOnPage, type Annotation } from "../lib/highlights";
+import { isPostItPart } from "../lib/postits";
 import { inkStrokeColor } from "./ink/geometry";
+import { drawPostIts } from "./postitPaint";
 import type { PageViewport } from "./types";
 
 /** Highlights are drawn the way a highlighter marks paper: multiplied
@@ -30,8 +32,8 @@ function box(viewport: PageViewport, r: number[]) {
 }
 
 /** Paint the annotations on page `pageIndex` (0-based) into `ctx` —
- *  ink too unless `withInk` is false (the pages draw theirs over the
- *  raster, ink/layer.ts). */
+ *  ink and post-its too unless `withInk` is false (the pages draw
+ *  theirs over the raster: ink/layer.ts, postits.ts). */
 export function drawAnnotations(
   ctx: CanvasRenderingContext2D,
   viewport: PageViewport,
@@ -41,7 +43,7 @@ export function drawAnnotations(
 ): void {
   const scale = viewport.scale;
   for (const a of annotations) {
-    if (a.type === "ink" && !withInk) continue;
+    if ((a.type === "ink" && !withInk) || isPostItPart(a)) continue;
     const pos = annotationPosition(a);
     // A passage may run onto the next page (`nextPageRects`).
     const rects = rectsOnPage(pos, pageIndex);
@@ -95,6 +97,7 @@ export function drawAnnotations(
     }
     ctx.restore();
   }
+  if (withInk) drawPostIts(ctx, viewport, annotations, pageIndex);
 }
 
 /** A string that changes when what is drawn on a page does — what
@@ -105,9 +108,11 @@ export function drawAnnotations(
 export function pageSignatures(annotations: Annotation[], withInk = true): Map<number, string> {
   const out = new Map<number, string>();
   for (const a of annotations) {
-    if (a.type === "ink" && !withInk) continue;
+    if ((a.type === "ink" || isPostItPart(a)) && !withInk) continue;
     const pos = (a._raw.data as Record<string, unknown>).annotationPosition;
-    const part = `${a.key}:${a.type}:${a.color}:${typeof pos === "string" ? pos : JSON.stringify(pos)}`;
+    // A post-it's words are drawn (in the folds and thumbnails).
+    const words = isPostItPart(a) ? a.comment : "";
+    const part = `${a.key}:${a.type}:${a.color}:${words}:${typeof pos === "string" ? pos : JSON.stringify(pos)}`;
     for (const idx of pagesOf(annotationPosition(a))) out.set(idx, out.has(idx) ? `${out.get(idx)},${part}` : part);
   }
   return out;

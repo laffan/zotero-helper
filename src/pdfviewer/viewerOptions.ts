@@ -1,11 +1,11 @@
 // What the viewer is given by its host (ReaderPane): the callbacks that
 // connect it to the notes, the bookmarks, the reader's sections and
-// Zotero, and the writer for
-// annotations made in it.
+// Zotero, and the writers for annotations and post-its made in it.
 import type { Annotation } from "../lib/highlights";
 import type { AnnotationDraft } from "./annotate";
 import type { InkWriter } from "./ink";
 import type { OutlineEntry } from "./outline";
+import type { PostItWriter } from "./postits";
 import type { MarkType } from "./selectionBar";
 import type { SavedView } from "./viewState";
 
@@ -30,6 +30,11 @@ export interface PdfViewerOptions {
   onRemoveSection?: (id: string) => void;
   /** Add Section is readied (the next tap places a line), or done. */
   onSectionTool?: (on: boolean) => void;
+  /** Keep the post-its (postits.ts); absent hides the tool, and they
+   *  are shown, not changed. */
+  postIts?: PostItWriter;
+  /** Post-it is readied (the next tap sticks one), or done. */
+  onPostItTool?: (on: boolean) => void;
   /** Quote selected text into the notes. */
   onQuote?: (text: string, page: number) => void;
   /** Ask the AI about selected text (the selection bar's sparkles),

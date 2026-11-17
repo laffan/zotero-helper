@@ -17,8 +17,10 @@ import { lastUi, saveUi } from "./recent";
 import { useStore } from "./store";
 
 export interface ReaderUi {
-  /** The panels, held in the app's store while the PDF is open. */
+  /** The panels, held in the app's store while the PDF is open (the
+   *  notes' width on a tablet-sized window apart). */
   notesWidth?: number;
+  notesWidthNarrow?: number | null;
   metaHidden?: boolean;
   outlineOpen?: boolean;
   /** The outline's unfolded headings (OutlinePanel's ids). */
@@ -39,7 +41,7 @@ export interface ReaderUi {
   notesTop?: number;
 }
 
-const PANEL_FIELDS = ["notesWidth", "metaHidden", "outlineOpen"] as const;
+const PANEL_FIELDS = ["notesWidth", "notesWidthNarrow", "metaHidden", "outlineOpen"] as const;
 
 let following = false;
 

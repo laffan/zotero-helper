@@ -19,11 +19,13 @@ const JPEG_QUALITY = 0.8;
  *  annotations in its database rather than in the PDF bytes, so nothing
  *  pdf.js draws will include them — we paint them ourselves. */
 export interface ThumbAnnotation {
-  type: string; // highlight | underline | note | image | ink
+  type: string; // highlight | underline | note | image | ink | text
   color: string;
   pageIndex: number;
   rects: number[][];
   paths: number[][];
+  /** A post-it's part (lib/postits.ts): its paper. */
+  postIt?: { color: string; rect: number[] };
 }
 
 /** Paint Zotero's page-1 marks onto the rendered page. Positions are in
@@ -37,8 +39,18 @@ function drawAnnotations(
   annotations: ThumbAnnotation[],
   pageIndex: number,
 ): void {
+  // Post-its' paper first, under their writing; their words are too
+  // small to show here.
   for (const ann of annotations) {
-    if (ann.pageIndex !== pageIndex) continue;
+    const r = ann.postIt?.rect;
+    if (ann.pageIndex !== pageIndex || !r) continue;
+    const [ax, ay] = viewport.convertToViewportPoint(r[0], r[1]);
+    const [bx, by] = viewport.convertToViewportPoint(r[2], r[3]);
+    ctx.fillStyle = ann.postIt!.color;
+    ctx.fillRect(Math.min(ax, bx), Math.min(ay, by), Math.abs(bx - ax), Math.abs(by - ay));
+  }
+  for (const ann of annotations) {
+    if (ann.pageIndex !== pageIndex || (ann.postIt && ann.type !== "ink")) continue;
     if (ann.type === "ink" && ann.paths.length) {
       ctx.strokeStyle = ann.color || "#ff0000";
       ctx.lineWidth = Math.max(0.5, scale);

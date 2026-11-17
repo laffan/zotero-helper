@@ -297,7 +297,11 @@
     box-shadow: none;
     z-index: auto;
     padding-top: 0;
-    width: min(var(--notes-w, 420px), 45vw);
+    /* 45% of the window, until its edge (App.tsx's PaneResizer, shown
+       at this width too — base.css) is dragged: then the width it was
+       dragged to here, kept apart from a wider window's, and held to
+       the window. */
+    width: min(var(--notes-w-narrow, 45vw), calc(100vw - 5px));
   }
   .ipados .meta-panel.notes-mode {
     padding-top: 0;

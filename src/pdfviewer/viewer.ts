@@ -49,6 +49,7 @@ import { createPlaceKeeper } from "./place";
 import { pagesInView, placeAtPoint, placeInView } from "./places";
 import { createPageFinder } from "./readingProgress";
 import { createPageRenderer } from "./render";
+import { createPostIts } from "./postits";
 import { createPdfSearch } from "./search";
 import { buildPdfToolbar, syncToolbar } from "./toolbar";
 import { attachTooltips } from "./tooltips";
@@ -166,6 +167,7 @@ export function createPdfViewer(container: HTMLElement, opts: PdfViewerOptions =
       ink.pageRendered(idx);
       annotating.pageRendered(idx);
       dividers.pageRendered(idx);
+      postIts.pageRendered(idx);
       if (opts.onQuote || opts.annotate) void attachTextLayer(pages[idx], page);
     },
     onUpdate: () => updatePageIndicator(),
@@ -175,6 +177,9 @@ export function createPdfViewer(container: HTMLElement, opts: PdfViewerOptions =
   const tb = buildPdfToolbar();
   root.appendChild(tb.toolbar);
   container.appendChild(root);
+  const pageEnv = { root, scrollArea, opts, getPages: () => pages, getPageLabels: () => pageLabels };
+  // A press on a post-it is its own, before ink mode hears it.
+  const postIts = createPostIts({ ...pageEnv, button: tb.postItBtn, onStart: () => exitFolded() });
   // Ink mode draws on whole pages, so it leaves the folded view.
   const ink = createInkTool({
     body,
@@ -202,7 +207,6 @@ export function createPdfViewer(container: HTMLElement, opts: PdfViewerOptions =
     },
     (v) => opts.onViewChange?.(currentPage(), v),
   );
-  const pageEnv = { root, scrollArea, opts, getPages: () => pages, getPageLabels: () => pageLabels };
   const bookmarks = createPageBookmarks(pageEnv);
   // Add Section draws on whole pages, so it leaves the folded view.
   const dividers = createDividers({ ...pageEnv, button: tb.sectionBtn, onStart: () => exitFolded() });
@@ -604,6 +608,7 @@ export function createPdfViewer(container: HTMLElement, opts: PdfViewerOptions =
     cropper.destroy();
     bookmarks.destroy();
     dividers.destroy();
+    postIts.destroy();
     foldLayer.destroy();
     progress.destroy();
     renderer.destroy();
@@ -634,7 +639,8 @@ export function createPdfViewer(container: HTMLElement, opts: PdfViewerOptions =
       annotLayer.setAnnotations(list);
       annotating.sync(list);
       ink.setAnnotations(list);
-      // The pages' rasters hold everything but ink; the folds' hold ink too.
+      postIts.setAnnotations(list);
+      // The pages' rasters hold all but ink and post-its; the folds' all.
       const changed = changedPages(old, list, false);
       if (changed.size) renderer.repaint(changed);
       if (changed.size || changedPages(old, list, true).size) foldLayer.onAnnotationsChanged();

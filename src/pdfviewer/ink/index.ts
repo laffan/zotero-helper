@@ -23,6 +23,7 @@
 // squeeze set to "switch to previous" goes between the pen and select.
 import { ANNOTATION_COLORS, annotationPosition, type Annotation } from "../../lib/highlights";
 import { whenPenRested } from "../../lib/penActivity";
+import { isPostItPart } from "../../lib/postits";
 import { isErasing, setErasing, watchErasing } from "../../lib/penTool";
 import type { PageRecord } from "../types";
 import { createInkBar, loadInkPrefs, saveInkPrefs } from "./bar";
@@ -451,7 +452,8 @@ export function createInkTool(env: InkEnv) {
     setAnnotations(list: Annotation[]): void {
       const ink: InkAnn[] = [];
       for (const a of list) {
-        if (a.type !== "ink") continue;
+        // A post-it's writing is the post-it's (postits.ts).
+        if (a.type !== "ink" || isPostItPart(a)) continue;
         let one = inkOf.get(a);
         if (one === undefined) {
           const pos = annotationPosition(a);

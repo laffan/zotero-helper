@@ -78,9 +78,9 @@ const topBand = () => {
   return c.contains("ipados") && !c.contains("status-bar-hidden") ? 34 : 10;
 };
 /** The icon's home: the next place down reading mode's buttons, after
- *  the ×, the sentence tool, Add Section and the pen (readingmode.css),
- *  56px apart. */
-const homeSpot = (): Spot => ({ left: 10, top: topBand() + 224 });
+ *  the ×, Add Section, the sentence tool, the pen and Post-it
+ *  (readingmode.css), 56px apart. */
+const homeSpot = (): Spot => ({ left: 10, top: topBand() + 280 });
 const storedIcon = () =>
   stored<Spot>(ICON_KEY, (s) => Number.isFinite(s.left) && Number.isFinite(s.top), () => ({
     left: window.innerWidth - ICON - 10,

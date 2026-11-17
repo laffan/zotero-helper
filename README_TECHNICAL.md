@@ -201,8 +201,9 @@ src/            React + TypeScript UI (Vite, zustand, MiniSearch)
                 renamed), postits (post-its: placed, drawn on their
                 pages, dragged, their presses), postitInk (writing and
                 erasing on one), postitEdit (a post-it's menu and its
-                text editor), postitCrop (one pared down by its bottom
-                corners), postitPaint (post-its painted into the
+                text editor), postitCrop (one pared down by its
+                corners, and its two places), postitMove (one dragged by
+                its grip), postitPaint (post-its painted into the
                 thumbnails, folds and clips), places (where the
                 reader is, what is at a point — for the notepad), and
                 annotating (the pieces below, put together):
@@ -2048,29 +2049,49 @@ else, the focus leaving it and the app being put away — the words kept
 each time. An empty post-it says "Write here, or double-tap to type".
 
 **Paring one down.** So that a post-it can stay where it is without
-covering the text, its two bottom corners crop it at rest
-(`postitCrop.ts`): dragged (any pointer; a finger there doesn't
-scroll), the bottom-left corner brings its left and bottom edges in,
-the bottom-right its right and bottom edges — never the top, with its
-grip — leaving at least 24 points each way, with the whole paper's
-outline dashed round the part kept while the corner moves. Only what
-shows changes: the paper, its words and its writing stay whole, and the
-post-it shows whole again while it is typed or written on (the crop
-eases out and back, 0.2s), to be pared down again after — so a note
-can be read and added to in full, and left as a sliver. What is pared
+covering the text, its four corners crop it at rest (`postitCrop.ts`):
+dragged (any pointer; a finger there doesn't scroll), a corner brings
+in the two edges it joins — the grip moving down with the top edge —
+leaving at least 24 points each way, with the whole paper's outline
+dashed round the part kept while the corner moves. Only what shows
+changes: the paper, its words and its writing stay whole. What is pared
 away is not there at rest: presses on it reach the page beneath. The
-corners are an L at each bottom corner of what shows, on a hovering
-mouse's post-it and always where fingers point; not while it is worked
-on, nor on someone else's. Its menu offers **Whole** while it is pared
-down. The crop is three insets in points kept in the post-it's record
-(`crop` in `zhPostIt`; Zotero shows the whole post-it), so it comes back
-on other devices. Built so: the element keeps the whole paper's box (so
-the writing, the editor and `--pk` are as before) but takes no presses
-itself; the paper is its `::before`, placed by the crop, and everything
-on the paper is in a sheet clipped to it (`clip-path: inset()`), so only
-the part kept shows or is hit. The thumbnails, folds, clips and the
-library's thumbnails paint it pared down; the Post-its tab shows it
-whole.
+corners are an L at each corner of what shows, in a target centred on
+the corner — half outside the post-it, so a narrow one keeps most of
+its grip (the top two lie over the grip's ends and are pressed before
+it) — on a hovering mouse's post-it and always where fingers point; not
+while it is open, nor on someone else's. Its menu offers **Whole**
+while it is pared down (which also brings it back to its open place).
+
+**Two places.** A pared-down post-it is closed at rest and opens to be
+worked on. Closed, it is at its rest place, which its grip drags about
+the page as far as the part that shows stays on it — so a sliver can be
+parked against the page's edge, the rest of the paper past it
+(`postitMove.ts`). A press on it — a finger's tap, the Pencil's or the
+mouse's press, which writes nothing — or Type opens it: the whole paper,
+at its open place, always inside the page, the crop and the slide
+easing out (0.2s); there it is typed and written on as any post-it, and
+its grip moves the open place. A press anywhere else, or Escape, closes
+it, sliding it back to its rest place and its crop. The open place is
+the rest place moved into the page by the least it takes (the two are
+the same unless the paper would reach past the page), and it is what
+Zotero has: the record's `rect`, so Zotero shows the words and the
+writing whole and on the page; the rest place is `shift`, its distance
+from the rect in points (x right, y down), and the crop `crop`, four
+insets in points (left, right, bottom, top; three, without the top,
+from before it could be cropped) — all in `zhPostIt`, so they come back
+on other devices. A post-it never pared down has no closed state, and
+is worked on where it is.
+
+Built so: the element keeps the whole paper's box at its open place
+(so the writing, the editor and `--pk` are as before), moved to its
+rest place by a `transform` while closed, and takes no presses itself;
+the paper is its `::before`, placed by the crop, and everything on the
+paper is in a sheet clipped to it (`clip-path: inset()`), so only the
+part kept shows or is hit. `.open` (and typing or writing) zeroes the
+crop and the transform. The thumbnails, folds, clips and the library's
+thumbnails paint it closed — at its rest place, pared down — and the
+folded view folds round what shows; the Post-its tab shows it whole.
 
 Writing on one follows the pages' ink (`postitInk.ts`): the kept strokes
 are an `<svg>` in the paper's own points, stretched with it; the stroke
@@ -2108,7 +2129,8 @@ So Zotero desktop, iOS and the web library show the words and the
 writing where they are on the page (without the paper). Each part
 carries, in its position beside what Zotero reads, the post-it's own
 record, `zhPostIt`: its id (tying its parts together), its paper's
-colour, its rect and its crop, if it has one. Zotero's server keeps a position as it is given,
+colour, its rect (where it is open) and, when it is pared down, its
+crop and its rest place (above). Zotero's server keeps a position as it is given,
 and its reader keeps unknown keys when a text box is resized; moving one
 there writes a new position without them, and the part becomes an
 ordinary text box or drawing again — drawn as such here too.

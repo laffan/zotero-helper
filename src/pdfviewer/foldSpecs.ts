@@ -3,7 +3,7 @@
 // merged with its neighbours on the page. Pure geometry — the folds
 // themselves (drawing, scrolling, the filter's state) are folds.ts's.
 import { annotationPosition, pagesOf, rectsOnPage, type Annotation } from "../lib/highlights";
-import { postItMeta } from "../lib/postits";
+import { postItMeta, shownRect } from "../lib/postits";
 import { pdfPointToViewport } from "./annotations";
 import type { PageRecord, PageViewport } from "./types";
 
@@ -65,8 +65,9 @@ export function annotationExtent(annot: Annotation, viewport: PageViewport, page
     top = Math.min(top, vy);
     bottom = Math.max(bottom, vy);
   };
-  // A post-it's part folds with all of its paper.
-  const paper = postItMeta(annot)?.rect;
+  // A post-it's part folds with all of its paper that shows.
+  const meta = postItMeta(annot);
+  const paper = meta && shownRect(meta.rect, meta.crop, meta.shift);
   for (const r of paper ? [paper] : ((pageIndex === undefined ? pos.rects : rectsOnPage(pos, pageIndex)) ?? [])) {
     if (!Array.isArray(r) || r.length < 4) continue;
     take(r[0], r[1]);

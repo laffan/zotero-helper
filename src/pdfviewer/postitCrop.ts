@@ -1,14 +1,22 @@
-// Paring a post-it down (postits.ts), so that at rest it covers less of
-// the text: its two bottom corners, dragged, bring its left or right
-// edge and its bottom edge in. Only what shows changes — the paper, its
-// words and its writing stay whole, and come back whole while it is
-// typed or written on (postits.css), to be pared down again after. The
-// crop is three insets in the paper's points — left, right, bottom; the
-// top, with its grip, stays — kept with the post-it (lib/postits.ts).
+// Paring a post-it down, and its two places (postits.ts). So that a
+// post-it can stay put without covering the text, its four corners,
+// dragged, bring its edges in at rest: a corner moves the two edges it
+// joins. Only what shows changes — the paper, its words and its writing
+// stay whole. The crop is four insets in the paper's points, left,
+// right, bottom, top, kept with the post-it (lib/postits.ts).
+//
+// A pared-down post-it has two places: its rect, where it is open —
+// typed or written on, shown whole — always inside its page; and its
+// rest place, the rect moved by its shift, where the part that shows
+// sits, and which may put the rest of the paper past the page's edge,
+// so a sliver can be kept at the margin. Opening it slides the whole
+// paper into the page; closing it slides it back. Dragged by its grip at
+// rest, it is the rest place that moves, as far as the part that shows
+// stays on the page (postitMove.ts).
 //
 // A corner shows on a hovering mouse's post-it, always where fingers
-// point, never on one being worked on or someone else's. Its drag
-// draws the whole paper's outline, dashed, round the part kept.
+// point; never on one that is open, or someone else's. Its drag draws
+// the whole paper's outline, dashed, round the part kept.
 
 /** The least a crop leaves of the paper, each way, in points. */
 const MIN_PT = 24;
@@ -18,21 +26,43 @@ export interface CropTarget {
   /** The paper's size, in points. */
   w: number;
   h: number;
-  /** Left, right, bottom insets, in points. */
+  /** Left, right, bottom, top insets, in points. */
   crop: number[];
 }
 
-/** Show a crop: the insets as CSS variables the paper, its sheet and
- *  its corners are placed by. */
-export function showCrop(el: HTMLElement, crop: number[]): void {
-  el.style.setProperty("--crop-l", String(crop[0]));
-  el.style.setProperty("--crop-r", String(crop[1]));
-  el.style.setProperty("--crop-b", String(crop[2]));
+/** Show a crop and a rest place: CSS variables the paper, its sheet,
+ *  its corners and its place at rest are set by (postits.css). */
+export function showCrop(el: HTMLElement, crop: number[], shift: number[]): void {
+  ["l", "r", "b", "t"].forEach((side, i) => el.style.setProperty(`--crop-${side}`, String(crop[i])));
+  el.style.setProperty("--shift-x", String(shift[0]));
+  el.style.setProperty("--shift-y", String(shift[1]));
 }
 
-/** A corner's drag, from its press. `done` hears the crop it ends on,
- *  if it moved. */
-export function dragCorner(t: CropTarget, e: PointerEvent, side: "l" | "r", done: (crop: number[]) => void): void {
+/** A rect moved, by the least it takes, inside the page's box (PDF
+ *  user space, both). */
+export function intoPage(r: number[], vb: number[]): number[] {
+  const dx = r[0] < vb[0] ? vb[0] - r[0] : r[2] > vb[2] ? vb[2] - r[2] : 0;
+  const dy = r[1] < vb[1] ? vb[1] - r[1] : r[3] > vb[3] ? vb[3] - r[3] : 0;
+  return [r[0] + dx, r[1] + dy, r[2] + dx, r[3] + dy];
+}
+
+/** The least each inset may be for what shows to stay on the page, the
+ *  paper at rest at `rest` (left, right, bottom, top). */
+export function leastInsets(rest: number[], vb: number[]): number[] {
+  return [vb[0] - rest[0], rest[2] - vb[2], vb[1] - rest[1], rest[3] - vb[3]].map((v) => Math.max(0, v));
+}
+
+/** A corner's drag, from its press: `top` and `left` say which. `least`
+ *  is each inset's floor (leastInsets). `done` hears the crop it ends
+ *  on, if it moved. */
+export function dragCorner(
+  t: CropTarget,
+  e: PointerEvent,
+  corner: { top: boolean; left: boolean },
+  least: number[],
+  shift: number[],
+  done: (crop: number[]) => void,
+): void {
   e.preventDefault();
   const box = t.el.getBoundingClientRect();
   const k = box.width / t.w;
@@ -46,13 +76,17 @@ export function dragCorner(t: CropTarget, e: PointerEvent, side: "l" | "r", done
     moved ||= Math.hypot(ev.clientX - x0, ev.clientY - y0) > 3;
     if (!moved) return;
     ev.preventDefault();
-    const [l, r] = t.crop;
-    const b = Math.max(0, Math.min(t.h - MIN_PT, t.h - (ev.clientY - box.top) / k));
+    const [l, r, b, tp] = t.crop;
     const x = (ev.clientX - box.left) / k;
-    crop = side === "l"
-      ? [Math.max(0, Math.min(t.w - r - MIN_PT, x)), r, b]
-      : [l, Math.max(0, Math.min(t.w - l - MIN_PT, t.w - x)), b];
-    showCrop(t.el, crop);
+    const y = (ev.clientY - box.top) / k;
+    const fit = (v: number, i: number, other: number, size: number) => Math.max(least[i], Math.min(size - other - MIN_PT, v));
+    crop = [
+      corner.left ? fit(x, 0, r, t.w) : l,
+      corner.left ? r : fit(t.w - x, 1, l, t.w),
+      corner.top ? b : fit(t.h - y, 2, tp, t.h),
+      corner.top ? fit(y, 3, b, t.h) : tp,
+    ];
+    showCrop(t.el, crop, shift);
   };
   const up = (ev: PointerEvent) => {
     if (ev.pointerId !== e.pointerId) return;

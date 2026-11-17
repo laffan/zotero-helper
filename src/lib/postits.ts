@@ -13,8 +13,10 @@
 // annotation of its own in Zotero; here it is drawn from the record each
 // part carries in its position, beside what Zotero reads there:
 // `zhPostIt` — the post-it's id (which ties its parts together), its
-// colour, its rect and, when it is pared down at rest, its crop (the
-// paper and its words stay whole in Zotero). Zotero stores a position as it is given, and its
+// colour, its rect (where it is when open, inside its page — where
+// Zotero shows its words and writing) and, when it is pared down at
+// rest, its crop and its rest place (the paper stays whole in Zotero,
+// at its rect). Zotero stores a position as it is given, and its
 // reader keeps unknown keys when a text box is resized — but moving one
 // there writes a new position without them, and the part becomes an
 // ordinary text box or drawing again (drawn as such here too).
@@ -73,23 +75,48 @@ export function rememberPostItColor(color: string): void {
 }
 
 /** What each part carries in its position. `rect` is the paper's, in
- *  PDF user space ([x1, y1, x2, y2], y up); `crop`, when it is pared
- *  down at rest, how far in its left, right and bottom edges come, in
- *  points. */
+ *  PDF user space ([x1, y1, x2, y2], y up) — where it is when open, and
+ *  always inside its page. When it is pared down at rest: `crop`, how
+ *  far in its left, right, bottom and top edges come, in points (an
+ *  earlier crop has no top); `shift`, how far its rest place is from
+ *  `rect`, in points, x right and y down — the part that shows may sit
+ *  at the page's edge, the rest of the paper past it. */
 export interface PostItMeta {
   id: string;
   color: string;
   rect: number[];
   crop?: number[];
+  shift?: number[];
 }
 
-const NO_CROP = [0, 0, 0];
+const NO_CROP = [0, 0, 0, 0];
+const NO_SHIFT = [0, 0];
 
-/** A crop as kept: three non-negative insets, or none. */
+const finite = (c: unknown, n: number): c is number[] =>
+  Array.isArray(c) && c.length === n && c.every((v) => Number.isFinite(v));
+/** A crop as kept: four non-negative insets (three, before the top
+ *  could be), or none. */
 function cropOf(c: unknown): number[] {
-  return Array.isArray(c) && c.length === 3 && c.every((v) => Number.isFinite(v) && v >= 0) ? (c as number[]) : NO_CROP;
+  if (finite(c, 3) && c.every((v) => v >= 0)) return [...c, 0];
+  return finite(c, 4) && c.every((v) => v >= 0) ? c : NO_CROP;
 }
+const shiftOf = (s: unknown): number[] => (finite(s, 2) ? s : NO_SHIFT);
 export const isCropped = (crop: number[]): boolean => crop.some((v) => v > 0);
+
+/** Where the whole paper lies at rest: `rect` moved by `shift`. */
+export function restRect(rect: number[], shift: number[]): number[] {
+  const [sx, sy] = shift;
+  return [rect[0] + sx, rect[1] - sy, rect[2] + sx, rect[3] - sy];
+}
+
+/** What shows of the paper at rest: its rest place pared down by its
+ *  crop. Takes a record's fields as kept (the library's thumbnails read
+ *  them raw). */
+export function shownRect(rect: number[], crop?: unknown, shift?: unknown): number[] {
+  const r = restRect(rect, shiftOf(shift));
+  const [l, rt, b, t] = cropOf(crop);
+  return [r[0] + l, r[1] + b, r[2] - rt, r[3] - t];
+}
 
 /** A post-it, as its parts describe it. */
 export interface PostIt {
@@ -98,9 +125,11 @@ export interface PostIt {
   pageIndex: number;
   rect: number[];
   color: string;
-  /** Its left, right and bottom edges' insets at rest, in points (all
-   *  0 when it shows whole). */
+  /** Its left, right, bottom and top edges' insets at rest, in points
+   *  (all 0 when it shows whole), and its rest place's distance from
+   *  `rect` (x right, y down). */
   crop: number[];
+  shift: number[];
   text: string;
   /** The writing: each stroke x, y pairs in points from the paper's top
    *  left, y down. */
@@ -119,7 +148,7 @@ export function postItMeta(a: Annotation): PostItMeta | null {
   if (!m || typeof m.id !== "string" || typeof m.color !== "string") return null;
   const r = m.rect;
   if (!Array.isArray(r) || r.length !== 4 || !r.every((v) => Number.isFinite(v))) return null;
-  return { id: m.id, color: m.color, rect: r, crop: cropOf(m.crop) };
+  return { id: m.id, color: m.color, rect: r, crop: cropOf(m.crop), shift: shiftOf(m.shift) };
 }
 
 export const isPostItPart = (a: Annotation): boolean => postItMeta(a) !== null;
@@ -142,6 +171,7 @@ export function postItsOf(list: Annotation[]): PostIt[] {
         rect: m.rect,
         color: m.color,
         crop: m.crop ?? NO_CROP,
+        shift: m.shift ?? NO_SHIFT,
         text: "",
         strokes: [],
         pageLabel: a.pageLabel,
@@ -160,6 +190,7 @@ export function postItsOf(list: Annotation[]): PostIt[] {
       p.rect = m.rect;
       p.color = m.color;
       p.crop = m.crop ?? NO_CROP;
+      p.shift = m.shift ?? NO_SHIFT;
     } else if (a.type === "ink") {
       p.inkKeys.push(a.key);
       const [x1, , , y2] = m.rect;
@@ -182,6 +213,7 @@ export interface PostItSave {
   rect: number[];
   color: string;
   crop: number[];
+  shift: number[];
   text: string;
   strokes: number[][];
   textKey: string | null;
@@ -218,6 +250,7 @@ export function savePostIt(p: PostItSave): { textKey: string | null; inkKeys: st
     color: p.color,
     rect: p.rect.map(round2),
     ...(isCropped(p.crop) ? { crop: p.crop.map(round2) } : {}),
+    ...(p.shift.some((v) => v !== 0) ? { shift: p.shift.map(round2) } : {}),
   };
   const [x1, y1, x2, y2] = zhPostIt.rect;
   const common = { attKey: p.attKey, pageLabel: p.pageLabel, sortIndex: p.sortIndex };

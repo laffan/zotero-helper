@@ -4,11 +4,11 @@
 // overlay (postits.ts), so the pages' own rasters leave them out.
 //
 // Drawn as the overlay looks at rest: the paper in its colour, 70%
-// opaque, pared down by its crop, the grip a shade darker across its
-// top, the words wrapped inside its margins and the writing over them.
+// opaque, at its rest place pared down by its crop, the grip a shade
+// darker across the top of what shows, the words wrapped inside its margins and the writing over them.
 import type { Annotation } from "../lib/highlights";
 import {
-  POSTIT_FONT, POSTIT_GRIP, POSTIT_INK, POSTIT_LINE, POSTIT_PAD, POSTIT_PEN, postItsOf, wrapLines,
+  POSTIT_FONT, POSTIT_GRIP, POSTIT_INK, POSTIT_LINE, POSTIT_PAD, POSTIT_PEN, postItsOf, restRect, wrapLines,
 } from "../lib/postits";
 import type { PageViewport } from "./types";
 
@@ -22,15 +22,15 @@ export function drawPostIts(
   const k = viewport.scale;
   for (const p of postItsOf(annotations)) {
     if (p.pageIndex !== pageIndex) continue;
-    const [x1, y1, x2, y2] = p.rect;
+    // At its rest place, pared down by its crop.
+    const [x1, y1, x2, y2] = restRect(p.rect, p.shift);
     const [ax, ay] = viewport.convertToViewportPoint(x1, y2);
     const [bx, by] = viewport.convertToViewportPoint(x2, y1);
     const left = Math.min(ax, bx);
     const top = Math.min(ay, by);
     const w = Math.abs(bx - ax);
-    // What shows at rest: the paper pared down by its crop.
-    const [cl, cr, cb] = p.crop.map((v) => v * k);
-    const shown = { x: left + cl, y: top, w: Math.max(0, w - cl - cr), h: Math.max(0, Math.abs(by - ay) - cb) };
+    const [cl, cr, cb, ct] = p.crop.map((v) => v * k);
+    const shown = { x: left + cl, y: top + ct, w: Math.max(0, w - cl - cr), h: Math.max(0, Math.abs(by - ay) - cb - ct) };
     ctx.save();
     ctx.globalAlpha = 0.7;
     ctx.fillStyle = p.color;

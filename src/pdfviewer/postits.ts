@@ -36,13 +36,14 @@
 // store (`set`) doesn't overwrite it.
 import { whenPenRested } from "../lib/penActivity";
 import {
-  isCropped, lastPostItColor, POSTIT_GRIP, POSTIT_INK, POSTIT_PEN, POSTIT_SIZE, postItsOf, rememberPostItColor, type PostIt, type PostItSave,
+  isCropped, lastPostItColor, POSTIT_GRIP, restRect, POSTIT_INK, POSTIT_PEN, POSTIT_SIZE, postItsOf, rememberPostItColor, type PostIt, type PostItSave,
 } from "../lib/postits";
 import type { Annotation } from "../lib/highlights";
 import { inkSortIndex } from "./ink/geometry";
-import { dragCorner, showCrop } from "./postitCrop";
+import { dragCorner, leastInsets, showCrop } from "./postitCrop";
 import { createPostItEditor, createPostItMenu } from "./postitEdit";
 import { createPostItPen, drawPostItInk, type PenTarget } from "./postitInk";
+import { dragPostIt } from "./postitMove";
 import type { PageRecord } from "./types";
 import type { PdfViewerOptions } from "./viewerOptions";
 
@@ -90,7 +91,8 @@ const DOUBLE_PX = 24;
 const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
 const sizeOf = (it: { rect: number[] }) => [it.rect[2] - it.rect[0], it.rect[3] - it.rect[1]];
 /** What a post-it shows, to tell whether it must be drawn again. */
-const sigOf = (it: Item) => JSON.stringify([it.pageIndex, it.rect, it.color, it.crop, it.text, it.strokes, it.editable]);
+const sigOf = (it: Item) =>
+  JSON.stringify([it.pageIndex, it.rect, it.color, it.crop, it.shift, it.text, it.strokes, it.editable]);
 
 export function createPostIts(env: PostItsEnv) {
   const { scrollArea } = env;
@@ -146,8 +148,7 @@ export function createPostIts(env: PostItsEnv) {
       `<svg class="pdf-postit-ink" preserveAspectRatio="none" fill="none" stroke="${POSTIT_INK}" stroke-width="${POSTIT_PEN}" ` +
       `stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"></svg>` +
       `<div class="pdf-postit-hint">Write here, or double-tap to type</div></div>` +
-      `<div class="pdf-postit-corner l" title="Drag to pare the post-it down"></div>` +
-      `<div class="pdf-postit-corner r" title="Drag to pare the post-it down"></div>`;
+      ["t l", "t r", "b l", "b r"].map((c) => `<div class="pdf-postit-corner ${c}" title="Drag to pare the post-it down"></div>`).join("");
     sizer.observe(el);
     return el;
   }
@@ -164,7 +165,8 @@ export function createPostIts(env: PostItsEnv) {
     if (sig === it.sig) return;
     it.sig = sig;
     el.style.setProperty("--postit-color", it.color);
-    showCrop(el, it.crop);
+    showCrop(el, it.crop, it.shift);
+    el.classList.toggle("cropped", isCropped(it.crop));
     el.classList.toggle("readonly", !it.editable);
     el.classList.toggle("empty", !it.text.trim() && !it.strokes.length);
     el.querySelector(".pdf-postit-text")!.textContent = it.text;
@@ -199,7 +201,7 @@ export function createPostIts(env: PostItsEnv) {
     if (!it || !writer || !it.editable) return;
     const keys = writer.save({
       id: it.id, pageIndex: it.pageIndex, pageLabel: it.pageLabel, sortIndex: it.sortIndex,
-      rect: it.rect, color: it.color, crop: it.crop, text: it.text, strokes: it.strokes, textKey: it.textKey, inkKeys: it.inkKeys,
+      rect: it.rect, color: it.color, crop: it.crop, shift: it.shift, text: it.text, strokes: it.strokes, textKey: it.textKey, inkKeys: it.inkKeys,
     });
     it.textKey = keys.textKey;
     it.inkKeys = keys.inkKeys;
@@ -338,7 +340,7 @@ export function createPostIts(env: PostItsEnv) {
     if (!rect || !p || !writer) return;
     const id = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 7)}`;
     const it: Item = {
-      id, attKey: "", pageIndex: idx, rect, color: lastPostItColor(), crop: [0, 0, 0], text: "", strokes: [],
+      id, attKey: "", pageIndex: idx, rect, color: lastPostItColor(), crop: [0, 0, 0, 0], shift: [0, 0], text: "", strokes: [],
       pageLabel: env.getPageLabels()?.[idx] || String(idx + 1), sortIndex: sortIndexOf(p, idx, rect),
       textKey: null, inkKeys: [], parts: [], editable: true, dirty: true,
     };
@@ -366,13 +368,18 @@ export function createPostIts(env: PostItsEnv) {
     const sel = window.getSelection();
     if (sel && !sel.isCollapsed && sel.anchorNode && scrollArea.contains(sel.anchorNode)) sel.removeAllRanges();
     const corner = (e.target as Element).closest<HTMLElement>(".pdf-postit-corner");
-    if (corner) {
+    const p = env.getPages()[it.pageIndex];
+    if (corner && p) {
       const [w, h] = sizeOf(it);
-      return dragCorner({ el, w, h, crop: it.crop }, e, corner.classList.contains("l") ? "l" : "r", (crop) => {
+      const which = { top: corner.classList.contains("t"), left: corner.classList.contains("l") };
+      // What shows stays on the page, the paper at its rest place.
+      const least = leastInsets(restRect(it.rect, it.shift), p.viewport.viewBox);
+      return dragCorner({ el, w, h, crop: it.crop }, e, which, least, it.shift, (crop) => {
         const cur = items.get(it.id);
         if (!cur) return;
         cur.crop = crop;
         cur.sig = sigOf(cur);
+        el.classList.toggle("cropped", isCropped(crop));
         changed(cur);
       });
     }
@@ -380,8 +387,16 @@ export function createPostIts(env: PostItsEnv) {
     // --grip-reach), where the Pencil and the mouse still write.
     const band = el.getBoundingClientRect().top + (el.clientWidth / sizeOf(it)[0]) * POSTIT_GRIP;
     if ((e.target as Element).closest(".pdf-postit-grip") && (e.pointerType === "touch" || e.clientY <= band + 1)) return grab(it, e);
-    if (e.pointerType === "touch") return watchTap(it, e);
+    // Pared down at rest, a press on it opens it: whole, in its page
+    // (a finger's tap; the Pencil's or the mouse's press), writing nothing.
+    const closed = isCropped(it.crop) && openId !== it.id;
+    if (e.pointerType === "touch") return watchTap(it, e, closed);
     e.preventDefault();
+    if (closed) {
+      openIt(it);
+      if (e.pointerType === "mouse") lastTap = { id: it.id, t: performance.now(), x: e.clientX, y: e.clientY };
+      return;
+    }
     // A double-click types; a click, or a drag, writes.
     const now = performance.now();
     if (e.pointerType === "mouse" && lastTap?.id === it.id && now - lastTap.t < DOUBLE_MS && Math.hypot(e.clientX - lastTap.x, e.clientY - lastTap.y) < DOUBLE_PX) {
@@ -413,8 +428,9 @@ export function createPostIts(env: PostItsEnv) {
     };
   }
 
-  /** A finger on the paper: a tap, and a second within DOUBLE_MS, types. */
-  function watchTap(it: Item, e: PointerEvent): void {
+  /** A finger on the paper: a tap, and a second within DOUBLE_MS, types;
+   *  a tap on one pared down at rest (`closed`) opens it. */
+  function watchTap(it: Item, e: PointerEvent, closed: boolean): void {
     const x0 = e.clientX;
     const y0 = e.clientY;
     const t0 = performance.now();
@@ -428,105 +444,121 @@ export function createPostIts(env: PostItsEnv) {
         lastTap = null;
         ev.preventDefault();
         type(it);
-      } else lastTap = { id: it.id, t: now, x: ev.clientX, y: ev.clientY };
+      } else {
+        lastTap = { id: it.id, t: now, x: ev.clientX, y: ev.clientY };
+        if (closed) openIt(it);
+      }
     };
     window.addEventListener("pointerup", up, true);
     window.addEventListener("pointercancel", up, true);
   }
 
-  /** The grip: a drag moves the post-it about its page, a tap opens its
-   *  menu. */
+  /** The grip: a drag moves the post-it about its page (postitMove.ts),
+   *  a tap opens its menu. */
   function grab(it: Item, e: PointerEvent): void {
-    e.preventDefault();
     pen.settle();
     const el = it.el!;
-    const page = el.parentElement?.parentElement;
     const p = env.getPages()[it.pageIndex];
-    if (!page || !p) return;
-    const pr = page.getBoundingClientRect();
-    const f = frac(it, p);
-    const x0 = e.clientX;
-    const y0 = e.clientY;
-    let moved = false;
-    let at = { l: f.l, t: f.t };
+    if (!p) return;
     dragging = it.id;
-    const move = (ev: PointerEvent) => {
-      if (ev.pointerId !== e.pointerId) return;
-      moved ||= Math.hypot(ev.clientX - x0, ev.clientY - y0) > 4;
-      if (!moved) return;
-      ev.preventDefault();
-      at = {
-        l: clamp(f.l + (ev.clientX - x0) / pr.width, 0, 1 - f.w),
-        t: clamp(f.t + (ev.clientY - y0) / pr.height, 0, 1 - f.h),
-      };
-      el.style.left = `${at.l * 100}%`;
-      el.style.top = `${at.t * 100}%`;
-      el.classList.add("dragging");
-    };
-    const up = (ev: PointerEvent) => {
-      if (ev.pointerId !== e.pointerId) return;
-      window.removeEventListener("pointermove", move, true);
-      window.removeEventListener("pointerup", up, true);
-      window.removeEventListener("pointercancel", up, true);
-      el.classList.remove("dragging");
+    const whole = !isCropped(it.crop) || openId === it.id;
+    dragPostIt({ el, rect: it.rect, shift: it.shift, crop: it.crop, whole }, e, p.viewport.viewBox, (to, ev) => {
       dragging = null;
       eatClickUntil = performance.now() + 700;
-      if (moved) {
-        const [w, h] = sizeOf(it);
-        const [x, y] = p.viewport.convertToPdfPoint(at.l * p.viewport.width, at.t * p.viewport.height);
-        it.rect = [x, y - h, x + w, y];
-        it.sortIndex = sortIndexOf(p, it.pageIndex, it.rect);
-        it.sig = sigOf(it);
-        return changed(it);
+      const cur = items.get(it.id);
+      if (!cur) return;
+      if (to) {
+        cur.rect = to.rect;
+        cur.shift = to.shift;
+        cur.sortIndex = sortIndexOf(p, cur.pageIndex, cur.rect);
+        draw(cur);
+        return changed(cur);
       }
-      if (ev.type !== "pointerup") return;
-      if (menu.isOpen()) return menu.close();
-      // The post-it as it is when a choice is made: the copy the store
-      // sends back may have taken this one's place meanwhile.
-      const now = () => items.get(it.id);
-      menu.open({
-        anchor: el,
-        color: it.color,
-        setColor: (c) => {
-          const cur = now();
-          rememberPostItColor(c);
-          if (!cur) return;
-          cur.color = c;
-          draw(cur);
-          changed(cur);
-        },
-        type: () => {
-          const cur = now();
-          if (cur) type(cur);
-        },
-        uncrop: isCropped(it.crop)
-          ? () => {
-              const cur = now();
-              if (!cur) return;
-              cur.crop = [0, 0, 0];
-              draw(cur);
-              changed(cur);
-            }
-          : undefined,
-        remove: () => {
-          editor.commit();
-          const cur = now();
-          if (!cur) return;
-          drop(cur);
-          waiting.delete(cur.id);
-          writer?.remove(cur);
-        },
-      });
-    };
-    window.addEventListener("pointermove", move, true);
-    window.addEventListener("pointerup", up, true);
-    window.addEventListener("pointercancel", up, true);
+      if (ev.type === "pointerup") openMenu(cur, el);
+    });
   }
 
-  /** Type on a post-it. */
+  function openMenu(it: Item, el: HTMLElement): void {
+    if (menu.isOpen()) return menu.close();
+    // The post-it as it is when a choice is made: the copy the store
+    // sends back may have taken this one's place meanwhile.
+    const now = () => items.get(it.id);
+    menu.open({
+      anchor: el,
+      color: it.color,
+      setColor: (c) => {
+        const cur = now();
+        rememberPostItColor(c);
+        if (!cur) return;
+        cur.color = c;
+        draw(cur);
+        changed(cur);
+      },
+      type: () => {
+        const cur = now();
+        if (cur) type(cur);
+      },
+      uncrop: isCropped(it.crop)
+        ? () => {
+            const cur = now();
+            if (!cur) return;
+            if (openId === cur.id) closeIt();
+            cur.crop = [0, 0, 0, 0];
+            cur.shift = [0, 0];
+            draw(cur);
+            changed(cur);
+          }
+        : undefined,
+      remove: () => {
+        editor.commit();
+        const cur = now();
+        if (!cur) return;
+        if (openId === cur.id) closeIt();
+        drop(cur);
+        waiting.delete(cur.id);
+        writer?.remove(cur);
+      },
+    });
+  }
+
+  // --- open and closed ---------------------------------------------------------
+  // A post-it pared down at rest opens — whole, slid into its page — at a
+  // press on it, or to be typed on; a press anywhere else, or Escape,
+  // closes it again, back to its rest place and its crop.
+  let openId: string | null = null;
+
+  function openIt(it: Item): void {
+    if (!isCropped(it.crop) || openId === it.id) return;
+    closeIt();
+    openId = it.id;
+    it.el?.classList.add("open");
+  }
+  function closeIt(): void {
+    const id = openId;
+    if (!id) return;
+    openId = null;
+    editor.commit();
+    items.get(id)?.el?.classList.remove("open");
+  }
+  function onAnyDown(e: PointerEvent): void {
+    if (!openId) return;
+    const t = e.target as Element;
+    if (t.closest?.(`.pdf-postit-menu, .pdf-postit[data-postit-id="${CSS.escape(openId)}"]`)) return;
+    closeIt();
+  }
+  function onKey(e: KeyboardEvent): void {
+    if (e.key !== "Escape" || !openId || e.defaultPrevented || editor.isOpen() || menu.isOpen()) return;
+    // Before reading mode's own Escape, which would leave it.
+    e.preventDefault();
+    e.stopPropagation();
+    closeIt();
+  }
+
+  /** Type on a post-it (opened first, when it is pared down). */
   function type(it: Item): void {
     pen.settle();
     if (!it.el) return;
+    openIt(it);
     editor.begin({
       id: it.id,
       el: it.el,
@@ -569,6 +601,8 @@ export function createPostIts(env: PostItsEnv) {
   scrollArea.addEventListener("pointerdown", onDown, true);
   scrollArea.addEventListener("click", onClick, true);
   document.addEventListener("visibilitychange", onHidden);
+  window.addEventListener("pointerdown", onAnyDown, true);
+  window.addEventListener("keydown", onKey, true);
 
   return {
     /** The PDF's post-its, from its annotations. One being worked on, or
@@ -609,6 +643,8 @@ export function createPostIts(env: PostItsEnv) {
       scrollArea.removeEventListener("pointerdown", onDown, true);
       scrollArea.removeEventListener("click", onClick, true);
       document.removeEventListener("visibilitychange", onHidden);
+      window.removeEventListener("pointerdown", onAnyDown, true);
+      window.removeEventListener("keydown", onKey, true);
     },
   };
 }

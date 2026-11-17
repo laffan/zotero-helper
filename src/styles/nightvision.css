@@ -23,37 +23,39 @@
 /* The colours look alike in night vision, so each colour dot shows its
    letter (colorLetter, lib/highlights.ts): the selection bar's and the
    highlight editor's dots, the pen's, the Highlights tab's filters and
-   reading mode's pen colours. The letter is sized to its dot, which the
-   UI font size doesn't change, so it follows the font size only a
-   little way. */
+   reading mode's pen colours (gray has none: its attribute is empty).
+   The letter is small, sized to its dot, which the UI font size doesn't
+   change, so it follows the font size only a little way. */
 html.night-vision .hl-swatch[data-letter] {
   position: relative;
 }
-html.night-vision :is(.pdf-mark-swatch, .hl-swatch)[data-letter]::before,
-html.night-vision .reading-mode-pen-color[data-letter]::after {
+html.night-vision :is(.pdf-mark-swatch, .hl-swatch)[data-letter]:not([data-letter=""])::before,
+html.night-vision .reading-mode-pen-color[data-letter]:not([data-letter=""])::after {
   content: attr(data-letter);
+  /* The letter's box trimmed to the capital itself (cap height to
+     baseline), then its middle put on the dot's: the capital is centred
+     whatever the font's ascent and descent. */
   position: absolute;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: calc(8.5px * min(var(--font-scale), 1.1));
+  top: 50%;
+  left: 0;
+  right: 0;
+  display: block;
+  transform: translateY(-50%);
+  text-box: trim-both cap alphabetic;
+  text-align: center;
+  font-size: calc(5.1px * min(var(--font-scale), 1.1));
   font-weight: 700;
   line-height: 1;
-  letter-spacing: -0.02em;
-  /* A capital's box is mostly above its baseline: down a touch to look
-     centred in the dot. */
-  padding-top: 0.12em;
   color: #000;
   pointer-events: none;
 }
 html.night-vision .reading-mode-pen-color[data-letter]::after {
-  font-size: calc(12px * min(var(--font-scale), 1.1));
+  font-size: calc(7.2px * min(var(--font-scale), 1.1));
 }
 /* Underlining, the dot is a bar under an empty square: the letter sits
    above the bar in the text's colour. */
 html.night-vision .pdf-selection-bar.underline .pdf-mark-swatch[data-letter]::before {
-  bottom: 4px;
+  top: calc(50% - 1.5px);
   color: var(--text);
 }
 

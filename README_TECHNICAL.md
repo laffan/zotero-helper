@@ -334,14 +334,16 @@ Reading mode hides the header, so it is turned on or off outside it.
 
 **Telling the colours apart.** In red alone the highlight colours look
 alike, so while night vision is on each colour carries a letter
-(`colorLetter`, `src/lib/highlights.ts`): Y, R, G, B, P, M (magenta),
-O, and Gy for gray, since G is green's; a colour another client chose
-takes the letter of the nearest of Zotero's. The colour dots show it —
+(`colorLetter`, `src/lib/highlights.ts`): Y, R, G, B, P, M (magenta)
+and O; gray, whose G would be green's, has none and is left unmarked.
+A colour another client chose takes the letter of the nearest of
+Zotero's. The colour dots show it, small —
 the selection bar's and the highlight editor's, the pen's, the
 Highlights tab's filters and reading mode's pen colours — through a
 `data-letter` attribute and `nightvision.css` (`::before`, or `::after`
 where the dot itself is drawn by `::before`). On the pages each
-highlight and underline gets a tiny flag in its colour with its letter
+highlight and underline gets a tiny flag in its colour with its letter,
+60% of its line's height and centred on it
 (`src/pdfviewer/colorFlags.ts`, run through `annotating.ts`): an SVG on
 a layer over the page wrapper in percentages of the page, like the
 passage marks, so it follows every zoom and its letter scales with it.

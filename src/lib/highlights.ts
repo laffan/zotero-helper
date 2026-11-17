@@ -55,7 +55,8 @@ export const ANNOTATION_COLORS: ReadonlyArray<string> = [
 /** Each colour's letter, for night vision (lib/nightVision.ts), where
  *  the app is drawn in red alone and the colours look alike: shown in
  *  the colour dots and on a flag by each highlight (colorFlags.ts). The
- *  first letter; gray takes two, since G is green's. */
+ *  first letter; gray has none (G is green's), so its dot and its
+ *  highlights stay unmarked. */
 const COLOR_LETTERS: Record<string, string> = {
   "#ffd400": "Y",
   "#ff6666": "R",
@@ -64,11 +65,11 @@ const COLOR_LETTERS: Record<string, string> = {
   "#a28ae5": "P",
   "#e56eee": "M",
   "#f19837": "O",
-  "#aaaaaa": "Gy",
+  "#aaaaaa": "",
 };
 
 /** The letter of `color` — one of Zotero's, or else the nearest of
- *  them (a colour another client chose). */
+ *  them (a colour another client chose); "" for gray. */
 export function colorLetter(color: string): string {
   const c = color.toLowerCase();
   if (COLOR_LETTERS[c]) return COLOR_LETTERS[c];

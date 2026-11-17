@@ -2,8 +2,9 @@
 // whole app is drawn in shades of red, and the highlight colours —
 // told apart by hue — look alike. So while it is on, each highlight and
 // underline on a page gets a tiny flag in its colour carrying the
-// colour's letter (`colorLetter`: Y, R, G, B, P, M, O, Gy — the same
-// letters the colour dots show then).
+// colour's letter (`colorLetter`: Y, R, G, B, P, M, O — the same
+// letters the colour dots show then). Gray has no letter, and no flag.
+// A flag is 60% of its line's height, centred on it.
 //
 // A flag is kept off the text where it can be. It is attached where the
 // passage meets a line break, so it lies in the margin or a column's
@@ -48,6 +49,8 @@ interface Box {
 type Quad = number[];
 
 const LAYER = "pdf-color-flags";
+/** A flag's height, as a share of its line's. */
+const FLAG = 0.6;
 const SVG = "http://www.w3.org/2000/svg";
 
 const nightVisionOn = () => document.documentElement.classList.contains("night-vision");
@@ -130,9 +133,9 @@ function quadOf(it: { transform?: number[]; width?: number; height?: number; str
 }
 
 function flagEl(f: Box, side: "left" | "right", color: string, letter: string, vp: PageViewport): SVGSVGElement {
-  // A tab 10 units high, 8 wide for one letter (11 for two), square on
-  // the side it is attached by and rounded on the other.
-  const vw = letter.length > 1 ? 11 : 8;
+  // A tab 10 units high and 8 wide, square on the side it is attached
+  // by and rounded on the other.
+  const vw = 8;
   const svg = document.createElementNS(SVG, "svg");
   svg.setAttribute("class", `pdf-color-flag pdf-color-flag-${side}`);
   svg.setAttribute("viewBox", `0 0 ${vw} 10`);
@@ -212,6 +215,7 @@ export function createColorFlags(env: ColorFlagsEnv) {
       if (!lines.length) continue;
       const color = a.color || "#ffd400";
       const letter = colorLetter(color);
+      if (!letter) continue;
       const runs = lines.map((l) => runOf(l, text));
       const tol = (l: Box) => 0.25 * l.h;
       let at = lines.findIndex((l, i) => runs[i].start >= l.x - tol(l));
@@ -221,11 +225,12 @@ export function createColorFlags(env: ColorFlagsEnv) {
         if (at >= 0) side = "right";
       }
       const line = lines[Math.max(0, at)];
-      const h = line.h;
-      const w = h * (letter.length > 1 ? 1.1 : 0.8);
-      const gap = 0.08 * h;
+      const h = FLAG * line.h;
+      const w = 0.8 * h;
+      const gap = 0.08 * line.h;
       const edge = at < 0 ? runs[0].start : line.x;
-      const f: Box = { x: side === "left" ? edge - gap - w : line.x + line.w + gap, y: line.y, w, h };
+      const y = line.y + (line.h - h) / 2;
+      const f: Box = { x: side === "left" ? edge - gap - w : line.x + line.w + gap, y, w, h };
       // Apart from the flags already placed, outwards along the line.
       for (let n = 0; n < 8 && placed.some((q) => meets(q, f)); n++) f.x += (side === "left" ? -1 : 1) * (w + gap);
       f.x = Math.min(Math.max(0, f.x), vp.width - w);

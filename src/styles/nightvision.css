@@ -24,11 +24,23 @@
    letter (colorLetter, lib/highlights.ts): the selection bar's and the
    highlight editor's dots, the pen's, the Highlights tab's filters and
    reading mode's pen colours (gray has none: its attribute is empty).
-   White, for contrast. The letter is sized to its dot, which the UI
-   font size doesn't change, so it follows the font size only a little
-   way. */
+   White, but black on yellow and orange, which night vision draws
+   nearly as bright as white: under it every colour is a shade of red,
+   and that is the higher contrast for each (yellow 3.6:1 black against
+   1.4:1 white; the others 2.3–2.6:1). The letter is sized to its dot,
+   which the UI font size doesn't change, so it follows the font size
+   only a little way. Always fully opaque: the Highlights tab's filters
+   fade the colours not chosen with `opacity`, which would fade the
+   letter with them, so here they fade the colour alone. */
 html.night-vision .hl-swatch[data-letter] {
   position: relative;
+}
+html.night-vision .hl-swatch[data-letter]:not([data-letter=""]):not(.active) {
+  opacity: 1;
+  background-color: color-mix(in srgb, var(--swatch) 55%, transparent) !important;
+}
+html.night-vision .hl-swatch[data-letter]:not([data-letter=""]):not(.active):hover {
+  background-color: color-mix(in srgb, var(--swatch) 85%, transparent) !important;
 }
 html.night-vision :is(.pdf-mark-swatch, .hl-swatch)[data-letter]:not([data-letter=""])::before,
 html.night-vision .reading-mode-pen-color[data-letter]:not([data-letter=""])::after {
@@ -53,10 +65,32 @@ html.night-vision .reading-mode-pen-color[data-letter]:not([data-letter=""])::af
 html.night-vision .reading-mode-pen-color[data-letter]::after {
   font-size: calc(10.2px * min(var(--font-scale), 1.1));
 }
+/* As specific as the rule above and then some, so it wins. */
+html.night-vision :is(.pdf-mark-swatch, .hl-swatch)[data-letter]:not([data-letter=""]):is([data-letter="Y"], [data-letter="O"])::before,
+html.night-vision .reading-mode-pen-color[data-letter]:not([data-letter=""]):is([data-letter="Y"], [data-letter="O"])::after {
+  color: #000;
+}
+/* A filter not chosen is faded towards the panel behind it, so its
+   letter takes the colour that stands out against the panel instead:
+   white in the dark theme (2.7–3.6:1 against 1.5–2.0:1 for black), black
+   in the light one (3.0–4.1:1 against 1.3–1.8:1), whatever the colour.
+   The theme is read as tokens.css reads it. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --nv-faded-letter: #fff;
+  }
+}
+:root[data-theme="dark"] {
+  --nv-faded-letter: #fff;
+}
+html.night-vision .hl-swatch.hl-swatch[data-letter]:not([data-letter=""]):not(.active)::before {
+  color: var(--nv-faded-letter, #000);
+}
 /* Underlining, the dot is a bar under an empty square: the letter sits
-   above the bar. */
-html.night-vision .pdf-selection-bar.underline .pdf-mark-swatch[data-letter]::before {
+   above the bar, on the bar's own background, in the text's colour. */
+html.night-vision .pdf-selection-bar.underline .pdf-mark-swatch[data-letter]:not([data-letter=""])::before {
   top: calc(50% - 1.5px);
+  color: var(--text);
 }
 
 /* Each highlight's flag on the page (pdfviewer/colorFlags.ts): only in
@@ -64,9 +98,10 @@ html.night-vision .pdf-selection-bar.underline .pdf-mark-swatch[data-letter]::be
    by this rule besides. A plain tab of the highlight's colour, the
    height of its line, with the letter in it. Sizes come from the line's
    height (`--lh`, page units) times the layer's CSS px per page unit
-   (`--fk`), so they follow the zoom: the letter, white, 0.444 of the
-   line plus 2px (never under 6px), and 0.085 of it plus a pixel each
-   side (colorFlags.ts's LETTER and ROOM). */
+   (`--fk`), so they follow the zoom: the letter, white (black on yellow
+   and orange, as in the dots), 0.444 of the line plus 2px (never under
+   6px), and 0.085 of it plus a pixel each side (colorFlags.ts's LETTER
+   and ROOM). */
 .pdf-color-flags {
   display: none;
 }
@@ -90,6 +125,9 @@ html.night-vision .pdf-color-flags {
   font-size: max(calc(var(--fk, 1px) * var(--lh) * 0.444 + 2px), 6px);
   font-weight: 700;
   line-height: 1;
+}
+.pdf-color-flag:is([data-letter="Y"], [data-letter="O"]) {
+  color: #000;
 }
 /* Trimmed to the capital, so centring it centres the letter (as in the
    dots above). */

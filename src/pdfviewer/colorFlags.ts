@@ -151,6 +151,7 @@ function flagEl(f: Box, lineH: number, side: "left" | "right", color: string, le
   el.style.height = `${(f.h / vp.height) * 100}%`;
   el.style.setProperty("--lh", String(lineH));
   el.style.setProperty("--flag", color);
+  el.dataset.letter = letter;
   const span = document.createElement("span");
   span.textContent = letter;
   el.appendChild(span);

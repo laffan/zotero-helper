@@ -337,7 +337,14 @@ alike, so while night vision is on each colour carries a letter
 (`colorLetter`, `src/lib/highlights.ts`): Y, R, G, B, P, M (magenta)
 and O; gray, whose G would be green's, has none and is left unmarked.
 A colour another client chose takes the letter of the nearest of
-Zotero's. The colour dots show it, small —
+Zotero's. The letters are white, but black on yellow and orange, which
+night vision draws nearly as bright as white (the higher contrast for
+each colour once all are shades of red), and always fully opaque: in
+the Highlights tab's filters a colour not chosen is faded in its fill
+rather than with `opacity`, which would fade its letter too, and its
+letter is white in the dark theme and black in the light one, whichever
+stands out against the panel it is faded towards. The colour
+dots show it —
 the selection bar's and the highlight editor's, the pen's, the
 Highlights tab's filters and reading mode's pen colours — through a
 `data-letter` attribute and `nightvision.css` (`::before`, or `::after`

@@ -60,7 +60,7 @@ export function ColorSwatches({ filter, row = false }: { filter: HighlightFilter
         <button
           key={c}
           className={`hl-swatch ${active.includes(c) ? "active" : ""}`}
-          style={{ backgroundColor: c }}
+          style={{ backgroundColor: c, "--swatch": c } as React.CSSProperties}
           data-letter={colorLetter(c)}
           onClick={(e) => pick(c, e)}
           title="Only this colour (⌘-click to pick several)"

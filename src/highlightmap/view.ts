@@ -17,7 +17,8 @@
 // `show` glides (350ms, easing out — the pad's follow.ts) to put a card
 // in the middle of the view: the search's way round its matches. It
 // keeps the zoom, unless the card wouldn't be readable (below
-// READABLE_Z) or wouldn't fit.
+// READABLE_Z) or wouldn't fit. With the notepad over the canvas's
+// right, the middle is the middle of what it leaves.
 
 export interface MapView {
   x: number;
@@ -29,6 +30,10 @@ export interface MapViewEnv {
   /** The view moved; `done` once a gesture, a wheel's burst or a glide
    *  is over — the view to keep. */
   moved: (v: MapView, done: boolean) => void;
+  /** How much of the canvas's right is covered (the notepad over it,
+   *  MapNotepad.tsx), px: what is kept in view, fitted and shown keeps
+   *  to the rest. */
+  covered?: () => number;
 }
 
 const MIN_Z = 0.05;
@@ -69,6 +74,8 @@ export function createMapView(host: HTMLElement, layer: HTMLElement, env: MapVie
   // The layer's own size (a transform doesn't change it), kept by a
   // ResizeObserver so a pan reads no layout.
   let size = { w: layer.offsetWidth, h: layer.offsetHeight };
+  /** The width of the canvas left uncovered. */
+  const shownW = () => Math.max(0, host.clientWidth - (env.covered?.() ?? 0));
 
   let frame = 0;
   const paint = () => {
@@ -81,7 +88,7 @@ export function createMapView(host: HTMLElement, layer: HTMLElement, env: MapVie
   };
   /** Some of the map stays in view, wherever it is pushed. */
   const keep = (n: MapView): MapView => {
-    const W = host.clientWidth;
+    const W = shownW();
     const H = host.clientHeight;
     // Folded away, there is no view to keep anything in.
     if (!W || !H) return n;
@@ -273,7 +280,7 @@ export function createMapView(host: HTMLElement, layer: HTMLElement, env: MapVie
 
   /** The view that fits the whole map, centred (never past 100%). */
   const fitted = (): MapView => {
-    const W = host.clientWidth;
+    const W = shownW();
     const H = host.clientHeight;
     const z = clampZ(Math.min(1, (W - 2 * MARGIN) / Math.max(1, size.w), (H - 2 * MARGIN) / Math.max(1, size.h)));
     return { z, x: (W - size.w * z) / 2, y: Math.max(MARGIN, (H - size.h * z) / 2) };
@@ -290,7 +297,7 @@ export function createMapView(host: HTMLElement, layer: HTMLElement, env: MapVie
     /** A first look: the map's top left, as wide as fits in [50%, 100%]. */
     home(): void {
       size = { w: layer.offsetWidth, h: layer.offsetHeight };
-      const z = clampZ(Math.min(1, Math.max(0.5, (host.clientWidth - 2 * MARGIN) / Math.max(1, size.w))));
+      const z = clampZ(Math.min(1, Math.max(0.5, (shownW() - 2 * MARGIN) / Math.max(1, size.w))));
       // Kept only once there is a view to have looked at.
       apply({ z, x: MARGIN, y: MARGIN }, host.clientWidth > 0);
     },
@@ -298,7 +305,7 @@ export function createMapView(host: HTMLElement, layer: HTMLElement, env: MapVie
     /** Zoom by `f` about the view's middle (the bar's − and +), or to
      *  100% (`f` null). */
     zoom(f: number | null): void {
-      const W = host.clientWidth / 2;
+      const W = shownW() / 2;
       const H = host.clientHeight / 2;
       const z = clampZ(f === null ? 1 : v.z * f);
       const mx = (W - v.x) / v.z;
@@ -313,7 +320,7 @@ export function createMapView(host: HTMLElement, layer: HTMLElement, env: MapVie
       const h = r.height / v.z;
       const x0 = (r.left - lr.left) / v.z;
       const y0 = (r.top - lr.top) / v.z;
-      const W = host.clientWidth;
+      const W = shownW();
       const H = host.clientHeight;
       let z = v.z < READABLE_Z ? 1 : v.z;
       z = clampZ(Math.min(z, (W - 2 * MARGIN) / Math.max(1, w)));

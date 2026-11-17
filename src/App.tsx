@@ -27,6 +27,9 @@ import { Terminal } from "./components/Terminal";
 import { Toolbar } from "./components/Toolbar";
 import { TaskTray } from "./components/TaskTray";
 
+/** A pane edge's width (base.css's .pane-resizer). */
+const RESIZER_PX = 5;
+
 function PaneResizer({ side }: { side: "left" | "right" }) {
   const { leftWidth, rightWidth, notesWidth, setPaneSizes, setNotesWidth } = useStore();
   const reading = useStore((s) => s.reading);
@@ -34,7 +37,7 @@ function PaneResizer({ side }: { side: "left" | "right" }) {
   const start = (e: React.PointerEvent) => {
     const startX = e.clientX;
     // While taking notes the right edge resizes the notes, which may
-    // take up to two thirds of the window.
+    // take the whole window but the edge itself, to drag them back by.
     const notes = side === "right" && reading !== null;
     const startW = side === "left" ? leftWidth : notes ? notesWidth : rightWidth;
     trackPointerDrag(e, (ev) => {
@@ -42,7 +45,7 @@ function PaneResizer({ side }: { side: "left" | "right" }) {
       if (side === "left") {
         setPaneSizes({ leftWidth: Math.min(420, Math.max(150, startW + delta)) });
       } else if (notes) {
-        setNotesWidth(Math.min(window.innerWidth * 0.66, Math.max(260, startW - delta)));
+        setNotesWidth(Math.min(window.innerWidth - RESIZER_PX, Math.max(260, startW - delta)));
       } else {
         setPaneSizes({ rightWidth: Math.min(520, Math.max(200, startW - delta)) });
       }

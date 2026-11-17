@@ -95,13 +95,14 @@ export function HighlightsPanel({ items, map = false }: { items: ZItem[]; map?: 
       {syncing ? <Spinner size={13} /> : <Refresh size={14} />}
     </button>
   );
-  /** "12 highlights · 2 bookmarks", or how many of them `shown` are. */
-  const countLabel = (shown: number, narrowed: string) =>
+  /** The list's count: "12 highlights · 2 bookmarks", or how many of
+   *  them `shown` are. (The map's bar has View Notepad in its place.) */
+  const countLabel = (shown: number) =>
     shown === all.length
       ? `${all.length - marks} ${all.length - marks === 1 ? "highlight" : "highlights"}${
           marks > 0 ? ` · ${marks} bookmark${marks === 1 ? "" : "s"}` : ""
         }`
-      : `${shown} of ${all.length} ${narrowed}`;
+      : `${shown} of ${all.length} shown`;
 
   if (map) {
     return (
@@ -112,7 +113,6 @@ export function HighlightsPanel({ items, map = false }: { items: ZItem[]; map?: 
         query={query}
         setQuery={setQuery}
         filter={filter}
-        count={countLabel(all.filter(filter.passes).length, "picked")}
         sync={sync}
         canAdd={canAdd}
         openAttKey={openAttKey}
@@ -169,7 +169,7 @@ export function HighlightsPanel({ items, map = false }: { items: ZItem[]; map?: 
       empty={visible.length === 0}
       head={
         <div className="hl-head">
-          <span className="hl-count">{countLabel(shown, "shown")}</span>
+          <span className="hl-count">{countLabel(shown)}</span>
           {sync}
         </div>
       }

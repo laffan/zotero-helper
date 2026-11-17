@@ -1,7 +1,8 @@
 // A view of a PDF's notepad (src/notepad/): a slim toolbar over the
 // canvas, the two one surface — reading mode's floating pad
-// (ReadingNotepad.tsx) and the notes pane's lower half (NotesPanel.tsx)
-// are both this, sharing one pad.
+// (ReadingNotepad.tsx), the notes pane's lower half (NotesPanel.tsx) and
+// the pane over the Highlight Map (MapNotepad.tsx) are all this, sharing
+// one pad.
 //
 // The toolbar, from its left: the quote button and the scissors, then
 // the host's own tools (`tools` — reading mode's auto-shift), the map — a minimap of
@@ -9,8 +10,8 @@
 // remembered for each view) — and the scroll link (an arrow up and down
 // with two bars across it): while it is on the pad follows the PDF,
 // panning to the part about each page as the reader turns to it (off by
-// default in the floating pad, on under the notes; remembered for
-// each). At the right, just before undo, what the Pencil
+// default in the floating pad, on under the notes and over the map;
+// remembered for each). At the right, just before undo, what the Pencil
 // does, one switch of four parts — write in the theme's ink (black,
 // white in the dark theme), write in red, erase, or lasso; the colour
 // is this device's choice, shared by every view, and the eraser is
@@ -115,11 +116,14 @@ const UndoIcon = () => (
   </svg>
 );
 
+export type PadView = "floating" | "docked" | "map";
+
 export interface NotepadBodyProps {
   attKey: string;
   /** Which view this is: whether it follows the PDF is kept for each,
-   *  and starts off in the floating pad, on under the notes. */
-  kind: "floating" | "docked";
+   *  and starts off in the floating pad, on under the notes and over
+   *  the Highlight Map. */
+  kind: PadView;
   /** A press on the bar's empty middle (the host drags the pad by it). */
   onBarPointerDown?: (e: React.PointerEvent) => void;
   /** The host's own tools, after the bar's. */
@@ -152,7 +156,7 @@ function storedFlag(key: string, fallback: boolean): boolean {
     return fallback;
   }
 }
-const storedFollow = (kind: "floating" | "docked") => storedFlag(followKey(kind), kind === "docked");
+const storedFollow = (kind: PadView) => storedFlag(followKey(kind), kind !== "floating");
 
 /** A switch kept for each view. */
 function useFlag(key: string, fallback: boolean): [boolean, (on: boolean) => void] {
@@ -169,7 +173,7 @@ function useFlag(key: string, fallback: boolean): [boolean, (on: boolean) => voi
 }
 
 export function NotepadBody({ attKey, kind, onBarPointerDown, tools, trailing }: NotepadBodyProps) {
-  const [follow, setFollow] = useFlag(followKey(kind), kind === "docked");
+  const [follow, setFollow] = useFlag(followKey(kind), kind !== "floating");
   const [map, setMap] = useFlag(mapKey(kind), false);
   const [confirming, setConfirming] = useState(false);
   // The reader's page, and which visit to it this is.

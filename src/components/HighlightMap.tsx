@@ -6,20 +6,21 @@
 // (HighlightRow): a click goes to the highlight in the pages, and Copy,
 // Note and Zotero are on it as in the list.
 //
-// One bar over the canvas holds the count, the search, the colours and
-// ↻, the search and colours being the list's own (kept per PDF), so the
-// panel crosses between the two with the same ones. They work
-// differently here: the search doesn't narrow the map but goes round its
-// matches — the first as the words are typed, then Enter (or ›) the next
-// and ⇧Enter (or ‹) the one before, each glided to the middle of the
-// view and ringed; the colours dim the cards they leave out (and the
-// search steps over those). The view — pan and zoom — is the PDF's, kept
-// beside it (lib/readerUi.ts), and as it was left when the map comes
-// back.
+// One bar over the canvas holds View Notepad (the PDF's notepad, as a
+// pane over the map's right — MapNotepad.tsx), the search, the colours
+// and ↻, the search and colours being the list's own (kept per PDF), so
+// the panel crosses between the two with the same ones. They work
+// differently here: neither narrows the map, which keeps still; both
+// fade what they leave out. The search also goes round its matches —
+// the first as the words are typed, then Enter (or ›) the next and
+// ⇧Enter (or ‹) the one before, each glided to the middle of the view
+// and ringed — stepping over the cards the colours leave out. The view —
+// pan and zoom — is the PDF's, kept beside it (lib/readerUi.ts), and as
+// it was left when the map comes back.
 import { useLayoutEffect, useEffect, useRef, useState } from "react";
 import { dividerIdOf } from "../lib/dividers";
 import { attachmentName } from "../lib/collections";
-import { matchesQuery } from "../lib/highlights";
+import { matchesQuery, type Annotation } from "../lib/highlights";
 import type { Section } from "../lib/outline";
 import { lastUi, saveUi } from "../lib/recent";
 import { mapRows, type MapColumn, type MapRow } from "../highlightmap/layout";
@@ -29,6 +30,7 @@ import { ColorSwatches, type HighlightFilter } from "./HighlightFilters";
 import { HighlightRow, useRowHover } from "./HighlightRow";
 import type { HighlightGroup } from "./HighlightsPanel";
 import { ChevronDown, ChevronUp, FitIcon, MinusIcon, PlusIcon } from "./Icons";
+import { MapNotepadPane, MapNotepadToggle, useMapNotepad } from "./MapNotepad";
 import { goToReaderPosition } from "./ReaderPane";
 
 /** The pause in typing before the map goes to the first match, ms. */
@@ -43,7 +45,6 @@ interface Props {
   query: string;
   setQuery: (q: string) => void;
   filter: HighlightFilter;
-  count: string;
   /** The ↻ button. */
   sync: React.ReactNode;
   canAdd: boolean;
@@ -60,7 +61,8 @@ interface Ctx extends Props {
 }
 
 export function HighlightMap(props: Props) {
-  const { groups, sectionsFor, query, setQuery, filter, count, sync, openAttKey, setShownKey } = props;
+  const { groups, sectionsFor, query, setQuery, filter, sync, openAttKey, setShownKey } = props;
+  const pad = useMapNotepad();
   const hostRef = useRef<HTMLDivElement>(null);
   const layerRef = useRef<HTMLDivElement>(null);
   const zoomRef = useRef<HTMLButtonElement>(null);
@@ -98,6 +100,8 @@ export function HighlightMap(props: Props) {
           saveUi(openAttKey, { hlMap: { x: Math.round(v.x), y: Math.round(v.y), z: Math.round(v.z * 1000) / 1000 } });
         }
       },
+      // The notepad's pane, beside the canvas in the stage.
+      covered: () => host.parentElement?.querySelector<HTMLElement>(".hlmap-notepad")?.offsetWidth ?? 0,
     });
     const saved = openAttKey ? lastUi(openAttKey).hlMap : undefined;
     if (saved) view.set(saved);
@@ -138,7 +142,7 @@ export function HighlightMap(props: Props) {
   return (
     <div className="hl-panel hlmap">
       <div className="hlmap-bar">
-        <span className="hl-count">{count}</span>
+        {openAttKey && <MapNotepadToggle pad={pad} />}
         <div className="hlmap-search">
           <input
             className="hl-search"
@@ -167,32 +171,35 @@ export function HighlightMap(props: Props) {
         <ColorSwatches filter={filter} row />
         {sync}
       </div>
-      <div className="hlmap-canvas" ref={hostRef} onClick={bare} onPointerMove={hover} onPointerLeave={hover}>
-        <div className="hlmap-layer" ref={layerRef}>
-          {maps.every((m) => !m.rows.length) && <div className="meta-empty">Nothing to map.</div>}
-          {maps.map(({ g, rows }) => (
-            <section className="hlmap-pdf" key={g.att.key}>
-              {groups.length > 1 && <div className="hlmap-pdf-title">{attachmentName(g.att)}</div>}
-              {rows.map((r) => (
-                <RowView key={r.key} row={r} g={g} ctx={ctx} />
-              ))}
-            </section>
-          ))}
+      <div className="hlmap-stage">
+        <div className="hlmap-canvas" ref={hostRef} onClick={bare} onPointerMove={hover} onPointerLeave={hover}>
+          <div className="hlmap-layer" ref={layerRef}>
+            {maps.every((m) => !m.rows.length) && <div className="meta-empty">Nothing to map.</div>}
+            {maps.map(({ g, rows }) => (
+              <section className="hlmap-pdf" key={g.att.key}>
+                {groups.length > 1 && <div className="hlmap-pdf-title">{attachmentName(g.att)}</div>}
+                {rows.map((r) => (
+                  <RowView key={r.key} row={r} g={g} ctx={ctx} />
+                ))}
+              </section>
+            ))}
+          </div>
+          <div className="hlmap-controls">
+            <button className="icon-btn" onClick={() => viewRef.current?.zoom(1 / ZOOM_STEP)} title="Zoom out" aria-label="Zoom out">
+              <MinusIcon size={13} />
+            </button>
+            <button className="hlmap-zoom" ref={zoomRef} onClick={() => viewRef.current?.zoom(null)} title="Actual size">
+              100%
+            </button>
+            <button className="icon-btn" onClick={() => viewRef.current?.zoom(ZOOM_STEP)} title="Zoom in" aria-label="Zoom in">
+              <PlusIcon size={13} />
+            </button>
+            <button className="icon-btn" onClick={() => viewRef.current?.fit()} title="The whole map" aria-label="Fit the whole map">
+              <FitIcon size={13} />
+            </button>
+          </div>
         </div>
-        <div className="hlmap-controls">
-          <button className="icon-btn" onClick={() => viewRef.current?.zoom(1 / ZOOM_STEP)} title="Zoom out" aria-label="Zoom out">
-            <MinusIcon size={13} />
-          </button>
-          <button className="hlmap-zoom" ref={zoomRef} onClick={() => viewRef.current?.zoom(null)} title="Actual size">
-            100%
-          </button>
-          <button className="icon-btn" onClick={() => viewRef.current?.zoom(ZOOM_STEP)} title="Zoom in" aria-label="Zoom in">
-            <PlusIcon size={13} />
-          </button>
-          <button className="icon-btn" onClick={() => viewRef.current?.fit()} title="The whole map" aria-label="Fit the whole map">
-            <FitIcon size={13} />
-          </button>
-        </div>
+        {openAttKey && pad.open && <MapNotepadPane attKey={openAttKey} pad={pad} />}
       </div>
     </div>
   );
@@ -217,6 +224,9 @@ function RowView({ row, g, ctx }: { row: MapRow; g: HighlightGroup; ctx: Ctx }) 
 
 function ColumnView({ column, headed, g, ctx }: { column: MapColumn; headed: boolean; g: HighlightGroup; ctx: Ctx }) {
   const { q, canAdd, openAttKey, shownKey, setShownKey, filter, matches, current } = ctx;
+  // Faded: left out by the colours, or by the search (its matches are
+  // among what the colours keep).
+  const faded = (a: Annotation) => (q ? !matches.has(a.key) : !filter.passes(a));
   return (
     <div className="hlmap-column">
       {column.section ? (
@@ -231,7 +241,7 @@ function ColumnView({ column, headed, g, ctx }: { column: MapColumn; headed: boo
           <div
             key={it.entry.key}
             data-key={it.entry.key}
-            className={`hlmap-card ${filter.passes(it.entry) ? "" : "dim"} ${matches.has(it.entry.key) ? "match" : ""} ${
+            className={`hlmap-card ${faded(it.entry) ? "dim" : ""} ${matches.has(it.entry.key) ? "match" : ""} ${
               current === it.entry.key ? "current" : ""
             }`}
           >

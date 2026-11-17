@@ -3,7 +3,7 @@
    divided into). Its cards are the list's rows (tabs.css), given a
    ground of their own over the canvas's dot grid. */
 
-/* One bar: the count, the search and its matches, the colours, ↻. */
+/* One bar: View Notepad, the search and its matches, the colours, ↻. */
 .hlmap-bar {
   display: flex;
   align-items: center;
@@ -12,8 +12,32 @@
   padding: 8px 10px 8px 12px;
   border-bottom: 1px solid var(--border);
 }
-.hlmap-bar .hl-count {
+/* View / Hide Notepad (MapNotepad.tsx): the notepad's red page, small,
+   and the words of the notes pane's own toggle. */
+.hlmap-notepad-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px 3px 8px;
+  border-radius: 999px;
   white-space: nowrap;
+  color: var(--text-dim);
+  font-size: calc(11px * var(--font-scale));
+  font-weight: 600;
+}
+.hlmap-notepad-toggle:hover {
+  background: var(--select);
+  color: var(--text);
+}
+.hlmap-notepad-toggle.active {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.hlmap-notepad-glyph {
+  width: 9px;
+  height: 12px;
+  border-radius: 2px;
+  background: #ff5f57; /* reading mode's notepad icon (readingmode.css) */
 }
 .hlmap-search {
   flex: 1 1 220px;
@@ -45,12 +69,21 @@
   padding: 0;
 }
 
+/* The canvas and, over its right, the notepad's pane. */
+.hlmap-stage {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+
 /* The canvas: the notepad's faint dot grid (notepad.css), moved and
    sized with the view (view.ts). A press anywhere pans, so nothing in
    it selects as text. */
 .hlmap-canvas {
   position: relative;
   flex: 1;
+  min-width: 0;
   min-height: 0;
   overflow: hidden;
   touch-action: none;
@@ -198,10 +231,11 @@
   box-shadow: 0 0 0 2.5px var(--accent);
 }
 
-/* Zoom: out, the zoom (a press is 100%), in, the whole map. */
+/* Zoom: out, the zoom (a press is 100%), in, the whole map — beside the
+   notepad's pane when it is over the canvas. */
 .hlmap-controls {
   position: absolute;
-  right: 12px;
+  right: calc(12px + var(--hlmap-covered, 0px));
   bottom: 12px;
   display: flex;
   align-items: center;
@@ -229,4 +263,21 @@
 .hlmap-zoom:hover {
   background: var(--panel-alt);
   color: var(--text);
+}
+
+/* The notepad over the map's right (MapNotepad.tsx): a full-height pane
+   on the canvas, sized by its inner edge — the docked pad's handle. */
+.hlmap-notepad {
+  position: absolute;
+  z-index: 2;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  max-width: calc(100% - 60px);
+  overflow: visible;
+  border-left: 1px solid var(--border);
+  box-shadow: -6px 0 18px rgb(0 0 0 / 0.08);
+}
+.hlmap-notepad .notepad-edge-size {
+  left: -8px;
 }

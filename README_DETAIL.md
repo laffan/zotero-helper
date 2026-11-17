@@ -38,7 +38,8 @@ Windows/Linux desktops too).
   the notes panel and the Highlights tab becomes a **Highlight Map**: the
   highlights on a canvas that pans and zooms (a finger, a pinch, the
   trackpad), in rows for the chapters and columns for the sections within
-  them; its search goes from match to match and its colours dim the rest.
+  them; its search goes from match to match, and the search and colours
+  fade the rest. View Notepad lays the PDF's notepad over the map.
 - **AI helpers (optional)** — tidy metadata, extract abstracts, ask
   questions of abstracts, full papers or a part of one with page-cited
   answers, have a selected passage explained in a few lines, with or

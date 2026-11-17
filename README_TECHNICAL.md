@@ -124,7 +124,8 @@ src/            React + TypeScript UI (Vite, zustand, MiniSearch)
   components/   toolbar, sidebar, virtualized item list, metadata panel
                 and its tabs (Highlights — HighlightRow, one highlight,
                 HighlightFilters, the colours and the search's marks,
-                both shared with HighlightMap, the wide panel's map —
+                both shared with HighlightMap, the wide panel's map,
+                and MapNotepad, the notepad over it —
                 Notes — NotesPrompts is an
                 empty note's reading questions), reader pane (and
                 ReadingModeExit, reading mode's way back and its
@@ -700,9 +701,12 @@ page and marks that page (`reveal` in `thumbnails.ts`, from the
 navigator's `positioned`). Beside its ×, a
 pair of chevrons opens every section, or, with every section open,
 folds them all (it is absent when the outline has no nested
-headings). Widen the notes
-panel past 600px and the Highlights tab becomes the **Highlight Map**
-(see Highlights, below); narrow it again and it is the list. The
+headings). The notes panel's left edge widens it as far as the reader
+likes — up to the whole window but the edge itself, to drag it back by
+(`PaneResizer` in `App.tsx`; it is held to the window's width when the
+window shrinks). Widen it past 600px and the Highlights tab becomes the
+**Highlight Map** (see Highlights, below); narrow it again and it is the
+list. The
 viewer's bottom toolbar draws its own tooltips — after a moment's
 hover, or on a press-and-hold with a finger, which then doesn't press
 the button — since iPadOS shows no `title` tooltips; a button with a
@@ -1504,25 +1508,40 @@ between the fingers or under the pointer. On the iPad a pinch arrives
 both as pointers and as gesture events; the gesture events are then only
 kept from zooming the page. The canvas keeps at least 60px of the map in
 view. At its lower right: −, the zoom (a press is 100%), + (×1.25 a
-press) and the whole map (fitted, never past 100%). A map seen for the
+press) and the whole map (fitted, never past 100%) — moved in beside the
+notepad's pane while it is open. A map seen for the
 first time starts at its top left, as wide as fits between 50% and 100%;
 after that the view is the PDF's, kept beside it (`hlMap` in
 `lib/readerUi.ts`) and put back whenever the map comes back.
 
-*Search and colours* sit in one bar over the canvas with the count and ↻,
-and are the list's own (`HighlightFilters.tsx`, kept per PDF), so the
-panel crosses between list and map with the same ones. On the map they
-work differently. The search doesn't narrow anything: it goes round its
-matches in reading order — to the first a moment (250ms) after the typing
+*The bar* over the canvas holds View Notepad (where the list has its
+count), the search, the colours and ↻. The search and colours are the
+list's own (`HighlightFilters.tsx`, kept per PDF), so the panel crosses
+between list and map with the same ones. On the map they work
+differently: neither narrows anything — the map keeps its shape, so it
+keeps still while they change — and both fade what they leave out to a
+fifth: the colours, the cards not in them; the search, the cards that
+don't match (or that the colours leave out). The search also goes round
+its matches in reading order — to the first a moment (250ms) after the typing
 stops, then Enter or › to the next and ⇧Enter or ‹ to the one before,
 with "2 of 7" beside the field. Each is glided to (350ms, easing out) and
 put in the middle of the view at the zoom in force, unless that is too
 small to read (under 45%, when it goes to 100%) or the card wouldn't fit.
 Matches are ringed, the one in force in the accent, and their words
-marked. The colours dim what they leave out to a fifth, and the search
-steps over the dimmed cards; the count reads "5 of 44 picked". Neither
-changes the map's shape, so it keeps still while they change. A tap on
+marked; the search steps over the cards the colours leave out. A tap on
 the bare canvas lets go of the card picked.
+
+*View Notepad* (`MapNotepad.tsx`; the notes pane's words, with reading
+mode's red notepad page beside them) opens the PDF's notepad as a pane
+over the canvas's right, full height — a view of the same pad (see The
+notepad), so what is gathered on the map can be written down beside it;
+its × or Hide Notepad closes it. It lies over the map rather than beside
+it: the map keeps its size, but what it fits, keeps in view and glides
+a match to is the part the pane leaves (`covered` in `view.ts`). Its
+inner edge sizes it — the docked pad's handle — from 240px to all but
+60px of the canvas. Whether it is open, and its width, are this
+device's (`zh-hlmap-notepad`), whichever PDF is open; it follows the PDF
+to begin with, as under the notes.
 
 ### AI
 
@@ -1926,10 +1945,11 @@ panel's headings, and the Share and Ask PDF menus' choice of a section.
 ### The notepad
 
 A scratchpad for the Apple Pencil, one per PDF, to be typed up into the
-notes afterwards (`src/notepad/`, `NotepadBody.tsx`). It shows in two
+notes afterwards (`src/notepad/`, `NotepadBody.tsx`). It shows in three
 places, sharing one pad (`notepadFor` / `watchNotepad` in
-`model.ts`, so a change in one view redraws the other): floating over
-the pages in reading mode, and in the notes pane's lower half.
+`model.ts`, so a change in one view redraws the others): floating over
+the pages in reading mode, in the notes pane's lower half, and over the
+Highlight Map's right (View Notepad in its bar; see Highlights).
 
 **In reading mode** (`ReadingNotepad.tsx`) the closed pad is an icon, a
 filled red rectangle, at home in the next place down reading mode's

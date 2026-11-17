@@ -162,8 +162,10 @@
 }
 
 /* --- with the PDF open, the notes panel is wider --- */
+/* As wide as the reader drags it, up to the whole window but its edge
+   (App.tsx) — and no wider than that when the window shrinks. */
 .meta-panel.notes-mode {
-  width: var(--notes-w, 420px);
+  width: min(var(--notes-w, 420px), calc(100vw - 5px));
 }
 
 /* --- the reader pane, in place of sidebar + item list --- */

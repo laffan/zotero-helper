@@ -1516,8 +1516,8 @@ first time starts at its top left, as wide as fits between 50% and 100%;
 after that the view is the PDF's, kept beside it (`hlMap` in
 `lib/readerUi.ts`) and put back whenever the map comes back.
 
-*The bar* over the canvas holds View Notepad (where the list has its
-count), the search, the colours and ↻. The search and colours are the
+*The bar* over the canvas holds the search, the colours, ↻ and, at its
+right end, View Notepad (the list's count has no place in it). The search and colours are the
 list's own (`HighlightFilters.tsx`, kept per PDF), so the panel crosses
 between list and map with the same ones. On the map they work
 differently: neither narrows anything — the map keeps its shape, so it
@@ -1533,15 +1533,17 @@ Matches are ringed, the one in force in the accent, and their words
 marked; the search steps over the cards the colours leave out. A tap on
 the bare canvas lets go of the card picked.
 
-*View Notepad* (`MapNotepad.tsx`; the notes pane's words, with reading
-mode's red notepad page beside them) opens the PDF's notepad as a pane
-over the canvas's right, full height — a view of the same pad (see The
+*View Notepad* (`MapNotepad.tsx`; an icon with no words — reading mode's
+red notepad page with a white arrow pointing left across it, lit while
+the pane is open) opens the PDF's notepad as a pane over the canvas's
+right, full height — a view of the same pad (see The
 notepad), so what is gathered on the map can be written down beside it;
-its × or Hide Notepad closes it. It lies over the map rather than beside
+its × or the button again closes it. It lies over the map rather than beside
 it: the map keeps its size, but what it fits, keeps in view and glides
 a match to is the part the pane leaves (`covered` in `view.ts`). Its
-inner edge sizes it — the docked pad's handle — from 240px to all but
-60px of the canvas. Whether it is open, and its width, are this
+inner edge sizes it — a strip as thick as the bar that divides the notes
+from their notepad (27px with its rule), in that bar's colour — from
+240px to all but 60px of the canvas. Whether it is open, and its width, are this
 device's (`zh-hlmap-notepad`), whichever PDF is open; it follows the PDF
 to begin with, as under the notes.
 

@@ -3,7 +3,7 @@
    divided into). Its cards are the list's rows (tabs.css), given a
    ground of their own over the canvas's dot grid. */
 
-/* One bar: View Notepad, the search and its matches, the colours, ↻. */
+/* One bar: the search and its matches, the colours, ↻, View Notepad. */
 .hlmap-bar {
   display: flex;
   align-items: center;
@@ -11,33 +11,6 @@
   gap: 6px 12px;
   padding: 8px 10px 8px 12px;
   border-bottom: 1px solid var(--border);
-}
-/* View / Hide Notepad (MapNotepad.tsx): the notepad's red page, small,
-   and the words of the notes pane's own toggle. */
-.hlmap-notepad-toggle {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 3px 10px 3px 8px;
-  border-radius: 999px;
-  white-space: nowrap;
-  color: var(--text-dim);
-  font-size: calc(11px * var(--font-scale));
-  font-weight: 600;
-}
-.hlmap-notepad-toggle:hover {
-  background: var(--select);
-  color: var(--text);
-}
-.hlmap-notepad-toggle.active {
-  background: var(--accent-soft);
-  color: var(--accent);
-}
-.hlmap-notepad-glyph {
-  width: 9px;
-  height: 12px;
-  border-radius: 2px;
-  background: #ff5f57; /* reading mode's notepad icon (readingmode.css) */
 }
 .hlmap-search {
   flex: 1 1 220px;
@@ -266,7 +239,9 @@
 }
 
 /* The notepad over the map's right (MapNotepad.tsx): a full-height pane
-   on the canvas, sized by its inner edge — the docked pad's handle. */
+   on the canvas, sized by its inner edge — a strip as thick as the bar
+   dividing the notes from their notepad (notepad-notes.css), in its
+   colour and with its rule. */
 .hlmap-notepad {
   position: absolute;
   z-index: 2;
@@ -274,10 +249,16 @@
   right: 0;
   bottom: 0;
   max-width: calc(100% - 60px);
-  overflow: visible;
-  border-left: 1px solid var(--border);
-  box-shadow: -6px 0 18px rgb(0 0 0 / 0.08);
+  display: flex;
 }
-.hlmap-notepad .notepad-edge-size {
-  left: -8px;
+.hlmap-notepad-edge {
+  flex: 0 0 26px;
+  border-left: 1px solid var(--border);
+  background: var(--panel-alt);
+  cursor: col-resize;
+  touch-action: none;
+}
+.hlmap-notepad-pad {
+  flex: 1;
+  min-width: 0;
 }

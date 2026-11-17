@@ -6,9 +6,9 @@
 // (HighlightRow): a click goes to the highlight in the pages, and Copy,
 // Note and Zotero are on it as in the list.
 //
-// One bar over the canvas holds View Notepad (the PDF's notepad, as a
-// pane over the map's right — MapNotepad.tsx), the search, the colours
-// and ↻, the search and colours being the list's own (kept per PDF), so
+// One bar over the canvas holds the search, the colours, ↻ and View
+// Notepad (the PDF's notepad, as a pane over the map's right —
+// MapNotepad.tsx), the search and colours being the list's own (kept per PDF), so
 // the panel crosses between the two with the same ones. They work
 // differently here: neither narrows the map, which keeps still; both
 // fade what they leave out. The search also goes round its matches —
@@ -142,7 +142,6 @@ export function HighlightMap(props: Props) {
   return (
     <div className="hl-panel hlmap">
       <div className="hlmap-bar">
-        {openAttKey && <MapNotepadToggle pad={pad} />}
         <div className="hlmap-search">
           <input
             className="hl-search"
@@ -170,6 +169,7 @@ export function HighlightMap(props: Props) {
         </div>
         <ColorSwatches filter={filter} row />
         {sync}
+        {openAttKey && <MapNotepadToggle pad={pad} />}
       </div>
       <div className="hlmap-stage">
         <div className="hlmap-canvas" ref={hostRef} onClick={bare} onPointerMove={hover} onPointerLeave={hover}>

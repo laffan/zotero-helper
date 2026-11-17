@@ -1,14 +1,16 @@
-// The notepad over the Highlight Map (HighlightMap.tsx): View Notepad, in
-// the map's bar where the count was, opens the PDF's notepad as a pane
-// over the canvas's right — a view of the same pad reading mode floats and
+// The notepad over the Highlight Map (HighlightMap.tsx): View Notepad, at
+// the right end of the map's bar (the notepad's red page, an arrow to the
+// left across it — the pane comes in from the right), opens the PDF's
+// notepad as a pane over the canvas's right — a view of the same pad reading mode floats and
 // the notes pane holds (NotepadBody, kind "map"), so what is gathered on
 // the map can be written down beside it. The pane is over the map, not
 // beside it: the map keeps its size, and keeps to what the pane leaves
 // when it fits or goes to a match (view.ts's `covered`), its zoom
 // buttons moving in beside the pane (`--hlmap-covered`).
 //
-// The pane's inner edge sizes it (the docked pad's handle, notepad.css),
-// from 240px to all but 60px of the canvas. Whether it is open and its
+// The pane's inner edge sizes it: a strip as thick as the bar dividing
+// the notes from their notepad (notepad-notes.css), and like it, from
+// 240px to all but 60px of the canvas. Whether it is open and its
 // width are this device's (`zh-hlmap-notepad`), whichever PDF is open.
 import { useEffect, useRef, useState } from "react";
 import { trackPointerDrag } from "../lib/dragGesture";
@@ -56,18 +58,30 @@ export function useMapNotepad() {
 
 export type MapNotepadState = ReturnType<typeof useMapNotepad>;
 
-/** View / Hide Notepad: the notepad's red page, and the words. */
+/** View / Hide Notepad: the notepad's red page (reading mode's icon,
+ *  readingmode.css), an arrow to the left across it; lit while open. */
 export function MapNotepadToggle({ pad }: { pad: MapNotepadState }) {
+  const label = pad.open ? "Hide Notepad" : "View Notepad";
   return (
     <button
       type="button"
-      className={pad.open ? "hlmap-notepad-toggle active" : "hlmap-notepad-toggle"}
+      className={pad.open ? "icon-btn hlmap-notepad-toggle active" : "icon-btn hlmap-notepad-toggle"}
       onClick={pad.toggle}
       aria-pressed={pad.open}
-      title={pad.open ? "Hide the notepad" : "Show the PDF's notepad over the map"}
+      aria-label={label}
+      title={pad.open ? "Hide the notepad" : "View the PDF's notepad over the map"}
     >
-      <span className="hlmap-notepad-glyph" aria-hidden="true" />
-      {pad.open ? "Hide Notepad" : "View Notepad"}
+      <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">
+        <rect x="2.5" y="1.5" width="11" height="13" rx="1.8" fill="#ff5f57" />
+        <path
+          d="M10.8 8H5.2M7.6 5.6 5.2 8l2.4 2.4"
+          fill="none"
+          stroke="#fff"
+          strokeWidth="1.6"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      </svg>
     </button>
   );
 }
@@ -106,17 +120,19 @@ export function MapNotepadPane({ attKey, pad }: { attKey: string; pad: MapNotepa
   };
 
   return (
-    <div ref={ref} className="notepad hlmap-notepad" style={{ width: pad.width }}>
-      <NotepadBody
-        attKey={attKey}
-        kind="map"
-        trailing={
-          <button type="button" className="notepad-tool" title="Hide the notepad" aria-label="Hide the notepad" onClick={pad.close}>
-            <CloseIcon size={13} />
-          </button>
-        }
-      />
-      <div className="notepad-edge-size" title="Drag to size the notepad" onPointerDown={size} />
+    <div ref={ref} className="hlmap-notepad" style={{ width: pad.width }}>
+      <div className="hlmap-notepad-edge" title="Drag to size the notepad" onPointerDown={size} />
+      <div className="notepad hlmap-notepad-pad">
+        <NotepadBody
+          attKey={attKey}
+          kind="map"
+          trailing={
+            <button type="button" className="notepad-tool" title="Hide the notepad" aria-label="Hide the notepad" onClick={pad.close}>
+              <CloseIcon size={13} />
+            </button>
+          }
+        />
+      </div>
     </div>
   );
 }

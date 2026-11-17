@@ -96,7 +96,7 @@ export function HighlightsPanel({ items, map = false }: { items: ZItem[]; map?: 
     </button>
   );
   /** The list's count: "12 highlights · 2 bookmarks", or how many of
-   *  them `shown` are. (The map's bar has View Notepad in its place.) */
+   *  them `shown` are. (The map's bar has none.) */
   const countLabel = (shown: number) =>
     shown === all.length
       ? `${all.length - marks} ${all.length - marks === 1 ? "highlight" : "highlights"}${

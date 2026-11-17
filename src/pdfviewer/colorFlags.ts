@@ -54,13 +54,13 @@ type Quad = number[];
 
 const LAYER = "pdf-color-flags";
 /** nightvision.css's letter size and side room, as shares of the line's
- *  height, and the pixel taken off the one and added to the other — for
- *  the width a flag will take, to keep flags apart. A capital is about
- *  0.75 of its size wide. */
+ *  height, and the pixels added to each (the letter's never under 6) —
+ *  for the width a flag will take, to keep flags apart. A capital is
+ *  about 0.75 of its size wide. */
 const LETTER = 0.444;
 const ROOM = 0.085;
 const flagWidth = (lineH: number, fk: number) =>
-  0.75 * Math.max(LETTER * lineH - 1 / fk, 3 / fk) + 2 * (ROOM * lineH + 1 / fk);
+  0.75 * Math.max(LETTER * lineH + 2 / fk, 6 / fk) + 2 * (ROOM * lineH + 1 / fk);
 
 const nightVisionOn = () => document.documentElement.classList.contains("night-vision");
 

@@ -24,8 +24,9 @@
    letter (colorLetter, lib/highlights.ts): the selection bar's and the
    highlight editor's dots, the pen's, the Highlights tab's filters and
    reading mode's pen colours (gray has none: its attribute is empty).
-   The letter is small, sized to its dot, which the UI font size doesn't
-   change, so it follows the font size only a little way. */
+   White, for contrast. The letter is sized to its dot, which the UI
+   font size doesn't change, so it follows the font size only a little
+   way. */
 html.night-vision .hl-swatch[data-letter] {
   position: relative;
 }
@@ -43,20 +44,19 @@ html.night-vision .reading-mode-pen-color[data-letter]:not([data-letter=""])::af
   transform: translateY(-50%);
   text-box: trim-both cap alphabetic;
   text-align: center;
-  font-size: calc(5.1px * min(var(--font-scale), 1.1));
+  font-size: calc(8.1px * min(var(--font-scale), 1.1));
   font-weight: 700;
   line-height: 1;
-  color: #000;
+  color: #fff;
   pointer-events: none;
 }
 html.night-vision .reading-mode-pen-color[data-letter]::after {
-  font-size: calc(7.2px * min(var(--font-scale), 1.1));
+  font-size: calc(10.2px * min(var(--font-scale), 1.1));
 }
 /* Underlining, the dot is a bar under an empty square: the letter sits
-   above the bar in the text's colour. */
+   above the bar. */
 html.night-vision .pdf-selection-bar.underline .pdf-mark-swatch[data-letter]::before {
   top: calc(50% - 1.5px);
-  color: var(--text);
 }
 
 /* Each highlight's flag on the page (pdfviewer/colorFlags.ts): only in
@@ -64,9 +64,9 @@ html.night-vision .pdf-selection-bar.underline .pdf-mark-swatch[data-letter]::be
    by this rule besides. A plain tab of the highlight's colour, the
    height of its line, with the letter in it. Sizes come from the line's
    height (`--lh`, page units) times the layer's CSS px per page unit
-   (`--fk`), so they follow the zoom: the letter 0.444 of the line less
-   a pixel, and 0.085 of it plus a pixel each side (colorFlags.ts's
-   LETTER and ROOM). */
+   (`--fk`), so they follow the zoom: the letter, white, 0.444 of the
+   line plus 2px (never under 6px), and 0.085 of it plus a pixel each
+   side (colorFlags.ts's LETTER and ROOM). */
 .pdf-color-flags {
   display: none;
 }
@@ -85,9 +85,9 @@ html.night-vision .pdf-color-flags {
   box-sizing: border-box;
   padding: 0 calc(var(--fk, 1px) * var(--lh) * 0.085 + 1px);
   background: var(--flag);
-  color: #000;
+  color: #fff;
   font-family: system-ui, -apple-system, sans-serif;
-  font-size: max(calc(var(--fk, 1px) * var(--lh) * 0.444 - 1px), 3px);
+  font-size: max(calc(var(--fk, 1px) * var(--lh) * 0.444 + 2px), 6px);
   font-weight: 700;
   line-height: 1;
 }

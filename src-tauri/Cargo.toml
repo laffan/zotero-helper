@@ -1,6 +1,6 @@
 [package]
 name = "zotero-helper"
-version = "0.2.0"
+version = "0.2.1"
 description = "Companion app for Zotero on iPadOS/iOS/macOS: fetch PDFs for DOIs and push them to your library"
 authors = ["Nate Laffan"]
 edition = "2021"

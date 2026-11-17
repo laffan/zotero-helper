@@ -74,7 +74,7 @@ function firstPageAnnotations(attKey: string): ThumbAnnotation[] {
   for (const i of useStore.getState().library.items) {
     const d = i.data as Record<string, unknown> | undefined;
     if (!d || d.parentItem !== attKey || d.itemType !== "annotation") continue;
-    let pos: { pageIndex?: number; rects?: number[][]; paths?: number[][]; zhPostIt?: { color?: unknown; rect?: unknown } } = {};
+    let pos: { pageIndex?: number; rects?: number[][]; paths?: number[][]; zhPostIt?: { color?: unknown; rect?: unknown; crop?: unknown } } = {};
     const raw = d.annotationPosition;
     try {
       pos = typeof raw === "string" ? JSON.parse(raw) : ((raw as typeof pos) ?? {});
@@ -89,11 +89,18 @@ function firstPageAnnotations(attKey: string): ThumbAnnotation[] {
       rects: Array.isArray(pos.rects) ? pos.rects : [],
       paths: Array.isArray(pos.paths) ? pos.paths : [],
       ...(typeof pos.zhPostIt?.color === "string" && Array.isArray(pos.zhPostIt.rect)
-        ? { postIt: { color: pos.zhPostIt.color, rect: pos.zhPostIt.rect as number[] } }
+        ? { postIt: { color: pos.zhPostIt.color, rect: shownRect(pos.zhPostIt.rect as number[], pos.zhPostIt.crop) } }
         : {}),
     });
   }
   return out;
+}
+
+/** A post-it's paper as it shows at rest: its rect pared down by its
+ *  crop (left, right, bottom insets; lib/postits.ts). */
+function shownRect(r: number[], crop: unknown): number[] {
+  const [l, rt, b] = Array.isArray(crop) && crop.length === 3 ? (crop as number[]) : [0, 0, 0];
+  return [r[0] + l, r[1] + b, r[2] - rt, r[3]];
 }
 
 /** Cache variant: what is painted on the first page, so a highlight
@@ -106,7 +113,7 @@ function firstPageAnnotations(attKey: string): ThumbAnnotation[] {
 function annotationSignature(marks: ThumbAnnotation[]): string {
   if (!marks.length) return "0x0";
   const text = marks
-    .map((m) => `${m.type}|${m.color}|${JSON.stringify(m.rects)}|${JSON.stringify(m.paths)}${m.postIt ? `|${m.postIt.color}` : ""}`)
+    .map((m) => `${m.type}|${m.color}|${JSON.stringify(m.rects)}|${JSON.stringify(m.paths)}${m.postIt ? `|${m.postIt.color}|${m.postIt.rect}` : ""}`)
     .sort()
     .join("\n");
   // FNV-1a, 32-bit: enough to tell one page's marks from another's.

@@ -5,7 +5,14 @@
    black ink stay; dark pages only dim it a little. The paper is 70%
    opaque, so the page shows faintly through it, and 90% while it is
    worked on — typed or written on, dragged, its menu open — fading back
-   as that ends. */
+   as that ends.
+
+   A post-it may be pared down at rest (postitCrop.ts): `--crop-l`,
+   `-r`, `-b`, set inline in points, bring its left, right and bottom
+   edges in. The element keeps the whole paper's box; what shows is the
+   paper (its ::before) and the sheet that holds everything on it,
+   clipped to the crop — and only those take presses, so the page
+   beneath the rest is the page's. Typed or written on, it shows whole. */
 .pdf-postits {
   position: absolute;
   inset: 0;
@@ -15,11 +22,13 @@
 .pdf-postit {
   position: absolute;
   box-sizing: border-box;
-  overflow: hidden;
-  pointer-events: auto;
+  pointer-events: none;
   /* lib/postits.ts's POSTIT_GRIP. */
   --grip: calc(var(--pk, 1px) * 9);
-  box-shadow: 0 calc(var(--pk, 1px) * 1.5) calc(var(--pk, 1px) * 5) rgb(0 0 0 / 0.28);
+  /* The crop in force, in px. */
+  --cl: calc(var(--pk, 1px) * var(--crop-l, 0));
+  --cr: calc(var(--pk, 1px) * var(--crop-r, 0));
+  --cb: calc(var(--pk, 1px) * var(--crop-b, 0));
   color: #1a1a1a;
   font-family: -apple-system, system-ui, sans-serif;
   /* lib/postits.ts's POSTIT_FONT and POSTIT_LINE. */
@@ -33,19 +42,46 @@
 .pdf-postit.readonly {
   cursor: default;
 }
+.pdf-postit.editing,
+.pdf-postit.writing {
+  --cl: 0px;
+  --cr: 0px;
+  --cb: 0px;
+}
 /* The paper, under everything on it (a box-shadow is drawn only
-   outside the box, so none shows through). */
+   outside the box, so none shows through), as far as the crop leaves. */
 .pdf-postit::before {
   content: "";
   position: absolute;
-  inset: 0;
+  top: 0;
+  left: var(--cl);
+  right: var(--cr);
+  bottom: var(--cb);
   background: var(--postit-color, #fff59d);
+  box-shadow: 0 calc(var(--pk, 1px) * 1.5) calc(var(--pk, 1px) * 5) rgb(0 0 0 / 0.4);
   opacity: 0.7;
-  transition: opacity 0.4s ease;
+  pointer-events: auto;
+  transition: opacity 0.4s ease, left 0.2s ease, right 0.2s ease, bottom 0.2s ease;
 }
 .pdf-postit:is(.editing, .writing, .dragging, .menu-open)::before {
   opacity: 0.9;
   transition-duration: 0.12s;
+}
+.pdf-postit-sheet {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  clip-path: inset(0 var(--cr) var(--cb) var(--cl));
+  transition: clip-path 0.2s ease;
+}
+/* While a corner is dragged the crop follows it at once, and the whole
+   paper is outlined round it. */
+.pdf-postit.cropping::before,
+.pdf-postit.cropping .pdf-postit-sheet {
+  transition: none;
+}
+.pdf-postit.cropping {
+  outline: 1px dashed rgb(0 0 0 / 0.35);
 }
 /* The grip: the band across the top it is dragged by. A finger there
    drags it rather than scrolling the page — and reaches a little below
@@ -60,6 +96,7 @@
   background: linear-gradient(rgb(0 0 0 / 0.07) 0 var(--grip), transparent 0);
   cursor: grab;
   touch-action: none;
+  pointer-events: auto;
 }
 @media (pointer: coarse) {
   .pdf-postit-grip {
@@ -70,8 +107,63 @@
   cursor: default;
   touch-action: auto;
 }
-.pdf-postit.dragging {
-  box-shadow: 0 calc(var(--pk, 1px) * 4) calc(var(--pk, 1px) * 14) rgb(0 0 0 / 0.32);
+.pdf-postit.dragging::before {
+  box-shadow: 0 calc(var(--pk, 1px) * 4) calc(var(--pk, 1px) * 14) rgb(0 0 0 / 0.45);
+}
+/* The corners that pare it down: an L at each bottom corner of what
+   shows, inside a larger target — shown on a hovering mouse's post-it,
+   always where fingers point; never while it is worked on, or on
+   someone else's. */
+.pdf-postit-corner {
+  position: absolute;
+  bottom: var(--cb);
+  width: 18px;
+  height: 18px;
+  pointer-events: auto;
+  touch-action: none;
+  opacity: 0;
+  transition: opacity 0.15s, left 0.2s ease, right 0.2s ease, bottom 0.2s ease;
+}
+.pdf-postit-corner.l {
+  left: var(--cl);
+  cursor: nesw-resize;
+}
+.pdf-postit-corner.r {
+  right: var(--cr);
+  cursor: nwse-resize;
+}
+.pdf-postit-corner::after {
+  content: "";
+  position: absolute;
+  bottom: 3px;
+  width: 7px;
+  height: 7px;
+  border-bottom: 2px solid rgb(0 0 0 / 0.45);
+}
+.pdf-postit-corner.l::after {
+  left: 3px;
+  border-left: 2px solid rgb(0 0 0 / 0.45);
+}
+.pdf-postit-corner.r::after {
+  right: 3px;
+  border-right: 2px solid rgb(0 0 0 / 0.45);
+}
+.pdf-postit:hover .pdf-postit-corner,
+.pdf-postit.cropping .pdf-postit-corner {
+  opacity: 1;
+}
+.pdf-postit.cropping .pdf-postit-corner {
+  transition: none;
+}
+@media (hover: none) {
+  .pdf-postit-corner {
+    width: 26px;
+    height: 26px;
+    opacity: 0.8;
+  }
+}
+.pdf-postit:is(.editing, .writing, .readonly) .pdf-postit-corner {
+  display: none;
 }
 .pdf-postit.dragging .pdf-postit-grip {
   cursor: grabbing;
@@ -96,6 +188,7 @@
   visibility: hidden;
 }
 .pdf-postit-editor {
+  pointer-events: auto;
   box-sizing: border-box;
   width: auto;
   height: auto;

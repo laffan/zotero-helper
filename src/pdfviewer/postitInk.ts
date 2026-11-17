@@ -127,7 +127,7 @@ export function createPostItPen(env: { writing?: () => void; erased?: (t: PenTar
     ctx.lineJoin = "round";
     ctx.strokeStyle = POSTIT_INK;
     ctx.lineWidth = POSTIT_PEN * k;
-    target.el.appendChild(canvas);
+    (target.el.querySelector(".pdf-postit-sheet") ?? target.el).appendChild(canvas);
     live = { target, canvas, ctx, box, k, parked: [] };
     return live;
   }

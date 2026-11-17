@@ -36,8 +36,10 @@ Windows/Linux desktops too).
   Highlights tab files the highlights under these sections — among the
   PDF's own outline headings, or on their own where it has none.
   **Post-its** stick a square of coloured paper on a page, to write on
-  with the Pencil or type on; they drag about their page, show in the
-  thumbnails and a Post-its tab of their own, and reach Zotero as its
+  with the Pencil or type on; they drag about their page, can be pared
+  down by their bottom corners to a sliver that stays out of the text
+  (whole again while written on), show in the thumbnails and a Post-its
+  tab of their own, and reach Zotero as its
   own text and ink annotations, so Zotero shows their words and writing
   too. Widen
   the notes panel and the Highlights tab becomes a **Highlight Map**: the

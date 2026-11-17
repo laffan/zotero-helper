@@ -4,8 +4,8 @@
 // overlay (postits.ts), so the pages' own rasters leave them out.
 //
 // Drawn as the overlay looks at rest: the paper in its colour, 70%
-// opaque, the grip a shade darker across its top, the words wrapped
-// inside its margins and the writing over them.
+// opaque, pared down by its crop, the grip a shade darker across its
+// top, the words wrapped inside its margins and the writing over them.
 import type { Annotation } from "../lib/highlights";
 import {
   POSTIT_FONT, POSTIT_GRIP, POSTIT_INK, POSTIT_LINE, POSTIT_PAD, POSTIT_PEN, postItsOf, wrapLines,
@@ -28,16 +28,18 @@ export function drawPostIts(
     const left = Math.min(ax, bx);
     const top = Math.min(ay, by);
     const w = Math.abs(bx - ax);
-    const h = Math.abs(by - ay);
+    // What shows at rest: the paper pared down by its crop.
+    const [cl, cr, cb] = p.crop.map((v) => v * k);
+    const shown = { x: left + cl, y: top, w: Math.max(0, w - cl - cr), h: Math.max(0, Math.abs(by - ay) - cb) };
     ctx.save();
     ctx.globalAlpha = 0.7;
     ctx.fillStyle = p.color;
-    ctx.fillRect(left, top, w, h);
+    ctx.fillRect(shown.x, shown.y, shown.w, shown.h);
     ctx.globalAlpha = 1;
     ctx.fillStyle = "rgb(0 0 0 / 0.07)";
-    ctx.fillRect(left, top, w, POSTIT_GRIP * k);
+    ctx.fillRect(shown.x, shown.y, shown.w, POSTIT_GRIP * k);
     ctx.beginPath();
-    ctx.rect(left, top, w, h);
+    ctx.rect(shown.x, shown.y, shown.w, shown.h);
     ctx.clip();
     if (p.text.trim()) {
       ctx.fillStyle = POSTIT_INK;

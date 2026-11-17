@@ -36,10 +36,11 @@
 // store (`set`) doesn't overwrite it.
 import { whenPenRested } from "../lib/penActivity";
 import {
-  lastPostItColor, POSTIT_GRIP, POSTIT_INK, POSTIT_PEN, POSTIT_SIZE, postItsOf, rememberPostItColor, type PostIt, type PostItSave,
+  isCropped, lastPostItColor, POSTIT_GRIP, POSTIT_INK, POSTIT_PEN, POSTIT_SIZE, postItsOf, rememberPostItColor, type PostIt, type PostItSave,
 } from "../lib/postits";
 import type { Annotation } from "../lib/highlights";
 import { inkSortIndex } from "./ink/geometry";
+import { dragCorner, showCrop } from "./postitCrop";
 import { createPostItEditor, createPostItMenu } from "./postitEdit";
 import { createPostItPen, drawPostItInk, type PenTarget } from "./postitInk";
 import type { PageRecord } from "./types";
@@ -89,7 +90,7 @@ const DOUBLE_PX = 24;
 const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
 const sizeOf = (it: { rect: number[] }) => [it.rect[2] - it.rect[0], it.rect[3] - it.rect[1]];
 /** What a post-it shows, to tell whether it must be drawn again. */
-const sigOf = (it: Item) => JSON.stringify([it.pageIndex, it.rect, it.color, it.text, it.strokes, it.editable]);
+const sigOf = (it: Item) => JSON.stringify([it.pageIndex, it.rect, it.color, it.crop, it.text, it.strokes, it.editable]);
 
 export function createPostIts(env: PostItsEnv) {
   const { scrollArea } = env;
@@ -136,12 +137,17 @@ export function createPostIts(env: PostItsEnv) {
     const el = document.createElement("div");
     el.className = "pdf-postit";
     el.dataset.postitId = it.id;
+    // What is on the paper is on its sheet, which a crop clips; the
+    // corners that set the crop are outside it.
     el.innerHTML =
+      `<div class="pdf-postit-sheet">` +
       `<div class="pdf-postit-grip" title="Drag to move · tap for colours, Type and Delete"></div>` +
       `<div class="pdf-postit-text"></div>` +
       `<svg class="pdf-postit-ink" preserveAspectRatio="none" fill="none" stroke="${POSTIT_INK}" stroke-width="${POSTIT_PEN}" ` +
       `stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"></svg>` +
-      `<div class="pdf-postit-hint">Write here, or double-tap to type</div>`;
+      `<div class="pdf-postit-hint">Write here, or double-tap to type</div></div>` +
+      `<div class="pdf-postit-corner l" title="Drag to pare the post-it down"></div>` +
+      `<div class="pdf-postit-corner r" title="Drag to pare the post-it down"></div>`;
     sizer.observe(el);
     return el;
   }
@@ -158,6 +164,7 @@ export function createPostIts(env: PostItsEnv) {
     if (sig === it.sig) return;
     it.sig = sig;
     el.style.setProperty("--postit-color", it.color);
+    showCrop(el, it.crop);
     el.classList.toggle("readonly", !it.editable);
     el.classList.toggle("empty", !it.text.trim() && !it.strokes.length);
     el.querySelector(".pdf-postit-text")!.textContent = it.text;
@@ -192,7 +199,7 @@ export function createPostIts(env: PostItsEnv) {
     if (!it || !writer || !it.editable) return;
     const keys = writer.save({
       id: it.id, pageIndex: it.pageIndex, pageLabel: it.pageLabel, sortIndex: it.sortIndex,
-      rect: it.rect, color: it.color, text: it.text, strokes: it.strokes, textKey: it.textKey, inkKeys: it.inkKeys,
+      rect: it.rect, color: it.color, crop: it.crop, text: it.text, strokes: it.strokes, textKey: it.textKey, inkKeys: it.inkKeys,
     });
     it.textKey = keys.textKey;
     it.inkKeys = keys.inkKeys;
@@ -212,8 +219,10 @@ export function createPostIts(env: PostItsEnv) {
     cancelWait = whenPenRested(WRITE_REST_MS, flush);
   }
 
-  /** Busy: being written on, typed on or dragged — the layer's own. */
-  const busy = (id: string) => pen.busy(id) || editor.editing(id) || dragging === id;
+  /** Busy: being written on, typed on, dragged or pared down — the
+   *  layer's own. */
+  const busy = (id: string) =>
+    pen.busy(id) || editor.editing(id) || dragging === id || Boolean(items.get(id)?.el?.classList.contains("cropping"));
 
   // --- the tool ---------------------------------------------------------------
   let placing = false;
@@ -329,7 +338,7 @@ export function createPostIts(env: PostItsEnv) {
     if (!rect || !p || !writer) return;
     const id = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 7)}`;
     const it: Item = {
-      id, attKey: "", pageIndex: idx, rect, color: lastPostItColor(), text: "", strokes: [],
+      id, attKey: "", pageIndex: idx, rect, color: lastPostItColor(), crop: [0, 0, 0], text: "", strokes: [],
       pageLabel: env.getPageLabels()?.[idx] || String(idx + 1), sortIndex: sortIndexOf(p, idx, rect),
       textKey: null, inkKeys: [], parts: [], editable: true, dirty: true,
     };
@@ -356,6 +365,17 @@ export function createPostIts(env: PostItsEnv) {
     if (!it.editable || (e.pointerType === "mouse" && e.button !== 0)) return;
     const sel = window.getSelection();
     if (sel && !sel.isCollapsed && sel.anchorNode && scrollArea.contains(sel.anchorNode)) sel.removeAllRanges();
+    const corner = (e.target as Element).closest<HTMLElement>(".pdf-postit-corner");
+    if (corner) {
+      const [w, h] = sizeOf(it);
+      return dragCorner({ el, w, h, crop: it.crop }, e, corner.classList.contains("l") ? "l" : "r", (crop) => {
+        const cur = items.get(it.id);
+        if (!cur) return;
+        cur.crop = crop;
+        cur.sig = sigOf(cur);
+        changed(cur);
+      });
+    }
     // The grip: its band, or for a finger a little below it too (CSS's
     // --grip-reach), where the Pencil and the mouse still write.
     const band = el.getBoundingClientRect().top + (el.clientWidth / sizeOf(it)[0]) * POSTIT_GRIP;
@@ -479,6 +499,15 @@ export function createPostIts(env: PostItsEnv) {
           const cur = now();
           if (cur) type(cur);
         },
+        uncrop: isCropped(it.crop)
+          ? () => {
+              const cur = now();
+              if (!cur) return;
+              cur.crop = [0, 0, 0];
+              draw(cur);
+              changed(cur);
+            }
+          : undefined,
         remove: () => {
           editor.commit();
           const cur = now();

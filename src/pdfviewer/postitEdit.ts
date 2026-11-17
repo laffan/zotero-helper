@@ -2,8 +2,9 @@
 //
 // The menu opens from a tap on the paper's grip — the darker band across
 // its top, which a drag moves it by — above the paper: the paper's
-// colours, Type (the editor, for a hand that holds only the Pencil) and
-// Delete, which a second press confirms. A colour, Type, a press
+// colours, Type (the editor, for a hand that holds only the Pencil),
+// Whole (while it is pared down, postitCrop.ts) and Delete, which a
+// second press confirms. A colour, Type, a press
 // elsewhere, Escape or a scroll of the pages closes it.
 //
 // The editor opens on a double-tap of a finger on the paper, a
@@ -20,6 +21,8 @@ export interface PostItMenuOpen {
   color: string;
   setColor: (c: string) => void;
   type: () => void;
+  /** Show it whole again — offered while it is pared down. */
+  uncrop?: () => void;
   remove: () => void;
 }
 
@@ -95,6 +98,18 @@ export function createPostItMenu(host: HTMLElement, scrollArea: HTMLElement) {
       close();
       o.type();
     });
+    let whole: HTMLButtonElement | null = null;
+    if (o.uncrop) {
+      whole = document.createElement("button");
+      whole.type = "button";
+      whole.className = "pdf-postit-action";
+      whole.textContent = "Whole";
+      whole.title = "Show the whole post-it again";
+      onPress(whole, () => {
+        close();
+        o.uncrop?.();
+      });
+    }
     const del = document.createElement("button");
     del.type = "button";
     del.className = "pdf-postit-action pdf-postit-delete";
@@ -108,7 +123,7 @@ export function createPostItMenu(host: HTMLElement, scrollArea: HTMLElement) {
       close();
       o.remove();
     });
-    m.append(type, del);
+    m.append(type, ...(whole ? [whole] : []), del);
     host.appendChild(m);
     menu = m;
     anchor = o.anchor;

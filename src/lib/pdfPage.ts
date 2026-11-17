@@ -24,7 +24,7 @@ export interface ThumbAnnotation {
   pageIndex: number;
   rects: number[][];
   paths: number[][];
-  /** A post-it's part (lib/postits.ts): its paper. */
+  /** A post-it's part (lib/postits.ts): its paper, as it shows. */
   postIt?: { color: string; rect: number[] };
 }
 
@@ -54,6 +54,16 @@ function drawAnnotations(
   for (const ann of annotations) {
     if (ann.pageIndex !== pageIndex || (ann.postIt && ann.type !== "ink")) continue;
     if (ann.type === "ink" && ann.paths.length) {
+      ctx.save();
+      // A post-it's writing, only where its paper shows.
+      const r = ann.postIt?.rect;
+      if (r) {
+        const [ax, ay] = viewport.convertToViewportPoint(r[0], r[1]);
+        const [bx, by] = viewport.convertToViewportPoint(r[2], r[3]);
+        ctx.beginPath();
+        ctx.rect(Math.min(ax, bx), Math.min(ay, by), Math.abs(bx - ax), Math.abs(by - ay));
+        ctx.clip();
+      }
       ctx.strokeStyle = ann.color || "#ff0000";
       ctx.lineWidth = Math.max(0.5, scale);
       ctx.lineCap = "round";
@@ -68,6 +78,7 @@ function drawAnnotations(
         }
         ctx.stroke();
       }
+      ctx.restore();
     } else if (ann.rects.length) {
       ctx.fillStyle = ann.color || "#ffff00";
       ctx.globalAlpha = 0.3;

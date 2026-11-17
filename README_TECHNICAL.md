@@ -201,7 +201,8 @@ src/            React + TypeScript UI (Vite, zustand, MiniSearch)
                 renamed), postits (post-its: placed, drawn on their
                 pages, dragged, their presses), postitInk (writing and
                 erasing on one), postitEdit (a post-it's menu and its
-                text editor), postitPaint (post-its painted into the
+                text editor), postitCrop (one pared down by its bottom
+                corners), postitPaint (post-its painted into the
                 thumbnails, folds and clips), places (where the
                 reader is, what is at a point — for the notepad), and
                 annotating (the pieces below, put together):
@@ -2046,6 +2047,31 @@ size, the words raw; Escape or ⌘↩ ends it, and so do a press anywhere
 else, the focus leaving it and the app being put away — the words kept
 each time. An empty post-it says "Write here, or double-tap to type".
 
+**Paring one down.** So that a post-it can stay where it is without
+covering the text, its two bottom corners crop it at rest
+(`postitCrop.ts`): dragged (any pointer; a finger there doesn't
+scroll), the bottom-left corner brings its left and bottom edges in,
+the bottom-right its right and bottom edges — never the top, with its
+grip — leaving at least 24 points each way, with the whole paper's
+outline dashed round the part kept while the corner moves. Only what
+shows changes: the paper, its words and its writing stay whole, and the
+post-it shows whole again while it is typed or written on (the crop
+eases out and back, 0.2s), to be pared down again after — so a note
+can be read and added to in full, and left as a sliver. What is pared
+away is not there at rest: presses on it reach the page beneath. The
+corners are an L at each bottom corner of what shows, on a hovering
+mouse's post-it and always where fingers point; not while it is worked
+on, nor on someone else's. Its menu offers **Whole** while it is pared
+down. The crop is three insets in points kept in the post-it's record
+(`crop` in `zhPostIt`; Zotero shows the whole post-it), so it comes back
+on other devices. Built so: the element keeps the whole paper's box (so
+the writing, the editor and `--pk` are as before) but takes no presses
+itself; the paper is its `::before`, placed by the crop, and everything
+on the paper is in a sheet clipped to it (`clip-path: inset()`), so only
+the part kept shows or is hit. The thumbnails, folds, clips and the
+library's thumbnails paint it pared down; the Post-its tab shows it
+whole.
+
 Writing on one follows the pages' ink (`postitInk.ts`): the kept strokes
 are an `<svg>` in the paper's own points, stretched with it; the stroke
 under the pen is drawn on a canvas over the paper, a segment a sample,
@@ -2082,7 +2108,7 @@ So Zotero desktop, iOS and the web library show the words and the
 writing where they are on the page (without the paper). Each part
 carries, in its position beside what Zotero reads, the post-it's own
 record, `zhPostIt`: its id (tying its parts together), its paper's
-colour and its rect. Zotero's server keeps a position as it is given,
+colour, its rect and its crop, if it has one. Zotero's server keeps a position as it is given,
 and its reader keeps unknown keys when a text box is resized; moving one
 there writes a new position without them, and the part becomes an
 ordinary text box or drawing again — drawn as such here too.
@@ -2121,7 +2147,7 @@ so a smaller post-it is a smaller card — in reading order, with its page
 under it; several PDFs list under a heading each. With the PDF open a
 click goes to the post-it on its page; otherwise it opens the PDF there.
 
-Not yet done: undo for a post-it's writing, sizing a post-it, moving one
+Not yet done: undo for a post-it's writing, making a post-it larger, moving one
 to another page, the Pencil's colours on one, and pages with a /Rotate
 (where a post-it's writing would be drawn turned).
 

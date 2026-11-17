@@ -230,7 +230,9 @@ src/            React + TypeScript UI (Vite, zustand, MiniSearch)
                 the reader's sections on the pages; explanations = the
                 explanation boxes; notepad-clips = the notepad's pins
                 and clips, and clip mode; notepad-texts = its text
-                notes and their editor; explainer = the explainer's
+                notes and their editor; notepad-notes = the pad under
+                the notes, its bar and its full-height and full-screen
+                places; explainer = the explainer's
                 window and its In Context menu; threads = a conversation's
                 columns and the passages marked in its answers)
 src-tauri/      Rust core (all networking + state)
@@ -324,8 +326,8 @@ YES, pinned in `src-tauri/Info.ios.plist`), and a swizzle of the getter
 reaches view controllers presented over the web view. The page hears of
 it as `status-bar-hidden` on `<html>`, set by the native side whenever
 it changes and once more when the page asks at boot
-(`lib/statusBar.ts`); `base.css`, `readingmode.css` and `notepad.css`
-keep the band only under `.ipados:not(.status-bar-hidden)`. Off the iPad
+(`lib/statusBar.ts`); `base.css`, `readingmode.css`, `notepad.css` and
+`notepad-notes.css` keep the band only under `.ipados:not(.status-bar-hidden)`. Off the iPad
 nothing changes.
 
 ### Continue Reading: the home-screen widget (iOS)
@@ -1999,6 +2001,18 @@ the sentence tool on, its tap doesn't also select a sentence
 **Under the notes**, from **View Notepad** at the pane's foot
 (`NotesPanel.tsx`) — the bar between the notes and the pad is the
 divider, dragged to share the height, with Hide Notepad at its middle.
+At the bar's right, two switches, lit while on: **full height** (bars
+at top and foot, an arrow between) gives the pad the whole pane, the
+bar at its top and the notes out of sight but still open (their caret
+and undo kept); **full screen** (arrows to two corners) puts the bar
+and the pad over the whole window (z-index 70, under the modals; below
+the iPad's status bar while there is one). Pressed again, each goes back
+to the split; full height pressed in full screen leaves it for the pane's
+height, and Hide Notepad leaves full screen too. The pad is one element
+through all three — only its place changes, by CSS — so its undo and pan
+carry on (`notepad-notes.css`). The split and full height are kept on
+this device (`zh-notes-notepad`); full screen lasts while the entry's
+notes are open.
 
 Either way it is one continuous surface in the panel's colour: a slim
 bar of tools over the canvas — a very faint dot grid, which pans with

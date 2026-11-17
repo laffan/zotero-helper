@@ -1,0 +1,93 @@
+/* The notepad under the notes (NotesPanel.tsx): the bar at the notes
+   pane's foot that shows and hides it and divides the pane, and the pad's
+   full-height and full-screen places. The pad itself is notepad.css's. */
+
+/* The notes pane's foot (NotesPanel.tsx): View Notepad at its middle; with
+   the notepad open, the divider between the notes and it, dragged to
+   share the height, full height and full screen at its right. */
+.notes-split-top {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+/* Under a pad of the pane's height: hidden, still open (caret, undo). */
+.notes-split-top.notes-out-of-sight {
+  display: none;
+}
+/* The bar and the pad under it. */
+.notes-notepad-area {
+  display: flex;
+  flex-direction: column;
+}
+.notes-notepad-area.open {
+  flex: 1;
+  min-height: 0;
+}
+/* Full screen: the same bar and pad over the whole window, below the
+   iPad's status bar while there is one (as .app keeps clear, base.css). */
+.notes-notepad-area.full-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
+  background: var(--panel);
+}
+.ipados:not(.status-bar-hidden) .notes-notepad-area.full-screen {
+  padding-top: max(env(safe-area-inset-top), 30px);
+}
+.notes-notepad-area.full-screen .notes-notepad-bar {
+  border-top: none;
+  border-bottom: 1px solid var(--border);
+}
+.notes-notepad-bar {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  padding: 4px;
+  border-top: 1px solid var(--border);
+  background: var(--panel-alt);
+  touch-action: none;
+}
+.notes-notepad-bar.open {
+  cursor: row-resize;
+}
+.notes-notepad-toggle {
+  padding: 2px 12px;
+  border-radius: 999px;
+  color: var(--text-dim);
+  font-size: calc(11px * var(--font-scale));
+  font-weight: 600;
+}
+.notes-notepad-toggle:hover {
+  background: var(--select);
+  color: var(--text);
+}
+/* Full height and full screen, at the bar's right, Hide Notepad left at
+   its middle. Lit while on. */
+.notes-notepad-modes {
+  position: absolute;
+  top: 50%;
+  right: 6px;
+  display: flex;
+  gap: 2px;
+  transform: translateY(-50%);
+}
+.notes-notepad-mode {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 22px;
+  border-radius: var(--radius);
+  color: var(--text-dim);
+}
+.notes-notepad-mode:hover {
+  background: var(--select);
+  color: var(--text);
+}
+.notes-notepad-mode.active {
+  background: var(--accent-soft);
+  color: var(--accent);
+}

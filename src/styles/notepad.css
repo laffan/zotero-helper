@@ -580,35 +580,3 @@
 .notepad-dock-preview-right {
   right: 0;
 }
-
-/* The notes pane's foot (NotesPanel.tsx): View Notepad at its middle; with
-   the notepad open, the divider between the notes and it, dragged to
-   share the height. */
-.notes-split-top {
-  flex: 1;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-}
-.notes-notepad-bar {
-  display: flex;
-  justify-content: center;
-  padding: 4px;
-  border-top: 1px solid var(--border);
-  background: var(--panel-alt);
-  touch-action: none;
-}
-.notes-notepad-bar.open {
-  cursor: row-resize;
-}
-.notes-notepad-toggle {
-  padding: 2px 12px;
-  border-radius: 999px;
-  color: var(--text-dim);
-  font-size: calc(11px * var(--font-scale));
-  font-weight: 600;
-}
-.notes-notepad-toggle:hover {
-  background: var(--select);
-  color: var(--text);
-}

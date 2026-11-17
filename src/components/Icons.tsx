@@ -167,6 +167,13 @@ export const PlusIcon = (p: IconProps = {}) => svg(<path d="M3.5 8h9M8 3.5v9" />
 export const FitIcon = (p: IconProps = {}) =>
   svg(<path d="M2.5 6V3.5a1 1 0 0 1 1-1H6M10 2.5h2.5a1 1 0 0 1 1 1V6M13.5 10v2.5a1 1 0 0 1-1 1H10M6 13.5H3.5a1 1 0 0 1-1-1V10" />, p);
 
+// The notes pane's notepad: the whole pane's height (bars at its top and
+// foot, an arrow between), and the whole screen (arrows to two corners).
+export const FullHeightIcon = (p: IconProps = {}) =>
+  svg(<path d="M3 2.5h10M3 13.5h10M8 5v6M6 7l2-2 2 2M6 9l2 2 2-2" />, p);
+export const FullScreenIcon = (p: IconProps = {}) =>
+  svg(<path d="M9.5 2.5h4v4M13.5 2.5 9 7M6.5 13.5h-4v-4M2.5 13.5 7 9" />, p);
+
 export const CheckIcon = (p: IconProps = {}) =>
   svg(<path d="M2.5 8.5l3.5 3.5 7.5-8" />, p);
 

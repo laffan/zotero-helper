@@ -7,14 +7,20 @@
 // notes above, the PDF's notepad below (NotepadBody, the pad reading
 // mode floats), so what was scribbled there can be typed up here. The
 // bar between them is the divider — dragged to share the height — with
-// Hide Notepad at its middle. Whether it shows, and the split, are this
-// device's.
+// Hide Notepad at its middle and, at its right, two switches: full
+// height (the pad takes the whole pane, the notes kept out of sight,
+// still open) and full screen (the pad and its bar fill the window).
+// Either goes back to the split; full height pressed in full screen
+// leaves it for the pane's height. The pad is the same element through
+// all three, only placed differently, so its undo and pan carry on.
+// Whether it shows, the split and full height are this device's; full
+// screen lasts while the notes are open.
 import { useEffect, useRef, useState } from "react";
 import { isStandaloneAttachment, pdfAttachmentOf } from "../lib/collections";
 import { noteAttachmentOf, openNote } from "../lib/notes";
 import { useStore } from "../lib/store";
 import type { NoteMeta, ZItem } from "../lib/types";
-import { Spinner } from "./Icons";
+import { FullHeightIcon, FullScreenIcon, Spinner } from "./Icons";
 import { NotepadBody } from "./NotepadBody";
 import { NotesEditor } from "./NotesEditor";
 
@@ -25,24 +31,37 @@ interface Note {
 
 const SPLIT_KEY = "zh-notes-notepad";
 
-function storedSplit(): { open: boolean; ratio: number } {
+interface Split {
+  open: boolean;
+  /** The notes' share of the height. */
+  ratio: number;
+  /** The pad takes the whole pane. */
+  tall?: boolean;
+}
+
+function storedSplit(): Split {
   try {
-    const v = JSON.parse(localStorage.getItem(SPLIT_KEY) ?? "null") as { open: boolean; ratio: number } | null;
+    const v = JSON.parse(localStorage.getItem(SPLIT_KEY) ?? "null") as Split | null;
     return v && typeof v.ratio === "number" ? v : { open: false, ratio: 0.5 };
   } catch {
     return { open: false, ratio: 0.5 };
   }
 }
 
-/** The pane's foot: View / Hide Notepad, and — open — the divider. */
-function NotepadSplit({ panelRef, split, setSplit }: {
+/** The pane's foot: View / Hide Notepad, and — open — the divider, with
+ *  full height and full screen at its right. */
+function NotepadSplit({ panelRef, split, setSplit, screen, setScreen }: {
   panelRef: React.RefObject<HTMLDivElement>;
-  split: { open: boolean; ratio: number };
-  setSplit: (s: { open: boolean; ratio: number }) => void;
+  split: Split;
+  setSplit: (s: Split) => void;
+  screen: boolean;
+  setScreen: (on: boolean) => void;
 }) {
+  // Only between the notes and the pad does the bar divide them.
+  const divides = split.open && !split.tall && !screen;
   const drag = (e: React.PointerEvent) => {
     const panel = panelRef.current;
-    if (!split.open || !panel || (e.target as Element).closest("button")) return;
+    if (!divides || !panel || (e.target as Element).closest("button")) return;
     e.preventDefault();
     const r = panel.getBoundingClientRect();
     const move = (ev: PointerEvent) =>
@@ -56,11 +75,46 @@ function NotepadSplit({ panelRef, split, setSplit }: {
     window.addEventListener("pointerup", up);
     window.addEventListener("pointercancel", up);
   };
+  const tallOn = split.tall && !screen;
   return (
-    <div className={split.open ? "notes-notepad-bar open" : "notes-notepad-bar"} onPointerDown={drag}>
-      <button type="button" className="notes-notepad-toggle" onClick={() => setSplit({ ...split, open: !split.open })}>
+    <div className={divides ? "notes-notepad-bar open" : "notes-notepad-bar"} onPointerDown={drag}>
+      <button
+        type="button"
+        className="notes-notepad-toggle"
+        onClick={() => {
+          if (split.open) setScreen(false);
+          setSplit({ ...split, open: !split.open });
+        }}
+      >
         {split.open ? "Hide Notepad" : "View Notepad"}
       </button>
+      {split.open && (
+        <span className="notes-notepad-modes">
+          <button
+            type="button"
+            className={tallOn ? "notes-notepad-mode active" : "notes-notepad-mode"}
+            aria-pressed={tallOn}
+            title={tallOn ? "Share the height with the notes" : "Full height: the notepad takes the whole pane"}
+            aria-label="Full height"
+            onClick={() => {
+              setScreen(false);
+              setSplit({ ...split, tall: !tallOn });
+            }}
+          >
+            <FullHeightIcon size={14} />
+          </button>
+          <button
+            type="button"
+            className={screen ? "notes-notepad-mode active" : "notes-notepad-mode"}
+            aria-pressed={screen}
+            title={screen ? "Leave full screen" : "Full screen: the notepad fills the window"}
+            aria-label="Full screen"
+            onClick={() => setScreen(!screen)}
+          >
+            <FullScreenIcon size={14} />
+          </button>
+        </span>
+      )}
     </div>
   );
 }
@@ -70,7 +124,9 @@ export function NotesPanel({ item }: { item: ZItem }) {
   // The notepad belongs to the PDF open beside these notes.
   const padKey = useStore((s) => (s.reading?.itemKey === item.key ? s.reading.attKey : null));
   const [split, setSplitState] = useState(storedSplit);
-  const setSplit = (s: { open: boolean; ratio: number }) => {
+  // The pad over the whole window, while the notes are open.
+  const [screen, setScreen] = useState(false);
+  const setSplit = (s: Split) => {
     setSplitState(s);
     try {
       localStorage.setItem(SPLIT_KEY, JSON.stringify(s));
@@ -122,10 +178,18 @@ export function NotesPanel({ item }: { item: ZItem }) {
     );
   }
   const padOpen = Boolean(padKey && split.open);
+  const full = padOpen && screen;
+  // The notes: their share beside the pad, out of sight under a pad of
+  // the pane's height, the whole pane otherwise (under a full screen too).
+  const tall = padOpen && split.tall && !full;
+  const shared = padOpen && !split.tall && !full;
   return (
     <div className="notes-panel" ref={panelRef}>
       {error && <div className="error-msg notes-error">{error}</div>}
-      <div className="notes-split-top" style={padOpen ? { flex: `0 0 ${split.ratio * 100}%` } : undefined}>
+      <div
+        className={tall ? "notes-split-top notes-out-of-sight" : "notes-split-top"}
+        style={shared ? { flex: `0 0 ${split.ratio * 100}%` } : undefined}
+      >
         <NotesEditor
           key={item.key}
           itemKey={item.key}
@@ -134,10 +198,14 @@ export function NotesPanel({ item }: { item: ZItem }) {
           pdfAttKey={pdfAtt?.key ?? null}
         />
       </div>
-      {padKey && <NotepadSplit panelRef={panelRef} split={split} setSplit={setSplit} />}
-      {padKey && padOpen && (
-        <div className="notepad notepad-docked">
-          <NotepadBody attKey={padKey} kind="docked" />
+      {padKey && (
+        <div className={`notes-notepad-area${padOpen ? " open" : ""}${full ? " full-screen" : ""}`}>
+          <NotepadSplit panelRef={panelRef} split={split} setSplit={setSplit} screen={full} setScreen={setScreen} />
+          {padOpen && (
+            <div className="notepad notepad-docked">
+              <NotepadBody attKey={padKey} kind="docked" />
+            </div>
+          )}
         </div>
       )}
     </div>

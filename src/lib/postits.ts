@@ -27,8 +27,9 @@
 import { createAnnotation, deleteAnnotation, newItemKey, updateAnnotation } from "./annotationEdits";
 import { annotationPosition, type Annotation } from "./highlights";
 
-/** A new post-it's side, in PDF points: 200 × 200 at 100% zoom. */
-export const POSTIT_SIZE = 200;
+/** A new post-it's side, in PDF points: 133 × 133 at 100% zoom. Its
+ *  type, margins, grip and pen don't depend on it. */
+export const POSTIT_SIZE = 133;
 /** The band across its top (the grip it is dragged by), its margins and
  *  its type, in points. */
 export const POSTIT_GRIP = 18;

@@ -194,7 +194,8 @@
 }
 
 /* The Post-its tab (PostItsPanel.tsx): each as it looks on its page,
-   smaller, its page under it. `--pk` is set on each card. */
+   smaller, its page under it. `--pk` is set on each card, the same on
+   all. */
 .postit-list {
   flex: 1;
   min-height: 0;
@@ -202,15 +203,16 @@
   padding: 10px 12px 16px;
 }
 .postit-cards {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, calc(180px * var(--font-scale)));
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
   gap: 16px 14px;
 }
+/* As wide as its post-it at the card's scale (set inline). */
 .postit-card {
   display: flex;
   flex-direction: column;
   gap: 4px;
-  width: calc(180px * var(--font-scale));
   padding: 0;
   border: none;
   background: none;

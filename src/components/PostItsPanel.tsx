@@ -14,8 +14,9 @@ import type { ZItem } from "../lib/types";
 import { pathD } from "../pdfviewer/ink/geometry";
 import { goToReaderPosition, openReaderAt } from "./ReaderPane";
 
-/** A card's width, CSS px at the UI's font size. */
-const CARD_PX = 180;
+/** A card's scale, CSS px per point at the UI's font size: each card
+ *  is its post-it at this size, so the type reads the same in all. */
+const CARD_K = 0.9;
 
 export interface PostItGroup {
   item: ZItem;
@@ -74,7 +75,13 @@ function PostItCard({ p, open, item }: { p: PostIt; open: boolean; item: ZItem }
       className="postit-card"
       onClick={go}
       title={open ? "Show on its page" : "Open the PDF at this post-it"}
-      style={{ "--postit-color": p.color, "--pk": `calc(${CARD_PX / w}px * var(--font-scale))` } as React.CSSProperties}
+      style={
+        {
+          "--postit-color": p.color,
+          "--pk": `calc(${CARD_K}px * var(--font-scale))`,
+          width: `calc(${CARD_K * w}px * var(--font-scale))`,
+        } as React.CSSProperties
+      }
     >
       <span className="postit-card-paper" style={{ aspectRatio: `${w} / ${h}` }}>
         <span

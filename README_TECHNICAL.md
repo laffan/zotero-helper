@@ -2006,8 +2006,12 @@ second press, or Escape, puts the tool away unused. While ready it has
 every press on the pages to itself, heard on the window before anything
 in them; a finger's drag still scrolls (`src/pdfviewer/postits.ts`).
 
-A new post-it is 200 × 200 points — 200 × 200 CSS px at 100% zoom —
-and, like the paper it stands for, belongs to its page: it is an
+A new post-it is 133 × 133 points — 133 × 133 CSS px at 100% zoom
+(`POSTIT_SIZE`; its type, margins, grip and pen are set apart from it,
+so a smaller paper holds fewer words, not smaller ones) — and, like the
+paper it stands for, belongs to its page. Each keeps the size it was
+made at (its rect is stored), so post-its made at an earlier size stay
+that size. It is an
 overlay on its page wrapper placed in percentages of the page, as the
 sections' lines are, so it grows and shrinks with the page through
 every zoom, fit and reading crop, with no raster. Its type (11pt, lines
@@ -2100,7 +2104,8 @@ Highlight Map leave them out.
 
 **The Post-its tab** (`PostItsPanel.tsx`), beside Highlights when the
 selection has any post-its (⇧T): each as it looks on its page, smaller —
-the paper, its words and its writing — in reading order, with its page
+the paper, its words and its writing, all at one scale (0.9px a point),
+so a smaller post-it is a smaller card — in reading order, with its page
 under it; several PDFs list under a heading each. With the PDF open a
 click goes to the post-it on its page; otherwise it opens the PDF there.
 

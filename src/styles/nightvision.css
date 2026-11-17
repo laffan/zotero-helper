@@ -59,8 +59,14 @@ html.night-vision .pdf-selection-bar.underline .pdf-mark-swatch[data-letter]::be
   color: var(--text);
 }
 
-/* Each highlight's flag on the page (pdfviewer/colorFlags.ts), drawn
-   only while night vision is on. */
+/* Each highlight's flag on the page (pdfviewer/colorFlags.ts): only in
+   night vision — built only then, taken down when it ends, and hidden
+   by this rule besides. A plain tab of the highlight's colour, the
+   height of its line, with the letter in it. Sizes come from the line's
+   height (`--lh`, page units) times the layer's CSS px per page unit
+   (`--fk`), so they follow the zoom: the letter 0.444 of the line less
+   a pixel, and 0.085 of it plus a pixel each side (colorFlags.ts's
+   LETTER and ROOM). */
 .pdf-color-flags {
   display: none;
 }
@@ -73,15 +79,20 @@ html.night-vision .pdf-color-flags {
 }
 .pdf-color-flag {
   position: absolute;
-  overflow: visible;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  padding: 0 calc(var(--fk, 1px) * var(--lh) * 0.085 + 1px);
+  background: var(--flag);
+  color: #000;
+  font-family: system-ui, -apple-system, sans-serif;
+  font-size: max(calc(var(--fk, 1px) * var(--lh) * 0.444 - 1px), 3px);
+  font-weight: 700;
+  line-height: 1;
 }
-.pdf-color-flag path {
-  stroke: rgb(0 0 0 / 0.55);
-  stroke-width: 0.5;
-}
-/* In the flag's own units (its viewBox is 10 high), so the letter grows
-   and shrinks with the flag, which the page's zoom sizes. */
-.pdf-color-flag text {
-  font: 700 7.4px system-ui, -apple-system, sans-serif;
-  fill: #000;
+/* Trimmed to the capital, so centring it centres the letter (as in the
+   dots above). */
+.pdf-color-flag > span {
+  text-box: trim-both cap alphabetic;
 }

@@ -342,23 +342,28 @@ the selection bar's and the highlight editor's, the pen's, the
 Highlights tab's filters and reading mode's pen colours — through a
 `data-letter` attribute and `nightvision.css` (`::before`, or `::after`
 where the dot itself is drawn by `::before`). On the pages each
-highlight and underline gets a tiny flag in its colour with its letter,
-60% of its line's height and centred on it
-(`src/pdfviewer/colorFlags.ts`, run through `annotating.ts`): an SVG on
-a layer over the page wrapper in percentages of the page, like the
-passage marks, so it follows every zoom and its letter scales with it.
-A flag is kept off the text: it goes on the left edge of the first of
-the passage's lines that begins a line of text (the first line if the
-passage begins one, else the second); failing that, on the right edge
-of a line that ends one; failing that (one line with words on both
-sides), in the margin at the start of that line of text, level with the
-passage. A line of text is a run of the page's text items (read with
+highlight and underline gets a tiny flag with its letter
+(`src/pdfviewer/colorFlags.ts`, run through `annotating.ts`): a plain
+tab of its colour (no border or rounding), the height of its line,
+attached to the passage. It sits on a layer over the page wrapper in
+percentages of the page, like the passage marks, so it follows every
+zoom; the letter's size and the tab's side room come from the line's
+height in CSS (`--lh`), through `--fk`, the layer's CSS px per page
+unit, which a `ResizeObserver` keeps. A flag is kept off the text where
+it can be: it goes on the left edge of the first of the passage's lines
+that begins a line of text (the first line if the passage begins one,
+else the second); failing that, on the right edge of a line that ends
+one; failing that (one line with words on both sides, which is rare),
+on the passage's own left edge, over the words before it. A line of
+text is a run of the page's text items (read with
 `pdfQuote.ts#textItems`, once a page, only in night vision) with no gap
 wider than the line's height, so on a two-column page the flag goes in
 the gutter, not over the other column. Flags that would meet are moved
 apart along the line, and kept on the page. With no text (a scan) a
-flag goes at the passage's left edge. The flags are built only while
-night vision is on (a class watch on `<html>`) and drawn again when the
+flag goes at the passage's left edge. The flags never show outside
+night vision: they are built only while it is on (a class watch on
+`<html>`), taken down when it ends, and hidden by `nightvision.css`
+unless `<html>` has its class; they are drawn again when the
 annotations change or a page is drawn. The folded view and the
 thumbnails have none; a reading crop that trims the margin can cut a
 margin flag off.

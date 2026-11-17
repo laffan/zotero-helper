@@ -4,7 +4,8 @@
 // underline on a page gets a tiny flag in its colour carrying the
 // colour's letter (`colorLetter`: Y, R, G, B, P, M, O — the same
 // letters the colour dots show then). Gray has no letter, and no flag.
-// A flag is 60% of its line's height, centred on it.
+// A flag is a plain tab of the colour, the height of the passage's line,
+// attached to it — no gap, border or rounding.
 //
 // A flag is kept off the text where it can be. It is attached where the
 // passage meets a line break, so it lies in the margin or a column's
@@ -14,8 +15,8 @@
 //      its second, which always does);
 //   2. else the right edge of the first line that ends a line of text
 //      (a one-line passage running to the line's end);
-//   3. else (one line, words on both sides) in the margin at the start
-//      of that line of text, level with the passage.
+//   3. else (one line, words on both sides — rare) the passage's own left
+//      edge, over the words before it.
 // "A line of text" is a run of the page's text items without a gap
 // wider than a line's height, so the other column of a two-column page
 // doesn't count. Flags that would meet are moved apart along the line.
@@ -23,10 +24,13 @@
 // edge.
 //
 // Drawn like the passage marks (passageMarks.ts): a layer on the page
-// wrapper in percentages of the page, so it follows every zoom, and
-// SVG, so the letter scales with its flag. Built only while night vision
-// is on (the page's text is read for it then), and shown only then
-// (nightvision.css). The folded view and the thumbnails have none.
+// wrapper, flags placed in percentages of the page, so they follow every
+// zoom. The letter is sized from the line's height in CSS
+// (nightvision.css), through `--fk`, the layer's CSS px per page unit,
+// kept as the page's size changes. Built only while night vision is on
+// (the page's text is read for it then), shown only then
+// (nightvision.css), and taken down when it ends. The folded view and
+// the thumbnails have none.
 import { annotationPosition, colorLetter, rectsOnPage, type Annotation } from "../lib/highlights";
 import { textItems } from "../lib/pdfQuote";
 import { isPostItPart } from "../lib/postits";
@@ -49,9 +53,14 @@ interface Box {
 type Quad = number[];
 
 const LAYER = "pdf-color-flags";
-/** A flag's height, as a share of its line's. */
-const FLAG = 0.6;
-const SVG = "http://www.w3.org/2000/svg";
+/** nightvision.css's letter size and side room, as shares of the line's
+ *  height, and the pixel taken off the one and added to the other — for
+ *  the width a flag will take, to keep flags apart. A capital is about
+ *  0.75 of its size wide. */
+const LETTER = 0.444;
+const ROOM = 0.085;
+const flagWidth = (lineH: number, fk: number) =>
+  0.75 * Math.max(LETTER * lineH - 1 / fk, 3 / fk) + 2 * (ROOM * lineH + 1 / fk);
 
 const nightVisionOn = () => document.documentElement.classList.contains("night-vision");
 
@@ -132,33 +141,20 @@ function quadOf(it: { transform?: number[]; width?: number; height?: number; str
   return [e, f, e + ux, f + uy, e + vx, f + vy, e + ux + vx, f + uy + vy];
 }
 
-function flagEl(f: Box, side: "left" | "right", color: string, letter: string, vp: PageViewport): SVGSVGElement {
-  // A tab 10 units high and 8 wide, square on the side it is attached
-  // by and rounded on the other.
-  const vw = 8;
-  const svg = document.createElementNS(SVG, "svg");
-  svg.setAttribute("class", `pdf-color-flag pdf-color-flag-${side}`);
-  svg.setAttribute("viewBox", `0 0 ${vw} 10`);
-  svg.style.left = `${(f.x / vp.width) * 100}%`;
-  svg.style.top = `${(f.y / vp.height) * 100}%`;
-  svg.style.width = `${(f.w / vp.width) * 100}%`;
-  svg.style.height = `${(f.h / vp.height) * 100}%`;
-  const r = 2.5;
-  const path = document.createElementNS(SVG, "path");
-  path.setAttribute(
-    "d",
-    side === "left"
-      ? `M${vw} 0.5H${r + 0.5}A${r} ${r} 0 0 0 0.5 ${r + 0.5}V${9.5 - r}A${r} ${r} 0 0 0 ${r + 0.5} 9.5H${vw}Z`
-      : `M0 0.5H${vw - r - 0.5}A${r} ${r} 0 0 1 ${vw - 0.5} ${r + 0.5}V${9.5 - r}A${r} ${r} 0 0 1 ${vw - r - 0.5} 9.5H0Z`,
-  );
-  path.setAttribute("fill", color);
-  const text = document.createElementNS(SVG, "text");
-  text.setAttribute("x", String(vw / 2));
-  text.setAttribute("y", "7.6");
-  text.setAttribute("text-anchor", "middle");
-  text.textContent = letter;
-  svg.append(path, text);
-  return svg;
+function flagEl(f: Box, lineH: number, side: "left" | "right", color: string, letter: string, vp: PageViewport): HTMLElement {
+  const el = document.createElement("div");
+  el.className = `pdf-color-flag pdf-color-flag-${side}`;
+  // Fixed by the edge it is attached by, so its width is its letter's.
+  if (side === "left") el.style.right = `${100 - ((f.x + f.w) / vp.width) * 100}%`;
+  else el.style.left = `${(f.x / vp.width) * 100}%`;
+  el.style.top = `${(f.y / vp.height) * 100}%`;
+  el.style.height = `${(f.h / vp.height) * 100}%`;
+  el.style.setProperty("--lh", String(lineH));
+  el.style.setProperty("--flag", color);
+  const span = document.createElement("span");
+  span.textContent = letter;
+  el.appendChild(span);
+  return el;
 }
 
 export function createColorFlags(env: ColorFlagsEnv) {
@@ -166,6 +162,21 @@ export function createColorFlags(env: ColorFlagsEnv) {
   const texts = new Map<number, Promise<Quad[]>>();
   // A page's latest draw; an older one still reading its text gives way.
   const tokens = new Map<number, number>();
+  // Each layer's CSS px per page unit (`--fk`), kept as the page resizes.
+  const sizes = new ResizeObserver((entries) => {
+    for (const e of entries) setScale(e.target as HTMLElement);
+  });
+  function setScale(layer: HTMLElement): number {
+    const k = layer.clientWidth / (Number(layer.dataset.vpw) || 1);
+    if (k > 0) layer.style.setProperty("--fk", `${k}px`);
+    return k > 0 ? k : 1;
+  }
+  function removeLayer(wrapper: HTMLElement | undefined): void {
+    const old = wrapper?.querySelector<HTMLElement>(`:scope > .${LAYER}`);
+    if (!old) return;
+    sizes.unobserve(old);
+    old.remove();
+  }
 
   function pageText(idx: number): Promise<Quad[]> {
     let t = texts.get(idx);
@@ -199,7 +210,7 @@ export function createColorFlags(env: ColorFlagsEnv) {
     tokens.set(idx, token);
     const marks = nightVisionOn() ? marksOn(idx) : [];
     if (!marks.length) {
-      env.getPages()[idx]?.wrapper.querySelector(`:scope > .${LAYER}`)?.remove();
+      removeLayer(env.getPages()[idx]?.wrapper);
       return;
     }
     const quads = await pageText(idx);
@@ -210,6 +221,8 @@ export function createColorFlags(env: ColorFlagsEnv) {
     const placed: Box[] = [];
     const layer = document.createElement("div");
     layer.className = LAYER;
+    layer.dataset.vpw = String(vp.width);
+    const fk = p.wrapper.clientWidth / vp.width || 1;
     for (const { a, rects } of marks) {
       const lines = linesOf(rects.map((r) => boxOf(vp, r)));
       if (!lines.length) continue;
@@ -224,21 +237,20 @@ export function createColorFlags(env: ColorFlagsEnv) {
         at = lines.findIndex((l, i) => runs[i].end <= l.x + l.w + tol(l));
         if (at >= 0) side = "right";
       }
+      // No line break to attach to: the passage's own left edge.
       const line = lines[Math.max(0, at)];
-      const h = FLAG * line.h;
-      const w = 0.8 * h;
-      const gap = 0.08 * line.h;
-      const edge = at < 0 ? runs[0].start : line.x;
-      const y = line.y + (line.h - h) / 2;
-      const f: Box = { x: side === "left" ? edge - gap - w : line.x + line.w + gap, y, w, h };
+      const w = flagWidth(line.h, fk);
+      const f: Box = { x: side === "left" ? line.x - w : line.x + line.w, y: line.y, w, h: line.h };
       // Apart from the flags already placed, outwards along the line.
-      for (let n = 0; n < 8 && placed.some((q) => meets(q, f)); n++) f.x += (side === "left" ? -1 : 1) * (w + gap);
+      for (let n = 0; n < 8 && placed.some((q) => meets(q, f)); n++) f.x += (side === "left" ? -1 : 1) * w;
       f.x = Math.min(Math.max(0, f.x), vp.width - w);
       placed.push(f);
-      layer.appendChild(flagEl(f, side, color, letter, vp));
+      layer.appendChild(flagEl(f, line.h, side, color, letter, vp));
     }
-    p.wrapper.querySelector(`:scope > .${LAYER}`)?.remove();
+    removeLayer(p.wrapper);
     p.wrapper.appendChild(layer);
+    setScale(layer);
+    sizes.observe(layer);
   }
 
   const drawn = () => env.getPages().flatMap((p, i) => (p.rendered ? [i] : []));
@@ -253,7 +265,7 @@ export function createColorFlags(env: ColorFlagsEnv) {
     if (now !== was) {
       was = now;
       if (now) redrawAll();
-      else for (const p of env.getPages()) p.wrapper.querySelector(`:scope > .${LAYER}`)?.remove();
+      else for (const p of env.getPages()) removeLayer(p.wrapper);
     }
   });
   watch.observe(document.documentElement, { attributes: true, attributeFilter: ["class"] });
@@ -269,6 +281,7 @@ export function createColorFlags(env: ColorFlagsEnv) {
     },
     destroy(): void {
       watch.disconnect();
+      sizes.disconnect();
     },
   };
 }

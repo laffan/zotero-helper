@@ -18,6 +18,7 @@ import {
   FolderPlus,
   GearIcon,
   ImportIcon,
+  NightVisionIcon,
   PanelLeft,
   PanelRight,
   PdfIcon,
@@ -54,6 +55,8 @@ export function Toolbar() {
   const items = useStore((s) => s.library.items);
   const askPreparing = useStore((s) => s.askPreparing);
   const aiOn = useStore((s) => aiConnected(s.settings));
+  const nightVision = useStore((s) => s.nightVision);
+  const setNightVision = useStore((s) => s.setNightVision);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const aiMenu = useDropdown();
   const collections = useStore((s) => s.library.collections);
@@ -277,6 +280,16 @@ export function Toolbar() {
           aria-label="Toggle activity log"
         >
           <TerminalIcon />
+        </button>
+        {/* Night vision (lib/nightVision.ts): the whole app in red. */}
+        <button
+          className={`icon-btn ${nightVision ? "active" : ""}`}
+          onClick={() => setNightVision(!nightVision)}
+          title={nightVision ? "Night vision is on — press to show colours again" : "Night vision — the app in red only, no blue light"}
+          aria-label="Night vision"
+          aria-pressed={nightVision}
+        >
+          <NightVisionIcon />
         </button>
         <button
           className="icon-btn"

@@ -2,6 +2,7 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App";
 import { initAppearance } from "./lib/appearance";
+import { initNightVision } from "./lib/nightVision";
 import { askStatusBar } from "./lib/statusBar";
 import "./styles/index.css";
 
@@ -25,6 +26,7 @@ askStatusBar();
 document.addEventListener("gesturestart", (e) => e.preventDefault());
 
 initAppearance();
+initNightVision();
 
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
   <React.StrictMode>

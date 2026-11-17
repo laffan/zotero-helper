@@ -101,6 +101,9 @@ interface UiPrefs {
   appearance: Appearance;
   /** The UI's base font size, px (13 is the size it was drawn at). */
   uiFontSize: number;
+  /** The app drawn in red alone (lib/nightVision.ts; the header's
+   *  button beside Settings). This device's, kept until turned off. */
+  nightVision: boolean;
 }
 
 export interface FolderView {
@@ -248,6 +251,7 @@ interface AppStore extends UiPrefs {
   setNotepadOpen: (b: boolean) => void;
   setAppearance: (a: Appearance) => void;
   setUiFontSize: (px: number) => void;
+  setNightVision: (on: boolean) => void;
   /** Open (or close, with null) a PDF. The right panel comes up on
    *  `tab` — Highlights unless the caller says otherwise. */
   setReading: (r: ReadingState | null, tab?: MetaTab) => void;
@@ -306,6 +310,7 @@ export const useStore = create<AppStore>()(
       notepadOpen: false,
       appearance: "system" as Appearance,
       uiFontSize: 13,
+      nightVision: false,
       uiTasks: [],
       uiTaskLabel: "",
 
@@ -474,6 +479,7 @@ export const useStore = create<AppStore>()(
       setNotepadOpen: (notepadOpen) => set({ notepadOpen }),
       setAppearance: (appearance) => set({ appearance }),
       setUiFontSize: (uiFontSize) => set({ uiFontSize }),
+      setNightVision: (nightVision) => set({ nightVision }),
       setReading: (reading, tab = "highlights") => {
         // Every PDF opened joins the sidebar's Recent folder.
         if (reading?.attKey) noteOpened(reading.itemKey, reading.attKey);
@@ -563,6 +569,7 @@ export const useStore = create<AppStore>()(
         outlineOpen: s.outlineOpen,
         appearance: s.appearance,
         uiFontSize: s.uiFontSize,
+        nightVision: s.nightVision,
       }),
     },
   ),

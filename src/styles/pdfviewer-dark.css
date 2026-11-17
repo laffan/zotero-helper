@@ -2,15 +2,13 @@
    black. Only in the dark theme — the bulb that turns it on shows only
    there, and the class it sets on the viewer's body does nothing in the
    light theme — so both read variables that only the dark theme
-   defines (the same two selectors as tokens.css). Night vision's
-   layers (pdfviewer-night.css) read `--pdf-night-layer` the same way. */
+   defines (the same two selectors as tokens.css). */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     --pdf-dark-offer: inline-block;
     --pdf-dark-filter: invert(1) hue-rotate(180deg);
     --pdf-dark-paper: #000;
     --pdf-dark-waiting: #0c0c0c;
-    --pdf-night-layer: block;
   }
 }
 :root[data-theme="dark"] {
@@ -18,7 +16,6 @@
   --pdf-dark-filter: invert(1) hue-rotate(180deg);
   --pdf-dark-paper: #000;
   --pdf-dark-waiting: #0c0c0c;
-  --pdf-night-layer: block;
 }
 
 .pdf-zoom-btn.pdf-dark-btn {

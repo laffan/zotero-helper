@@ -10,9 +10,6 @@ import type { MarkType } from "./selectionBar";
 import type { SavedView } from "./viewState";
 
 export interface PdfViewerOptions {
-  /** What night vision (the light bulb's third setting, nightVision.ts)
-   *  covers — the reader pane; the viewer's own root when absent. */
-  nightVisionHost?: HTMLElement;
   /** Open the PDF in Zotero at a page (toolbar link, page pop-out). */
   onOpenInZotero?: (page: number) => void;
   /** Bookmark a page (its hover button), named as it is made; `top`

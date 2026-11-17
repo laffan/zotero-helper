@@ -22,8 +22,7 @@ Windows/Linux desktops too).
   same ink annotations Zotero's reader makes), a folded view of just the
   annotated passages, a paged view of one to five pages at a time (with
   an adjustable reading crop), a full-screen reading mode, white-on-black
-  pages in the dark theme (and a night vision setting beside them that
-  draws the reader in red alone, with no blue light), pinch to magnify, search, outlines and page
+  pages in the dark theme, pinch to magnify, search, outlines and page
   citations into the notes;
   ⌘-click (or the sentence tool) selects a whole sentence, highlights
   can run across a page break and their ends can be dragged, and
@@ -62,7 +61,9 @@ Windows/Linux desktops too).
 - **Keyboard first** — rebindable shortcuts for moving between panes, the
   list, and the viewer's modes (Settings → Keyboard Shortcuts).
 - **Your look** — light, dark or system appearance and an adjustable UI font
-  size (Settings → General).
+  size (Settings → General); and night vision (the eye beside Settings),
+  which draws the whole app in red only, with no blue light, for
+  working in the dark.
 - **Full screen on iPad** — the status bar is hidden while the app fills
   the screen.
 - **Continue Reading widgets (iOS)** — home-screen widgets with the PDFs

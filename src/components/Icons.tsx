@@ -94,6 +94,18 @@ export const GearIcon = (p: IconProps = {}) =>
     p,
   );
 
+// Night vision (lib/nightVision.ts): an eye, with a small star above
+// it — seeing in the dark.
+export const NightVisionIcon = (p: IconProps = {}) =>
+  svg(
+    <>
+      <path d="M1.5 10C3 7.4 5.3 6 8 6s5 1.4 6.5 4C13 12.6 10.7 14 8 14s-5-1.4-6.5-4z" />
+      <circle cx="8" cy="10" r="1.8" />
+      <path d="M12.5 1.5v3M11 3h3" />
+    </>,
+    p,
+  );
+
 export const TerminalIcon = (p: IconProps = {}) =>
   svg(
     <>

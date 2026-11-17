@@ -104,9 +104,11 @@ src/            React + TypeScript UI (Vite, zustand, MiniSearch)
                 panel's tabs), listNav (the item list / icon grid
                 selection from the arrows), hoverFocus (the pointer
                 over the pages or the notes moves the focus there)
-  lib/appearance.ts, lib/panels.ts
-                Settings → General's theme and UI font size; showing and
-                hiding the side panels (toolbar buttons and shortcuts)
+  lib/appearance.ts, lib/nightVision.ts, lib/panels.ts
+                Settings → General's theme and UI font size; night
+                vision (the header's eye: the whole app in red);
+                showing and hiding the side panels (toolbar buttons and
+                shortcuts)
   lib/annotationEdits.ts, lib/pendingAnnotations.ts
                 highlights and drawings made in the reader: create /
                 edit / delete, the push schedule, and unsent changes
@@ -192,8 +194,7 @@ src/            React + TypeScript UI (Vite, zustand, MiniSearch)
                 (the passages the AI explained, the words looked up),
                 excerpt (pages cut into a PDF of their own, a page's
                 region as an image), darkPages (the pages white on
-                black; the light bulb's three settings), nightVision
-                (the reader pane in red alone), pencilFinger
+                black), pencilFinger
                 (the Pencil out of ink mode, a finger), bookmarks (the
                 pages' bookmark buttons and marks), bookmarkHold
                 (reading mode's hold on a corner), nameBox (the box
@@ -317,6 +318,35 @@ build, and `src/lib/pdfjsAssets.ts` hands every `getDocument` call
 their URLs.
 
 ## Features
+
+### Night vision
+
+The eye in the header, to the left of Settings, draws the whole app in
+shades of pure red — no blue and no green light — for working in the
+dark without losing dark adaptation (the rods that see at night are
+nearly blind to deep red). Each pixel keeps its brightness (its
+luminance) and loses its hue. It lies over whatever is on screen:
+either theme, dark pages or not, the library, the reader, reading mode,
+Settings and modals. The choice is this device's and lasts until it is
+turned off (`nightVision` in the store's persisted UI prefs, applied
+before the first render by `initNightVision`, `src/lib/nightVision.ts`).
+Reading mode hides the header, so it is turned on or off outside it.
+
+Two click-through layers on `<body>`, over everything else
+(`nightvision.css`, z-index 2147483646 and 2147483647 — above modals,
+the notepad's link line and the drag ghost): `backdrop-filter:
+grayscale(1)` (what is under it reduced to its luminance), then pure red
+with `mix-blend-mode: multiply` (that grey times (1, 0, 0): luminance in
+the red channel, green and blue zero). Whatever the grey layer misses is
+still multiplied, so nothing keeps any blue. They are children of
+`<body>` rather than of one host, which would be its own stacking
+context and leave both sampling an empty backdrop. Only filter
+functions and a blend mode: an SVG `url()` filter would do it in one
+step, but WebKit renders those off its accelerated filter path
+(unreliable over composited layers such as the page canvases) and
+doesn't take them in `backdrop-filter`. Not covered: what the system
+draws (the status bar, the keyboard, menus and share sheets, text
+selection handles), and the home-screen widgets.
 
 ### Full screen on the iPad
 
@@ -982,11 +1012,8 @@ outright for a frame (a relayout that keeps the scroll), noting it in
 the activity log at debug level.
 
 **Dark pages.** In the dark theme the bottom bar offers a light bulb
-(off to begin with; the choice is this device's, `zh-pdf-dark`: `0`,
-`1` dark, `2` night vision) whose presses step through three settings —
-pages as printed, dark pages, night vision — and round again. Dark
-pages draws the pages white on black (`darkPages.ts`,
-`pdfviewer-dark.css`).
+(off to begin with; the choice is this device's, `zh-pdf-dark`) that
+draws the pages white on black (`darkPages.ts`, `pdfviewer-dark.css`).
 It is a CSS filter over each page's raster, the folds' and the ink —
 inverted, then turned half way round the colour wheel, so colours keep
 roughly their hue — rather than pdf.js's `pageColors`, which would mean
@@ -994,32 +1021,8 @@ drawing every page again at each switch and reduces images to two
 tones; the text layer, selections and the app's own marks are left as
 they are. Highlights painted into the pages come out as darker bands of
 their colour, and photographs inverted. In the light theme the bulb is
-hidden and the class does nothing, so the pages are as printed.
-
-**Night vision.** The bulb's third setting (the bulb is drawn filled):
-dark pages, with the whole reader pane in shades of pure red — no blue
-and no green light — for reading in the dark without losing dark
-adaptation (`nightVision.ts`, `pdfviewer-night.css`). It covers a
-portion of the app, the reader pane's box (`ReaderPane` hands its
-section to the viewer as `nightVisionHost`): the pages, the bottom bar,
-the outline and reading mode's notepad — so in reading mode the whole
-screen. The library, the notes panel, the settings and modals keep
-their colours, and so does what the pane draws outside its box: the
-explanation box (`.explain-chat`, fixed at the window's bottom right)
-is over the notes panel outside reading mode. Two click-through layers are appended to
-the pane, its last children: `backdrop-filter: grayscale(1)` (what is
-under it reduced to its luminance), then pure red with
-`mix-blend-mode: multiply` (that grey times (1, 0, 0): luminance in the
-red channel, green and blue zero). Whatever the grey layer misses is
-still multiplied, so nothing under it keeps any blue. Only filter
-functions and a blend mode: an SVG `url()` filter would do it in one
-step, but WebKit renders those off its accelerated filter path and
-doesn't take them in `backdrop-filter`. While they are up the pane is
-`isolation: isolate`, so their z-index puts them over the pane's own
-contents (its popovers included) and nothing outside it; a modal
-opened over the reader stays in its colours. Like dark pages it acts
-only in the dark theme (`--pdf-night-layer`, defined by the dark theme
-alone), and the viewer takes the layers down when it is destroyed.
+hidden and the class does nothing, so the pages are as printed. Night
+vision (below, Features) lies over either.
 
 **Pinch to magnify.** A pinch over the pages magnifies them like a
 loupe, and only them: the app itself never zooms (`index.html`'s

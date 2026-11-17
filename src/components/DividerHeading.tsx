@@ -20,9 +20,12 @@ interface Props {
   open: boolean;
   shown: boolean;
   onShown: () => void;
+  /** Indented by its depth, as in the list (not as the map's column
+   *  heading or row). */
+  indent?: boolean;
 }
 
-export function DividerHeading({ section, id, itemKey, attKey, open, shown, onShown }: Props) {
+export function DividerHeading({ section, id, itemKey, attKey, open, shown, onShown, indent = true }: Props) {
   const [renaming, setRenaming] = useState(false);
   const [name, setName] = useState(section.title);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -50,7 +53,7 @@ export function DividerHeading({ section, id, itemKey, attKey, open, shown, onSh
   return (
     <div
       className={`hl-section hl-divider ${shown ? "shown" : ""}`}
-      style={{ paddingLeft: Math.min(section.depth, 3) * 10 }}
+      style={indent ? { paddingLeft: Math.min(section.depth, 3) * 10 } : undefined}
       title={`${section.path.join(" › ")} — go to this section`}
       onClick={go}
     >

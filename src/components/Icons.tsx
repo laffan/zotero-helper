@@ -160,6 +160,13 @@ export const ChevronDown = (p: IconProps = {}) =>
 export const ExpandAllIcon = (p: IconProps = {}) => svg(<path d="M5 6l3-3 3 3M5 10l3 3 3-3" />, p);
 export const CollapseAllIcon = (p: IconProps = {}) => svg(<path d="M5 2.5l3 3 3-3M5 13.5l3-3 3 3" />, p);
 
+// The Highlight Map's zoom: out, in, and the whole map in view (four
+// corners).
+export const MinusIcon = (p: IconProps = {}) => svg(<path d="M3.5 8h9" />, p);
+export const PlusIcon = (p: IconProps = {}) => svg(<path d="M3.5 8h9M8 3.5v9" />, p);
+export const FitIcon = (p: IconProps = {}) =>
+  svg(<path d="M2.5 6V3.5a1 1 0 0 1 1-1H6M10 2.5h2.5a1 1 0 0 1 1 1V6M13.5 10v2.5a1 1 0 0 1-1 1H10M6 13.5H3.5a1 1 0 0 1-1-1V10" />, p);
+
 export const CheckIcon = (p: IconProps = {}) =>
   svg(<path d="M2.5 8.5l3.5 3.5 7.5-8" />, p);
 

@@ -8,13 +8,12 @@
 // conversations; the entry's PDF button (Download / View / Close PDF)
 // sits at the right end.
 // While the PDF is open, the panel stays on that entry whatever the
-// selection does — and once it is wider than SPLIT_WIDTH, Highlights
-// and Notes become one tab with the two side by side.
+// selection does — and once it is wider than MAP_WIDTH, the Highlights
+// tab shows the Highlight Map (HighlightMap.tsx) in place of the list.
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useBookmarks } from "../lib/bookmarks";
 import { aiConnected } from "../lib/ai/models";
 import { isStandaloneAttachment } from "../lib/collections";
-import { trackPointerDrag } from "../lib/dragGesture";
 import { EXPLANATIONS, QUESTIONS, useStore, type MetaTab } from "../lib/store";
 import { WORDS } from "../lib/words";
 import { AttachmentPanel } from "./AttachmentPanel";
@@ -27,36 +26,21 @@ import { NotesPanel } from "./NotesPanel";
 import { PdfTabButton } from "./PdfTabButton";
 import { SummaryView } from "./SummaryView";
 
-/** Past this width (px) the open PDF's highlights and notes share the
- *  panel instead of taking turns. */
-const SPLIT_WIDTH = 600;
+/** Past this width (px) the open PDF's highlights are a map instead of
+ *  a list. */
+const MAP_WIDTH = 600;
 
-/** Is the element wider than SPLIT_WIDTH? Follows it as it resizes. */
-function useWiderThanSplit(ref: React.RefObject<HTMLElement>): boolean {
+/** Is the element wider than MAP_WIDTH? Follows it as it resizes. */
+function useWide(ref: React.RefObject<HTMLElement>): boolean {
   const [wide, setWide] = useState(false);
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
-    const ro = new ResizeObserver(() => setWide(el.clientWidth > SPLIT_WIDTH));
+    const ro = new ResizeObserver(() => setWide(el.clientWidth > MAP_WIDTH));
     ro.observe(el);
     return () => ro.disconnect();
   }, [ref]);
   return wide;
-}
-
-/** The edge between the highlights and the notes, side by side: drag
- *  it to share the width differently (each keeps at least 160px). */
-function SplitResizer({ split }: { split: React.RefObject<HTMLDivElement> }) {
-  const setFrac = useStore((s) => s.setSplitHighlights);
-  const start = (e: React.PointerEvent) => {
-    const box = split.current?.getBoundingClientRect();
-    if (!box || box.width < 320) return;
-    trackPointerDrag(e, (ev) => {
-      const x = Math.min(box.width - 160, Math.max(160, ev.clientX - box.left));
-      setFrac(x / box.width);
-    });
-  };
-  return <div className="meta-split-resizer" onPointerDown={start} />;
 }
 
 export function MetadataPanel() {
@@ -71,9 +55,7 @@ export function MetadataPanel() {
   const { metaOpen, setMetaOpen } = useStore();
   const hidden = useStore((s) => s.metaHidden);
   const panelRef = useRef<HTMLElement>(null);
-  const splitRef = useRef<HTMLDivElement>(null);
-  const splitFrac = useStore((s) => s.splitHighlights);
-  const wide = useWiderThanSplit(panelRef);
+  const wide = useWide(panelRef);
 
   const selected = useMemo(() => {
     // An open PDF holds the panel on its entry whatever the selection does.
@@ -106,8 +88,8 @@ export function MetadataPanel() {
       : metaTab === "chats" && !(aiOn && selected.length === 1)
         ? "details"
         : metaTab;
-  // Highlights beside the notes, under one tab — reading, with room.
-  const split = Boolean(reading) && wide && highlightCount > 0;
+  // The Highlight Map in place of the list — reading, with room.
+  const map = Boolean(reading) && wide && highlightCount > 0;
 
   let tabs: React.ReactNode = null;
   let content: React.ReactNode;
@@ -142,14 +124,8 @@ export function MetadataPanel() {
     tabs = (
       <div className="meta-tabs" role="tablist">
         {tabButton("details", one ? "Details" : "Summary")}
-        {split ? (
-          tabButton("notes", `Highlights ${highlightCount} & Notes`, tab === "notes" || tab === "highlights")
-        ) : (
-          <>
-            {highlightCount > 0 && tabButton("highlights", `Highlights ${highlightCount}`)}
-            {tabButton("notes", "Notes")}
-          </>
-        )}
+        {highlightCount > 0 && tabButton("highlights", `${map ? "Highlight Map" : "Highlights"} ${highlightCount}`)}
+        {tabButton("notes", "Notes")}
         {one && aiOn &&
           tabButton(
             "chats",
@@ -163,19 +139,9 @@ export function MetadataPanel() {
         {one && <PdfTabButton item={one} />}
       </div>
     );
-    if (tab === "notes" || (split && tab === "highlights")) {
-      // One wrapper either way, so the notes editor stays mounted (caret,
-      // undo history) as the panel crosses SPLIT_WIDTH.
+    if (tab === "notes") {
       content = one ? (
-        <div className={split ? "meta-split" : "meta-single"} ref={splitRef}>
-          {split ? (
-            <>
-              <div className="meta-split-hl" style={{ flexBasis: `${splitFrac * 100}%` }}>
-                <HighlightsPanel items={selected} />
-              </div>
-              <SplitResizer split={splitRef} />
-            </>
-          ) : null}
+        <div className="meta-single">
           <NotesPanel key={one.key} item={one} />
         </div>
       ) : (
@@ -184,7 +150,7 @@ export function MetadataPanel() {
     } else if (tab === "chats" && one) {
       content = <ItemChats item={one} />;
     } else if (tab === "highlights") {
-      content = <HighlightsPanel items={selected} />;
+      content = <HighlightsPanel items={selected} map={map} />;
     } else if (!one) {
       content = <SummaryView items={selected} />;
     } else {

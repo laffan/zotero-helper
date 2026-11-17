@@ -76,7 +76,7 @@ src/            React + TypeScript UI (Vite, zustand, MiniSearch)
                 the sections the reader adds (Add Section): the store,
                 its file (through src-tauri/src/dividers.rs), and
                 withDividers, which puts them among the outline's
-                headings for the Highlights tab
+                headings for the Highlights tab and its map
   lib/highlights.ts, lib/notes.ts
                 annotations out of the library cache; NOTES.md load /
                 save / periodic push, the PDF cache
@@ -122,7 +122,10 @@ src/            React + TypeScript UI (Vite, zustand, MiniSearch)
   lib/widget.ts the iOS home-screen widget's PDFs and page pictures,
                 sent to tauri-plugin-widget; the links it opens with
   components/   toolbar, sidebar, virtualized item list, metadata panel
-                and its tabs (Highlights, Notes — NotesPrompts is an
+                and its tabs (Highlights — HighlightRow, one highlight,
+                HighlightFilters, the colours and the search's marks,
+                both shared with HighlightMap, the wide panel's map —
+                Notes — NotesPrompts is an
                 empty note's reading questions), reader pane (and
                 ReadingModeExit, reading mode's way back and its
                 buttons; ExplainChat, the explainer's window, and
@@ -152,6 +155,10 @@ src/            React + TypeScript UI (Vite, zustand, MiniSearch)
                 markdown (their Markdown, read as Hush reads a text
                 shape, set as DOM), history (what undo takes back, and
                 taking it back)
+  highlightmap/ the Highlight Map: layout (a PDF's highlights in rows
+                for its chapters and columns for what each is divided
+                into) and view (the canvas, panned and zoomed: a finger,
+                the mouse, a wheel, a pinch; the glide to a card)
   components/settings/
                 the settings page: SettingsView (section list, the
                 draft and Save) and one component per section —
@@ -217,6 +224,7 @@ src/            React + TypeScript UI (Vite, zustand, MiniSearch)
                 (the reading questions and the "?" menu)
   styles/       one stylesheet per UI region (tokens, base, toolbar, …;
                 keyboard = the pane outline and sidebar cursor;
+                highlightmap = the Highlight Map;
                 pdfviewer-dark = dark pages; pdfviewer-sections =
                 the reader's sections on the pages; explanations = the
                 explanation boxes; notepad-clips = the notepad's pins
@@ -673,7 +681,7 @@ to another and back (from the list or the recent-PDFs menu), and
 from one session to the next: its layout (scroll direction, fit,
 paged sets, zoom), the folded view with its zoom and filter, and the
 place in it, to the pixel; and everything around it — the notes
-panel's width and whether it is shown, the highlights / notes split,
+panel's width and whether it is shown, the Highlight Map's pan and zoom,
 the outline (shown or not, which headings are
 unfolded, where it is scrolled), the Highlights tab's search, colours
 and scroll, the search in the PDF on the match it was on (without
@@ -693,9 +701,8 @@ navigator's `positioned`). Beside its ×, a
 pair of chevrons opens every section, or, with every section open,
 folds them all (it is absent when the outline has no nested
 headings). Widen the notes
-panel past 600px and the Highlights and Notes tabs become one, with
-the highlights beside the notes (drag the edge between them to share
-the width differently); narrow it again and they separate. The
+panel past 600px and the Highlights tab becomes the **Highlight Map**
+(see Highlights, below); narrow it again and it is the list. The
 viewer's bottom toolbar draws its own tooltips — after a moment's
 hover, or on a press-and-hold with a finger, which then doesn't press
 the button — since iPadOS shows no `title` tooltips; a button with a
@@ -1451,6 +1458,72 @@ no highlights are left out. The sections the reader adds (Sections,
 below) join those headings, or divide the highlights alone in a PDF
 with no outline.
 
+**The Highlight Map.** With the PDF open and the notes panel wider
+than 600px (`MAP_WIDTH` in `MetadataPanel.tsx`), the Highlights tab —
+named *Highlight Map* then — lays the same highlights out on a canvas
+that pans and zooms (`HighlightMap.tsx`, `src/highlightmap/`). It
+replaces the earlier arrangement, in which the wide panel put the
+highlights beside the notes under one tab.
+
+*Its shape* (`layout.ts`) is the list's filing, laid out in two
+directions. Rows are the PDF's chapters: the outline's top-level
+headings, and any heading — the outline's, or a section the reader
+added — whose name begins with "Chapter". Columns are what a chapter is
+divided into: the outline's headings one level under the chapter's, and
+every section the reader added that isn't a chapter. A heading deeper
+than that is a small heading inside its column. Walking the headings in
+document order, a chapter starts a row, a column heading starts a
+column in it, and a highlight goes in the column in force (the nearest
+heading above it, as in the list). The highlights before a row's first
+column heading are a column with no heading at its start, and those
+before the first chapter a row with no heading at the top. As in the
+list, the outline's headings with no highlights are left out and the
+reader's stay (an empty column says "No highlights"). A PDF with no
+outline and no sections is one column; Add Section divides it, and a
+section named "Chapter …" starts a row. Several PDFs of one entry are
+each a map of their own, under its file name.
+
+*The cards* are the list's rows (`HighlightRow.tsx`) on the panel's
+colour, 280px wide, their words cut at ten lines until the card is
+picked; a click goes to the highlight in the pages, and Copy, Note and
+Zotero show as in the list. Headings: the outline's go to their place in
+the PDF, the reader's are the list's `DividerHeading` (go to the line,
+Rename, Delete). A column's heading is one line high, and a column
+without one leaves the room, so a row's cards start level.
+
+*Moving about* (`view.ts`) is the notepad's way of moving its canvas —
+one layer under one transform, set once a frame, over the pad's faint
+dot grid, which moves and scales with it — with zoom added. A finger or
+the mouse dragged anywhere but on a button or a field pans, and the click
+such a press would end in is stopped before it reaches a card (for 400ms,
+since WebKit may send a slight drag's click late); a wheel or a
+trackpad's two fingers pan. Two fingers pinch; a trackpad's pinch zooms
+— WebKit's gesture events on a Mac, a wheel with ctrlKey elsewhere — as
+do ⌘ or Ctrl with a wheel (one notch at most ×1.28), each about the point
+between the fingers or under the pointer. On the iPad a pinch arrives
+both as pointers and as gesture events; the gesture events are then only
+kept from zooming the page. The canvas keeps at least 60px of the map in
+view. At its lower right: −, the zoom (a press is 100%), + (×1.25 a
+press) and the whole map (fitted, never past 100%). A map seen for the
+first time starts at its top left, as wide as fits between 50% and 100%;
+after that the view is the PDF's, kept beside it (`hlMap` in
+`lib/readerUi.ts`) and put back whenever the map comes back.
+
+*Search and colours* sit in one bar over the canvas with the count and ↻,
+and are the list's own (`HighlightFilters.tsx`, kept per PDF), so the
+panel crosses between list and map with the same ones. On the map they
+work differently. The search doesn't narrow anything: it goes round its
+matches in reading order — to the first a moment (250ms) after the typing
+stops, then Enter or › to the next and ⇧Enter or ‹ to the one before,
+with "2 of 7" beside the field. Each is glided to (350ms, easing out) and
+put in the middle of the view at the zoom in force, unless that is too
+small to read (under 45%, when it goes to 100%) or the card wouldn't fit.
+Matches are ringed, the one in force in the accent, and their words
+marked. The colours dim what they leave out to a fifth, and the search
+steps over the dimmed cards; the count reads "5 of 44 picked". Neither
+changes the map's shape, so it keeps still while they change. A tap on
+the bare canvas lets go of the card picked.
+
 ### AI
 
 The AI features — the toolbar's **AI** menu, **Questions** (and
@@ -1841,7 +1914,9 @@ in the open PDF, or opening it at the page — and Rename and Delete (a
 second press confirms) show as a row's actions do
 (`DividerHeading.tsx`). Unlike the outline's headings, a section with
 no highlights under it still shows, unless the search or a colour
-narrows the list. They are kept like the bookmarks: `sections.json` in
+narrows the list. On the Highlight Map a section is a column of
+its chapter's row — or, named "Chapter …", a row of its own (see
+Highlights). They are kept like the bookmarks: `sections.json` in
 the app's data folder (`src-tauri/src/dividers.rs`, opaque JSON; the
 shape is `Divider` in `src/lib/dividers.ts`), on this device only, never
 sent to Zotero. (In the code they are dividers, to keep them apart from

@@ -1,10 +1,9 @@
 // The reading UI around each PDF, kept per PDF beside its view
 // (lib/recent.ts), so that coming back to a PDF — from the list, or
 // through the recent-PDFs menu — finds everything as it was left: the
-// notes panel's width and whether it is shown, the highlights / notes
-// split, the outline (open, which headings are
-// unfolded, where it is scrolled), the Highlights tab's search, colours
-// and scroll, the search in the PDF and the match it was on, and the
+// notes panel's width and whether it is shown, the outline (open, which
+// headings are unfolded, where it is scrolled), the Highlights tab's
+// search, colours and scroll, and the Highlight Map's pan and zoom, the search in the PDF and the match it was on, and the
 // caret and scroll in the notes. Not the tab in front: a PDF opens on
 // Highlights, or on the conversation it was opened from (setReading).
 // The viewer's own state (layout,
@@ -20,7 +19,6 @@ import { useStore } from "./store";
 export interface ReaderUi {
   /** The panels, held in the app's store while the PDF is open. */
   notesWidth?: number;
-  splitHighlights?: number;
   metaHidden?: boolean;
   outlineOpen?: boolean;
   /** The outline's unfolded headings (OutlinePanel's ids). */
@@ -30,6 +28,8 @@ export interface ReaderUi {
   hlQuery?: string;
   hlColors?: string[];
   hlScroll?: number;
+  /** The Highlight Map: its pan (px) and zoom. */
+  hlMap?: { x: number; y: number; z: number };
   /** The search in the PDF, and its current match (1-based). */
   search?: string;
   searchHit?: number;
@@ -39,7 +39,7 @@ export interface ReaderUi {
   notesTop?: number;
 }
 
-const PANEL_FIELDS = ["notesWidth", "splitHighlights", "metaHidden", "outlineOpen"] as const;
+const PANEL_FIELDS = ["notesWidth", "metaHidden", "outlineOpen"] as const;
 
 let following = false;
 

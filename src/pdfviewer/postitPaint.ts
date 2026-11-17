@@ -3,9 +3,9 @@
 // their canvases (paint.ts). On the pages themselves a post-it is a live
 // overlay (postits.ts), so the pages' own rasters leave them out.
 //
-// Drawn as the overlay looks: the paper in its colour, the grip a shade
-// darker across its top, the words wrapped inside its margins and the
-// writing over them.
+// Drawn as the overlay looks at rest: the paper in its colour, 70%
+// opaque, the grip a shade darker across its top, the words wrapped
+// inside its margins and the writing over them.
 import type { Annotation } from "../lib/highlights";
 import {
   POSTIT_FONT, POSTIT_GRIP, POSTIT_INK, POSTIT_LINE, POSTIT_PAD, POSTIT_PEN, postItsOf, wrapLines,
@@ -30,12 +30,10 @@ export function drawPostIts(
     const w = Math.abs(bx - ax);
     const h = Math.abs(by - ay);
     ctx.save();
-    ctx.shadowColor = "rgb(0 0 0 / 0.25)";
-    ctx.shadowBlur = 4 * k;
-    ctx.shadowOffsetY = 1.5 * k;
+    ctx.globalAlpha = 0.7;
     ctx.fillStyle = p.color;
     ctx.fillRect(left, top, w, h);
-    ctx.shadowColor = "transparent";
+    ctx.globalAlpha = 1;
     ctx.fillStyle = "rgb(0 0 0 / 0.07)";
     ctx.fillRect(left, top, w, POSTIT_GRIP * k);
     ctx.beginPath();

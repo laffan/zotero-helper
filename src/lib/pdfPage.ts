@@ -47,7 +47,9 @@ function drawAnnotations(
     const [ax, ay] = viewport.convertToViewportPoint(r[0], r[1]);
     const [bx, by] = viewport.convertToViewportPoint(r[2], r[3]);
     ctx.fillStyle = ann.postIt!.color;
+    ctx.globalAlpha = 0.7;
     ctx.fillRect(Math.min(ax, bx), Math.min(ay, by), Math.abs(bx - ax), Math.abs(by - ay));
+    ctx.globalAlpha = 1;
   }
   for (const ann of annotations) {
     if (ann.pageIndex !== pageIndex || (ann.postIt && ann.type !== "ink")) continue;

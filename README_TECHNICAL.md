@@ -2006,7 +2006,7 @@ second press, or Escape, puts the tool away unused. While ready it has
 every press on the pages to itself, heard on the window before anything
 in them; a finger's drag still scrolls (`src/pdfviewer/postits.ts`).
 
-A new post-it is 133 × 133 points — 133 × 133 CSS px at 100% zoom
+A new post-it is 113 × 113 points — 113 × 113 CSS px at 100% zoom
 (`POSTIT_SIZE`; its type, margins, grip and pen are set apart from it,
 so a smaller paper holds fewer words, not smaller ones) — and, like the
 paper it stands for, belongs to its page. Each keeps the size it was
@@ -2022,13 +2022,25 @@ on this device to begin with (`zh-postit-color`). The paper keeps its
 colours and black ink in the dark theme; dark pages only dim it a
 little (`postits.css`).
 
-Across its top is its grip, a shade darker: a drag there (any pointer;
-a finger there doesn't scroll) moves the post-it about its page — not
-onto another — and a tap opens its menu above it (`postitEdit.ts`): the
+The paper is 70% opaque, so the page shows faintly through it, and 90%
+while it is worked on — typed or written on, dragged, its menu open —
+fading back once that ends (writing counts until it settles, 600ms
+after the pen rests): the paper is a `::before` of its own under
+everything on it, its opacity eased between the two. The painted
+copies (thumbnails, folds, clips, the library's first-page thumbnails)
+are 70% too; the Post-its tab's cards are opaque.
+
+Across its top is its grip, a band a shade darker, 9 points deep: a
+drag there (any pointer; a finger there doesn't scroll) moves the
+post-it about its page — not onto another — and a tap opens its menu
+above it (`postitEdit.ts`): the
 five colours, **Type** and **Delete** (a second press confirms). On the
 paper the Pencil writes, and so does a mouse dragged (a click alone
 writes nothing); two taps of a finger, or a double-click, type on it.
-A finger otherwise scrolls the pages as anywhere else. Typing is a bare
+A finger otherwise scrolls the pages as anywhere else. Where fingers
+point, the grip reaches 12px below its band (`--grip-reach`), which a
+finger couldn't otherwise hit; the Pencil and the mouse still write
+there, the grip taking only their presses on the band itself. Typing is a bare
 textarea over the paper below the grip, in the paper's own face and
 size, the words raw; Escape or ⌘↩ ends it, and so do a press anywhere
 else, the focus leaving it and the app being put away — the words kept

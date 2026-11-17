@@ -2,7 +2,10 @@
    the pages, sized in the page's points (`--pk`, CSS px per point, set
    as each one's box changes), so the paper, its type and its writing
    follow every zoom. Paper is paper in either theme: the colours and the
-   black ink stay; dark pages only dim it a little. */
+   black ink stay; dark pages only dim it a little. The paper is 70%
+   opaque, so the page shows faintly through it, and 90% while it is
+   worked on — typed or written on, dragged, its menu open — fading back
+   as that ends. */
 .pdf-postits {
   position: absolute;
   inset: 0;
@@ -14,7 +17,8 @@
   box-sizing: border-box;
   overflow: hidden;
   pointer-events: auto;
-  background: var(--postit-color, #fff59d);
+  /* lib/postits.ts's POSTIT_GRIP. */
+  --grip: calc(var(--pk, 1px) * 9);
   box-shadow: 0 calc(var(--pk, 1px) * 1.5) calc(var(--pk, 1px) * 5) rgb(0 0 0 / 0.28);
   color: #1a1a1a;
   font-family: -apple-system, system-ui, sans-serif;
@@ -29,17 +33,38 @@
 .pdf-postit.readonly {
   cursor: default;
 }
-/* The grip: the band across the top it is dragged by (POSTIT_GRIP). A
-   finger there drags it rather than scrolling the page. */
+/* The paper, under everything on it (a box-shadow is drawn only
+   outside the box, so none shows through). */
+.pdf-postit::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: var(--postit-color, #fff59d);
+  opacity: 0.7;
+  transition: opacity 0.4s ease;
+}
+.pdf-postit:is(.editing, .writing, .dragging, .menu-open)::before {
+  opacity: 0.9;
+  transition-duration: 0.12s;
+}
+/* The grip: the band across the top it is dragged by. A finger there
+   drags it rather than scrolling the page — and reaches a little below
+   the band (`--grip-reach`), which a finger couldn't otherwise hit;
+   the Pencil and the mouse write there (postits.ts). */
 .pdf-postit-grip {
   position: absolute;
   top: 0;
   left: 0;
   right: 0;
-  height: calc(var(--pk, 1px) * 18);
-  background: rgb(0 0 0 / 0.07);
+  height: calc(var(--grip) + var(--grip-reach, 0px));
+  background: linear-gradient(rgb(0 0 0 / 0.07) 0 var(--grip), transparent 0);
   cursor: grab;
   touch-action: none;
+}
+@media (pointer: coarse) {
+  .pdf-postit-grip {
+    --grip-reach: 12px;
+  }
 }
 .pdf-postit.readonly .pdf-postit-grip {
   cursor: default;
@@ -55,7 +80,7 @@
 .pdf-postit-text,
 .pdf-postit-editor {
   position: absolute;
-  top: calc(var(--pk, 1px) * 22);
+  top: calc(var(--grip) + var(--pk, 1px) * 4);
   left: calc(var(--pk, 1px) * 8);
   right: calc(var(--pk, 1px) * 8);
   bottom: calc(var(--pk, 1px) * 8);
@@ -102,7 +127,7 @@
 .pdf-postit-hint {
   display: none;
   position: absolute;
-  inset: calc(var(--pk, 1px) * 18) calc(var(--pk, 1px) * 10) 0;
+  inset: var(--grip) calc(var(--pk, 1px) * 10) 0;
   align-items: center;
   justify-content: center;
   text-align: center;
@@ -235,7 +260,7 @@
   top: 0;
   left: 0;
   right: 0;
-  height: calc(var(--pk) * 18);
+  height: calc(var(--pk) * 9);
   background: rgb(0 0 0 / 0.07);
 }
 .postit-card:hover .postit-card-paper {

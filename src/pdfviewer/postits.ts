@@ -36,7 +36,7 @@
 // store (`set`) doesn't overwrite it.
 import { whenPenRested } from "../lib/penActivity";
 import {
-  lastPostItColor, POSTIT_INK, POSTIT_PEN, POSTIT_SIZE, postItsOf, rememberPostItColor, type PostIt, type PostItSave,
+  lastPostItColor, POSTIT_GRIP, POSTIT_INK, POSTIT_PEN, POSTIT_SIZE, postItsOf, rememberPostItColor, type PostIt, type PostItSave,
 } from "../lib/postits";
 import type { Annotation } from "../lib/highlights";
 import { inkSortIndex } from "./ink/geometry";
@@ -356,7 +356,10 @@ export function createPostIts(env: PostItsEnv) {
     if (!it.editable || (e.pointerType === "mouse" && e.button !== 0)) return;
     const sel = window.getSelection();
     if (sel && !sel.isCollapsed && sel.anchorNode && scrollArea.contains(sel.anchorNode)) sel.removeAllRanges();
-    if ((e.target as Element).closest(".pdf-postit-grip")) return grab(it, e);
+    // The grip: its band, or for a finger a little below it too (CSS's
+    // --grip-reach), where the Pencil and the mouse still write.
+    const band = el.getBoundingClientRect().top + (el.clientWidth / sizeOf(it)[0]) * POSTIT_GRIP;
+    if ((e.target as Element).closest(".pdf-postit-grip") && (e.pointerType === "touch" || e.clientY <= band + 1)) return grab(it, e);
     if (e.pointerType === "touch") return watchTap(it, e);
     e.preventDefault();
     // A double-click types; a click, or a drag, writes.

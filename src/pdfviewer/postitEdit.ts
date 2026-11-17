@@ -43,11 +43,15 @@ function onPress(btn: HTMLElement, fn: () => void): void {
 
 export function createPostItMenu(host: HTMLElement, scrollArea: HTMLElement) {
   let menu: HTMLElement | null = null;
+  // The post-it it is open for, its paper more opaque meanwhile.
+  let anchor: HTMLElement | null = null;
 
   function close(): void {
     if (!menu) return;
     menu.remove();
     menu = null;
+    anchor?.classList.remove("menu-open");
+    anchor = null;
     document.removeEventListener("pointerdown", onOutside, true);
     window.removeEventListener("keydown", onKey, true);
     scrollArea.removeEventListener("scroll", close);
@@ -107,6 +111,8 @@ export function createPostItMenu(host: HTMLElement, scrollArea: HTMLElement) {
     m.append(type, del);
     host.appendChild(m);
     menu = m;
+    anchor = o.anchor;
+    anchor.classList.add("menu-open");
     // Above the paper (clear of its words), or under it where there is
     // no room above; kept inside the viewer.
     const h = host.getBoundingClientRect();

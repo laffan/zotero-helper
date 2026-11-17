@@ -102,6 +102,7 @@ export function createPostItPen(env: { writing?: () => void; erased?: (t: PenTar
     const svg = l.target.el.querySelector<SVGSVGElement>(".pdf-postit-ink");
     if (svg) for (const s of l.parked) svg.appendChild(strokePath(s));
     l.canvas.remove();
+    l.target.el.classList.remove("writing");
   }
 
   /** The canvas for writing on `target`, the size its box is now. */
@@ -192,6 +193,7 @@ export function createPostItPen(env: { writing?: () => void; erased?: (t: PenTar
     env.writing?.();
     if (gs.erase || (gs.mouse && !gs.moved) || !gs.pts.length) {
       if (live && !live.parked.length) settle();
+      if (live?.target.id !== gs.target.id) gs.target.el.classList.remove("writing");
       return;
     }
     const stroke = smoothPath(gs.pts).map(round2);
@@ -223,6 +225,8 @@ export function createPostItPen(env: { writing?: () => void; erased?: (t: PenTar
       if (erase) settle();
       else if (!liveFor(target, box)) return;
       g = { id: e.pointerId, target, erase, mouse: e.pointerType === "mouse", box, k, pts: [], startX: e.clientX, startY: e.clientY, moved: false };
+      // Being written on: the paper more opaque until the writing settles.
+      target.el.classList.add("writing");
       heardAt = performance.now();
       penDown(me);
       env.writing?.();

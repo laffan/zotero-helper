@@ -251,6 +251,8 @@ export function ReaderPane() {
   const reading = useStore((s) => s.reading);
   const items = useStore((s) => s.library.items);
   const hostRef = useRef<HTMLDivElement>(null);
+  // The reader pane: what night vision covers (the bulb's third setting).
+  const paneRef = useRef<HTMLElement>(null);
   const viewerRef = useRef<PdfViewer | null>(null);
   const [state, setState] = useState<"loading" | "ready" | "error">("loading");
   const [error, setError] = useState("");
@@ -278,6 +280,7 @@ export function ReaderPane() {
         const settings = () => useStore.getState().settings;
         const cite = (page: number) => `[p. ${page}](${pdfLink(settings(), attKey, page)})`;
         viewer = createPdfViewer(host, {
+          nightVisionHost: paneRef.current ?? undefined,
           onOpenInZotero: (page) => void openInZotero(itemKey, attKey, undefined, page),
           onBookmark: (pageIndex, top, name, pageLabel) =>
             addBookmark({ attKey, itemKey, pageIndex, top, name, pageLabel }),
@@ -480,7 +483,7 @@ export function ReaderPane() {
 
   if (!reading) return null;
   return (
-    <section className="reader-pane">
+    <section className="reader-pane" ref={paneRef}>
       {outlineShown && attKey && <OutlinePanel key={attKey} attKey={attKey} outline={outline ?? []} />}
       {!attKey ? (
         <div className="reader-empty">

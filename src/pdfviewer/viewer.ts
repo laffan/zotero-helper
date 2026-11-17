@@ -273,7 +273,7 @@ export function createPdfViewer(container: HTMLElement, opts: PdfViewerOptions =
   const search = createPdfSearch({ getPdfDoc: () => pdfDoc, getPages: () => pages, isDestroyed: () => destroyed, reveal: revealPoint });
   const citeMark = createCiteMark({ getPdfDoc: () => pdfDoc, getPages: () => pages, reveal: revealPoint, goToPage: (n) => goToPage(n) });
 
-  attachDarkPages(body, tb.darkBtn);
+  const detachDarkPages = attachDarkPages(body, tb.darkBtn, opts.nightVisionHost ?? root);
   pinFrames(root, body);
 
   // --- zoom & modes ---------------------------------------------------------
@@ -615,6 +615,7 @@ export function createPdfViewer(container: HTMLElement, opts: PdfViewerOptions =
     annotating.destroy();
     ink.destroy();
     detachTooltips();
+    detachDarkPages();
     const doc = pdfDoc;
     pdfDoc = null;
     pages = [];

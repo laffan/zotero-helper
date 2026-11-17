@@ -192,7 +192,8 @@ src/            React + TypeScript UI (Vite, zustand, MiniSearch)
                 (the passages the AI explained, the words looked up),
                 excerpt (pages cut into a PDF of their own, a page's
                 region as an image), darkPages (the pages white on
-                black), pencilFinger
+                black; the light bulb's three settings), nightVision
+                (the reader pane in red alone), pencilFinger
                 (the Pencil out of ink mode, a finger), bookmarks (the
                 pages' bookmark buttons and marks), bookmarkHold
                 (reading mode's hold on a corner), nameBox (the box
@@ -981,8 +982,11 @@ outright for a frame (a relayout that keeps the scroll), noting it in
 the activity log at debug level.
 
 **Dark pages.** In the dark theme the bottom bar offers a light bulb
-(off to begin with; the choice is this device's, `zh-pdf-dark`) that
-draws the pages white on black (`darkPages.ts`, `pdfviewer-dark.css`).
+(off to begin with; the choice is this device's, `zh-pdf-dark`: `0`,
+`1` dark, `2` night vision) whose presses step through three settings —
+pages as printed, dark pages, night vision — and round again. Dark
+pages draws the pages white on black (`darkPages.ts`,
+`pdfviewer-dark.css`).
 It is a CSS filter over each page's raster, the folds' and the ink —
 inverted, then turned half way round the colour wheel, so colours keep
 roughly their hue — rather than pdf.js's `pageColors`, which would mean
@@ -991,6 +995,31 @@ tones; the text layer, selections and the app's own marks are left as
 they are. Highlights painted into the pages come out as darker bands of
 their colour, and photographs inverted. In the light theme the bulb is
 hidden and the class does nothing, so the pages are as printed.
+
+**Night vision.** The bulb's third setting (the bulb is drawn filled):
+dark pages, with the whole reader pane in shades of pure red — no blue
+and no green light — for reading in the dark without losing dark
+adaptation (`nightVision.ts`, `pdfviewer-night.css`). It covers a
+portion of the app, the reader pane's box (`ReaderPane` hands its
+section to the viewer as `nightVisionHost`): the pages, the bottom bar,
+the outline and reading mode's notepad — so in reading mode the whole
+screen. The library, the notes panel, the settings and modals keep
+their colours, and so does what the pane draws outside its box: the
+explanation box (`.explain-chat`, fixed at the window's bottom right)
+is over the notes panel outside reading mode. Two click-through layers are appended to
+the pane, its last children: `backdrop-filter: grayscale(1)` (what is
+under it reduced to its luminance), then pure red with
+`mix-blend-mode: multiply` (that grey times (1, 0, 0): luminance in the
+red channel, green and blue zero). Whatever the grey layer misses is
+still multiplied, so nothing under it keeps any blue. Only filter
+functions and a blend mode: an SVG `url()` filter would do it in one
+step, but WebKit renders those off its accelerated filter path and
+doesn't take them in `backdrop-filter`. While they are up the pane is
+`isolation: isolate`, so their z-index puts them over the pane's own
+contents (its popovers included) and nothing outside it; a modal
+opened over the reader stays in its colours. Like dark pages it acts
+only in the dark theme (`--pdf-night-layer`, defined by the dark theme
+alone), and the viewer takes the layers down when it is destroyed.
 
 **Pinch to magnify.** A pinch over the pages magnifies them like a
 loupe, and only them: the app itself never zooms (`index.html`'s

@@ -117,8 +117,9 @@ export function buildPdfToolbar() {
   // Ink mode: draw with the Pencil (or a mouse), as Zotero's pen does.
   const inkBtn = svgBtn("pdf-zoom-btn pdf-ink-btn", "Draw — the Pencil writes, a finger scrolls", PEN_ICON, "pdfInk");
 
-  // Dark pages (darkPages.ts) — offered only while the app is dark.
-  const darkBtn = svgBtn("pdf-zoom-btn pdf-dark-btn", "Dark pages — white text on black", BULB_ICON);
+  // Dark pages and night vision (darkPages.ts, nightVision.ts) — offered
+  // only while the app is dark. Its tooltip is set by the setting it is on.
+  const darkBtn = svgBtn("pdf-zoom-btn pdf-dark-btn", "Dark pages", BULB_ICON);
 
   // Sections, spaced apart by the bar (pdfviewer.css): reading mode and
   // dark pages; pages per screen; scroll direction; fixed / continuous;

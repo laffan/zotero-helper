@@ -22,7 +22,8 @@ Windows/Linux desktops too).
   same ink annotations Zotero's reader makes), a folded view of just the
   annotated passages, a paged view of one to five pages at a time (with
   an adjustable reading crop), a full-screen reading mode, white-on-black
-  pages in the dark theme, pinch to magnify, search, outlines and page
+  pages in the dark theme (and a night vision setting beside them that
+  draws the reader in red alone, with no blue light), pinch to magnify, search, outlines and page
   citations into the notes;
   ⌘-click (or the sentence tool) selects a whole sentence, highlights
   can run across a page break and their ends can be dragged, and

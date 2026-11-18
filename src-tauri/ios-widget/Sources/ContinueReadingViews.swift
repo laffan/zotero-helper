@@ -34,7 +34,8 @@ struct ContinueReadingView: View {
     content(pdfs)
       .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
       .legacyMargins()
-      .widgetBackground()
+      .nightVision(entry.nightVision)
+      .widgetBackground(nightVision: entry.nightVision)
   }
 
   @ViewBuilder
@@ -223,15 +224,32 @@ private struct EmptyShelf: View {
   }
 }
 
+/// Night vision's red: the display's own red (P3), so no green or blue
+/// is lit.
+let nightVisionRed = Color(.displayP3, red: 1, green: 0, blue: 0)
+
 extension View {
   /// iOS 17 gives a widget its background through the container, and
-  /// margins of its own; before it, the view brings both.
+  /// margins of its own; before it, the view brings both. In night
+  /// vision the background goes red with the rest.
   @ViewBuilder
-  func widgetBackground() -> some View {
+  func widgetBackground(nightVision: Bool = false) -> some View {
     if #available(iOSApplicationExtension 17.0, *) {
-      containerBackground(for: .widget) { Color(UIColor.systemBackground) }
+      containerBackground(for: .widget) { Color(UIColor.systemBackground).nightVision(nightVision) }
     } else {
-      background(Color(UIColor.systemBackground))
+      background(Color(UIColor.systemBackground).nightVision(nightVision))
+    }
+  }
+
+  /// Night vision, as the app draws it (lib/nightVision.ts): everything —
+  /// text, the pages' pictures, the background — reduced to its
+  /// brightness, then multiplied by pure red, so only red is lit.
+  @ViewBuilder
+  func nightVision(_ on: Bool) -> some View {
+    if on {
+      grayscale(1).colorMultiply(nightVisionRed)
+    } else {
+      self
     }
   }
 

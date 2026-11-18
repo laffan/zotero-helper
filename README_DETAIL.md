@@ -62,8 +62,8 @@ Windows/Linux desktops too).
   list, and the viewer's modes (Settings → Keyboard Shortcuts).
 - **Your look** — light, dark or system appearance and an adjustable UI font
   size (Settings → General); and night vision (the eye beside Settings),
-  which draws the whole app in red only, with no blue light, for
-  working in the dark; the colour dots then show each colour's letter
+  which draws the whole app — and its home-screen widgets — in red only,
+  with no blue light, for working in the dark; the colour dots then show each colour's letter
   (Y, R, G, B, P, M, O; gray has none), and each highlight on the page a tiny flag
   with it, kept in the margin where it can be.
 - **Full screen on iPad** — the status bar is hidden while the app fills

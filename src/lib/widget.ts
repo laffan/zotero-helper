@@ -12,7 +12,9 @@
 // picture is sent once; the native side keeps it (tauri-plugin-widget's
 // WidgetPlugin.swift, in the app group the widget reads) until its PDF
 // leaves the three. The list is sent when it changes: a PDF opened, a
-// page turned, a picture drawn. What came of it goes to the log, once
+// page turned, a picture drawn — and with it whether the app is in night
+// vision (lib/nightVision.ts), which the widgets then are too, sent at
+// once when it is turned on or off. What came of it goes to the log, once
 // each time it changes: how many PDFs the widget lists, or why the
 // native side couldn't write them (`report`).
 //
@@ -121,11 +123,12 @@ async function send(): Promise<void> {
     const p = pictures.get(e.attKey);
     if (p && !p.sent) thumbnails[e.attKey] = p.data;
   }
-  const key = JSON.stringify(entries);
+  const nightVision = useStore.getState().nightVision;
+  const key = JSON.stringify({ entries, nightVision });
   if (key === lastSent && !Object.keys(thumbnails).length) return;
   try {
     const written = await invoke<{ listed: number; folder: string }>("plugin:widget|update", {
-      payload: { entries, thumbnails },
+      payload: { entries, thumbnails, nightVision },
     });
     lastSent = key;
     for (const k of Object.keys(thumbnails)) {
@@ -215,6 +218,8 @@ export function startWidget(): void {
   // A highlight or a drawing made: the page is pictured again.
   useStore.subscribe((s, prev) => {
     if (s.library !== prev.library && s.reading?.attKey) pictureSoon();
+    // Night vision turned on or off: the widgets follow at once.
+    if (s.nightVision !== prev.nightVision) sendSoon(0);
   });
   document.addEventListener("visibilitychange", () => {
     if (document.visibilityState !== "hidden") return;

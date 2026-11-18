@@ -38,10 +38,14 @@ class WidgetPlugin: Plugin {
   struct UpdateArgs: Decodable {
     let entries: [Entry]
     let thumbnails: [String: String]
+    /// The app is in night vision: the widgets draw in red alone too.
+    /// Absent from an app from before night vision.
+    let nightVision: Bool?
   }
 
   struct RecentFile: Encodable {
     let entries: [Entry]
+    let nightVision: Bool
   }
 
   /// The answer: what the widget now lists, and the folder it reads.
@@ -79,7 +83,7 @@ class WidgetPlugin: Plugin {
     where name.hasSuffix(".jpg") && !keep.contains(name) {
       try? files.removeItem(at: dir.appendingPathComponent(name))
     }
-    let json = try JSONEncoder().encode(RecentFile(entries: entries))
+    let json = try JSONEncoder().encode(RecentFile(entries: entries, nightVision: args.nightVision ?? false))
     try json.write(to: dir.appendingPathComponent("recent.json"), options: .atomic)
     WidgetCenter.shared.reloadAllTimelines()
     invoke.resolve(Written(listed: entries.count, folder: dir.path))

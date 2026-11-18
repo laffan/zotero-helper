@@ -67,6 +67,8 @@ struct RecentPDF: Codable, Hashable, Identifiable {
 
 private struct RecentFile: Decodable {
   let entries: [RecentPDF]
+  /// The app is in night vision (absent from an app from before it).
+  let nightVision: Bool?
 }
 
 /// Why there is nothing to show, when it isn't simply that nothing has
@@ -101,6 +103,9 @@ struct ReadingEntry: TimelineEntry {
   let pages: [String: UIImage]
   /// Why `pdfs` is empty, when it isn't for want of a PDF read.
   var problem: ShelfProblem? = nil
+  /// Drawn in red alone, as the app is in night vision
+  /// (ContinueReadingViews.swift, `nightVision`).
+  var nightVision = false
 
   static let sample = ReadingEntry(
     date: Date(),
@@ -140,7 +145,7 @@ enum Shelf {
         if let image = UIImage(contentsOfFile: path) { pages[pdf.attKey] = image }
       }
     }
-    return ReadingEntry(date: Date(), pdfs: pdfs, pages: pages)
+    return ReadingEntry(date: Date(), pdfs: pdfs, pages: pages, nightVision: file.nightVision ?? false)
   }
 }
 

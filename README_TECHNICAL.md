@@ -331,6 +331,7 @@ Settings and modals. The choice is this device's and lasts until it is
 turned off (`nightVision` in the store's persisted UI prefs, applied
 before the first render by `initNightVision`, `src/lib/nightVision.ts`).
 Reading mode hides the header, so it is turned on or off outside it.
+The Continue Reading widgets follow it (see Continue Reading, above).
 
 **Telling the colours apart.** In red alone the highlight colours look
 alike, so while night vision is on each colour carries a letter
@@ -451,6 +452,16 @@ as `widget/recent.json` and `widget/<attKey>.jpg` in the group's folder,
 letting go of the pictures of PDFs no longer among the three; the
 widgets read them when WidgetKit asks (a timeline of one entry, never
 refreshed by itself). In the browser and off iOS none of this runs.
+
+Night vision. While the app is in night vision the widgets are too:
+`recent.json` carries `nightVision`, sent with the list and at once
+when it is turned on or off, and the widgets draw everything — text,
+the pages' pictures, the background — reduced to its brightness and
+multiplied by the display's own red (`nightVision` in
+`ContinueReadingViews.swift`: `grayscale(1)`, then `colorMultiply` by
+P3 red), as the app does with its two layers. The pictures themselves
+are kept in colour, so the widgets come back in colour as soon as night
+vision is turned off.
 
 The links. The widget opens `zoterohelper://open?item=…&att=…&page=…`
 (the scheme is in `Info.ios.plist`'s `CFBundleURLTypes`); the plugin

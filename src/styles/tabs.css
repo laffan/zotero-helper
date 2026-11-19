@@ -263,6 +263,27 @@
   font-size: inherit;
   font-weight: 600;
 }
+/* A section being renamed: its name, and under it what it is nested in. */
+.hl-divider-edit {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.hl-divider-nest {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-dim);
+  font-size: calc(11px * var(--font-scale));
+  font-weight: 400;
+}
+.hl-divider-nest select {
+  flex: 1;
+  min-width: 0;
+  font-size: calc(11px * var(--font-scale));
+}
 .hl-actions .link-btn.danger {
   color: var(--bad);
 }

@@ -18,6 +18,8 @@ tauri-build = { version = "2.7", features = [] }
 tauri = { version = "2.12", features = ["unstable"] }
 tauri-plugin-dialog = "2"
 tauri-plugin-opener = "2"
+# Copy buttons write through the system clipboard (src/lib/clipboard.ts).
+tauri-plugin-clipboard-manager = "2"
 # In-app PDF capture browser for iPad (native WKWebView overlay).
 tauri-plugin-capture-view = { path = "tauri-plugin-capture-view" }
 tauri-plugin-share-sheet = { path = "tauri-plugin-share-sheet" }

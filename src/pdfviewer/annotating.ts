@@ -9,7 +9,7 @@
 // its pages and the writer; absent a writer, a selection can only be
 // quoted.
 import { annotationPosition, type Annotation } from "../lib/highlights";
-import { annotationAtPoint, attachAnnotationTaps, draftFromRange, pageBoxAt } from "./annotate";
+import { annotationAtClient, attachAnnotationTaps, draftFromRange } from "./annotate";
 import { createAnnotationPopover } from "./annotPopover";
 import { createColorFlags } from "./colorFlags";
 import { createHighlightHandles } from "./highlightHandles";
@@ -38,6 +38,22 @@ export interface AnnotatingEnv {
   sentenceButton: HTMLElement;
 }
 
+/** Are two passages on a page (PDF rects) the same one — overlapping by
+ *  at least 80% of the larger? Then explaining one again opens the other's
+ *  explanation, rather than asking anew. */
+function samePassage(a: number[][], b: number[][]): boolean {
+  const area = (rs: number[][]) => rs.reduce((n, r) => n + Math.abs(r[2] - r[0]) * Math.abs(r[3] - r[1]), 0);
+  let shared = 0;
+  for (const r of a) {
+    for (const q of b) {
+      const w = Math.min(Math.max(r[0], r[2]), Math.max(q[0], q[2])) - Math.max(Math.min(r[0], r[2]), Math.min(q[0], q[2]));
+      const h = Math.min(Math.max(r[1], r[3]), Math.max(q[1], q[3])) - Math.max(Math.min(r[1], r[3]), Math.min(q[1], q[3]));
+      if (w > 0 && h > 0) shared += w * h;
+    }
+  }
+  return shared >= 0.8 * Math.max(area(a), area(b));
+}
+
 /** A word looked up, as the pages mark it: a tap shows `definition`. */
 export type DefinedWord = WordMark & { word: string; definition: string };
 
@@ -62,6 +78,10 @@ export function createAnnotating(env: AnnotatingEnv) {
           onExplain: opts.onExplain
             ? (text, page, range) => {
                 const d = draftFromRange(range, env.getPages(), env.getPageLabels());
+                // The passage explained before (the sentence tool selects
+                // what it underlined): that explanation, opened again.
+                const known = d && explained.onPage(d.pageIndex).find((m) => samePassage(m.rects, d.rects));
+                if (known && opts.onExplainTap) return opts.onExplainTap(known.id);
                 opts.onExplain?.(text, page, d ? { pageIndex: d.pageIndex, rects: d.rects } : undefined);
               }
             : undefined,
@@ -121,20 +141,32 @@ export function createAnnotating(env: AnnotatingEnv) {
               opts.onExplain!(a.text, pageIndex + 1, { pageIndex, rects: [], annotationKey: a.key });
             }
           : undefined,
+        onOpenExplanation: opts.onExplainTap,
         canLookup: opts.canExplain,
         onOpen: (a) => handles?.show(a),
         onClose: () => handles?.hide(),
-      })
+      }, scrollArea)
     : null;
 
   // Before the highlights' taps, which a tap on an explained passage
-  // or a word looked up goes ahead of.
+  // or a word looked up goes ahead of — unless one of the reader's own
+  // highlights lies beneath it: its editor opens then, carrying the
+  // explanation (Explain opens it) or the definition (shown over it), so
+  // a highlight under an underline can still be recoloured, edited and
+  // deleted, and the underline's explanation is still a tap away.
   const ignore = () => Boolean(selection?.justDismissed());
+  const editableAt = (target: Element, x: number, y: number) => {
+    if (!popover || !writer) return null;
+    const a = annotationAtClient(target, x, y, env.getPages(), env.getAnnotations());
+    return a && writer.canEdit(a) ? a : null;
+  };
+  const yields = (target: Element, x: number, y: number) => editableAt(target, x, y) !== null;
   const explained = createPassageMarks(scrollArea, {
     kind: "explain",
     getPages: env.getPages,
     open: (id) => opts.onExplainTap?.(id),
     ignore,
+    yields,
   });
   // A word's definition, over the word, until the next press elsewhere
   // or a scroll.
@@ -157,6 +189,7 @@ export function createAnnotating(env: AnnotatingEnv) {
       document.addEventListener("pointerdown", onOutside, true);
     },
     ignore,
+    yields,
   });
 
   if (popover && writer) {
@@ -165,7 +198,13 @@ export function createAnnotating(env: AnnotatingEnv) {
       getAnnotations: env.getAnnotations,
       ignore: () => Boolean(selection?.justDismissed()),
       canEdit: writer.canEdit,
-      open: (a, at) => popover.open(a, at),
+      open: (a, at, tap) => {
+        const word = defined.find((w) => w.id === words.idAt(tap.target, tap.x, tap.y));
+        popover.open(a, at, {
+          explanation: explained.idAt(tap.target, tap.x, tap.y),
+          definition: word ? { word: word.word, text: word.definition } : null,
+        });
+      },
     });
   }
 
@@ -182,15 +221,12 @@ export function createAnnotating(env: AnnotatingEnv) {
     ? attachSentenceMarks(scrollArea, {
         latched: () => sentenceTool,
         // Text something else has claimed — a highlight or underline
-        // (the reader's or not), an explained passage, a word looked up
-        // — keeps its own tap.
+        // (the reader's or not), a word looked up — keeps its own tap. An
+        // explained passage doesn't: the tool selects it, to be marked,
+        // and the bar's Explain opens its explanation again.
         claimed: (target, x, y) => {
-          if (explained.at(target, x, y) || words.at(target, x, y)) return true;
-          const at = pageBoxAt(target);
-          const p = at ? env.getPages()[at.pageIndex] : undefined;
-          if (!at || !p) return false;
-          const r = at.box.getBoundingClientRect();
-          return Boolean(annotationAtPoint(p, at.pageIndex, (x - r.left) / r.width, (y - r.top) / r.height, env.getAnnotations()));
+          if (words.at(target, x, y)) return true;
+          return Boolean(annotationAtClient(target, x, y, env.getPages(), env.getAnnotations()));
         },
         enabled: () => !scrollArea.classList.contains("pdf-crop-editing"),
       })

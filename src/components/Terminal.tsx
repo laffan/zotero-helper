@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { copyText } from "../lib/clipboard";
 import { trackPointerDrag } from "../lib/dragGesture";
 import { appLog, useStore } from "../lib/store";
 import { CloseIcon, CopyIcon } from "./Icons";
@@ -28,22 +29,10 @@ export function Terminal() {
     const text = logs
       .map((l) => `${fmtTime(l.ts)} [${l.level.toUpperCase()}] ${l.message}`)
       .join("\n");
-    try {
-      await navigator.clipboard.writeText(text);
+    if (await copyText(text)) {
       setCopied(true);
       setTimeout(() => setCopied(false), 1500);
-    } catch {
-      // WebView clipboard fallback
-      const ta = document.createElement("textarea");
-      ta.value = text;
-      document.body.appendChild(ta);
-      ta.select();
-      document.execCommand("copy");
-      ta.remove();
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1500);
-      appLog("debug", "Copied log via fallback path");
-    }
+    } else appLog("warn", "Could not copy the log");
   };
 
   const startResize = (e: React.PointerEvent) => {

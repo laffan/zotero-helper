@@ -661,6 +661,9 @@ export function createPdfViewer(container: HTMLElement, opts: PdfViewerOptions =
     setSections: (list: PageDivider[]) => dividers.set(list),
     /** A keyboard command (lib/shortcuts/): a mode, a page or fold step. */
     command,
+    /** A press on reading mode's Post-it: dragged onto a page, it sticks
+     *  one there (postitDragOut.ts). */
+    postItDragOut: (e: PointerEvent, button: HTMLElement) => postIts.dragOut(e, button),
     /** Ink mode's pen: its colour, and the colours it takes. */
     inkPen: ink.pen,
     /** Report a view change still waiting out its pause. */

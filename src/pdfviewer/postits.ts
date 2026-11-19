@@ -7,7 +7,8 @@
 // The tool is then done, as Add Section is after one line: one post-it
 // per press (a second press, or Escape, puts it away unused). While
 // ready it has every press on the pages to itself, heard on the window
-// before anything in them; a finger's drag still scrolls.
+// before anything in them; a finger's drag still scrolls. A post-it can
+// also be dragged out of either button onto a page (postitDragOut.ts).
 //
 // On the page a post-it is a square of paper over the text — an overlay
 // on its page placed in percentages of the page, like the sections'
@@ -44,6 +45,7 @@ import { dragCorner, leastInsets, showCrop } from "./postitCrop";
 import { createPostItEditor, createPostItMenu } from "./postitEdit";
 import { createPostItPen, drawPostItInk, type PenTarget } from "./postitInk";
 import { dragPostIt } from "./postitMove";
+import { beginPostItDrag } from "./postitDragOut";
 import type { PageRecord } from "./types";
 import type { PdfViewerOptions } from "./viewerOptions";
 
@@ -598,6 +600,28 @@ export function createPostIts(env: PostItsEnv) {
   const enabled = Boolean(writer);
   if (enabled) env.button.addEventListener("click", () => setPlacing(!placing));
   else env.button.style.display = "none";
+  // Dragged out of a button (this one, or reading mode's) onto a page.
+  const dragOut = (e: PointerEvent, button: HTMLElement) =>
+    beginPostItDrag(e, button, {
+      enabled: () => enabled,
+      color: lastPostItColor,
+      start: env.onStart,
+      guideAt(x, y) {
+        const at = pageAt(document.elementFromPoint(x, y));
+        if (at) showGuide(at.idx, at.wrapper, x, y);
+        else hideGuide();
+        return at !== null;
+      },
+      hideGuide,
+      stickAt(x, y) {
+        const at = pageAt(document.elementFromPoint(x, y));
+        if (!at) return false;
+        stick(at.idx, at.wrapper, x, y);
+        setPlacing(false);
+        return true;
+      },
+    });
+  env.button.addEventListener("pointerdown", (e) => dragOut(e, env.button));
   scrollArea.addEventListener("pointerdown", onDown, true);
   scrollArea.addEventListener("click", onClick, true);
   document.addEventListener("visibilitychange", onHidden);
@@ -627,6 +651,9 @@ export function createPostIts(env: PostItsEnv) {
       const p = env.getPages()[idx];
       if (p) for (const it of items.values()) if (it.pageIndex === idx && it.el) place(it, p);
     },
+    /** A press on a Post-it button outside the viewer (reading mode's):
+     *  dragged, it sticks a post-it where it is let go. */
+    dragOut,
     /** Write what waits (the PDF closing). */
     flush(): void {
       editor.commit();

@@ -155,23 +155,38 @@ export async function cacheItemPdf(itemKey: string): Promise<void> {
 }
 
 /** Download every PDF in a folder that isn't on this device yet — the
- *  sidebar folder menu's "Download all PDFs". One at a time, with the
- *  progress in the task tray. */
+ *  sidebar folder menu's "Download all PDFs". */
 export async function cacheFolderPdfs(collectionKey: string): Promise<void> {
   const st = useStore.getState();
-  const items = st.library.items;
-  const todo = itemsForCollection(items, collectionKey).filter((i) => {
-    const att = pdfAttachmentOf(items, i.key);
-    return att && !st.cachedPdfs[att.key];
-  });
   const name = String(
     st.library.collections.find((c) => c.key === collectionKey)?.data?.name ?? "folder",
   );
+  await cachePdfsOf(itemsForCollection(st.library.items, collectionKey), `“${name}”`);
+}
+
+/** The entries among `items` with a PDF in Zotero that isn't on this
+ *  device yet. */
+export function pdfsToDownload(items: ZItem[]): ZItem[] {
+  const st = useStore.getState();
+  const all = st.library.items;
+  return items.filter((i) => {
+    const att = pdfAttachmentOf(all, i.key);
+    return att && !st.cachedPdfs[att.key];
+  });
+}
+
+/** Download the PDFs of `items` that aren't on this device yet — a
+ *  folder's, or the selected entries' (the multi-selection panel's
+ *  "Download all PDFs"). One at a time, with the progress in the task
+ *  tray; `label` names the set there and in the log. */
+export async function cachePdfsOf(items: ZItem[], label: string): Promise<void> {
+  const st = useStore.getState();
+  const todo = pdfsToDownload(items);
   if (!todo.length) {
-    appLog("info", `Every PDF in “${name}” is already on this device`);
+    appLog("info", `Every PDF in ${label} is already on this device`);
     return;
   }
-  st.startUiTasks(`Download PDFs · ${name}`, todo.map((i) => ({ id: i.key, title: itemTitle(i) })));
+  st.startUiTasks(`Download PDFs · ${label}`, todo.map((i) => ({ id: i.key, title: itemTitle(i) })));
   try {
     for (const item of todo) {
       const { updateUiTask } = useStore.getState();

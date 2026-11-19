@@ -295,5 +295,7 @@
   border-top: 1px solid var(--border);
   padding: 8px 10px;
   display: flex;
+  flex-wrap: wrap;
   justify-content: flex-end;
+  gap: 6px;
 }

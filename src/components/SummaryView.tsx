@@ -1,8 +1,11 @@
 // Multi-select view: one condensed card per selected item, with a
 // configurable field set. Clicking a card narrows the selection to that
-// item; the Share button exports exactly what's on screen as Markdown.
+// item; the Share button exports exactly what's on screen as Markdown,
+// and Download all PDFs keeps the selected entries' PDFs on this device
+// (those not here yet, one at a time, in the task tray).
 import { useEffect, useRef, useState } from "react";
 import { fullCreatorList } from "../lib/collections";
+import { cachePdfsOf, pdfsToDownload } from "../lib/notes";
 import { shareSummary } from "../lib/share";
 import { useStore } from "../lib/store";
 import {
@@ -10,7 +13,7 @@ import {
   SUMMARY_FIELD_OPTIONS,
   type ZItem,
 } from "../lib/types";
-import { ShareIcon } from "./Icons";
+import { DownloadIcon, ShareIcon } from "./Icons";
 
 const ABSTRACT_PREVIEW_CHARS = 240;
 
@@ -34,6 +37,10 @@ export function summaryValue(item: ZItem, field: string): string {
 
 export function SummaryView({ items }: { items: ZItem[] }) {
   const { summaryFields, setSummaryFields, setSelectedKeys } = useStore();
+  // Read again as PDFs arrive and as downloads start and end.
+  useStore((s) => s.cachedPdfs);
+  const busy = useStore((s) => s.pdfsDownloading.length > 0);
+  const missing = pdfsToDownload(items).length;
   const [filterOpen, setFilterOpen] = useState(false);
   const popRef = useRef<HTMLDivElement>(null);
   const shareRef = useRef<HTMLButtonElement>(null);
@@ -129,6 +136,18 @@ export function SummaryView({ items }: { items: ZItem[] }) {
         ))}
       </div>
       <div className="summary-footer">
+        <button
+          className="tool-btn"
+          onClick={() => void cachePdfsOf(items, `${items.length} selected items`)}
+          disabled={missing === 0 || busy}
+          title={
+            missing
+              ? `Download the ${missing} PDF${missing === 1 ? "" : "s"} of these items not yet on this device`
+              : "Every PDF of these items is on this device"
+          }
+        >
+          <DownloadIcon size={13} /> Download all PDFs{missing ? ` (${missing})` : ""}
+        </button>
         <button
           className="tool-btn"
           ref={shareRef}

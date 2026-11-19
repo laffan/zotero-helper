@@ -13,7 +13,8 @@
 // A section shows as a dashed line across its page with its name in a
 // tab at the left, above the line. The tab is the section's handle: a tap
 // opens the box to rename it or Remove it, a drag moves the line up or
-// down its page.
+// down its page. Adding one or renaming it, the box also offers the
+// sections before it that it can be nested under (lib/dividers.ts).
 //
 // While the tool is ready it has every press on the pages to itself —
 // heard on the window before anything in the pages (the sentence tool,
@@ -37,6 +38,8 @@ export interface PageDivider {
   /** PDF units, y up. */
   top: number;
   name: string;
+  /** The section it is nested under. */
+  parentId?: string;
 }
 
 interface DividersEnv {
@@ -220,21 +223,45 @@ export function createDividers(env: DividersEnv) {
     const fy = clamp01((y - r.top) / r.height);
     const name = textBelow(wrapper, y) || "Section";
     const line = showGuide(wrapper, fy, name);
+    const top = heightAt(p, fy);
     box.open({
       anchor: line.querySelector<HTMLElement>(".pdf-divider-label")!,
       align: "left",
       label: "Section name",
       name,
       existing: false,
-      save: (n) => {
+      choice: nestChoice(idx, top),
+      save: (n, parent) => {
         hideGuide();
-        opts.onAddSection?.(idx, heightAt(p, fy), n, env.getPageLabels()?.[idx]);
+        opts.onAddSection?.(idx, top, n, env.getPageLabels()?.[idx], parent || undefined);
       },
       dropped: hideGuide,
     });
     // Placed: the tool is done (the guide stays, as the line being
     // named, while the box is open).
     setPlacing(false);
+  }
+
+  /** The box's "Nested under": the sections one at `(idx, top)` can go
+   *  under — none (the first choice) or one of those before it, still
+   *  open there. Undefined when there are none. A section being renamed
+   *  keeps its own; a new one starts beside the one before it (under
+   *  that one's parent, the choice above it), as an outline's next line
+   *  does. */
+  function nestChoice(idx: number, top: number, exceptId?: string, current?: string) {
+    const list = opts.sectionParents?.(idx, top, exceptId) ?? [];
+    if (!list.length) return undefined;
+    const value = exceptId
+      ? current && list.some((c) => c.id === current) ? current : ""
+      : (list[list.length - 2]?.id ?? "");
+    return {
+      label: "Nested under",
+      options: [
+        { value: "", text: "None" },
+        ...list.map((c) => ({ value: c.id, text: c.name, level: c.level })),
+      ],
+      value,
+    };
   }
 
   // A tab: a tap renames (or removes), a drag moves the line.
@@ -280,7 +307,8 @@ export function createDividers(env: DividersEnv) {
         label: "Section name",
         name: mark.name,
         existing: true,
-        save: (n) => opts.onRenameSection?.(mark.id, n),
+        choice: nestChoice(mark.pageIndex, mark.top, mark.id, mark.parentId),
+        save: (n, parent) => opts.onRenameSection?.(mark.id, n, parent || null),
         remove: () => opts.onRemoveSection?.(mark.id),
       });
     };

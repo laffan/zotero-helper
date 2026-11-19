@@ -5,7 +5,8 @@
 // caret toggles the sentence tool (a tap selects the sentence under it,
 // as a ⌘-click does), a pen toggles ink mode — the Pencil writing, or
 // selecting and highlighting like a finger — and a square of paper
-// readies Post-it (the next tap on a page sticks one there). All four
+// readies Post-it (the next tap on a page sticks one there — or it is
+// dragged out of the button onto a page, and let go there). All four
 // are the viewer's own, toggled through its commands and shown filled
 // while on (the store's `sectionTool` / `sentenceTool` / `inkMode` /
 // `postItTool`, which the viewer reports). With ink mode on, holding the pen a moment
@@ -23,7 +24,7 @@ import { useEffect, useRef, useState } from "react";
 import { ANNOTATION_COLORS, colorLetter } from "../lib/highlights";
 import { useStore } from "../lib/store";
 import { LassoIcon } from "./NotepadBody";
-import { readerCommand, readerPen } from "./ReaderPane";
+import { readerCommand, readerPen, readerPostItDrag } from "./ReaderPane";
 
 const HOLD_MS = 450;
 
@@ -139,9 +140,14 @@ export function ReadingModeExit() {
       <button
         type="button"
         className={postItTool ? "reading-mode-tool reading-mode-postit on" : "reading-mode-tool reading-mode-postit"}
-        title={postItTool ? "Post-it: tap a page to stick it there (again to cancel)" : "Post-it: tap a page to stick a post-it there"}
+        title={
+          postItTool
+            ? "Post-it: tap a page to stick it there (again to cancel)"
+            : "Post-it: tap, then tap a page to stick a post-it there — or drag one onto a page"
+        }
         aria-label="Post-it"
         aria-pressed={postItTool}
+        onPointerDown={(e) => readerPostItDrag(e.nativeEvent, e.currentTarget)}
         onClick={() => readerCommand("postit")}
       >
         {POSTIT}

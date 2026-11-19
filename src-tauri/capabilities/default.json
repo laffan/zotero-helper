@@ -8,6 +8,7 @@
     "core:window:allow-close",
     "dialog:default",
     "opener:default",
+    "clipboard-manager:allow-write-text",
     "capture-view:default",
     "pencil:default",
     "status-bar:default",

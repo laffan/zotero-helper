@@ -3,8 +3,10 @@
 // heading, the outline's or the reader's (Add Section), whose name
 // begins with "Chapter". Columns are what a chapter is divided into —
 // the outline's headings one level under the chapter's, and every
-// section the reader added (lib/dividers.ts) that isn't a chapter. A
-// heading deeper than that is a small heading within its column.
+// section the reader added (lib/dividers.ts) that isn't a chapter — but
+// one the reader nested under another of theirs that isn't a chapter is
+// a small heading within that one's column, as is any heading deeper
+// than a column's.
 //
 // It is the same filing the Highlights list does (sectionIndexOf, in
 // lib/outline.ts — a highlight falls under the nearest heading above
@@ -71,13 +73,17 @@ export function mapRows(sections: Section[], list: Annotation[]): MapRow[] {
   let row = rows[0];
   let column = row.columns[0];
   column.items.push(...entries(-1));
+  const byId = new Map(sections.map((s) => [s.id, s]));
   sections.forEach((s, i) => {
     const mine = dividerIdOf(s) !== null;
+    const parent = s.nestedIn ? byId.get(s.nestedIn) : undefined;
+    // Nested under a column of the reader's (or a heading in one): within it.
+    const within = mine && parent !== undefined && !isChapter(parent);
     if (isChapter(s) || (!mine && s.depth === 0)) {
       row = { key: s.id, section: s, depth: s.depth, columns: [lead(s.id)] };
       rows.push(row);
       column = row.columns[0];
-    } else if (mine || s.depth <= row.depth + 1) {
+    } else if (!within && (mine || s.depth <= row.depth + 1)) {
       column = { key: s.id, section: s, items: [] };
       row.columns.push(column);
     } else column.items.push({ kind: "heading", section: s });
@@ -96,7 +102,10 @@ export function mapRows(sections: Section[], list: Annotation[]): MapRow[] {
 }
 
 /** A heading within a column goes when no highlight follows it before
- *  the next heading (or the column's end). */
+ *  the next heading (or the column's end) — but the reader's own, which
+ *  they put there. */
 function dropBareHeadings(items: MapItem[]): MapItem[] {
-  return items.filter((it, i) => it.kind === "entry" || items[i + 1]?.kind === "entry");
+  return items.filter(
+    (it, i) => it.kind === "entry" || dividerIdOf(it.section) !== null || items[i + 1]?.kind === "entry",
+  );
 }

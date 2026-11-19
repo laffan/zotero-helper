@@ -50,6 +50,10 @@ export function setPageCount(attKey: string, pages: number): void {
   if (pages > 0) pageCounts.set(attKey, pages);
 }
 
+/** A PDF's outline as known so far (the open PDF's, or one read from a
+ *  PDF on this device); empty when none is. */
+export const outlineOf = (attKey: string): OutlineEntry[] => outlines.get(attKey) ?? [];
+
 export function setOutline(attKey: string, outline: OutlineEntry[]): void {
   outlines.set(attKey, outline);
   outlinesVersion.set(outlinesVersion.get() + 1);
@@ -141,6 +145,9 @@ export interface Section {
   /** PDF y (up from the bottom) of the heading; Infinity for the top
    *  of the page. */
   top: number;
+  /** A reader's section nested under another (lib/dividers.ts): that
+   *  one's id. */
+  nestedIn?: string;
 }
 
 const sectionsCache = new WeakMap<OutlineEntry[], Section[]>();

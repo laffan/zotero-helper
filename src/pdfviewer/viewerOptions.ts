@@ -22,11 +22,17 @@ export interface PdfViewerOptions {
   onRenameBookmark?: (id: string, name: string) => void;
   onRemoveBookmark?: (id: string) => void;
   /** Add a section (Add Section, dividers.ts): a named line across page
-   *  `pageIndex` at height `top` (PDF units); absent hides the tool. */
-  onAddSection?: (pageIndex: number, top: number, name: string, pageLabel?: string) => void;
+   *  `pageIndex` at height `top` (PDF units), nested under the section
+   *  `parentId` when one was chosen; absent hides the tool. */
+  onAddSection?: (pageIndex: number, top: number, name: string, pageLabel?: string, parentId?: string) => void;
   /** A section's line dragged to height `top` of its page. */
   onMoveSection?: (id: string, top: number) => void;
-  onRenameSection?: (id: string, name: string) => void;
+  /** Renamed, and nested under `parentId` (null: under none). */
+  onRenameSection?: (id: string, name: string, parentId: string | null) => void;
+  /** The sections one at `(pageIndex, top)` can be nested under, the
+   *  outermost first (lib/dividers.ts nestingChoices); `exceptId` is
+   *  the one being renamed. Absent, the box offers no nesting. */
+  sectionParents?: (pageIndex: number, top: number, exceptId?: string) => { id: string; name: string; level: number }[];
   onRemoveSection?: (id: string) => void;
   /** Add Section is readied (the next tap places a line), or done. */
   onSectionTool?: (on: boolean) => void;

@@ -3,7 +3,8 @@
 // removes one already there. Made: the name filled in and selected,
 // Enter (or Add) keeps it. Existing: its name, to Save, or Remove.
 // Escape or a press elsewhere drops the box, and `dropped` hears of it.
-// One box at a time per viewer.
+// One box at a time per viewer. A section's box also offers, beneath,
+// the sections it can be nested under (`choice`), when there are any.
 
 export interface NameBoxOpen {
   /** What the box sits by, and on which side of it. Under the anchor:
@@ -15,7 +16,10 @@ export interface NameBoxOpen {
   name: string;
   /** Renaming an existing one (Save, and Remove) rather than adding. */
   existing: boolean;
-  save: (name: string) => void;
+  /** A dropdown under the name: its label, its options (`level` indents
+   *  one), and the one chosen to begin with. Its value goes to `save`. */
+  choice?: { label: string; options: { value: string; text: string; level?: number }[]; value: string };
+  save: (name: string, choice?: string) => void;
   remove?: () => void;
   /** Closed without Add, Save or Remove. */
   dropped?: () => void;
@@ -47,11 +51,28 @@ export function createNameBox(host: HTMLElement) {
     const input = form.querySelector("input")!;
     input.setAttribute("aria-label", o.label);
     input.value = o.name;
+    let select: HTMLSelectElement | null = null;
+    if (o.choice && o.choice.options.length > 1) {
+      const row = document.createElement("label");
+      row.className = "pdf-name-box-choice";
+      row.append(o.choice.label);
+      select = document.createElement("select");
+      for (const opt of o.choice.options) {
+        const el = document.createElement("option");
+        el.value = opt.value;
+        // Indented by its depth (non-breaking spaces: a select keeps them).
+        el.textContent = `${"\u00a0\u00a0\u00a0".repeat(opt.level ?? 0)}${opt.text}`;
+        select.appendChild(el);
+      }
+      select.value = o.choice.value;
+      row.appendChild(select);
+      form.appendChild(row);
+    }
     form.addEventListener("submit", (e) => {
       e.preventDefault();
       const name = input.value.trim() || o.name;
       close(true);
-      o.save(name);
+      o.save(name, select?.value);
     });
     form.querySelector(".pdf-bookmark-remove")?.addEventListener("click", () => {
       close(true);

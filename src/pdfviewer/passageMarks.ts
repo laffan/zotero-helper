@@ -5,6 +5,10 @@
 // (--explain-mark), a tap on one showing its definition above it. Both work in reading mode too,
 // where there is no sidebar to find them in.
 //
+// A mark over one of the reader's highlights leaves the tap to the
+// highlight (`yields`): its editor opens, and offers the explanation or
+// shows the definition (annotating.ts), so both stay within reach.
+//
 // The marks are drawn like an AI citation's (citeMark.ts): an overlay on
 // the page wrapper in percentages of the page, so they need no raster
 // and follow every zoom. They are the app's own and never written to
@@ -32,6 +36,9 @@ export interface PassageMarksEnv {
   open: (id: string, at: DOMRect) => void;
   /** Taps are ignored right now (a selection just dismissed). */
   ignore: () => boolean;
+  /** Is the tap at this point another's — a highlight's beneath, whose
+   *  editor then opens instead? */
+  yields?: (target: Element, x: number, y: number) => boolean;
 }
 
 /** A rect in PDF space, as fractions of its page. */
@@ -117,7 +124,7 @@ export function createPassageMarks(scrollArea: HTMLElement, env: PassageMarksEnv
     const target = e.target as Element;
     if (target.closest("a, button")) return;
     const m = markAt(target, e.clientX, e.clientY);
-    if (!m) return;
+    if (!m || env.yields?.(target, e.clientX, e.clientY)) return;
     e.stopImmediatePropagation();
     env.open(m.id, boxOf(m));
   });
@@ -131,6 +138,10 @@ export function createPassageMarks(scrollArea: HTMLElement, env: PassageMarksEnv
     },
     /** Is there a mark under this client point? */
     at: (target: Element, x: number, y: number) => markAt(target, x, y) !== null,
+    /** The mark under this client point, if any. */
+    idAt: (target: Element, x: number, y: number) => markAt(target, x, y)?.id ?? null,
+    /** The marks on page `idx`. */
+    onPage: (idx: number) => marks.filter((m) => m.pageIndex === idx),
     /** A page was drawn (perhaps at its own size, at last). */
     pageRendered(idx: number): void {
       if (marks.some((m) => m.pageIndex === idx)) drawPage(idx);

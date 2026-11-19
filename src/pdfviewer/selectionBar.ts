@@ -8,7 +8,8 @@
 //
 // Highlight vs underline is a switch at the bar's left, remembered
 // between selections — the swatches then make whichever it is set to,
-// the way Zotero's reader keeps its active tool.
+// the way Zotero's reader keeps its active tool. Flipping it keeps the
+// bar and the selection: it only changes what the colours make.
 //
 // A tap anywhere on the pages dismisses the selection, and the bar
 // with it, the moment the finger (or button) lifts. Left to itself the
@@ -18,13 +19,27 @@
 // and on iPad a tap on text cleared it only after the tap gestures had
 // been told apart.
 //
+// Pressing the bar must not lose what it acts on. On the iPad — a finger,
+// or a trackpad's pointer — the press can end the selection before the
+// button hears its release (the system's text interaction takes the tap
+// as one outside the selection), and the click it would end in may never
+// come. So:
+// - the passage the bar acts on is taken as the press begins (`held`),
+//   and kept while the bar is pressed, however long, and a moment after;
+// - its buttons act on the release of a press over them, from any
+//   pointer (`onRelease`), the click only for the keyboard;
+// - once a button has acted and the bar has gone, the click the tap
+//   still ends in is swallowed (`swallowClicks`): it would land on
+//   whatever lay under the bar — often the highlight just made above the
+//   next passage — opening its editor, whose handles keep the page's text
+//   from being selected, so the next try did nothing.
+//
 // On the iPad the system's own selection furniture is in the way: its
 // handles stand a finger's width above the first line and below the
-// last, taking the touches around them, and its gestures can swallow
-// the click a tap on the bar would end in. So where fingers select, the
-// bar keeps its distance from the passage (`TOUCH_GAP`), and its
-// buttons act on the release of a press rather than on the click
-// (`onRelease`). The system's menu is dismissed from lib/pencil.ts.
+// last, taking the touches around them. So where fingers select, the
+// bar keeps its distance from the passage (`TOUCH_GAP`). The system's
+// menu is dismissed from lib/pencil.ts.
+import { copyText } from "../lib/clipboard";
 import { ANNOTATION_COLORS, colorLetter } from "../lib/highlights";
 import { rangeText } from "./annotate";
 import { COPY_ICON, HIGHLIGHT_ICON, LOOKUP_ICON, NOTE_ICON, SPARKLES_ICON, UNDERLINE_ICON } from "./icons";
@@ -56,17 +71,24 @@ const TOUCH_GAP = 30;
 const fingers = () =>
   document.documentElement.classList.contains("ipados") || window.matchMedia?.("(pointer: coarse)").matches;
 
-/** `act` on the release of a finger's or the Pencil's press on `btn`,
- *  or on a click no such press led to (the mouse, whose clicks nothing
- *  swallows, and the keyboard). Never twice for one press. */
+/** How long after a press the bar keeps what it acts on, and swallows
+ *  the click the press ends in, ms. */
+const GRACE_MS = 450;
+
+/** `act` on the release of a press on `btn` — any pointer — over it, or
+ *  on a click no such press led to (the keyboard). Never twice for one
+ *  press. */
 function onRelease(btn: HTMLElement, act: () => void): void {
-  let down = false;
+  let down = -1;
   let actedAt = -Infinity;
-  btn.addEventListener("pointerdown", (e) => (down = e.pointerType !== "mouse"));
-  btn.addEventListener("pointercancel", () => (down = false));
+  btn.addEventListener("pointerdown", (e) => {
+    if (e.pointerType === "mouse" && e.button !== 0) return;
+    down = e.pointerId;
+  });
+  btn.addEventListener("pointercancel", () => (down = -1));
   btn.addEventListener("pointerup", (e) => {
-    if (!down) return;
-    down = false;
+    if (e.pointerId !== down) return;
+    down = -1;
     const r = btn.getBoundingClientRect();
     const inside = e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom;
     if (!inside) return;
@@ -128,14 +150,29 @@ export function createSelectionBar(
   bar.className = "pdf-selection-bar";
   bar.style.display = "none";
   root.appendChild(bar);
+  // What a moment's message ("Copied") says, over the bar's buttons.
+  const status = document.createElement("span");
+  status.className = "pdf-selection-bar-status";
 
+  type Passage = { text: string; page: number; range: Range };
   let mode = storedMode();
-  let current: { text: string; page: number; range: Range } | null = null;
+  // The selection the bar is for, and — from a press on the bar until
+  // it has acted — that passage as the press found it.
+  let current: Passage | null = null;
+  let held: Passage | null = null;
+  const target = () => current ?? held;
   let hideTimer = 0;
-  // While the bar is being pressed, and briefly after (see check()).
-  let barPressedUntil = 0;
+  let flashTimer = 0;
+  // Until when a selection that has gone leaves the bar up: Infinity
+  // while the bar is pressed (or kept after the mode switch), a moment
+  // after a release.
+  let keepUntil = 0;
+  let kept = false;
   // When a tap last dismissed the selection (that tap is not a click).
   let dismissedAt = 0;
+  // Clicks outside the bar until then are the end of a press the bar
+  // has answered (see the module comment).
+  let swallowUntil = 0;
 
   const button = (cls: string, title?: string) => {
     const b = document.createElement("button");
@@ -145,6 +182,14 @@ export function createSelectionBar(
     bar.appendChild(b);
     return b;
   };
+
+  /** The bar has acted and goes, the selection with it. */
+  function done(): void {
+    swallowUntil = performance.now() + GRACE_MS;
+    dismissedAt = performance.now();
+    window.getSelection()?.removeAllRanges();
+    hide();
+  }
 
   const modeBtns: Record<MarkType, HTMLButtonElement> | null = handlers.onAnnotate
     ? {
@@ -160,6 +205,7 @@ export function createSelectionBar(
         mode = m;
         store(MODE_KEY, m);
         paintMode();
+        keep();
       });
     }
     const sep = document.createElement("span");
@@ -170,9 +216,9 @@ export function createSelectionBar(
       s.style.setProperty("--swatch", color);
       s.dataset.letter = colorLetter(color);
       onRelease(s, () => {
-        if (current) handlers.onAnnotate?.(current.range, mode, color);
-        window.getSelection()?.removeAllRanges();
-        hide();
+        const t = target();
+        if (t) handlers.onAnnotate?.(t.range, mode, color);
+        done();
       });
     }
   }
@@ -184,22 +230,23 @@ export function createSelectionBar(
   const copy = button("pdf-selection-icon", "Copy");
   copy.innerHTML = COPY_ICON;
   onRelease(copy, () => {
-    if (!current) return;
-    const text = current.text;
-    // The Clipboard API, or — where it is refused — the browser's own
-    // copy of the selection, which is still there.
-    navigator.clipboard?.writeText(text).catch(() => document.execCommand("copy"));
-    if (!navigator.clipboard) document.execCommand("copy");
-    window.getSelection()?.removeAllRanges();
-    hide();
+    const t = target();
+    if (!t) return;
+    // Said on the bar, which then goes: the text was copied, or not.
+    flash("Copying…");
+    void copyText(t.text).then((ok) => {
+      flash(ok ? "Copied" : "Couldn't copy");
+      clearTimeout(flashTimer);
+      flashTimer = window.setTimeout(done, ok ? 650 : 1400);
+    });
   });
   if (handlers.onQuote) {
     const quote = button("pdf-selection-icon", "Add to notes — a quote with a link back to the page");
     quote.innerHTML = NOTE_ICON;
     onRelease(quote, () => {
-      if (current) handlers.onQuote?.(current.text, current.page);
-      window.getSelection()?.removeAllRanges();
-      hide();
+      const t = target();
+      if (t) handlers.onQuote?.(t.text, t.page);
+      done();
     });
   }
   const lookup = handlers.onLookup ? button("pdf-selection-icon", "Look up — a short definition") : null;
@@ -207,21 +254,23 @@ export function createSelectionBar(
   if (lookup) {
     lookup.innerHTML = LOOKUP_ICON;
     onRelease(lookup, () => {
-      if (!current) return;
-      const { text, page, range } = current;
-      const answer = handlers.onLookup!(text, page, range);
-      definition.show(text, answer, bar.getBoundingClientRect());
+      const t = target();
+      if (!t) return;
+      const answer = handlers.onLookup!(t.text, t.page, t.range);
+      definition.show(t.text, answer, bar.getBoundingClientRect());
+      keep();
     });
   }
   const explain = handlers.onExplain ? button("pdf-selection-explain", "Ask the AI to explain this passage") : null;
   if (explain) {
     explain.innerHTML = SPARKLES_ICON;
     onRelease(explain, () => {
-      if (current) handlers.onExplain?.(current.text, current.page, current.range);
-      window.getSelection()?.removeAllRanges();
-      hide();
+      const t = target();
+      if (t) handlers.onExplain?.(t.text, t.page, t.range);
+      done();
     });
   }
+  bar.appendChild(status);
 
   function paintMode(): void {
     if (!modeBtns) return;
@@ -231,28 +280,65 @@ export function createSelectionBar(
   }
   paintMode();
 
+  /** Show `text` over the bar's buttons (until it hides). */
+  function flash(text: string): void {
+    status.textContent = text;
+    bar.classList.add("flashing");
+    keepUntil = Infinity;
+  }
+
+  /** The bar stays for what it holds — the mode switched, a look-up
+   *  shown — even should the press have ended the selection, which is
+   *  put back (now, and once the iPad's tap has settled). */
+  function keep(): void {
+    const t = target();
+    if (!t) return;
+    current = t;
+    kept = true;
+    keepUntil = Infinity;
+    const restore = () => {
+      const sel = window.getSelection();
+      if (!sel || current !== t || !(sel.isCollapsed || !sel.rangeCount)) return;
+      try {
+        sel.removeAllRanges();
+        sel.addRange(t.range);
+      } catch {
+        /* the passage is gone from the page: the bar still acts on it */
+      }
+    };
+    restore();
+    window.setTimeout(restore, 250);
+  }
+
   function hide(): void {
     clearTimeout(hideTimer);
+    clearTimeout(flashTimer);
     bar.style.display = "none";
+    bar.classList.remove("flashing");
     current = null;
+    held = null;
+    kept = false;
+    keepUntil = 0;
     definition.hide();
   }
 
   function check(): void {
     const sel = window.getSelection();
     if (!sel || sel.isCollapsed || !sel.rangeCount) {
-      // A tap on the bar can collapse the selection before its click
-      // arrives; keep what was selected for a moment so the tap counts.
-      // Otherwise the bar goes with the selection.
-      if (performance.now() >= barPressedUntil) return hide();
+      // A press on the bar can end the selection before its button
+      // hears the release: the bar stays while it is pressed (or kept),
+      // and a moment after, so the press counts. Otherwise the bar goes
+      // with the selection.
+      const wait = keepUntil - performance.now();
+      if (wait <= 0) return hide();
       clearTimeout(hideTimer);
-      hideTimer = window.setTimeout(hide, 300);
+      if (wait !== Infinity) hideTimer = window.setTimeout(check, wait + 10);
       return;
     }
     const range = sel.getRangeAt(0);
     const anchor = range.commonAncestorContainer;
     const el = anchor instanceof Element ? anchor : anchor.parentElement;
-    if (!el || !scrollArea.contains(el)) return hide();
+    if (!el || !scrollArea.contains(el)) return kept ? undefined : hide();
     const text = rangeText(range);
     const wrapper = (range.startContainer.parentElement ?? el).closest<HTMLElement>(
       ".pdf-page-wrapper, .pdf-fold-wrapper",
@@ -265,7 +351,14 @@ export function createSelectionBar(
     if (explain) explain.style.display = ai ? "" : "none";
     if (lookup) lookup.style.display = ai ? "" : "none";
     clearTimeout(hideTimer);
-    current = { text, page: Number(wrapper.dataset.pageIndex ?? 0) + 1, range: range.cloneRange() };
+    const page = Number(wrapper.dataset.pageIndex ?? 0) + 1;
+    // A selection other than the one kept lets go of keeping it.
+    if (kept && current && rangeText(current.range) !== text) {
+      kept = false;
+      keepUntil = 0;
+      definition.hide();
+    }
+    current = { text, page, range: range.cloneRange() };
     const r = selectionBox(range, scrollArea);
     if (!r) return hide();
     const host = root.getBoundingClientRect();
@@ -296,22 +389,34 @@ export function createSelectionBar(
   };
   document.addEventListener("selectionchange", schedule);
   scrollArea.addEventListener("scroll", hide, { passive: true });
-  // Keep the selection alive while the bar is pressed.
+  // A press on the bar: keep the selection where the browser lets us,
+  // and what it holds whatever happens to the selection meanwhile.
   bar.addEventListener("pointerdown", (e) => {
     e.preventDefault();
-    barPressedUntil = Infinity;
+    held = current;
+    keepUntil = Infinity;
   });
-  const barReleased = () => (barPressedUntil = performance.now() + 400);
+  const barReleased = () => {
+    if (!kept && !bar.classList.contains("flashing")) keepUntil = performance.now() + GRACE_MS;
+    if (bar.style.display !== "none") window.setTimeout(check, GRACE_MS + 10);
+  };
   bar.addEventListener("pointerup", barReleased);
   bar.addEventListener("pointercancel", barReleased);
+  const swallowClicks = (e: MouseEvent) => {
+    if (performance.now() > swallowUntil || bar.contains(e.target as Node)) return;
+    swallowUntil = 0;
+    e.preventDefault();
+    e.stopImmediatePropagation();
+  };
+  window.addEventListener("click", swallowClicks, true);
 
-  // A tap on the pages while something is selected: clear it. Left
-  // alone are drags (scrolling, or selecting afresh), long presses (a
-  // new selection on iPad), shift-clicks (extending this one) and the
-  // later clicks of a double or triple click (selecting a word or a
-  // line). Where the browser has already dropped the selection itself
-  // (a click on text, on the Mac), only the bar is left to go — the
-  // caret it put there is what a double click grows into a word.
+  // A tap on the pages while something is selected (or the bar is up):
+  // clear it. Left alone are drags (scrolling, or selecting afresh), long
+  // presses (a new selection on iPad), shift-clicks (extending this one)
+  // and the later clicks of a double or triple click (selecting a word
+  // or a line). Where the browser has already dropped the selection
+  // itself (a click on text, on the Mac), only the bar is left to go —
+  // the caret it put there is what a double click grows into a word.
   let press: { x: number; y: number; at: number; id: number; armed: boolean } | null = null;
   let lastTap = { x: 0, y: 0, at: 0 };
   const onDown = (e: PointerEvent) => {
@@ -321,7 +426,7 @@ export function createSelectionBar(
     const repeat = now - lastTap.at < 400 && Math.hypot(e.clientX - lastTap.x, e.clientY - lastTap.y) < 10;
     const sel = window.getSelection();
     const selected = Boolean(sel && !sel.isCollapsed && sel.anchorNode && scrollArea.contains(sel.anchorNode));
-    press = { x: e.clientX, y: e.clientY, at: now, id: e.pointerId, armed: selected && !repeat && !e.shiftKey };
+    press = { x: e.clientX, y: e.clientY, at: now, id: e.pointerId, armed: (selected || kept) && !repeat && !e.shiftKey };
   };
   const onUp = (e: PointerEvent) => {
     const d = press;
@@ -342,14 +447,16 @@ export function createSelectionBar(
   scrollArea.addEventListener("pointercancel", onCancel);
 
   return {
-    /** Did a tap just dismiss the selection? Its click is then not a
-     *  click on whatever lay under it (a highlight, say). */
+    /** Did a tap just dismiss the selection (or the bar act)? Its click
+     *  is then not a click on whatever lay under it (a highlight, say). */
     justDismissed: () => performance.now() - dismissedAt < 600,
 
     destroy(): void {
       clearTimeout(timer);
       clearTimeout(hideTimer);
+      clearTimeout(flashTimer);
       document.removeEventListener("selectionchange", schedule);
+      window.removeEventListener("click", swallowClicks, true);
       bar.remove();
       definition.destroy();
     },

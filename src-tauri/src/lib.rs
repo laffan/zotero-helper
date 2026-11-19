@@ -254,7 +254,7 @@ async fn discard_temp_file(state: State<'_, AppState>, path: String) -> Result<(
 }
 
 // ---------------------------------------------------------------------------
-// AI tidy
+// AI: Tidy Metadata, Get Abstract, Questions (kept on this device, never in Zotero)
 // ---------------------------------------------------------------------------
 
 #[tauri::command]
@@ -294,14 +294,8 @@ async fn ai_get_abstract(
     ai::get_abstract(&app, &state, item, page_text).await
 }
 
-// ---------------------------------------------------------------------------
-// Questions: chats about a folder, a selection, or one item. Nothing here
-// touches Zotero — the conversations live in the app's own data dir.
-// ---------------------------------------------------------------------------
-
-/// One turn of a conversation, sent back with every request (the
-/// providers are stateless). `mode` "explain" is the reader's short
-/// explainer of a passage, "define" its look-up of a word.
+/// One turn of a conversation, sent back with every request (the providers are
+/// stateless). `mode` "explain" is the reader's explainer, "define" its look-up.
 #[tauri::command]
 async fn ai_chat(
     app: AppHandle,
@@ -322,6 +316,16 @@ async fn ai_chat_title(
     answer: String,
 ) -> Result<ai::ChatReply> {
     ai::title(&app, &state, question, answer).await
+}
+
+/// A provider's models as it lists them now; `api_key`: as typed, unsaved.
+#[tauri::command]
+async fn ai_list_models(
+    state: State<'_, AppState>,
+    service: String,
+    api_key: Option<String>,
+) -> Result<Vec<ai::ListedModel>> {
+    ai::list_models(&state, &service, api_key).await
 }
 
 /// Size of a chat request before it is sent — the cost popup's numbers.
@@ -345,8 +349,7 @@ async fn save_chats(state: State<'_, AppState>, chats: Vec<Value>) -> Result<()>
 }
 
 // ---------------------------------------------------------------------------
-// Share (iOS share sheet via tauri-plugin-share-sheet; desktop exports
-// staged files through save/folder dialogs instead)
+// Share (iOS: tauri-plugin-share-sheet; desktop: staged files via save/folder dialogs)
 // ---------------------------------------------------------------------------
 
 /// Download an attachment into the share staging dir; returns the path.
@@ -489,8 +492,7 @@ fn open_url(app: &AppHandle, url: String) -> Result<()> {
 }
 
 // ---------------------------------------------------------------------------
-// PDF rescue browser. Desktop: Tauri child webview (src/capture.rs).
-// Mobile: native WKWebView overlay (tauri-plugin-capture-view).
+// PDF rescue browser: desktop, a child webview (capture.rs); mobile, tauri-plugin-capture-view.
 // ---------------------------------------------------------------------------
 
 #[cfg(not(desktop))]
@@ -593,6 +595,7 @@ pub fn run() {
     let app = tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_capture_view::init())
         .plugin(tauri_plugin_share_sheet::init())
         .plugin(tauri_plugin_keyboard_focus::init())
@@ -643,6 +646,7 @@ pub fn run() {
             ai_chat,
             ai_chat_title,
             ai_count_tokens,
+            ai_list_models,
             load_chats,
             save_chats,
             bookmarks::load_bookmarks,

@@ -4,9 +4,14 @@
 // Explain (the explainer's window, about the annotation's text) — and
 // Delete. It opens on a tap on a highlight or underline in
 // the pages, with handles on the passage to change its extent
-// (highlightHandles.ts, through onOpen / onClose). Changes go out as
-// they are made — a colour at once, the comment after a pause in typing
-// and when the popover closes.
+// (highlightHandles.ts, through onOpen / onClose) — above the passage,
+// or below it when there is no room above, never over its words or
+// either handle, so both ends can be grabbed while it is open. Changes
+// go out as they are made — a colour at once, the comment after a pause
+// in typing and when the popover closes. Where the highlight lies under
+// a passage the AI explained, its Explain opens that explanation; under
+// a word looked up, the word's definition shows over it.
+import { copyText } from "../lib/clipboard";
 import { ANNOTATION_COLORS, colorLetter, type Annotation } from "../lib/highlights";
 import { COPY_ICON, LOOKUP_ICON, NOTE_ICON, SPARKLES_ICON } from "./icons";
 import { createLookupPopup } from "./lookupPopup";
@@ -22,15 +27,34 @@ export interface AnnotationEditHandlers {
    *  Explain does a selection's; shown, as Look up is, while
    *  `canLookup`. */
   onExplain?: (a: Annotation) => void;
+  /** Open an explanation made before, by its id: one of a passage the
+   *  highlight overlaps (`open`'s `extras`). */
+  onOpenExplanation?: (id: string) => void;
   canLookup?: () => boolean;
   /** It opened on `a`, and it closed. */
   onOpen?: (a: Annotation) => void;
   onClose?: () => void;
 }
 
-const COMMENT_PAUSE_MS = 700;
+/** What else is under the tap that opens the editor: an explained
+ *  passage (its id) and a word looked up (its definition). */
+export interface OpenExtras {
+  explanation?: string | null;
+  definition?: { word: string; text: string } | null;
+}
 
-export function createAnnotationPopover(root: HTMLElement, handlers: AnnotationEditHandlers) {
+const COMMENT_PAUSE_MS = 700;
+/** Room between the passage and the editor, CSS px: the handles' knobs
+ *  stand 9px past the line, and a finger needs more round them than a
+ *  pointer does. */
+const GAP = 16;
+const TOUCH_GAP = 30;
+const fingers = () =>
+  document.documentElement.classList.contains("ipados") || window.matchMedia?.("(pointer: coarse)").matches;
+
+/** `area`: the part of the viewer the pages show in (the editor stays
+ *  inside it); the whole of `root` when absent. */
+export function createAnnotationPopover(root: HTMLElement, handlers: AnnotationEditHandlers, area?: HTMLElement) {
   const el = document.createElement("div");
   el.className = "pdf-annot-popover";
   el.style.display = "none";
@@ -113,18 +137,35 @@ export function createAnnotationPopover(root: HTMLElement, handlers: AnnotationE
     if (current) handlers.onInsert?.(current);
     close();
   });
+  // Copy says whether it worked — the button's title and a mark on it —
+  // and leaves the editor open.
+  let copyTimer = 0;
   copy.addEventListener("click", () => {
-    if (current) void navigator.clipboard?.writeText(current.text).catch(() => {});
-    close();
+    if (!current) return;
+    clearTimeout(copyTimer);
+    void copyText(current.text).then((ok) => {
+      copy.classList.toggle("copied", ok);
+      copy.classList.toggle("copy-failed", !ok);
+      copy.dataset.flash = ok ? "Copied" : "Couldn't copy";
+      copyTimer = window.setTimeout(() => {
+        copy.classList.remove("copied", "copy-failed");
+        delete copy.dataset.flash;
+      }, 1400);
+    });
   });
   lookup.addEventListener("click", () => {
     if (!current || !handlers.onLookup) return;
     definition.show(current.text, handlers.onLookup(current), el.getBoundingClientRect());
   });
+  // An explained passage under the tap: Explain opens it, rather than
+  // asking about the highlight's text anew.
+  let explanation: string | null = null;
   explain.addEventListener("click", () => {
     const a = current;
+    const id = explanation;
     close();
-    if (a) handlers.onExplain?.(a);
+    if (id) handlers.onOpenExplanation?.(id);
+    else if (a) handlers.onExplain?.(a);
   });
 
   // Delete asks once more before it goes: a second press within a few
@@ -148,9 +189,13 @@ export function createAnnotationPopover(root: HTMLElement, handlers: AnnotationE
     handlers.remove(key);
   });
 
-  /** Open for `a` below `anchor` (client coordinates), or above it
-   *  when there is no room below. */
-  function open(a: Annotation, anchor: DOMRect): void {
+  /** Open for `a`, whose passage is `anchor` (client coordinates):
+   *  above it, clear of the knob over its start, so neither the words
+   *  nor either handle is covered; below it, clear of the end's knob,
+   *  when there is no room above; and where neither has room (a passage
+   *  as tall as the view), on the side with more. Kept inside `area`,
+   *  the part of the viewer the pages show in. */
+  function open(a: Annotation, anchor: DOMRect, extras: OpenExtras = {}): void {
     if (current) commitComment();
     current = a;
     committed = a.comment;
@@ -161,17 +206,30 @@ export function createAnnotationPopover(root: HTMLElement, handlers: AnnotationE
     copy.style.display = a.text ? "" : "none";
     const ai = Boolean(a.text) && handlers.canLookup?.() !== false;
     lookup.style.display = handlers.onLookup && ai ? "" : "none";
-    explain.style.display = handlers.onExplain && ai ? "" : "none";
+    explanation = (handlers.onOpenExplanation && extras.explanation) || null;
+    explain.style.display = (handlers.onExplain && ai) || explanation ? "" : "none";
+    explain.classList.toggle("has-explanation", Boolean(explanation));
+    explain.title = explanation ? "Open the explanation of this passage" : "Ask the AI to explain this passage";
     definition.hide();
     el.style.display = "";
     const host = root.getBoundingClientRect();
+    const view = (area ?? root).getBoundingClientRect();
     const w = el.offsetWidth;
     const h = el.offsetHeight;
+    const gap = fingers() ? TOUCH_GAP : GAP;
+    const minTop = view.top - host.top + 8;
+    const maxTop = view.bottom - host.top - h - 8;
+    const above = anchor.top - host.top - gap - h;
+    const below = anchor.bottom - host.top + gap;
+    let top: number;
+    if (above >= minTop) top = above;
+    else if (below <= maxTop) top = below;
+    else top = anchor.top - view.top > view.bottom - anchor.bottom ? minTop : maxTop;
     const left = anchor.left - host.left + anchor.width / 2 - w / 2;
-    let top = anchor.bottom - host.top + 8;
-    if (top + h > host.height - 8) top = anchor.top - host.top - h - 8;
     el.style.left = `${Math.max(8, Math.min(left, host.width - w - 8))}px`;
-    el.style.top = `${Math.max(8, Math.min(top, host.height - h - 8))}px`;
+    el.style.top = `${Math.max(minTop, Math.min(top, maxTop))}px`;
+    // A word looked up under the tap: its definition, over the editor.
+    if (extras.definition) definition.showKnown(extras.definition.word, extras.definition.text, el.getBoundingClientRect());
     handlers.onOpen?.(a);
   }
 

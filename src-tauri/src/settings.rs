@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use std::collections::BTreeMap;
 use std::path::Path;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -11,18 +12,27 @@ pub struct Settings {
     pub library_type: String,
     /// Email sent to Unpaywall / CrossRef polite pools. Optional but recommended.
     pub contact_email: String,
-    /// Which model provider every AI feature talks to: "anthropic" or "openai".
-    pub ai_service: String,
+    /// Both providers' keys are kept; either may be empty.
     pub anthropic_api_key: String,
-    pub anthropic_model: String,
     pub openai_api_key: String,
+    /// The model each AI task uses (ai::Task's keys: "chat", "explain",
+    /// "define", "metadata", "title"), as "service:model" — e.g.
+    /// "anthropic:claude-sonnet-5-5". A task missing here uses the one
+    /// provider and model of before (the three fields below).
+    pub ai_models: BTreeMap<String, String>,
+    /// Before models were chosen per task: the provider every AI feature
+    /// talked to ("anthropic" or "openai") and its model. Kept so that
+    /// settings saved then still work until saved again.
+    pub ai_service: String,
+    pub anthropic_model: String,
     pub openai_model: String,
     /// Minimum delay between automated requests to the same host, in ms.
     pub rate_limit_ms: u64,
 }
 
-/// Defaults for the two dropdowns. The frontend owns the full catalog
-/// (src/lib/ai/models.ts) — these only have to be valid ids.
+/// The models of before per-task choices, for settings that have none.
+/// The frontend owns the catalog (src/lib/ai/models.ts) — these only
+/// have to be valid ids.
 pub const DEFAULT_ANTHROPIC_MODEL: &str = "claude-sonnet-5";
 pub const DEFAULT_OPENAI_MODEL: &str = "gpt-5.6-terra";
 
@@ -33,10 +43,11 @@ impl Default for Settings {
             zotero_user_id: String::new(),
             library_type: "user".into(),
             contact_email: String::new(),
-            ai_service: "anthropic".into(),
             anthropic_api_key: String::new(),
-            anthropic_model: DEFAULT_ANTHROPIC_MODEL.into(),
             openai_api_key: String::new(),
+            ai_models: BTreeMap::new(),
+            ai_service: "anthropic".into(),
+            anthropic_model: DEFAULT_ANTHROPIC_MODEL.into(),
             openai_model: DEFAULT_OPENAI_MODEL.into(),
             rate_limit_ms: 1500,
         }

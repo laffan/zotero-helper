@@ -3,17 +3,25 @@
 //! features above — AI Tidy, Get Abstract, and the abstract/full-paper
 //! chats — never branch on which service the user configured.
 //!
+//!
+//! Both providers' keys can be in at once, and each task (`Task`) has a
+//! model of its own, from either provider: which one is resolved per
+//! request from the settings.
+//!
 //!   mod       — provider resolution + dispatch (this file)
 //!   anthropic — Anthropic Messages API
 //!   openai    — OpenAI Chat Completions
+//!   models    — each provider's list of the models it offers now
 //!   tidy      — AI Tidy Metadata / Get Abstract
 //!   chat      — the Questions conversations
 mod anthropic;
 mod chat;
+mod models;
 mod openai;
 mod tidy;
 
 pub use chat::{chat, count_tokens, title, ChatReply, TokenCount};
+pub use models::{list_models, ListedModel};
 pub use tidy::{get_abstract, tidy_item};
 
 use crate::state::AppState;
@@ -27,7 +35,7 @@ pub enum Service {
 }
 
 impl Service {
-    fn parse(s: &str) -> Service {
+    pub fn parse(s: &str) -> Service {
         match s.trim().to_ascii_lowercase().as_str() {
             "openai" => Service::OpenAi,
             _ => Service::Anthropic,
@@ -42,7 +50,35 @@ impl Service {
     }
 }
 
-/// The configured service, its key, and the model to call — resolved
+/// What a request is for. Each has its own model in Settings → AI.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum Task {
+    /// The Questions conversations (and their clarifications).
+    Chat,
+    /// The reader's explainer (and its clarifications).
+    Explain,
+    /// The reader's look-up of a word.
+    Define,
+    /// Tidy Metadata and Get Abstract.
+    Metadata,
+    /// Naming a conversation, heading an explanation.
+    Title,
+}
+
+impl Task {
+    /// Its key in `Settings::ai_models` (and the frontend's AI_TASKS).
+    pub fn key(self) -> &'static str {
+        match self {
+            Task::Chat => "chat",
+            Task::Explain => "explain",
+            Task::Define => "define",
+            Task::Metadata => "metadata",
+            Task::Title => "title",
+        }
+    }
+}
+
+/// The service, its key, and the model to call for one task — resolved
 /// once per request so a mid-request settings change can't split a call
 /// across two providers.
 pub struct Provider {
@@ -52,30 +88,38 @@ pub struct Provider {
 }
 
 impl Provider {
-    /// Read the active provider out of settings. Errors with the message
-    /// the UI shows when no key has been entered yet.
-    pub async fn resolve(state: &AppState) -> Result<Provider> {
+    /// The provider and model `task` is set to use. Errors with the
+    /// message the UI shows when that provider has no key yet.
+    pub async fn resolve(state: &AppState, task: Task) -> Result<Provider> {
         let s = state.settings.read().await;
-        let service = Service::parse(&s.ai_service);
-        let (api_key, model) = match service {
-            Service::Anthropic => (
-                s.anthropic_api_key.trim().to_string(),
-                s.anthropic_model.trim().to_string(),
-            ),
-            Service::OpenAi => (
-                s.openai_api_key.trim().to_string(),
-                s.openai_model.trim().to_string(),
-            ),
+        // "service:model" chosen for the task; else the one provider and
+        // model of before.
+        let chosen = s
+            .ai_models
+            .get(task.key())
+            .and_then(|r| r.split_once(':'))
+            .map(|(svc, m)| (Service::parse(svc), m.trim().to_string()));
+        let (service, model) = chosen.unwrap_or_else(|| {
+            let service = Service::parse(&s.ai_service);
+            let model = match service {
+                Service::Anthropic => s.anthropic_model.trim().to_string(),
+                Service::OpenAi => s.openai_model.trim().to_string(),
+            };
+            (service, model)
+        });
+        let api_key = match service {
+            Service::Anthropic => s.anthropic_api_key.trim().to_string(),
+            Service::OpenAi => s.openai_api_key.trim().to_string(),
         };
         if api_key.is_empty() {
             return Err(Error::msg(format!(
-                "No {} API key configured — add one in Settings first",
+                "No {} API key configured — add one in Settings → AI, or pick another model there",
                 service.label()
             )));
         }
         if model.is_empty() {
             return Err(Error::msg(format!(
-                "No {} model chosen — pick one in Settings first",
+                "No {} model chosen — pick one in Settings → AI first",
                 service.label()
             )));
         }

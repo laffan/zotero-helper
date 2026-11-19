@@ -92,6 +92,10 @@ src/            React + TypeScript UI (Vite, zustand, MiniSearch)
   lib/pdfQuote.ts, lib/pdfHighlight.ts
                 finding an AI citation's quoted passage in a PDF (the
                 page sweep; the word matching)
+  lib/clipboard.ts
+                copying text for every Copy button: the system
+                clipboard (tauri-plugin-clipboard-manager) and the
+                web's, either one a copy
   lib/dragGesture.ts
                 pointer drags (pane edges, columns, items) that keep
                 text selection off while they last
@@ -205,7 +209,8 @@ src/            React + TypeScript UI (Vite, zustand, MiniSearch)
                 erasing on one), postitEdit (a post-it's menu and its
                 text editor), postitCrop (one pared down by its
                 corners, and its two places), postitMove (one dragged by
-                its grip), postitPaint (post-its painted into the
+                its grip), postitDragOut (one dragged out of its
+                button onto a page), postitPaint (post-its painted into the
                 thumbnails, folds and clips), places (where the
                 reader is, what is at a point — for the notepad), and
                 annotating (the pieces below, put together):
@@ -266,7 +271,9 @@ src-tauri/      Rust core (all networking + state)
                    scraping + validated downloads, per-host rate limiter;
                    patterns = learned per-publisher PDF URL shapes)
   src/ai/          model access, one file per concern (mod = provider
-                   dispatch, anthropic, openai, tidy, chat)
+                   dispatch and the model of each task, anthropic,
+                   openai, models (each provider's list of its models),
+                   tidy, chat)
   src/chats.rs     the Questions conversations on disk
   src/words.rs     the Words looked up, on disk
   src/notepads.rs  the notepads on disk, one per PDF
@@ -603,7 +610,10 @@ into per-item summary cards (title/authors/abstract by default — the field
 set is configurable from the "Fields" popup, where the abstract can be
 abbreviated or full; that choice only affects the cards, exports always
 carry the whole abstract). Clicking a card narrows the selection to that
-item, and "Share filtered metadata" exports the cards as Markdown,
+item, **Download all PDFs** (with the count not yet on this device)
+keeps the selected entries' PDFs on this device — one at a time, in
+the task tray, as the folder menu's does (`cachePdfsOf` in
+`lib/notes.ts`) — and "Share filtered metadata" exports the cards as Markdown,
 titles linked back to their Zotero entries.
 
 **Drag items into folders** — drag from the item list (or the icon view)
@@ -1160,10 +1170,14 @@ size, and the renderer rasterises at the resulting scale.
 **Highlighting.** Selecting text in the PDF brings up a small bar
 above the passage (below it only when the passage starts at the top
 of the view), on iPad as on the Mac:
-Zotero's eight colours (5px further apart than the bar's other items,
-for a finger; the highlight editor is wide enough for them so spaced —
-202px, 242px with a touch screen's larger swatches), a highlight / underline switch beside them
-(remembered between selections), then three icons — Copy (the text),
+Zotero's eight colours (17.25px dots, 23px on a touch screen; 5px
+further apart than the bar's other items, for a finger; the highlight
+editor is wide enough for them so spaced — 218px, 266px with a touch
+screen's larger swatches), a highlight / underline switch beside them
+(remembered between selections; flipping it keeps the bar and the
+selection — the selection is put back should the press have ended it),
+then three icons — Copy (the text; the bar says "Copied", or "Couldn't
+copy", for a moment before it goes — `lib/clipboard.ts`),
 Add to notes (a quote with a link to its page; the Highlights tab's two
 icons) and, with an AI service connected, Look up (see AI) — and the
 AI's sparkles, which open the explainer (see AI). A colour marks
@@ -1176,10 +1190,28 @@ anywhere on the pages — text, margin or the space between pages —
 dismisses the selection and its bar as the finger lifts (the
 browser alone ignores taps on the unselectable parts of a page, and
 on iPad clears a selection only after its tap gestures settle).
+
+Pressing the bar must not lose what it acts on. On the iPad — a finger,
+or a trackpad's pointer — the press can end the selection before the
+button hears its release, and the click it would end in may never come.
+So the passage the bar acts on is taken as the press begins and kept
+while the bar is pressed, however long, and a moment after
+(`GRACE_MS`); its buttons act on the release of a press over them, from
+any pointer, the click only for the keyboard; and once a button has
+acted and the bar has gone, the click the tap still ends in is
+swallowed. That click used to land on whatever lay under the bar —
+often the highlight just made, above the next passage — opening its
+editor, whose handles keep the page's text from being selected, so the
+next try did nothing: highlighting worked every other time.
+
 Tapping a highlight or underline opens a
 small editor: colour, comment, the same Copy / Add to notes / Look up /
 Explain icons (the last two with an AI service connected; Explain as
-under AI), and *Delete* (a second press confirms) — and puts a handle at each end of the passage,
+under AI), and *Delete* (a second press confirms) — above the passage,
+or below it when there is no room above, never over its words or either
+handle (16px clear of them, 30px where fingers point;
+`annotationClientBox` in `annotate.ts`); its Copy marks itself "Copied"
+and leaves it open — and puts a handle at each end of the passage,
 a bar the height of the line with a knob above the start and below the
 end, as the system's selection handles look. Dragging one moves that
 end through the text by words, the other end staying put, with the new
@@ -1203,9 +1235,10 @@ sentence it falls in, and the bar comes up over it to mark it in the
 colour of the reader's choosing. The sentence tool does the same for a
 plain tap: the caret in the bottom bar (and in reading mode), or S. It
 selects only text nothing else has claimed: while it is on, a tap on a
-highlight or underline (editable or not), on an explained passage or on
-a word looked up does what it does without the tool (`claimed` in
-`annotating.ts`); ⌘-click always selects. With something in the pages
+highlight or underline (editable or not) or on a word looked up does
+what it does without the tool (`claimed` in `annotating.ts`); an
+explained passage it selects, so that it can be highlighted — the bar's
+Explain then opens its explanation again; ⌘-click always selects. With something in the pages
 already selected, the tool's tap — inside the selection or out — only
 lets go of it, as any tap on the pages does (`selectionBar.ts`); the
 next tap selects, so a stray tap never swaps one sentence for another
@@ -1797,7 +1830,17 @@ work. The
 explained passage stays marked in the PDF with a dashed purple
 underline (`--explain-underline`, an overlay like a citation's,
 `passageMarks.ts`; where it is kept as the chat's `passage`), and a tap
-on it opens its explainer again — in reading mode too. One asked from a
+on it opens its explainer again — in reading mode too. The underline
+is drawn over the page and takes no presses, so a highlight and an
+explained passage can lie over the same words: where they do, a tap
+opens the highlight's editor (so the highlight can still be recoloured,
+edited or deleted), whose Explain — underlined in the explainer's
+purple — opens that explanation; and a word looked up under a
+highlight shows its definition over the editor (`yields` in
+`passageMarks.ts`). Explaining a passage already explained — the same
+words on the same page, or a selection covering at least 80% of the
+explained one (`samePassage` in `annotating.ts`) — opens that
+explanation rather than paying for another. One asked from a
 highlight's editor isn't underlined (the highlight marks the passage,
 and keeps its tap, which opens the editor); it is kept with the
 highlight's key (`passage.annotationKey`), and the editor's Explain
@@ -1916,6 +1959,17 @@ Claude Sonnet 5 or Claude Haiku 4.5, GPT-5.6 Terra or GPT-5.6 Luna. Every
 AI feature uses whichever is selected; the per-model prices live in
 `src/lib/ai/models.ts`, which is also what the cost estimates are
 computed from.
+
+*In progress: a model per task.* The Rust core already resolves the
+provider and model per task (`Task` and `Provider::resolve` in
+`src-tauri/src/ai/mod.rs`: chat, explain, define, metadata, title) from
+`Settings.aiModels`, a map of task to `"service:model"`, using the key
+of that model's provider; a task with none there uses the service and
+model above, so settings saved before keep working. `ai_list_models`
+(`src-tauri/src/ai/models.rs`) lists a provider's models as it offers
+them now — Anthropic's `/v1/models`, newest first, with their names;
+OpenAI's, left to the chat models by their ids. Settings → AI doesn't
+use either yet.
 
 **Questions — chat with your abstracts (or your papers)** — a folder
 above Library holding conversations about works in the library. Start one
@@ -2065,7 +2119,24 @@ Highlights). They are kept like the bookmarks: `sections.json` in
 the app's data folder (`src-tauri/src/dividers.rs`, opaque JSON; the
 shape is `Divider` in `src/lib/dividers.ts`), on this device only, never
 sent to Zotero. (In the code they are dividers, to keep them apart from
-the outline's sections.) Not yet done: sections among the outline
+the outline's sections.)
+
+**Nesting.** Adding a section, or renaming it (on the page or in the
+Highlights tab), the box offers **Nested under**: none, or one of the
+reader's sections before it that is still open there — the nearest
+before it, that one's parent, and so on up, within the same outline
+heading (`nestingChoices` in `lib/dividers.ts`), so the nesting always
+reads true in document order. A new section starts beside the one
+before it (under that one's parent), as an outline's next line does.
+Nested, a section is a level under its parent in the list, and on the
+Highlight Map a heading within its parent's column rather than a
+column of its own — unless the parent is a chapter, whose sections are
+its columns anyway; a reader's heading stays on the map with no
+highlights under it. Whether a section is a chapter is still its
+name's to say. It is kept as the divider's `parentId`; one whose parent
+is no longer open there (moved past another) sits at the top level
+again, and deleting a section moves those nested in it up to its own
+parent. Not yet done: sections among the outline
 panel's headings, and the Share and Ask PDF menus' choice of a section.
 
 ### Post-its
@@ -2082,6 +2153,15 @@ centred on the tap and kept inside the page. One post-it per press; a
 second press, or Escape, puts the tool away unused. While ready it has
 every press on the pages to itself, heard on the window before anything
 in them; a finger's drag still scrolls (`src/pdfviewer/postits.ts`).
+
+**Dragged out.** A post-it can also be dragged out of its button —
+reading mode's or the bottom bar's — onto a page (`postitDragOut.ts`):
+a press that moves past 8px becomes a square of paper under the finger
+or pointer, which over a page gives way to the tool's dashed guide;
+let go there, the post-it is stuck centred on that point, kept inside
+the page, as the tool's tap would. A press that doesn't move is the
+button's tap, as before. The button holds the pointer while it is
+dragged, so the pages are neither selected nor scrolled meanwhile.
 
 A new post-it is 113 × 113 points — 113 × 113 CSS px at 100% zoom
 (`POSTIT_SIZE`; its type, margins, grip and pen are set apart from it,

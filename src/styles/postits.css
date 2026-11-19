@@ -281,6 +281,33 @@
   pointer-events: none;
 }
 
+/* A post-it dragged out of its button (postitDragOut.ts): a square of
+   paper under the point, centred on it — over a page, the guide above
+   shows instead, where it would land. */
+.pdf-postit-ghost {
+  position: fixed;
+  z-index: 200;
+  top: 0;
+  left: 0;
+  width: 56px;
+  height: 56px;
+  margin: -28px 0 0 -28px;
+  border-top: 7px solid color-mix(in srgb, var(--postit-color, #fff59d) 80%, #000);
+  border-radius: 2px;
+  background: var(--postit-color, #fff59d);
+  box-shadow: 0 4px 14px rgb(0 0 0 / 0.3);
+  opacity: 0.9;
+  pointer-events: none;
+}
+.pdf-postit-ghost.over-page {
+  display: none;
+}
+/* Its buttons are dragged from: a finger there doesn't scroll. */
+.pdf-postit-btn,
+.reading-mode-postit {
+  touch-action: none;
+}
+
 /* The menu a tap on the grip opens (postitEdit.ts): the colours, Type
    and Delete. */
 .pdf-postit-menu {

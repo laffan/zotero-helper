@@ -169,6 +169,22 @@ export function draftFromRange(
   };
 }
 
+/** The reader's highlight or underline under a client point, on the page
+ *  `target` is on (null where there is none, or no page). */
+export function annotationAtClient(
+  target: Element,
+  x: number,
+  y: number,
+  pages: PageRecord[],
+  annotations: Annotation[],
+): Annotation | null {
+  const at = pageBoxAt(target);
+  const p = at ? pages[at.pageIndex] : undefined;
+  if (!at || !p) return null;
+  const r = at.box.getBoundingClientRect();
+  return annotationAtPoint(p, at.pageIndex, (x - r.left) / r.width, (y - r.top) / r.height, annotations);
+}
+
 /** The highlight or underline under a point on a page, given as
  *  fractions (0–1) of the page's width and height; where several
  *  overlap, the last in reading order wins, as it is painted on top. */
@@ -198,14 +214,36 @@ export function annotationAtPoint(
   return hit;
 }
 
+/** Where `a`'s passage is on page `idx`, shown as `box`: the box round
+ *  its lines there, in client coordinates; null when it has none there. */
+export function annotationClientBox(a: Annotation, p: PageRecord, idx: number, box: HTMLElement): DOMRect | null {
+  const rects = rectsOnPage(annotationPosition(a), idx);
+  if (!rects?.length) return null;
+  const br = box.getBoundingClientRect();
+  const vp = p.viewport;
+  let left = Infinity, top = Infinity, right = -Infinity, bottom = -Infinity;
+  for (const r of rects) {
+    const [x1, y1] = vp.convertToViewportPoint(r[0], r[1]);
+    const [x2, y2] = vp.convertToViewportPoint(r[2], r[3]);
+    left = Math.min(left, x1, x2);
+    right = Math.max(right, x1, x2);
+    top = Math.min(top, y1, y2);
+    bottom = Math.max(bottom, y1, y2);
+  }
+  const kx = br.width / vp.width;
+  const ky = br.height / vp.height;
+  return new DOMRect(br.left + left * kx, br.top + top * ky, (right - left) * kx, (bottom - top) * ky);
+}
+
 export interface AnnotationTapEnv {
   getPages: () => PageRecord[];
   getAnnotations: () => Annotation[];
   /** Taps are ignored right now (a selection just dismissed). */
   ignore: () => boolean;
   canEdit: (a: Annotation) => boolean;
-  /** Open the editor for `a`, beside `at` (client coordinates). */
-  open: (a: Annotation, at: DOMRect) => void;
+  /** Open the editor for `a`, beside `at` — its passage on the page
+   *  tapped, in client coordinates; `tap` is where it was tapped. */
+  open: (a: Annotation, at: DOMRect, tap: { target: Element; x: number; y: number }) => void;
 }
 
 /** A tap on one of this app's highlights or underlines opens its
@@ -227,6 +265,8 @@ export function attachAnnotationTaps(scrollArea: HTMLElement, env: AnnotationTap
     const fx = (e.clientX - wr.left) / wr.width;
     const fy = (e.clientY - wr.top) / wr.height;
     const a = annotationAtPoint(p, idx, fx, fy, env.getAnnotations());
-    if (a && env.canEdit(a)) env.open(a, new DOMRect(e.clientX, e.clientY - 10, 0, 20));
+    if (!a || !env.canEdit(a)) return;
+    const box = annotationClientBox(a, p, idx, wrapper) ?? new DOMRect(e.clientX, e.clientY - 10, 0, 20);
+    env.open(a, box, { target, x: e.clientX, y: e.clientY });
   });
 }

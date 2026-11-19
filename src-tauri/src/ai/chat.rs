@@ -17,7 +17,7 @@
 //! look-up ("define"), one question and one answer of at most 50 words,
 //! never kept as a conversation.
 
-use super::{estimate_tokens, send, Ask, AskSchema, Provider, Service, Turn, Usage};
+use super::{estimate_tokens, send, Ask, AskSchema, Provider, Service, Task, Turn, Usage};
 use super::anthropic;
 use crate::state::AppState;
 use crate::{log, Result};
@@ -140,7 +140,13 @@ pub async fn chat(
     messages: Vec<Turn>,
     mode: Option<String>,
 ) -> Result<ChatReply> {
-    let provider = Provider::resolve(state).await?;
+    // The explainer and the look-up have models of their own.
+    let task = match mode.as_deref() {
+        Some("explain") | Some("explain-context") => Task::Explain,
+        Some("define") => Task::Define,
+        _ => Task::Chat,
+    };
+    let provider = Provider::resolve(state, task).await?;
     let ask = chat_ask(&context, messages, mode.as_deref());
     log(
         app,
@@ -169,7 +175,7 @@ pub async fn title(
     question: String,
     answer: String,
 ) -> Result<ChatReply> {
-    let provider = Provider::resolve(state).await?;
+    let provider = Provider::resolve(state, Task::Title).await?;
     let answer: String = answer.chars().take(2000).collect();
     let mut ask = Ask::single(
         TITLE_SYSTEM,
@@ -203,7 +209,7 @@ pub async fn count_tokens(
     context: String,
     messages: Vec<Turn>,
 ) -> Result<TokenCount> {
-    let provider = Provider::resolve(state).await?;
+    let provider = Provider::resolve(state, Task::Chat).await?;
     let ask = chat_ask(&context, messages, None);
     let rough = || {
         estimate_tokens(&ask.system)

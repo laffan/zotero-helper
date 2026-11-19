@@ -58,16 +58,19 @@ export function startExplain(itemKey: string, text: string, page: number, passag
   if (!item || !settings) return;
   const context = "";
   const quoted = text.replace(/\s+/g, " ").trim();
-  // A highlight explained before, its text unchanged: that explanation,
-  // opened again, rather than another one paid for.
+  // A highlight explained before, its text unchanged — or the same words
+  // on the same page explained before, from a selection or a highlight:
+  // that explanation, opened again, rather than another one paid for.
   const known =
-    passage?.annotationKey &&
+    passage &&
     st.chats.find(
       (c) =>
         c.mode === "explain" &&
         c.passage?.attKey === passage.attKey &&
-        c.passage.annotationKey === passage.annotationKey &&
-        c.messages[0]?.display === quoted,
+        c.messages[0]?.display === quoted &&
+        (passage.annotationKey
+          ? c.passage.annotationKey === passage.annotationKey || c.passage.pageIndex === passage.pageIndex
+          : c.passage.pageIndex === passage.pageIndex),
     );
   if (known) return st.setExplain({ chatId: known.id });
   const short = quoted.length > 48 ? `${quoted.slice(0, 48).trimEnd()}…` : quoted;

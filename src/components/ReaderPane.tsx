@@ -29,10 +29,14 @@ import {
   type Annotation,
 } from "../lib/highlights";
 import { addBookmark, bookmarksOf, removeBookmark, renameBookmark, useBookmarks } from "../lib/bookmarks";
-import { addDivider, dividersOf, moveDivider, removeDivider, renameDivider, useDividers } from "../lib/dividers";
+import {
+  addDivider, dividersOf, moveDivider, nestingChoices, removeDivider, renameDivider, useDividers,
+} from "../lib/dividers";
 import { insertIntoNotes, readItem } from "../lib/notes";
 import { deletePostIt, savePostIt } from "../lib/postits";
-import { setOutline, setPageCount, setReaderPage, useOutline, useReaderPage } from "../lib/outline";
+import {
+  outlineOf, sectionsOf, setOutline, setPageCount, setReaderPage, useOutline, useReaderPage,
+} from "../lib/outline";
 import { flushSavedPage, lastPage, lastView, savePage } from "../lib/recent";
 import { appLog, useStore, type MetaTab } from "../lib/store";
 import { invoke } from "../lib/tauri";
@@ -122,6 +126,12 @@ export function goToReaderPosition(pageIndex: number, top: number | null): void 
 /** A keyboard command for the open viewer (lib/shortcuts/). */
 export function readerCommand(cmd: ViewerCommand): void {
   active?.viewer.command(cmd);
+}
+
+/** A press on reading mode's Post-it button: dragged onto a page, it
+ *  sticks a post-it there; a tap is left to the button. */
+export function readerPostItDrag(e: PointerEvent, button: HTMLElement): void {
+  active?.viewer.postItDragOut(e, button);
 }
 
 /** The open viewer's pen — its colour and the colours it takes — for
@@ -284,10 +294,18 @@ export function ReaderPane() {
           holdToBookmark: () => useStore.getState().readingMode,
           onRenameBookmark: renameBookmark,
           onRemoveBookmark: removeBookmark,
-          onAddSection: (pageIndex, top, name, pageLabel) =>
-            addDivider({ attKey, itemKey, pageIndex, top, name, pageLabel }),
+          onAddSection: (pageIndex, top, name, pageLabel, parentId) =>
+            addDivider({ attKey, itemKey, pageIndex, top, name, pageLabel, ...(parentId ? { parentId } : {}) }),
           onMoveSection: moveDivider,
           onRenameSection: renameDivider,
+          sectionParents: (pageIndex, top, exceptId) =>
+            nestingChoices(
+              sectionsOf(outlineOf(attKey)),
+              dividersOf(useDividers.getState().list, attKey),
+              pageIndex,
+              top,
+              exceptId,
+            ),
           onRemoveSection: removeDivider,
           onSectionTool: (on) => useStore.getState().setViewerTools({ sectionTool: on }),
           postIts: {

@@ -14,6 +14,7 @@
 // (tabs.css).
 import { useRef, useState } from "react";
 import { openInZotero } from "../lib/actions";
+import { copyText } from "../lib/clipboard";
 import { isBookmark } from "../lib/bookmarks";
 import { annotationMarkdown, annotationPosition, type Annotation } from "../lib/highlights";
 import { insertIntoNotes } from "../lib/notes";
@@ -60,13 +61,8 @@ export function HighlightRow({ item, att, entry: a, q, canAdd, openAttKey, shown
     setDone(what);
     window.setTimeout(() => setDone((d) => (d === what ? null : d)), 1500);
   };
-  const copy = async () => {
-    try {
-      await navigator.clipboard.writeText(annotationMarkdown(settings, a));
-      flash("copy");
-    } catch {
-      setDone(null);
-    }
+  const copy = () => {
+    void copyText(annotationMarkdown(settings, a)).then((ok) => (ok ? flash("copy") : setDone(null)));
   };
   const add = () => {
     insertIntoNotes(annotationMarkdown(settings, a));

@@ -2,7 +2,7 @@
 //! behind the toolbar's AI menu. Both are one-shot structured-output
 //! requests against whichever provider is configured.
 
-use super::{parse_json, send, Ask, AskSchema, Provider};
+use super::{parse_json, send, Ask, AskSchema, Provider, Task};
 use crate::state::AppState;
 use crate::{log, Error, Result};
 use percent_encoding::{utf8_percent_encode, NON_ALPHANUMERIC};
@@ -89,7 +89,7 @@ pub async fn get_abstract(
     item: Value,
     page_text: String,
 ) -> Result<String> {
-    let provider = Provider::resolve(state).await?;
+    let provider = Provider::resolve(state, Task::Metadata).await?;
     if page_text.trim().is_empty() {
         return Err(Error::msg("No text could be extracted from the PDF"));
     }
@@ -138,7 +138,7 @@ pub async fn tidy_item(
     item: Value,
     page_image: Option<String>,
 ) -> Result<Value> {
-    let provider = Provider::resolve(state).await?;
+    let provider = Provider::resolve(state, Task::Metadata).await?;
     let email = state.settings.read().await.contact_email.clone();
     let data = if item["data"].is_object() { item["data"].clone() } else { item.clone() };
 

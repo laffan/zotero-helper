@@ -28,6 +28,7 @@ import { invoke } from "../tauri";
 import type { Chat, ContextPart } from "../types";
 import { nameChat, persistChats, removeChat } from "./chat";
 import { heading as headingOf } from "./context";
+import { taskModel } from "./modelChoice";
 import { fillPrompt, promptTemplate } from "./prompts";
 
 // An explainer closed before anything was asked — no question in it,
@@ -74,7 +75,7 @@ export function startExplain(itemKey: string, text: string, page: number, passag
     );
   if (known) return st.setExplain({ chatId: known.id });
   const short = quoted.length > 48 ? `${quoted.slice(0, 48).trimEnd()}…` : quoted;
-  const service = settings.aiService;
+  const { service, id: model } = taskModel(settings, "explain");
   const chat: Chat = {
     id: `chat-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
     // Named by its passage, which is how it will be looked for again.
@@ -82,7 +83,7 @@ export function startExplain(itemKey: string, text: string, page: number, passag
     titled: true,
     createdMs: Date.now(),
     service,
-    model: service === "openai" ? settings.openaiModel : settings.anthropicModel,
+    model,
     mode: "explain",
     passage,
     source: {

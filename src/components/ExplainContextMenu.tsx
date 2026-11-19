@@ -13,6 +13,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { cachedFor, partKey } from "../lib/ai/contextCache";
 import { contextParts } from "../lib/ai/explain";
+import { taskModel } from "../lib/ai/modelChoice";
 import { pdfAttachmentOf } from "../lib/collections";
 import { readerPageNow, sectionAtPage, usePdfShape } from "../lib/outline";
 import { useStore } from "../lib/store";
@@ -60,7 +61,7 @@ export function ExplainContextMenu({
   const parts = attKey
     ? contextParts(attKey, page, total, span && { title: span.section.title, from: span.from, to: span.to }, visible)
     : null;
-  const model = settings?.aiService === "openai" ? settings.openaiModel : (settings?.anthropicModel ?? "");
+  const model = settings ? taskModel(settings, "explain").id : "";
 
   // The cache's countdown, while the menu is open.
   const [, tick] = useState(0);

@@ -359,3 +359,61 @@
   pointer-events: none;
   box-shadow: 0 2px 8px rgb(0 0 0 / 0.2);
 }
+
+/* --- Settings → AI (AiSettings.tsx): the keys, and a model per task --- */
+.ai-key-note {
+  color: var(--text-dim);
+  font-size: calc(11px * var(--font-scale));
+}
+.ai-models-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+.ai-task-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 6px 0 4px;
+}
+.ai-task {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr);
+  align-items: start;
+  gap: 12px;
+}
+.ai-task-all {
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border);
+}
+.ai-task-name {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: calc(12px * var(--font-scale));
+}
+.ai-task-name span,
+.ai-task-pick small {
+  color: var(--text-dim);
+  font-size: calc(11px * var(--font-scale));
+}
+.ai-task-pick {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+.ai-task-pick select {
+  width: 100%;
+}
+.ai-key-note.bad,
+.ai-task-pick small.bad {
+  color: var(--bad);
+}
+@media (max-width: 560px) {
+  .ai-task {
+    grid-template-columns: 1fr;
+    gap: 4px;
+  }
+}

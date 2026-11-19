@@ -1,10 +1,12 @@
 // Multi-select view: one condensed card per selected item, with a
 // configurable field set. Clicking a card narrows the selection to that
-// item; the Share button exports exactly what's on screen as Markdown,
-// and Download all PDFs keeps the selected entries' PDFs on this device
-// (those not here yet, one at a time, in the task tray).
+// item; the Share button exports exactly what's on screen as Markdown.
+// Across the top, while any of the selected entries' PDFs isn't on this
+// device, a button downloads them — "Download all PDFs", or "Download
+// missing PDFs" when some are here already — one at a time, in the task
+// tray.
 import { useEffect, useRef, useState } from "react";
-import { fullCreatorList } from "../lib/collections";
+import { fullCreatorList, pdfAttachmentOf } from "../lib/collections";
 import { cachePdfsOf, pdfsToDownload } from "../lib/notes";
 import { shareSummary } from "../lib/share";
 import { useStore } from "../lib/store";
@@ -40,7 +42,9 @@ export function SummaryView({ items }: { items: ZItem[] }) {
   // Read again as PDFs arrive and as downloads start and end.
   useStore((s) => s.cachedPdfs);
   const busy = useStore((s) => s.pdfsDownloading.length > 0);
+  const all = useStore((s) => s.library.items);
   const missing = pdfsToDownload(items).length;
+  const withPdf = items.filter((i) => pdfAttachmentOf(all, i.key)).length;
   const [filterOpen, setFilterOpen] = useState(false);
   const popRef = useRef<HTMLDivElement>(null);
   const shareRef = useRef<HTMLButtonElement>(null);
@@ -90,6 +94,19 @@ export function SummaryView({ items }: { items: ZItem[] }) {
 
   return (
     <div className="summary-view">
+      {missing > 0 && (
+        <div className="summary-download">
+          <button
+            className="tool-btn summary-download-btn"
+            onClick={() => void cachePdfsOf(items, `${items.length} selected items`)}
+            disabled={busy}
+            title={`Download the ${missing} PDF${missing === 1 ? "" : "s"} of these items not yet on this device`}
+          >
+            <DownloadIcon size={13} />
+            {busy ? "Downloading PDFs…" : missing < withPdf ? `Download missing PDFs (${missing})` : `Download all PDFs (${missing})`}
+          </button>
+        </div>
+      )}
       <div className="summary-header">
         <span>{items.length} items selected</span>
         <div className="filter-anchor" ref={popRef}>
@@ -136,18 +153,6 @@ export function SummaryView({ items }: { items: ZItem[] }) {
         ))}
       </div>
       <div className="summary-footer">
-        <button
-          className="tool-btn"
-          onClick={() => void cachePdfsOf(items, `${items.length} selected items`)}
-          disabled={missing === 0 || busy}
-          title={
-            missing
-              ? `Download the ${missing} PDF${missing === 1 ? "" : "s"} of these items not yet on this device`
-              : "Every PDF of these items is on this device"
-          }
-        >
-          <DownloadIcon size={13} /> Download all PDFs{missing ? ` (${missing})` : ""}
-        </button>
         <button
           className="tool-btn"
           ref={shareRef}

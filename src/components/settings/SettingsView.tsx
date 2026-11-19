@@ -6,6 +6,7 @@
 // Shortcuts are this device's and act at once.
 import { useEffect, useState } from "react";
 import { bootstrap, saveSettings, syncNow } from "../../lib/actions";
+import { AI_TASKS, draftTaskModel, refString } from "../../lib/ai/modelChoice";
 import { appLog, useStore } from "../../lib/store";
 import type { Settings } from "../../lib/types";
 import { Spinner } from "../Icons";
@@ -20,11 +21,12 @@ const BLANK: Settings = {
   zoteroUserId: "",
   libraryType: "user",
   contactEmail: "",
-  aiService: "anthropic",
   anthropicApiKey: "",
-  anthropicModel: "claude-sonnet-5",
   openaiApiKey: "",
-  openaiModel: "gpt-5.6-terra",
+  aiModels: {},
+  aiService: "anthropic",
+  anthropicModel: "claude-sonnet-5-5",
+  openaiModel: "gpt-6.1-terra",
   rateLimitMs: 1500,
 };
 
@@ -100,6 +102,9 @@ export function SettingsView() {
         contactEmail: draft.contactEmail.trim(),
         anthropicApiKey: draft.anthropicApiKey.trim(),
         openaiApiKey: draft.openaiApiKey.trim(),
+        // Every task's model written out, so none falls back to the one
+        // choice of before.
+        aiModels: Object.fromEntries(AI_TASKS.map((t) => [t.id, refString(draftTaskModel(draft, t.id))])),
         rateLimitMs: Math.max(250, Number(draft.rateLimitMs) || 1500),
       };
       await saveSettings(clean);

@@ -605,15 +605,17 @@ marks into buttons — download on the empty ones, remove on the filled
 — that act without changing the selection; the icon view shows the
 same mark, smaller, at the right of each caption's author line.
 
-**Summary select** — selecting multiple items collapses the right panel
+**Summary select** — across the top of the panel, while any of the
+selected entries' PDFs isn't on this device, a full-width button
+downloads them — **Download all PDFs**, or **Download missing PDFs**
+when some are here already, with the count — one at a time, in the
+task tray, as the folder menu's does (`cachePdfsOf` in
+`lib/notes.ts`); with every one here, it isn't shown. Selecting multiple items collapses the right panel
 into per-item summary cards (title/authors/abstract by default — the field
 set is configurable from the "Fields" popup, where the abstract can be
 abbreviated or full; that choice only affects the cards, exports always
 carry the whole abstract). Clicking a card narrows the selection to that
-item, **Download all PDFs** (with the count not yet on this device)
-keeps the selected entries' PDFs on this device — one at a time, in
-the task tray, as the folder menu's does (`cachePdfsOf` in
-`lib/notes.ts`) — and "Share filtered metadata" exports the cards as Markdown,
+item, and "Share filtered metadata" exports the cards as Markdown,
 titles linked back to their Zotero entries.
 
 **Drag items into folders** — drag from the item list (or the icon view)
@@ -1953,23 +1955,34 @@ Only changed fields are written back. Its sibling, **Get Abstract**,
 parses the PDF's first pages locally and has the model lift the
 abstract out verbatim.
 
-**Two providers, four models** — Settings → AI picks a service (Anthropic or
-OpenAI), takes that service's key, and offers a short fixed model list:
-Claude Sonnet 5 or Claude Haiku 4.5, GPT-5.6 Terra or GPT-5.6 Luna. Every
-AI feature uses whichever is selected; the per-model prices live in
-`src/lib/ai/models.ts`, which is also what the cost estimates are
-computed from.
+**Both providers, a model per task** — Settings → AI takes a key for
+Anthropic, OpenAI or both, then a model for each task, from either
+provider with a key: **Questions** (conversations and their
+clarifications), **Explainer**, **Look-up**, **Tidy Metadata & Get
+Abstract**, and **Titles** (naming conversations and explanations), with
+"Every task" to set them all at once (`AiSettings.tsx`). The choices are
+`Settings.aiModels`, task → `"service:model"`, written out for every
+task on Save; the Rust core resolves the model and its provider's key
+per request (`Task` and `Provider::resolve` in
+`src-tauri/src/ai/mod.rs`; `taskModel` in `lib/ai/modelChoice.ts` does
+the same for the frontend). Settings saved before keep working: a task
+with no entry uses the one service and model chosen then — or, in the
+settings window, where that provider has no key and the other has, the
+other's suggestion for the task (`draftTaskModel`). The AI features show
+once either key is in.
 
-*In progress: a model per task.* The Rust core already resolves the
-provider and model per task (`Task` and `Provider::resolve` in
-`src-tauri/src/ai/mod.rs`: chat, explain, define, metadata, title) from
-`Settings.aiModels`, a map of task to `"service:model"`, using the key
-of that model's provider; a task with none there uses the service and
-model above, so settings saved before keep working. `ai_list_models`
-(`src-tauri/src/ai/models.rs`) lists a provider's models as it offers
-them now — Anthropic's `/v1/models`, newest first, with their names;
-OpenAI's, left to the chat models by their ids. Settings → AI doesn't
-use either yet.
+What there is to choose from is each provider's own list of what it
+offers now (`ai_list_models`, `src-tauri/src/ai/models.rs`: Anthropic's
+`/v1/models`, newest first, with their names; OpenAI's, left to its chat
+models by their ids), kept on this device (`zotero-helper-ai-listed`)
+and asked again with **Refresh model lists** — and by itself as the
+section opens, when a list is a week old — or, before a provider has
+listed, the price table's. Each shows its price where the table has it
+(`src/lib/ai/models.ts`, from the providers' own pricing pages, November
+2026, long-context tiers included: Haiku 5.5 past 100K input tokens,
+OpenAI's models past 272K); a model the table doesn't know shows "price
+unknown", and its costs count as $0. A dated snapshot id
+("…-20261101") is priced as its model.
 
 **Questions — chat with your abstracts (or your papers)** — a folder
 above Library holding conversations about works in the library. Start one
@@ -2678,8 +2691,8 @@ iPad's typing.
   library type, and PDF retrieval: the contact email for the
   Unpaywall/CrossRef polite pools and the pause between downloads.
 - **Cache** — what the app keeps on the device (see "Cache" above).
-- **AI** — the service, its key and the model, and the reader's
-  prompts (Prompts, above; these apply at once). Until a key is in, the
+- **AI** — the keys (Anthropic, OpenAI, or both), the model for each
+  task, and the reader's prompts (Prompts, above; these apply at once). Until a key is in, the
   AI menu and Questions are hidden (see "AI" above).
 - **Keyboard Shortcuts** — every rebindable shortcut, grouped by where
   it works, plus a list of the built-in ones. See below.

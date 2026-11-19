@@ -295,7 +295,16 @@
   border-top: 1px solid var(--border);
   padding: 8px 10px;
   display: flex;
-  flex-wrap: wrap;
   justify-content: flex-end;
-  gap: 6px;
+}
+/* Across the top while any selected PDF isn't on this device. */
+.summary-download {
+  padding: 10px 12px 0;
+  background: var(--panel-alt);
+}
+.summary-download-btn {
+  justify-content: center;
+  width: 100%;
+  border-color: var(--border);
+  background: var(--panel);
 }

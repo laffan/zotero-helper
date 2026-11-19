@@ -6,10 +6,14 @@ export interface Settings {
   zoteroUserId: string;
   libraryType: "user" | "group";
   contactEmail: string;
-  aiService: AiService;
   anthropicApiKey: string;
-  anthropicModel: string;
   openaiApiKey: string;
+  /** Each AI task's model, as "service:model" (lib/ai/modelChoice.ts). */
+  aiModels: Record<string, string>;
+  /** Before each task had its own: the provider and its model, which a
+   *  task with no entry in `aiModels` still uses. */
+  aiService: AiService;
+  anthropicModel: string;
   openaiModel: string;
   rateLimitMs: number;
 }

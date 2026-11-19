@@ -90,7 +90,8 @@ On first launch, open **Settings → Zotero** and paste a Zotero API key
 read/write **and file access** enabled). "Verify" fills in your user ID.
 Add a contact email (used for the Unpaywall/CrossRef polite pools — strongly
 recommended, PDF discovery is much weaker without it) and, for the AI
-features, pick a service and paste its API key under **Settings → AI**. Save,
+features, paste an Anthropic or OpenAI API key (or both) under **Settings → AI**
+and pick a model for each task. Save,
 and the app downloads your library.
 
 ### iOS / iPadOS

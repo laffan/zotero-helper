@@ -41,6 +41,7 @@ export const ACTIONS: ShortcutAction[] = [
   a("general", "toggleLeft", "Toggle the left sidebar (the outline, while reading)", "mod+\\"),
   a("general", "toggleRight", "Toggle the right sidebar", "mod+shift+\\"),
   a("general", "focusSearch", "Focus the search field", "mod+f"),
+  a("general", "nightVision", "Night vision (the app in red only) on / off", "mod+shift+r"),
   // The recent-PDFs menu's first five, in its order: the PDFs opened
   // lately, newest first, leaving out the one open (lib/recent.ts).
   ...[1, 2, 3, 4, 5].map((n) => a("general", `recent${n}`, `Open recent PDF ${n}`, `mod+${n}`)),

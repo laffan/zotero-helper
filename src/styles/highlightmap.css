@@ -1,6 +1,7 @@
 /* The Highlight Map (HighlightMap.tsx, src/highlightmap/): the Highlights
    tab, wide, as a canvas of rows (chapters) and columns (what each is
-   divided into). Its cards are the list's rows (tabs.css), given a
+   divided into), a column's cards in as many stacks as fit the canvas's
+   height (wrap.ts). Its cards are the list's rows (tabs.css), given a
    ground of their own over the canvas's dot grid. */
 
 /* One bar: the search and its matches, the colours, ↻, View Notepad. */
@@ -92,8 +93,10 @@
   font-weight: 600;
 }
 
-/* A chapter: its heading, then its columns side by side. */
+/* A chapter: its heading, then its columns side by side. Positioned, so
+   wrap.ts reads a column's top within it. */
 .hlmap-row {
+  position: relative;
   padding-bottom: 36px;
 }
 .hlmap-row + .hlmap-row {
@@ -103,11 +106,30 @@
 .hlmap-columns {
   display: flex;
   align-items: flex-start;
-  gap: 22px;
+  gap: 36px;
 }
+/* A column is as wide as its stacks: wrap.ts sizes its flow and places
+   each item (a card, or a heading within the column) in it, 280px wide,
+   14px between stacks — closer than columns are, so a column's stacks
+   read as one. Its headings take its width without widening it. */
 .hlmap-column {
-  flex: 0 0 280px;
+  flex: none;
+  min-width: 280px;
+}
+.hlmap-column > .hlmap-head {
+  width: 0;
+  min-width: 100%;
+}
+.hlmap-flow {
+  position: relative;
+}
+.hlmap-item {
+  position: absolute;
+  top: 0;
+  left: 0;
   width: 280px;
+  /* Its own block, so its heading's or card's margins are inside it. */
+  display: flow-root;
 }
 
 /* Headings: a chapter's, a column's (each the same height, a blank one

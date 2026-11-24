@@ -285,7 +285,10 @@ export function Toolbar() {
         <button
           className={`icon-btn ${nightVision ? "active" : ""}`}
           onClick={() => setNightVision(!nightVision)}
-          title={nightVision ? "Night vision is on — press to show colours again" : "Night vision — the app in red only, no blue light"}
+          title={
+            (nightVision ? "Night vision is on — press to show colours again" : "Night vision — the app in red only, no blue light") +
+            shortcutHint("nightVision")
+          }
           aria-label="Night vision"
           aria-pressed={nightVision}
         >

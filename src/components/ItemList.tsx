@@ -26,6 +26,7 @@ import {
   THUMB_SCALE,
   useStore,
   type ResizableCol,
+  type SortBy,
 } from "../lib/store";
 import { useSearchResults } from "../lib/search";
 import { useThumbnail, useThumbnailsReady } from "../lib/thumbnails";
@@ -57,6 +58,20 @@ function fmtAdded(iso: string): string {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return iso.slice(0, 10);
   return `${MONTHS[d.getMonth()]} ${d.getDate()} ${d.getFullYear()}`;
+}
+
+const COMPARE: Record<SortBy, (a: ZItem, b: ZItem) => number> = {
+  title: (a, b) => String(a.data?.title ?? "").localeCompare(String(b.data?.title ?? "")),
+  creator: (a, b) => creatorSummary(a).localeCompare(creatorSummary(b)),
+  date: (a, b) => yearOf(a).localeCompare(yearOf(b)),
+  dateAdded: (a, b) => String(a.data?.dateAdded ?? "").localeCompare(String(b.data?.dateAdded ?? "")),
+};
+
+/** The list sorted by a column — a folder's, or the search's results
+ *  once a header is clicked. */
+function sortedBy(list: ZItem[], by: SortBy, dir: "asc" | "desc"): ZItem[] {
+  const d = dir === "asc" ? 1 : -1;
+  return list.slice().sort((a, b) => d * COMPARE[by](a, b));
 }
 
 /** A row's tiny first-page cover, once the folder's icon view has
@@ -98,7 +113,7 @@ export function ItemList() {
   const searchDates = useStore((s) => s.searchDates);
   const selectedKeys = useStore((s) => s.selectedKeys);
   const setSelectedKeys = useStore((s) => s.setSelectedKeys);
-  const { sortBy, sortDir, setSort } = useStore();
+  const { sortBy, sortDir, setSort, sortSearch, searchSorted, setSearchSorted } = useStore();
   const jobs = useStore((s) => s.jobs);
   const jobOrder = useStore((s) => s.jobOrder);
   const recentOpened = useRecent((s) => s.opened);
@@ -134,6 +149,11 @@ export function ItemList() {
     searchDates,
   );
   const searching = searchKeys !== null;
+  // Results come ranked (a date range's newest first) until a column's
+  // header is clicked, and are ranked again from the next search on.
+  useEffect(() => {
+    if (!searching && searchSorted) setSearchSorted(false);
+  }, [searching, searchSorted, setSearchSorted]);
   const withPdf = useMemo(() => pdfMap(library.items), [library.items]);
   const withAbstract = useMemo(() => abstractMap(library.items), [library.items]);
   const attByParent = useMemo(
@@ -176,23 +196,12 @@ export function ItemList() {
       list = searchKeys
         .map((k) => byKey.get(k))
         .filter((i): i is ZItem => Boolean(i));
+      if (searchSorted) list = sortedBy(list, sortBy, sortDir);
     } else if (selectedCollection === RECENT) {
       // Recent is its own order: the last opened first.
       list = itemsForCollection(library.items, RECENT);
     } else {
-      list = itemsForCollection(library.items, selectedCollection);
-      const dir = sortDir === "asc" ? 1 : -1;
-      const cmp: Record<string, (a: ZItem, b: ZItem) => number> = {
-        title: (a, b) =>
-          String(a.data?.title ?? "").localeCompare(String(b.data?.title ?? "")),
-        creator: (a, b) => creatorSummary(a).localeCompare(creatorSummary(b)),
-        date: (a, b) => yearOf(a).localeCompare(yearOf(b)),
-        dateAdded: (a, b) =>
-          String(a.data?.dateAdded ?? "").localeCompare(
-            String(b.data?.dateAdded ?? ""),
-          ),
-      };
-      list = list.slice().sort((a, b) => dir * cmp[sortBy](a, b));
+      list = sortedBy(itemsForCollection(library.items, selectedCollection), sortBy, sortDir);
     }
     // Rows for in-flight jobs replace their library rows.
     list = list.filter((i) => !jobItemKeys.has(i.key));
@@ -212,6 +221,7 @@ export function ItemList() {
     recentOpened,
     selectedCollection,
     searchKeys,
+    searchSorted,
     sortBy,
     sortDir,
     jobItemKeys,
@@ -305,10 +315,12 @@ export function ItemList() {
     },
   });
 
-  // Recent keeps its own order, so no column claims to sort it.
+  // Recent keeps its own order, and ranked results theirs, so no column
+  // claims to sort them.
   const isRecent = selectedCollection === RECENT && !searching;
-  const sortIndicator = (col: string) =>
-    sortBy === col && !isRecent ? (sortDir === "asc" ? " ↑" : " ↓") : "";
+  const sortIndicator = (col: SortBy) =>
+    sortBy === col && !isRecent && (!searching || searchSorted) ? (sortDir === "asc" ? " ↑" : " ↓") : "";
+  const sortColumn = (col: SortBy) => (searching ? sortSearch(col) : setSort(col));
   const emptyText = searching
     ? "No results"
     : isRecent
@@ -436,18 +448,18 @@ export function ItemList() {
         {showCovers && (
           <span className="col col-cover" data-tip="First page" aria-label="First page" />
         )}
-        <button className="col col-title" onClick={() => setSort("title")}>
+        <button className="col col-title" onClick={() => sortColumn("title")}>
           Title{sortIndicator("title")}
         </button>
-        <button className="col col-creator" onClick={() => setSort("creator")}>
+        <button className="col col-creator" onClick={() => sortColumn("creator")}>
           <ColGrip col="creator" />
           Creator{sortIndicator("creator")}
         </button>
-        <button className="col col-year" onClick={() => setSort("date")}>
+        <button className="col col-year" onClick={() => sortColumn("date")}>
           <ColGrip col="year" />
           Year{sortIndicator("date")}
         </button>
-        <button className="col col-added" onClick={() => setSort("dateAdded")}>
+        <button className="col col-added" onClick={() => sortColumn("dateAdded")}>
           <ColGrip col="added" />
           Added{sortIndicator("dateAdded")}
         </button>

@@ -15,7 +15,9 @@
 // column in the row, and each heading's highlights go in the column in
 // force. Highlights before a row's first column heading make a column
 // of their own at its start, with no heading; those before the first
-// chapter, a row with no heading at the top.
+// chapter, a row with no heading at the top. How tall a column may be
+// is the canvas's to say: wrap.ts runs a long one on into more stacks
+// to its right, so a row is never taller than the canvas.
 //
 // As in the list, the outline's headings with no highlights are left
 // out, and the reader's sections stay (an empty column, or a row),

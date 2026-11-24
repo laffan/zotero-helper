@@ -45,8 +45,9 @@ Windows/Linux desktops too).
   the notes panel and the Highlights tab becomes a **Highlight Map**: the
   highlights on a canvas that pans and zooms (a finger, a pinch, the
   trackpad), in rows for the chapters and columns for the sections within
-  them; its search goes from match to match, and the search and colours
-  fade the rest. View Notepad lays the PDF's notepad over the map, and
+  them, a long section running on into more columns so that no chapter
+  is taller than the screen; its search goes from match to match, and
+  the search and colours fade the rest. View Notepad lays the PDF's notepad over the map, and
   its quote button links to the map's cards.
 - **AI helpers (optional)** — tidy metadata, extract abstracts, ask
   questions of abstracts, full papers or a part of one with page-cited
@@ -59,9 +60,11 @@ Windows/Linux desktops too).
   marked; clarifications nest, and in a conversation each can be
   carried on as a thread of its own.
 - **Keyboard first** — rebindable shortcuts for moving between panes, the
-  list, and the viewer's modes (Settings → Keyboard Shortcuts).
+  list, the viewer's modes and night vision (Settings → Keyboard
+  Shortcuts).
 - **Your look** — light, dark or system appearance and an adjustable UI font
-  size (Settings → General); and night vision (the eye beside Settings),
+  size (Settings → General); and night vision (the eye beside Settings,
+  or ⌘⇧R),
   which draws the whole app in red only, with no blue light, for
   working in the dark; the colour dots then show each colour's letter
   (Y, R, G, B, P, M, O; gray has none), and each highlight on the page a tiny flag

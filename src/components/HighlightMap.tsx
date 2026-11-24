@@ -2,7 +2,9 @@
 // panel is wide (MetadataPanel's MAP_WIDTH) — the same highlights as
 // the list, laid out on a canvas that pans and zooms (highlightmap/
 // view.ts), in rows for the PDF's chapters and columns for what each is
-// divided into (highlightmap/layout.ts). Each card is the list's row
+// divided into (highlightmap/layout.ts) — a column running on into more
+// to its right, so that no chapter is taller than the canvas
+// (highlightmap/wrap.ts). Each card is the list's row
 // (HighlightRow): a click goes to the highlight in the pages, and Copy,
 // Note and Zotero are on it as in the list.
 //
@@ -25,6 +27,7 @@ import type { Section } from "../lib/outline";
 import { lastUi, saveUi } from "../lib/recent";
 import { mapRows, type MapColumn, type MapRow } from "../highlightmap/layout";
 import { createMapView, type MapViewControl } from "../highlightmap/view";
+import { createMapWrap, type MapWrapControl } from "../highlightmap/wrap";
 import { DividerHeading } from "./DividerHeading";
 import { ColorSwatches, type HighlightFilter } from "./HighlightFilters";
 import { HighlightRow, useRowHover } from "./HighlightRow";
@@ -67,6 +70,7 @@ export function HighlightMap(props: Props) {
   const layerRef = useRef<HTMLDivElement>(null);
   const zoomRef = useRef<HTMLButtonElement>(null);
   const viewRef = useRef<MapViewControl | null>(null);
+  const wrapRef = useRef<MapWrapControl | null>(null);
   const hover = useRowHover();
   const q = query.trim().toLowerCase();
 
@@ -87,6 +91,19 @@ export function HighlightMap(props: Props) {
   const step = (d: number) => {
     if (order.length) setCursor({ q, i: (at + d + order.length) % order.length, step: cursor.step + 1 });
   };
+
+  // The columns wrapped to the canvas's height, after every render (what
+  // changed may be any card's height) — before the view below first
+  // measures the map.
+  useLayoutEffect(() => {
+    const wrap = createMapWrap(hostRef.current!, layerRef.current!);
+    wrapRef.current = wrap;
+    return () => {
+      wrap.destroy();
+      wrapRef.current = null;
+    };
+  }, []);
+  useLayoutEffect(() => wrapRef.current?.relayout());
 
   // The canvas: its view as this PDF left it, or a first look.
   useLayoutEffect(() => {
@@ -205,7 +222,8 @@ export function HighlightMap(props: Props) {
   );
 }
 
-/** A chapter: its heading over its columns, side by side. */
+/** A chapter: its heading over its columns, side by side, each in as
+ *  many stacks as its cards need (highlightmap/wrap.ts). */
 function RowView({ row, g, ctx }: { row: MapRow; g: HighlightGroup; ctx: Ctx }) {
   // A column with no heading leaves its heading's room, so the cards
   // start level across the row.
@@ -227,6 +245,7 @@ function ColumnView({ column, headed, g, ctx }: { column: MapColumn; headed: boo
   // Faded: left out by the colours, or by the search (its matches are
   // among what the colours keep).
   const faded = (a: Annotation) => (q ? !matches.has(a.key) : !filter.passes(a));
+  // Each item in a box of its own, placed by wrap.ts.
   return (
     <div className="hlmap-column">
       {column.section ? (
@@ -234,29 +253,36 @@ function ColumnView({ column, headed, g, ctx }: { column: MapColumn; headed: boo
       ) : (
         headed && <div className="hlmap-head hlmap-head-column hlmap-head-blank" />
       )}
-      {column.items.map((it) =>
-        it.kind === "heading" ? (
-          <Heading key={it.section.id} section={it.section} kind="sub" g={g} ctx={ctx} />
-        ) : (
-          <div
-            key={it.entry.key}
-            data-key={it.entry.key}
-            className={`hlmap-card ${faded(it.entry) ? "dim" : ""} ${matches.has(it.entry.key) ? "match" : ""} ${
-              current === it.entry.key ? "current" : ""
-            }`}
-          >
-            <HighlightRow
-              item={g.item}
-              att={g.att}
-              entry={it.entry}
-              q={matches.has(it.entry.key) ? q : ""}
-              canAdd={canAdd}
-              openAttKey={openAttKey}
-              shown={shownKey === it.entry.key}
-              onShown={() => setShownKey(it.entry.key)}
-            />
-          </div>
-        ),
+      {column.items.length > 0 && (
+        <div className="hlmap-flow">
+          {column.items.map((it) =>
+            it.kind === "heading" ? (
+              <div key={it.section.id} className="hlmap-item hlmap-item-head">
+                <Heading section={it.section} kind="sub" g={g} ctx={ctx} />
+              </div>
+            ) : (
+              <div key={it.entry.key} className="hlmap-item">
+                <div
+                  data-key={it.entry.key}
+                  className={`hlmap-card ${faded(it.entry) ? "dim" : ""} ${matches.has(it.entry.key) ? "match" : ""} ${
+                    current === it.entry.key ? "current" : ""
+                  }`}
+                >
+                  <HighlightRow
+                    item={g.item}
+                    att={g.att}
+                    entry={it.entry}
+                    q={matches.has(it.entry.key) ? q : ""}
+                    canAdd={canAdd}
+                    openAttKey={openAttKey}
+                    shown={shownKey === it.entry.key}
+                    onShown={() => setShownKey(it.entry.key)}
+                  />
+                </div>
+              </div>
+            ),
+          )}
+        </div>
       )}
       {!column.items.length && <div className="hlmap-empty">No highlights</div>}
     </div>

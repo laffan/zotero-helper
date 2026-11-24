@@ -46,6 +46,12 @@ function toggleLeft(): void {
   } else toggleSidebar();
 }
 
+/** The header's eye (lib/nightVision.ts) — reading mode hides it. */
+function toggleNightVision(): void {
+  const s = useStore.getState();
+  s.setNightVision(!s.nightVision);
+}
+
 function viewPdf(): void {
   const { selectedKeys } = useStore.getState();
   if (selectedKeys.length !== 1) return;
@@ -71,6 +77,7 @@ export const RUN: Record<string, () => void> = {
   toggleLeft,
   toggleRight: toggleMeta,
   focusSearch: () => focusWhenShown(".toolbar .toolbar-search input", true),
+  nightVision: toggleNightVision,
   recent1: () => openRecent(1),
   recent2: () => openRecent(2),
   recent3: () => openRecent(3),

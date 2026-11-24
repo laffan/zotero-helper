@@ -2,7 +2,8 @@
 // surface.ts) — one layer under one transform, set once a frame however
 // many moves arrive, over the pad's faint dot grid, which moves with it —
 // and zoomed, which the pad isn't. The cards are DOM in the layer, laid
-// out by CSS (HighlightMap.tsx); this module only moves them.
+// out by CSS (HighlightMap.tsx) and wrap.ts, which stacks each column's
+// cards to the canvas's height; this module only moves them.
 //
 // Who does what: a finger, or the mouse, dragged anywhere but on a
 // button or a field pans; a wheel or a trackpad's two fingers pan. Two

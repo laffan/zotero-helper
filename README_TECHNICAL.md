@@ -169,9 +169,10 @@ src/            React + TypeScript UI (Vite, zustand, MiniSearch)
                 taking it back)
   highlightmap/ the Highlight Map: layout (a PDF's highlights in rows
                 for its chapters and columns for what each is divided
-                into), view (the canvas, panned and zoomed: a finger,
-                the mouse, a wheel, a pinch; the glide to a card) and
-                drop (a link let go over a card)
+                into), wrap (each column's cards in stacks as tall as
+                the canvas), view (the canvas, panned and zoomed: a
+                finger, the mouse, a wheel, a pinch; the glide to a
+                card) and drop (a link let go over a card)
   components/settings/
                 the settings page: SettingsView (section list, the
                 draft and Save) and one component per section —
@@ -337,7 +338,10 @@ either theme, dark pages or not, the library, the reader, reading mode,
 Settings and modals. The choice is this device's and lasts until it is
 turned off (`nightVision` in the store's persisted UI prefs, applied
 before the first render by `initNightVision`, `src/lib/nightVision.ts`).
-Reading mode hides the header, so it is turned on or off outside it.
+⌘⇧R (Ctrl+Shift+R elsewhere; rebindable, see
+[Keyboard shortcuts](#keyboard-shortcuts)) turns it on and off too,
+reading mode included, which hides the header — anywhere shortcuts
+listen, so not on the settings page or under a modal.
 
 **Telling the colours apart.** In red alone the highlight colours look
 alike, so while night vision is on each colour carries a letter
@@ -640,6 +644,18 @@ which filters on the parsed year instead of running a text query. The
 active mode is the field's placeholder, so the box always says what it
 will search, and results always render as a list whatever view the
 folder is set to (relevance order is invisible in a grid of thumbnails).
+
+**Sorting the results.** Results come ranked by relevance (a date range's
+newest first), and no column header shows an arrow. A click on a header
+sorts them by that column instead (`sortSearch` in the store): the
+first click on the column the folders are sorted by keeps their
+direction, on another column sorts it ascending, and each click after
+that reverses it, as in a folder. It is the one sort the folders share
+(`sortBy` / `sortDir`), so a column chosen while searching is the
+folders' sort too once the search is cleared. The results stay sorted
+while the query changes (`searchSorted`, not kept between sessions);
+when the search ends they go back to being ranked, so the next search
+starts ranked (an effect in `ItemList.tsx`).
 
 ### Import and PDFs
 
@@ -1638,6 +1654,28 @@ reader's stay (an empty column says "No highlights"). A PDF with no
 outline and no sections is one column; Add Section divides it, and a
 section named "Chapter …" starts a row. Several PDFs of one entry are
 each a map of their own, under its file name.
+
+*Its height* (`wrap.ts`): no chapter is taller than the canvas, so the
+chapters go down the map and what is in each goes across it. A
+column's cards and small headings run down to the canvas's height at
+100% — less the chapter's heading, the column's, and 24px above and
+below — then on into another stack to its right, and another, under the
+column's one heading, which spans them; stacks are 14px apart and
+columns 36px, so a column's stacks read as one. At 100% a chapter fits
+the canvas's height; zoomed out, several are in view. The height is the
+canvas's, not the zoomed view's, so a zoom moves nothing; the stacks are
+laid out again when the canvas changes height (the window resized, the
+iPad turned, the bar wrapping onto a second line) or an item does (a
+card picked and shown in full, a section being renamed, the font size)
+— a ResizeObserver on the canvas and on each item — and after every
+render of the map. A small heading isn't left at a stack's foot: it goes
+over with the cards after it. A card taller than the room has a stack
+to itself, and however short the canvas a stack is given 200px. The
+items are placed by script, absolutely within their column (every
+height read before any place is written, so the map is laid out once),
+rather than put into stacks by React, which would mount an item moved
+into the next stack afresh and lose what it was doing — a section being
+renamed, which is what makes its heading taller.
 
 *The cards* are the list's rows (`HighlightRow.tsx`) on the panel's
 colour, 280px wide, their words cut at ten lines until the card is
@@ -2778,6 +2816,7 @@ doesn't cost the role, so there is nothing to reclaim.
 | General | Toggle the left sidebar (the outline, while reading) | ⌘\ |
 | General | Toggle the right sidebar | ⌘⇧\ |
 | General | Focus the search field (the PDF's, while reading) | ⌘F |
+| General | Night vision on / off | ⌘⇧R |
 | General | Open recent PDF 1–5 | ⌘1 – ⌘5 |
 | Library | Show details / highlights / notes | D / H / N |
 | Library | Show AI conversations (AI connected) | Q |

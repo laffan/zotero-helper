@@ -156,6 +156,10 @@ interface AppStore extends UiPrefs {
   selectedCollection: string; // collection key, "all", "unfiled", QUESTIONS, EXPLANATIONS, WORDS or RECENT
   selectedKeys: string[];
   searchQuery: string;
+  /** The search's results sorted by a column (sortBy / sortDir) rather
+   *  than ranked: a column's header clicked while searching. Ranked
+   *  again once the search ends (ItemList.tsx). */
+  searchSorted: boolean;
   /** Year bounds for the date-range mode — kept apart from the text
    *  query so switching modes back and forth loses neither. */
   searchDates: SearchDates;
@@ -203,6 +207,11 @@ interface AppStore extends UiPrefs {
   setLogOpen: (b: boolean) => void;
   setModal: (m: ModalState) => void;
   setSort: (by: SortBy) => void;
+  /** A column's header clicked while searching: the first click sorts
+   *  the results by it (in the direction the folders have, when it is
+   *  their column already), the next ones as setSort. */
+  sortSearch: (by: SortBy) => void;
+  setSearchSorted: (b: boolean) => void;
   setSummaryFields: (f: string[]) => void;
   setPaneSizes: (p: Partial<Pick<UiPrefs, "leftWidth" | "rightWidth" | "termHeight">>) => void;
   toggleFolder: (key: string) => void;
@@ -324,6 +333,7 @@ export const useStore = create<AppStore>()(
       selectedCollection: "all",
       selectedKeys: [],
       searchQuery: "",
+      searchSorted: false,
       searchDates: { from: "", to: "" },
       sidebarOpen: false,
       metaOpen: false,
@@ -374,6 +384,12 @@ export const useStore = create<AppStore>()(
           set({ sortBy: by, sortDir: "asc" });
         }
       },
+      sortSearch: (by) => {
+        const { searchSorted, sortBy, setSort } = get();
+        if (searchSorted || by !== sortBy) setSort(by);
+        set({ searchSorted: true });
+      },
+      setSearchSorted: (searchSorted) => set({ searchSorted }),
       setSummaryFields: (summaryFields) => set({ summaryFields }),
       setPaneSizes: (p) => set(p),
       toggleFolder: (key) =>

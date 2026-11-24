@@ -5,7 +5,7 @@ import WidgetKit
 // Pins: a PDF kept in its place in the Continue Reading widgets however
 // many are read after it. The pin beside each PDF on a widget
 // (ContinueReadingViews.swift's PinButton) runs TogglePin, in the
-// widget's own process (an interactive widget: iOS 17): the PDF is
+// widget's own process (an interactive widget): the PDF is
 // pinned to the place it is in — the first, second or third — or, if it
 // is pinned already, let go. Every place can be pinned; the places not
 // pinned are filled with the PDFs read last, newest first.

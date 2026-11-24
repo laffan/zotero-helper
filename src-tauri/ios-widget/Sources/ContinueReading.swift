@@ -28,8 +28,7 @@ import WidgetKit
 // into opening the reader).
 //
 // Built as an app extension added to the Xcode project Tauri generates
-// (scripts/ios-widget.mjs), for iOS 17 and later: the pins are buttons on
-// the widget, which iOS 17 brought.
+// (scripts/ios-widget.mjs), for iOS 26 and later, as the app is.
 
 let appGroup = "group.com.laffan.zoterohelper"
 

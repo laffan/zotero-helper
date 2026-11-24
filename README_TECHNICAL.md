@@ -454,8 +454,8 @@ are read after it; pressed again, it lets it go. Any place can be
 pinned, all of them too; the places not pinned show the PDFs read last,
 newest first, none twice (`Shelf.arrange`), and with fewer PDFs than
 places they close up. A pin is a button on the widget (an App Intent,
-`TogglePin`, run in the widget's own process — iOS 17's interactive
-widgets; hence the widget needs iOS 17), not a setting behind Edit
+`TogglePin`, run in the widget's own process — an interactive
+widget), not a setting behind Edit
 Widget: iOS draws that screen itself from a widget's parameters, and a
 switch there can only be labelled with words fixed when the app is
 built, never a PDF's title. A widget is never told which copy of it was
@@ -515,17 +515,27 @@ project, which Tauri generates (`tauri ios init`) and the repository
 doesn't keep, so `scripts/ios-widget.mjs` (`npm run ios:widget`) adds it
 to the generated XcodeGen spec (`gen/apple/project.yml`) and makes the
 project again with XcodeGen: the `ZoteroHelperWidget` app extension
-(`<identifier>.widget`, iOS 17, built from `ios-widget/Sources`, its
+(`<identifier>.widget`, iOS 26 like the app, built from `ios-widget/Sources`, its
 Info.plist and entitlements made by XcodeGen), the app embedding it, and
 the app group in both targets' entitlements — in the spec, as each
 target's `entitlements: properties`: XcodeGen writes a target's
 entitlements file from those properties every time it makes the
 project, so an app group written into the app's file itself (as the
 script first did) was wiped by its own `xcodegen generate`, and the app
-was signed without it. `--if-needed` runs it again when either the
-widget or the app's group is missing from the spec, or the widget's iOS
-is below 17 (a spec made when the widget was iOS 15's is brought up to
-it; the app itself stays at iOS 15). Making the project again
+was signed without it. The least iOS is tauri.conf.json's
+`bundle > iOS > minimumSystemVersion` (26.0), which Tauri writes into
+the spec only when `tauri ios init` makes it, as the project's default:
+a spec made under an older minimum (15.0 until iOS 26 was required)
+keeps it, and the widget's target its own. So every iOS version in the
+spec below the minimum — the project's, a target's `deploymentTarget`,
+an `IPHONEOS_DEPLOYMENT_TARGET` setting — is raised to it, and the
+widget's is also written as a build setting of its own. Once XcodeGen
+has made the project, the script reads its build settings back, and a
+target still below the minimum stops it there, saying so: a widget left
+at iOS 15 failed the build instead, with Swift errors about App Intents
+and interactive buttons not being available yet. `--if-needed` runs it
+again when the widget or the app's group is missing from the spec, or
+any iOS version in the spec or the made project is below the minimum. Making the project again
 would drop a signing team chosen in Xcode, so the script writes the
 team into the spec for both targets — `APPLE_DEVELOPMENT_TEAM`,
 tauri.conf.json's `bundle > iOS > developmentTeam`, or the one the
@@ -2981,8 +2991,11 @@ the app's WebKit targets have it, but a test browser may need a polyfill.
 - Xcode 27 (iOS 27 SDK) needs Tauri 2.12 or later: its `swift build`
   uses the new Swift Build backend, which older swift-rs (pulled in by
   Tauri ≤ 2.11) can't drive, and the build fails compiling Tauri's own
-  Swift package against the macOS SDK. The minimum iOS version is 15.0
-  (`bundle > iOS > minimumSystemVersion` in `tauri.conf.json`).
+  Swift package against the macOS SDK. The minimum iOS version is 26.0
+  (`bundle > iOS > minimumSystemVersion` in `tauri.conf.json`), for the
+  app and its widget alike (`scripts/ios-widget.mjs` brings an existing
+  Xcode project up to it); the app's own Swift plugins still declare
+  iOS 15 in their packages, a minimum they meet, not one the app has.
 - Xcode 27 also builds Swift `@_cdecl` exports as local symbols, which
   swift-rs repairs with `llvm-objcopy` — so `rust-toolchain.toml` asks
   rustup for the `llvm-tools` component — but swift-rs 1.0.8 misses its

@@ -71,7 +71,7 @@ Windows/Linux desktops too).
   with it, kept in the margin where it can be.
 - **Full screen on iPad** — the status bar is hidden while the app fills
   the screen.
-- **Continue Reading widgets (iOS 17+)** — home-screen widgets with the
+- **Continue Reading widgets (iOS)** — home-screen widgets with the
   PDFs read last and the page each was left on, as text or as the page
   itself (highlights and ink included); a tap opens the PDF there, and
   the pin beside each keeps it in its place whatever is read next.
@@ -99,6 +99,8 @@ and pick a model for each task. Save,
 and the app downloads your library.
 
 ### iOS / iPadOS
+
+The app needs iOS / iPadOS 26 or later.
 
 One-time setup (requires macOS + Xcode):
 

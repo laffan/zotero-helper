@@ -263,8 +263,8 @@ private struct EmptyShelf: View {
 }
 
 extension View {
-  /// A widget's background, given through its container (iOS 17), which
-  /// gives it its margins too.
+  /// A widget's background, given through its container, which gives it
+  /// its margins too.
   func widgetBackground() -> some View {
     containerBackground(for: .widget) { Color(UIColor.systemBackground) }
   }

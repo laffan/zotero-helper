@@ -7,7 +7,11 @@ import WidgetKit
 // last three stacked in a large one — as text, with a bar for how far
 // through each one the page is, or (`withPages`) with the page itself.
 // A small widget opens its PDF from anywhere on it; the larger ones,
-// each PDF from its own part.
+// each PDF from its own part. Each PDF has a pin at its top right
+// (PinButton): faint until it is pressed, then filled in the accent while
+// it keeps the PDF in its place (ContinueReadingPins.swift) — beside the
+// title, on the heading's line in a small widget, or on a disc over the
+// page's corner on a page card.
 
 /// The app's accent: its red, lighter in the dark.
 let accent = Color(UIColor { traits in
@@ -21,19 +25,10 @@ struct ContinueReadingView: View {
   let entry: ReadingEntry
   let withPages: Bool
 
-  private var count: Int {
-    switch family {
-    case .systemSmall: return 1
-    case .systemMedium: return 2
-    default: return 3
-    }
-  }
-
   var body: some View {
-    let pdfs = Array(entry.pdfs.prefix(count))
+    let pdfs = Array(entry.pdfs.prefix(places(in: family)))
     content(pdfs)
       .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-      .legacyMargins()
       .widgetBackground()
   }
 
@@ -42,13 +37,17 @@ struct ContinueReadingView: View {
     if pdfs.isEmpty {
       EmptyShelf(problem: entry.problem)
     } else if family == .systemSmall {
-      cell(pdfs[0]).widgetURL(pdfs[0].openURL)
+      cell(pdfs[0])
+        .widgetURL(pdfs[0].openURL)
+        .overlay(alignment: .topTrailing) { pin(pdfs[0], at: 0) }
     } else if family == .systemMedium {
       VStack(alignment: .leading, spacing: 8) {
         if !withPages { Heading() }
         HStack(alignment: .top, spacing: 12) {
-          ForEach(pdfs) { pdf in
+          ForEach(Array(pdfs.enumerated()), id: \.element.id) { i, pdf in
+            // The pin over the link, not in it: a press there is the pin's.
             Link(destination: pdf.openURL) { cell(pdf) }
+              .overlay(alignment: .topTrailing) { pin(pdf, at: i) }
           }
           // One PDF read so far: it keeps to its half.
           if pdfs.count == 1 { Spacer(minLength: 0).frame(maxWidth: .infinity) }
@@ -60,10 +59,19 @@ struct ContinueReadingView: View {
         ForEach(Array(pdfs.enumerated()), id: \.element.id) { i, pdf in
           if i > 0 { Divider().padding(.vertical, 8) }
           Link(destination: pdf.openURL) { row(pdf) }
+            .overlay(alignment: .topTrailing) { pin(pdf, at: i) }
         }
         Spacer(minLength: 0)
       }
     }
+  }
+
+  /// The pin of the PDF in place `i`: on a disc inside a page card's
+  /// corner; else level with the title (the heading, in a small widget).
+  private func pin(_ pdf: RecentPDF, at i: Int) -> some View {
+    let onPage = withPages && family != .systemLarge
+    return PinButton(attKey: pdf.attKey, slot: i, pinned: entry.pinned.contains(pdf.attKey), onPage: onPage)
+      .offset(x: onPage ? -2 : 8, y: onPage ? 2 : -7)
   }
 
   /// A small widget's PDF, or one of a medium one's two.
@@ -78,6 +86,8 @@ struct ContinueReadingView: View {
           .font(.system(size: 15, weight: .semibold))
           .lineLimit(3)
           .foregroundColor(.primary)
+          // Clear of the pin, which a small widget has on the heading's line.
+          .padding(.trailing, family == .systemSmall ? 0 : 16)
         Text(pdf.author)
           .font(.system(size: 12))
           .foregroundColor(.secondary)
@@ -102,6 +112,7 @@ struct ContinueReadingView: View {
           .font(.system(size: 15, weight: .semibold))
           .lineLimit(2)
           .foregroundColor(.primary)
+          .padding(.trailing, 16)
         Text(pdf.author)
           .font(.system(size: 12))
           .foregroundColor(.secondary)
@@ -208,6 +219,34 @@ private struct PageCard: View {
   }
 }
 
+/// The pin beside a PDF (TogglePin): faint until pressed, then filled in
+/// the accent while it keeps the PDF in its place; pressed again, it lets
+/// it go. Over a page it sits on a disc of the widget's ground, so it
+/// shows on any page.
+struct PinButton: View {
+  let attKey: String
+  let slot: Int
+  let pinned: Bool
+  var onPage = false
+
+  var body: some View {
+    Button(intent: TogglePin(attKey: attKey, slot: slot)) {
+      Image(systemName: pinned ? "pin.fill" : "pin")
+        .font(.system(size: 11, weight: .semibold))
+        .foregroundColor(pinned ? accent : Color.secondary.opacity(onPage ? 1 : 0.6))
+        .frame(width: 22, height: 22)
+        .background {
+          if onPage { Circle().fill(Color(UIColor.systemBackground).opacity(0.88)) }
+        }
+        // A press a little short of it still counts.
+        .frame(width: 30, height: 30)
+        .contentShape(Rectangle())
+    }
+    .buttonStyle(.plain)
+    .accessibilityLabel(pinned ? "Unpin" : "Pin in this place")
+  }
+}
+
 /// Nothing read yet — or, with a problem, why there is nothing to show.
 private struct EmptyShelf: View {
   let problem: ShelfProblem?
@@ -224,23 +263,9 @@ private struct EmptyShelf: View {
 }
 
 extension View {
-  /// iOS 17 gives a widget its background through the container, and
-  /// margins of its own; before it, the view brings both.
-  @ViewBuilder
+  /// A widget's background, given through its container (iOS 17), which
+  /// gives it its margins too.
   func widgetBackground() -> some View {
-    if #available(iOSApplicationExtension 17.0, *) {
-      containerBackground(for: .widget) { Color(UIColor.systemBackground) }
-    } else {
-      background(Color(UIColor.systemBackground))
-    }
-  }
-
-  @ViewBuilder
-  func legacyMargins() -> some View {
-    if #available(iOSApplicationExtension 17.0, *) {
-      self
-    } else {
-      padding(16)
-    }
+    containerBackground(for: .widget) { Color(UIColor.systemBackground) }
   }
 }

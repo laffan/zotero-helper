@@ -1,10 +1,12 @@
 //! The Continue Reading widget on the iOS home screen
 //! (src-tauri/ios-widget/), from the app's side:
 //!
-//! - `update`: the PDFs read last — title, author, the page each was left
-//!   on — and thumbnails of those pages, handed to ios/Sources/
+//! - `update`: the PDFs read, newest first — title, author, the page each
+//!   was left on — and thumbnails of their pages, handed to ios/Sources/
 //!   WidgetPlugin.swift, which writes them where the widget can read them
-//!   (the app group both share) and has the widgets drawn again.
+//!   (the app group both share), keeps the thumbnails of the latest three
+//!   and of the PDFs pinned in the widgets, and has the widgets drawn
+//!   again.
 //! - The links the widget opens the app with
 //!   (`zoterohelper://open?item=…&att=…&page=…`), kept until the page
 //!   takes them (`take_open_url`) and announced as they come (the
@@ -48,7 +50,9 @@ fn remember(url: String) {
 }
 
 /// What the native side wrote: how many PDFs the widget now lists, and
-/// the folder it wrote them in (the app group's), for the page's log.
+/// the folder it wrote them in (the app group's), for the page's log;
+/// and the PDFs whose thumbnails it keeps, so the page can send one again
+/// that was let go.
 /// It answers with this rather than with nothing: a bare
 /// `invoke.resolve()` reaches Rust as `null`, which no struct decodes
 /// from, so every update that worked read as one that failed.
@@ -56,6 +60,8 @@ fn remember(url: String) {
 struct Written {
     listed: usize,
     folder: String,
+    #[serde(default)]
+    kept: Vec<String>,
 }
 
 /// The widget's PDFs and any new thumbnails, as the page sends them:

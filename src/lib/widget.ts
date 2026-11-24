@@ -2,19 +2,27 @@
 // from the page's side: what it shows, and the links it opens the app
 // with. Only in the app on iOS; elsewhere `startWidget` does nothing.
 //
-// What it shows: the three PDFs opened last (Recent's first three that
-// are still in the library), each with its title, author, the page it
-// was left on and — once read here — its page count; and a picture of
-// each one's page, the reader's highlights and ink on it, drawn from the
-// open PDF (`readerPageImage`) once a page has been read a moment
-// (SETTLE_MS, and the pen at rest), and again as the app goes to the
-// background, the last chance to show the page it is left on. Each
-// picture is sent once; the native side keeps it (tauri-plugin-widget's
-// WidgetPlugin.swift, in the app group the widget reads) until its PDF
-// leaves the three. The list is sent when it changes: a PDF opened, a
-// page turned, a picture drawn. What came of it goes to the log, once
-// each time it changes: how many PDFs the widget lists, or why the
-// native side couldn't write them (`report`).
+// What it shows: the PDFs opened last, each with its title, author, the
+// page it was left on and — once read here — its page count; and a
+// picture of each one's page, the reader's highlights and ink on it,
+// drawn from the open PDF (`readerPageImage`) once a page has been read a
+// moment (SETTLE_MS, and the pen at rest), and again as the app goes to
+// the background, the last chance to show the page it is left on.
+//
+// The widget has pins of its own (a PDF kept in its place there,
+// src-tauri/ios-widget/Sources/ContinueReadingPins.swift), which the app
+// doesn't know of, so the list is the whole of Recent still in the
+// library, newest first: a pinned PDF is in it however long ago it was
+// read, and the widget picks what it shows. Pictures are only ever of the
+// PDF open, which is the latest, so they are sent for the first three
+// (SHOWN) only, each once; the native side (tauri-plugin-widget's
+// WidgetPlugin.swift, in the app group the widget reads) keeps those of
+// the latest three and of the pinned PDFs, and says which it has, so one
+// it let go is sent again when its PDF is back among the three. The list
+// is sent when it changes: a PDF opened, a page turned, a picture drawn.
+// What came of it goes to the log, once each time it changes: how many
+// PDFs the widget has to choose from, or why the native side couldn't
+// write them (`report`).
 //
 // The links: a tap on a PDF in the widget opens the app with
 // zoterohelper://open?item=…&att=…&page=…, which the plugin keeps until
@@ -28,7 +36,7 @@ import { lastPage, useRecent } from "./recent";
 import { appLog, useStore } from "./store";
 import { invoke, isTauri, on } from "./tauri";
 
-/** How many PDFs the largest widget shows. */
+/** How many PDFs the largest widget shows, the latest first (pins aside). */
 const SHOWN = 3;
 /** How long a page is read before it is pictured, ms. */
 const SETTLE_MS = 4000;
@@ -68,14 +76,16 @@ function keepCount(attKey: string, n: number): void {
   }
 }
 
-/** The PDFs to show, newest first. */
+/** The PDFs the widget chooses from: Recent's still in the library,
+ *  newest first. */
 function shelf(): WidgetPdf[] {
-  const items = useStore.getState().library.items;
+  // All of Recent (up to 100) against the whole library: looked up, not searched.
+  const byKey = new Map(useStore.getState().library.items.map((i) => [i.key, i]));
   const known = counts();
   const out: WidgetPdf[] = [];
   for (const r of useRecent.getState().opened) {
-    const item = items.find((i) => i.key === r.itemKey);
-    if (!item || !items.some((i) => i.key === r.attKey)) continue;
+    const item = byKey.get(r.itemKey);
+    if (!item || !byKey.has(r.attKey)) continue;
     const pageCount = readerPageCount(r.attKey);
     if (pageCount) keepCount(r.attKey, pageCount);
     out.push({
@@ -87,7 +97,6 @@ function shelf(): WidgetPdf[] {
       pageCount: pageCount ?? known[r.attKey] ?? null,
       openedMs: r.ms,
     });
-    if (out.length === SHOWN) break;
   }
   return out;
 }
@@ -117,22 +126,26 @@ async function picture(): Promise<void> {
 async function send(): Promise<void> {
   const entries = shelf();
   const thumbnails: Record<string, string> = {};
-  for (const e of entries) {
+  for (const e of entries.slice(0, SHOWN)) {
     const p = pictures.get(e.attKey);
     if (p && !p.sent) thumbnails[e.attKey] = p.data;
   }
   const key = JSON.stringify(entries);
   if (key === lastSent && !Object.keys(thumbnails).length) return;
   try {
-    const written = await invoke<{ listed: number; folder: string }>("plugin:widget|update", {
+    const written = await invoke<{ listed: number; folder: string; kept: string[] }>("plugin:widget|update", {
       payload: { entries, thumbnails },
     });
     lastSent = key;
-    for (const k of Object.keys(thumbnails)) {
-      const p = pictures.get(k);
-      if (p) p.sent = true;
-    }
-    report("info", `Widget: ${written.listed} PDF${written.listed === 1 ? "" : "s"} listed, in ${written.folder}`, written.listed);
+    // What the widget has: a picture sent and kept. One it let go goes
+    // again once its PDF is among the latest three again.
+    const kept = new Set(written.kept);
+    for (const [k, p] of pictures) p.sent = kept.has(k) && (p.sent || k in thumbnails);
+    report(
+      "info",
+      `Widget: ${written.listed} PDF${written.listed === 1 ? "" : "s"} to choose from, in ${written.folder}`,
+      written.listed,
+    );
   } catch (e) {
     report("warn", `Widget: could not update it: ${e}`);
   }

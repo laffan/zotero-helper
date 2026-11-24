@@ -8,7 +8,9 @@
 //
 // - a `ZoteroHelperWidget` app extension built from
 //   src-tauri/ios-widget/Sources, its Info.plist and entitlements made by
-//   XcodeGen (the WidgetKit extension point; the app group);
+//   XcodeGen (the WidgetKit extension point; the app group), for iOS 17
+//   and later (WIDGET_IOS: its pins are buttons on the widget, which iOS
+//   17 brought) — a spec made when it was iOS 15 is brought up to it;
 // - the app embedding it;
 // - the app group (`group.<identifier>`) in the app's own entitlements,
 //   so the app and the widget share a folder (tauri-plugin-widget writes
@@ -26,7 +28,8 @@
 //
 // Run again after `tauri ios init` (which writes project.yml afresh);
 // npm run ios:deploy does it when the widget or the app's group is
-// missing. With --if-needed it does nothing when the spec has both.
+// missing, or the widget's iOS is older than WIDGET_IOS. With
+// --if-needed it does nothing when the spec has all of these.
 // Usage: npm run ios:widget [-- --if-needed]
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
@@ -37,6 +40,8 @@ const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), "..");
 const APPLE = path.join(ROOT, "src-tauri", "gen", "apple");
 const SPEC = path.join(APPLE, "project.yml");
 const WIDGET = "ZoteroHelperWidget";
+/** The least iOS the widget runs on. */
+const WIDGET_IOS = "17.0";
 const ifNeeded = process.argv.includes("--if-needed");
 
 function fail(msg) {
@@ -53,14 +58,15 @@ const appName = spec.match(/^ {2}(\S+)_iOS:\s*$/m)?.[1];
 if (!appName) fail("no <app>_iOS target in project.yml — is it Tauri's?");
 const APP = `${appName}_iOS`;
 
-/** The app target's part of the spec: [start, end) — its line up to the
- *  next target, or the next key at the top level. */
-function appBlock(text) {
-  const start = text.indexOf(`\n  ${APP}:\n`) + 1;
-  const rest = text.slice(start + APP.length + 4);
+/** A target's part of the spec: [start, end) — its line up to the next
+ *  target, or the next key at the top level. */
+function targetBlock(text, name) {
+  const start = text.indexOf(`\n  ${name}:\n`) + 1;
+  const rest = text.slice(start + name.length + 4);
   const next = rest.search(/^ {0,2}\S/m);
-  return [start, next < 0 ? text.length : start + APP.length + 4 + next];
+  return [start, next < 0 ? text.length : start + name.length + 4 + next];
 }
+const appBlock = (text) => targetBlock(text, APP);
 const appHasGroup = (text) => {
   const [a, b] = appBlock(text);
   return text.slice(a, b).includes(`- ${group}`);
@@ -68,7 +74,13 @@ const appHasGroup = (text) => {
 
 const had = spec.includes(`\n  ${WIDGET}:\n`);
 const hadGroup = appHasGroup(spec);
-if (had && hadGroup && ifNeeded) process.exit(0);
+/** The widget target's iOS, as the spec has it. */
+const widgetIos = (text) => {
+  const [a, b] = targetBlock(text, WIDGET);
+  return text.slice(a, b).match(/^ {4}deploymentTarget: "?([\d.]+)"?\s*$/m)?.[1] ?? null;
+};
+const oldIos = had && parseFloat(widgetIos(spec) ?? "0") < parseFloat(WIDGET_IOS);
+if (had && hadGroup && !oldIos && ifNeeded) process.exit(0);
 
 // The signing team: the environment's, the config's, the project's.
 const pbxproj = path.join(APPLE, `${appName}.xcodeproj`, "project.pbxproj");
@@ -98,7 +110,7 @@ if (!had) {
   ${WIDGET}:
     type: app-extension
     platform: iOS
-    deploymentTarget: "15.0"
+    deploymentTarget: "${WIDGET_IOS}"
     sources:
       - path: ../../ios-widget/Sources
     info:
@@ -128,6 +140,15 @@ ${team ? `        DEVELOPMENT_TEAM: ${team}\n` : ""}        SWIFT_VERSION: "5.0"
       - sdk: SwiftUI.framework
 `;
   spec = `${spec.replace(/\s*$/, "\n")}${target}`;
+} else if (oldIos) {
+  // Made when the widget was iOS 15's: brought up to WIDGET_IOS.
+  const [a, b] = targetBlock(spec, WIDGET);
+  let block = spec.slice(a, b);
+  const line = `    deploymentTarget: "${WIDGET_IOS}"`;
+  block = /^ {4}deploymentTarget:.*$/m.test(block)
+    ? block.replace(/^ {4}deploymentTarget:.*$/m, line)
+    : block.replace(/^( {4}platform: iOS\n)/m, `$1${line}\n`);
+  spec = `${spec.slice(0, a)}${block}${spec.slice(b)}`;
 }
 fs.writeFileSync(SPEC, spec);
 
@@ -158,6 +179,7 @@ if (!hadGroup) {
 }
 
 console.log(`▸ ${had ? "project.yml already has the widget" : `added ${WIDGET} to project.yml`}`);
+if (oldIos) console.log(`▸ the widget's iOS raised to ${WIDGET_IOS} (project.yml)`);
 console.log(`▸ app group ${group}: ${hadGroup ? "already in" : "added to"} the app's entitlements (project.yml)`);
 if (!team) console.log("  ! no signing team found: set it for both targets in Xcode, or set APPLE_DEVELOPMENT_TEAM and run this again.");
 console.log("▸ xcodegen generate");

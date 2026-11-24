@@ -13,19 +13,35 @@ import WidgetKit
 // - "Continue Reading — Page" shows the page itself, as the app last
 //   drew it: the reader's highlights and ink on it.
 //
+// A pin beside each PDF keeps it in its place, whatever is read after it
+// (ContinueReadingPins.swift); the places not pinned show the PDFs read
+// last.
+//
 // A widget runs apart from the app and can't ask it anything: the app
 // writes the list and the pages' thumbnails into the app group both
 // share (tauri-plugin-widget's WidgetPlugin.swift: `widget/recent.json`,
 // `widget/<attKey>.jpg`) and has the widgets drawn again as it does, so
-// the timeline here is one entry that never expires by itself. A tap on
+// the timeline here is one entry that never expires by itself (a pin
+// pressed has them drawn again too). A tap on
 // a PDF opens the app on it, at its page
 // (zoterohelper://open?item=…&att=…&page=…, which the app's page turns
 // into opening the reader).
 //
 // Built as an app extension added to the Xcode project Tauri generates
-// (scripts/ios-widget.mjs).
+// (scripts/ios-widget.mjs), for iOS 17 and later: the pins are buttons on
+// the widget, which iOS 17 brought.
 
 let appGroup = "group.com.laffan.zoterohelper"
+
+/// How many PDFs a widget of `family` shows: one, two side by side, three
+/// stacked.
+func places(in family: WidgetFamily) -> Int {
+  switch family {
+  case .systemSmall: return 1
+  case .systemMedium: return 2
+  default: return 3
+  }
+}
 
 /// One PDF read, as the app writes it.
 struct RecentPDF: Codable, Hashable, Identifiable {
@@ -96,11 +112,14 @@ enum ShelfProblem {
 
 struct ReadingEntry: TimelineEntry {
   let date: Date
+  /// The PDFs shown, place by place (Shelf.arrange).
   let pdfs: [RecentPDF]
   /// Each PDF's page, by attKey (the page widget's only).
   let pages: [String: UIImage]
   /// Why `pdfs` is empty, when it isn't for want of a PDF read.
   var problem: ShelfProblem? = nil
+  /// The PDFs pinned (by attKey), whichever place they are in.
+  var pinned: Set<String> = []
 
   static let sample = ReadingEntry(
     date: Date(),
@@ -109,7 +128,8 @@ struct ReadingEntry: TimelineEntry {
       RecentPDF(itemKey: "B", attKey: "B1", title: "The Archive and the Margin", author: "Marsh and Ellery", page: 41, pageCount: 212, openedMs: 0),
       RecentPDF(itemKey: "C", attKey: "C1", title: "Notes Toward a Theory of Annotation", author: "Okafor et al.", page: 3, pageCount: 18, openedMs: 0),
     ],
-    pages: [:]
+    pages: [:],
+    pinned: ["B1"]
   )
 }
 
@@ -121,7 +141,8 @@ enum Shelf {
       .appendingPathComponent("widget", isDirectory: true)
   }
 
-  static func read(withPages: Bool) -> ReadingEntry {
+  /// What the app has written, arranged for `slots` places with the pins.
+  static func read(withPages: Bool, slots: Int) -> ReadingEntry {
     func nothing(_ problem: ShelfProblem) -> ReadingEntry {
       ReadingEntry(date: Date(), pdfs: [], pages: [:], problem: problem)
     }
@@ -132,7 +153,10 @@ enum Shelf {
     guard let file = try? JSONDecoder().decode(RecentFile.self, from: data) else {
       return nothing(.unreadable)
     }
-    let pdfs = Array(file.entries.prefix(3))
+    // The whole of Recent, newest first: a pinned PDF is among it however
+    // long ago it was read.
+    let pins = Pins.read()
+    let pdfs = arrange(file.entries, pins: pins, slots: slots)
     var pages: [String: UIImage] = [:]
     if withPages {
       for pdf in pdfs {
@@ -140,7 +164,7 @@ enum Shelf {
         if let image = UIImage(contentsOfFile: path) { pages[pdf.attKey] = image }
       }
     }
-    return ReadingEntry(date: Date(), pdfs: pdfs, pages: pages)
+    return ReadingEntry(date: Date(), pdfs: pdfs, pages: pages, pinned: Set(pins.map(\.attKey)))
   }
 }
 
@@ -151,14 +175,15 @@ struct Provider: TimelineProvider {
   func placeholder(in context: Context) -> ReadingEntry { .sample }
 
   func getSnapshot(in context: Context, completion: @escaping (ReadingEntry) -> Void) {
-    let entry = Shelf.read(withPages: withPages)
+    let entry = Shelf.read(withPages: withPages, slots: places(in: context.family))
     // The widget gallery shows a sample until something has been read.
     completion(context.isPreview && entry.pdfs.isEmpty ? .sample : entry)
   }
 
   func getTimeline(in context: Context, completion: @escaping (Timeline<ReadingEntry>) -> Void) {
     // The app has the widgets drawn again whenever what they show changes.
-    completion(Timeline(entries: [Shelf.read(withPages: withPages)], policy: .never))
+    let entry = Shelf.read(withPages: withPages, slots: places(in: context.family))
+    completion(Timeline(entries: [entry], policy: .never))
   }
 }
 
@@ -168,7 +193,7 @@ struct ContinueReadingWidget: Widget {
       ContinueReadingView(entry: entry, withPages: false)
     }
     .configurationDisplayName("Continue Reading")
-    .description("The PDFs you read last, each with the page you left it on.")
+    .description("The PDFs you read last, each with the page you left it on. Pin one to keep it there.")
     .supportedFamilies([.systemSmall, .systemMedium, .systemLarge])
   }
 }
@@ -179,7 +204,7 @@ struct ContinueReadingPageWidget: Widget {
       ContinueReadingView(entry: entry, withPages: true)
     }
     .configurationDisplayName("Continue Reading — Page")
-    .description("The page you left each PDF on, with your highlights and ink.")
+    .description("The page you left each PDF on, with your highlights and ink. Pin one to keep it there.")
     .supportedFamilies([.systemSmall, .systemMedium, .systemLarge])
   }
 }

@@ -71,9 +71,10 @@ Windows/Linux desktops too).
   with it, kept in the margin where it can be.
 - **Full screen on iPad** — the status bar is hidden while the app fills
   the screen.
-- **Continue Reading widgets (iOS)** — home-screen widgets with the PDFs
-  read last and the page each was left on, as text or as the page itself
-  (highlights and ink included); a tap opens the PDF there.
+- **Continue Reading widgets (iOS 17+)** — home-screen widgets with the
+  PDFs read last and the page each was left on, as text or as the page
+  itself (highlights and ink included); a tap opens the PDF there, and
+  the pin beside each keeps it in its place whatever is read next.
 
 The full feature breakdown, architecture and contributor rules are in
 [README_TECHNICAL.md](README_TECHNICAL.md).

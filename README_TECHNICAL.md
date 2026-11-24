@@ -293,9 +293,11 @@ src-tauri/      Rust core (all networking + state)
                    Apple Pencil's double-tap / squeeze, the app
                    full screen (the status bar hidden), and the
                    home-screen widget's data and links
-  ios-widget/      the Continue Reading widgets (WidgetKit, SwiftUI),
-                   an app extension added to the generated Xcode
-                   project by scripts/ios-widget.mjs
+  ios-widget/      the Continue Reading widgets (WidgetKit, SwiftUI):
+                   ContinueReading (the data, the timeline), its Views
+                   and its Pins (a PDF kept in its place; the pin's
+                   App Intent) — an app extension added to the
+                   generated Xcode project by scripts/ios-widget.mjs
   Info.ios.plist   keys merged into the generated iOS Info.plist
 ```
 
@@ -443,15 +445,40 @@ A tap opens the app on that PDF at that page — anywhere on a small
 widget, each PDF's own part of a larger one. Until something has been
 read, a line says so.
 
+Pins. Each PDF on a widget has a pin at its top right — beside the
+title (on the heading's line in a small widget), or on a disc inside the
+page's corner on a page card — faint until it is pressed. Pressed, it
+keeps that PDF in the place it is in (the first, second or third: a
+medium widget's left or right), filled in the accent, however many PDFs
+are read after it; pressed again, it lets it go. Any place can be
+pinned, all of them too; the places not pinned show the PDFs read last,
+newest first, none twice (`Shelf.arrange`), and with fewer PDFs than
+places they close up. A pin is a button on the widget (an App Intent,
+`TogglePin`, run in the widget's own process — iOS 17's interactive
+widgets; hence the widget needs iOS 17), not a setting behind Edit
+Widget: iOS draws that screen itself from a widget's parameters, and a
+switch there can only be labelled with words fixed when the app is
+built, never a PDF's title. A widget is never told which copy of it was
+pressed, so pins belong to all the widgets, kept in the app group
+(`widget/pins.json`, which only the widgets write): every Continue
+Reading widget, text or page, any size, keeps the same PDF in the same
+place — a place a widget doesn't have (the second, on a small one) isn't
+shown there — and pinning a PDF to a place another pin held takes it
+over. A pin pressed has all the widgets drawn again. A pinned PDF that
+is no longer in Recent (or the library) gives its place to the latest
+until it is back; its pin stays until another takes the place.
+
 Where the data comes from. A widget runs apart from the app and can't
 ask it anything, so the app writes what the widgets show into an app
 group both belong to (`group.com.laffan.zoterohelper`), and has them
 drawn again (`WidgetCenter.reloadAllTimelines`, which doesn't count
 against WidgetKit's budget while the app is in front). The page decides
-what (`lib/widget.ts`): Recent's first three PDFs still in the library,
-each with its title, creator summary, the page it was left on, and its
-page count once it has been open here (kept on this device,
-`zh-widget-page-counts`); and a picture of the open PDF's page, drawn
+what (`lib/widget.ts`): Recent's PDFs still in the library — the whole
+of it (up to 100), since the app doesn't know the widgets' pins and a
+pinned PDF must be there however long ago it was read; the widgets pick
+what they show — each with its title, creator summary, the page it was
+left on, and its page count once it has been open here (kept on this
+device, `zh-widget-page-counts`); and a picture of the open PDF's page, drawn
 afresh from the PDF 480px wide with the highlights and ink painted in
 (`pageImage` in `pdfviewer/excerpt.ts`), once a page has been read for
 4s with the pen at rest, after a highlight or drawing changes the
@@ -459,9 +486,13 @@ library, and as the app goes to the background — the last chance to
 show the page it is left on. Each picture is sent once, the list
 whenever it changes. `tauri-plugin-widget` (its Swift side) writes them
 as `widget/recent.json` and `widget/<attKey>.jpg` in the group's folder,
-letting go of the pictures of PDFs no longer among the three; the
-widgets read them when WidgetKit asks (a timeline of one entry, never
-refreshed by itself). In the browser and off iOS none of this runs.
+keeping the pictures of the latest three and of the pinned PDFs (it
+reads `widget/pins.json`) and letting go of the rest; it answers with
+those it keeps, and the page sends one let go again once its PDF is back
+among the three (a picture is only ever of the PDF open, the latest, so
+only the first three are ever sent). The widgets read them when
+WidgetKit asks (a timeline of one entry, never refreshed by itself). In
+the browser and off iOS none of this runs.
 
 The links. The widget opens `zoterohelper://open?item=…&att=…&page=…`
 (the scheme is in `Info.ios.plist`'s `CFBundleURLTypes`); the plugin
@@ -484,7 +515,7 @@ project, which Tauri generates (`tauri ios init`) and the repository
 doesn't keep, so `scripts/ios-widget.mjs` (`npm run ios:widget`) adds it
 to the generated XcodeGen spec (`gen/apple/project.yml`) and makes the
 project again with XcodeGen: the `ZoteroHelperWidget` app extension
-(`<identifier>.widget`, iOS 15, built from `ios-widget/Sources`, its
+(`<identifier>.widget`, iOS 17, built from `ios-widget/Sources`, its
 Info.plist and entitlements made by XcodeGen), the app embedding it, and
 the app group in both targets' entitlements — in the spec, as each
 target's `entitlements: properties`: XcodeGen writes a target's
@@ -492,7 +523,9 @@ entitlements file from those properties every time it makes the
 project, so an app group written into the app's file itself (as the
 script first did) was wiped by its own `xcodegen generate`, and the app
 was signed without it. `--if-needed` runs it again when either the
-widget or the app's group is missing from the spec. Making the project again
+widget or the app's group is missing from the spec, or the widget's iOS
+is below 17 (a spec made when the widget was iOS 15's is brought up to
+it; the app itself stays at iOS 15). Making the project again
 would drop a signing team chosen in Xcode, so the script writes the
 team into the spec for both targets — `APPLE_DEVELOPMENT_TEAM`,
 tauri.conf.json's `bundle > iOS > developmentTeam`, or the one the
@@ -503,13 +536,15 @@ the team, which automatic signing registers; this is generally said to
 need a paid Apple Developer Program membership (not checked against an
 official statement). None of the native side could be built here (no
 Xcode); the page's side was checked in a browser with the plugin stubbed.
+The pins (Swift) were written without Xcode either: their placing was
+checked by a copy of `Shelf.arrange` and `Pins.toggle` in JavaScript.
 
 When it shows nothing. Each part says where the chain stops. The app's
 log (the terminal) says, once each time it changes, how many PDFs the
-widget lists and the shared folder they were written in — or why they
+widget has to choose from and the shared folder they were written in — or why they
 weren't: "The app group … isn't available to the app" means the app's
 own signature lacks the entitlement. (The native side answers `update`
-with `{ listed, folder }`. A bare `invoke.resolve()` reaches Rust as
+with `{ listed, folder, kept }`. A bare `invoke.resolve()` reaches Rust as
 `null`, which `run_mobile_plugin` can't decode into a struct, so every
 update used to read as a failure, even one that had worked.) An empty
 widget says which case it is: the normal line when the app has listed

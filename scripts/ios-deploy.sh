@@ -71,7 +71,8 @@ if [[ $BUILD -eq 1 ]]; then
   # in step (near-instant no-op when nothing changed).
   echo "▸ npm install"
   npm install --no-audit --no-fund
-  # The widget's target, after a fresh 'tauri ios init' (a no-op once in).
+  # The widget's target, after a fresh 'tauri ios init' (a no-op once in,
+  # and on the iOS it needs).
   node scripts/ios-widget.mjs --if-needed
   echo "▸ building (tauri ios build --export-method $EXPORT_METHOD)"
   npx --no-install tauri ios build --export-method "$EXPORT_METHOD"

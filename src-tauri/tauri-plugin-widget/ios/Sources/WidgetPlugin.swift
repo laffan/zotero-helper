@@ -11,18 +11,25 @@ import WidgetKit
 // its own and can't ask the app anything; it reads what is there when
 // WidgetKit asks it for a timeline.
 //
-// `update` is handed the PDFs read last, newest first (title, author,
-// the page each was left on, its page count) and thumbnails of those
-// pages, as JPEG, for the PDFs whose page has been drawn again since the
-// last update. Each thumbnail is kept as `widget/<attKey>.jpg`, the
-// list as `widget/recent.json`; thumbnails of PDFs no longer listed are
-// let go. Then the widgets are drawn again — which, done while the app is
-// in front, doesn't count against WidgetKit's budget of reloads. The
-// answer says how many PDFs are listed and where (the page logs it);
-// without the app group (the App Groups entitlement missing from the
-// app's signature) the update is refused, saying so.
+// `update` is handed the PDFs read, newest first — the whole of Recent,
+// since a PDF pinned in the widgets stays however long ago it was read —
+// (title, author, the page each was left on, its page count) and
+// thumbnails of their pages, as JPEG, for the PDFs whose page has been
+// drawn again since the last update. Each thumbnail is kept as
+// `widget/<attKey>.jpg`, the list as `widget/recent.json`. Thumbnails are
+// kept only for what a widget can show: the three PDFs read last, and
+// those pinned (`widget/pins.json`, which only the widgets write —
+// ContinueReadingPins.swift); the rest are let go. Then the widgets are
+// drawn again — which, done while the app is in front, doesn't count
+// against WidgetKit's budget of reloads. The answer says how many PDFs
+// are listed and where (the page logs it), and whose thumbnails are kept
+// (the page sends one let go again when its PDF is back among the
+// three); without the app group (the App Groups entitlement missing from
+// the app's signature) the update is refused, saying so.
 
 let appGroup = "group.com.laffan.zoterohelper"
+/// How many PDFs the largest widget shows, the latest first.
+let shown = 3
 
 class WidgetPlugin: Plugin {
   struct Entry: Codable {
@@ -44,10 +51,21 @@ class WidgetPlugin: Plugin {
     let entries: [Entry]
   }
 
-  /// The answer: what the widget now lists, and the folder it reads.
+  /// The widgets' pins: only which PDFs, here.
+  struct Pin: Decodable {
+    let attKey: String
+  }
+
+  struct PinFile: Decodable {
+    let pins: [Pin]
+  }
+
+  /// The answer: what the widget now lists, the folder it reads, and the
+  /// PDFs whose thumbnails it has.
   struct Written: Encodable {
     let listed: Int
     let folder: String
+    let kept: [String]
   }
 
   /// Zotero's keys are letters and digits: nothing else names a file.
@@ -74,15 +92,25 @@ class WidgetPlugin: Plugin {
       try data.write(to: dir.appendingPathComponent("\(attKey).jpg"), options: .atomic)
     }
     let entries = args.entries.filter { isKey($0.attKey) && isKey($0.itemKey) }
-    let keep = Set(entries.map { "\($0.attKey).jpg" })
-    for name in (try? files.contentsOfDirectory(atPath: dir.path)) ?? []
-    where name.hasSuffix(".jpg") && !keep.contains(name) {
-      try? files.removeItem(at: dir.appendingPathComponent(name))
+    var keep = Set(entries.prefix(shown).map(\.attKey))
+    if let data = try? Data(contentsOf: dir.appendingPathComponent("pins.json")),
+      let pinned = try? JSONDecoder().decode(PinFile.self, from: data)
+    {
+      keep.formUnion(pinned.pins.map(\.attKey))
+    }
+    var kept: [String] = []
+    for name in (try? files.contentsOfDirectory(atPath: dir.path)) ?? [] where name.hasSuffix(".jpg") {
+      let attKey = String(name.dropLast(4))
+      if keep.contains(attKey) {
+        kept.append(attKey)
+      } else {
+        try? files.removeItem(at: dir.appendingPathComponent(name))
+      }
     }
     let json = try JSONEncoder().encode(RecentFile(entries: entries))
     try json.write(to: dir.appendingPathComponent("recent.json"), options: .atomic)
     WidgetCenter.shared.reloadAllTimelines()
-    invoke.resolve(Written(listed: entries.count, folder: dir.path))
+    invoke.resolve(Written(listed: entries.count, folder: dir.path, kept: kept))
   }
 }
 

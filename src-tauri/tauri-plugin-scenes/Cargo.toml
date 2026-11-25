@@ -1,0 +1,17 @@
+[package]
+name = "tauri-plugin-scenes"
+version = "0.1.0"
+description = "iPadOS windows: a window for each one the system asks for, links to a window already open, external displays declined"
+edition = "2021"
+rust-version = "1.77"
+links = "tauri-plugin-scenes"
+
+[build-dependencies]
+tauri-plugin = { version = "2", features = ["build"] }
+
+[dependencies]
+tauri = { version = "2" }
+serde = { version = "1", features = ["derive"] }
+
+[target.'cfg(target_os = "ios")'.dependencies]
+objc2 = "0.6"

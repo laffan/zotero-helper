@@ -78,8 +78,38 @@
   letter-spacing: 0.05em;
   color: var(--text-dim);
 }
+/* The search field (HighlightSearch): an input's box, with the
+   magnifier — or, with a query, the ✕ that clears it — at its left, as
+   the PDF's own find has (toolbar.css). */
 .hl-search {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   margin: 0 10px 8px;
+  padding: 0 8px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text-dim);
+}
+.hl-search:focus-within {
+  border-color: var(--accent);
+}
+.hl-search input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  background: transparent;
+  padding: 6px 0;
+}
+.hl-search-glyph {
+  display: inline-flex;
+  color: var(--text-dim);
+}
+.hl-search .hl-search-clear {
+  width: 22px;
+  height: 22px;
+  margin-left: -4px;
 }
 .hl-body {
   flex: 1;

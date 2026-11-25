@@ -4012,6 +4012,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "tauri-plugin-scenes"
+version = "0.1.0"
+dependencies = [
+ "objc2",
+ "serde",
+ "tauri",
+ "tauri-plugin",
+]
+
+[[package]]
 name = "tauri-plugin-share-sheet"
 version = "0.1.0"
 dependencies = [
@@ -5679,6 +5689,7 @@ dependencies = [
  "tauri-plugin-keyboard-focus",
  "tauri-plugin-opener",
  "tauri-plugin-pencil",
+ "tauri-plugin-scenes",
  "tauri-plugin-share-sheet",
  "tauri-plugin-status-bar",
  "tauri-plugin-widget",

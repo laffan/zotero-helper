@@ -16,7 +16,7 @@
 // fade what they leave out. The search also goes round its matches —
 // the first as the words are typed, then Enter (or ›) the next and
 // ⇧Enter (or ‹) the one before, each glided to the middle of the view
-// and ringed — stepping over the cards the colours leave out. The view —
+// and ringed — the cards the colours fade among them. The view —
 // pan and zoom — is the PDF's, kept beside it (lib/readerUi.ts), and as
 // it was left when the map comes back.
 import { useLayoutEffect, useEffect, useRef, useState } from "react";
@@ -29,7 +29,7 @@ import { mapRows, type MapColumn, type MapRow } from "../highlightmap/layout";
 import { createMapView, type MapViewControl } from "../highlightmap/view";
 import { createMapWrap, type MapWrapControl } from "../highlightmap/wrap";
 import { DividerHeading } from "./DividerHeading";
-import { ColorSwatches, type HighlightFilter } from "./HighlightFilters";
+import { ColorSwatches, HighlightSearch, type HighlightFilter } from "./HighlightFilters";
 import { HighlightRow, useRowHover } from "./HighlightRow";
 import type { HighlightGroup } from "./HighlightsPanel";
 import { ChevronDown, ChevronUp, FitIcon, MinusIcon, PlusIcon } from "./Icons";
@@ -76,14 +76,16 @@ export function HighlightMap(props: Props) {
 
   const maps = groups.map((g) => ({ g, rows: mapRows(sectionsFor(g), g.list.filter((a) => a.text || a.comment)) }));
 
-  // The search's matches, in reading order: the cards it goes round.
+  // The search's matches, in reading order: the cards it goes round —
+  // the ones the colours fade among them, since a faded card is still
+  // on the map to be found.
   const order: string[] = [];
   if (q) {
     for (const { rows } of maps)
       for (const r of rows)
         for (const c of r.columns)
           for (const it of c.items)
-            if (it.kind === "entry" && filter.passes(it.entry) && matchesQuery(it.entry, q)) order.push(it.entry.key);
+            if (it.kind === "entry" && matchesQuery(it.entry, q)) order.push(it.entry.key);
   }
   const [cursor, setCursor] = useState({ q, i: 0, step: 0 });
   const at = cursor.q === q && order.length ? Math.min(cursor.i, order.length - 1) : 0;
@@ -160,12 +162,10 @@ export function HighlightMap(props: Props) {
     <div className="hl-panel hlmap">
       <div className="hlmap-bar">
         <div className="hlmap-search">
-          <input
-            className="hl-search"
-            type="search"
-            placeholder="Search the map…"
+          <HighlightSearch
             value={query}
-            onChange={(e) => setQuery(e.target.value)}
+            onChange={setQuery}
+            placeholder="Search the map…"
             onKeyDown={(e) => {
               if (e.key !== "Enter") return;
               e.preventDefault();
@@ -242,8 +242,8 @@ function RowView({ row, g, ctx }: { row: MapRow; g: HighlightGroup; ctx: Ctx }) 
 
 function ColumnView({ column, headed, g, ctx }: { column: MapColumn; headed: boolean; g: HighlightGroup; ctx: Ctx }) {
   const { q, canAdd, openAttKey, shownKey, setShownKey, filter, matches, current } = ctx;
-  // Faded: left out by the colours, or by the search (its matches are
-  // among what the colours keep).
+  // Faded: left out by the search, while there is one — a match shows
+  // whatever its colour — else by the colours.
   const faded = (a: Annotation) => (q ? !matches.has(a.key) : !filter.passes(a));
   // Each item in a box of its own, placed by wrap.ts.
   return (

@@ -16,12 +16,19 @@
 // as one; and no push starts while the Pencil is writing — on the pages
 // or on the notepad (lib/penActivity.ts) — since its results would land
 // in the middle of a stroke (`notePenActivity`).
+//
+// The other windows (lib/windows/) hear of each change as it shows, and
+// of what each push made of them, and take both in as this one does —
+// so a highlight made in one window's pages is on another's Highlight
+// Map at once, and stays there through its syncs until Zotero has it.
+// Any window may push: the outbox is the Rust side's, one push at a time.
 import type { Annotation } from "./highlights";
 import { penRestedMs } from "./penActivity";
 import { forget, holdDeleted, holdItem, holdPatch } from "./pendingAnnotations";
 import { appLog, useStore } from "./store";
 import { invoke, isTauri } from "./tauri";
 import type { Settings, ZItem } from "./types";
+import { announce, hear } from "./windows/channel";
 
 const PUSH_DELAY_MS = 1500;
 /** No push while the pen has written within this long. */
@@ -144,10 +151,11 @@ function upsertSoon(item: ZItem): void {
   queued.set(item.key, item);
 }
 
-function show(item: ZItem): void {
+function show(item: ZItem, mine = true): void {
   bump(item.key);
   holdItem(item);
   upsertSoon(item);
+  if (mine) announce("annotation", { op: "show", item });
 }
 
 function itemOf(key: string): ZItem | undefined {
@@ -204,12 +212,25 @@ export function updateAnnotation(key: string, patch: AnnotationPatch): void {
 export function deleteAnnotation(key: string): void {
   const item = itemOf(key);
   if (!item) return;
+  dropShown(key);
+  enqueue({ key, op: "delete", version: item.version });
+  announce("annotation", { op: "delete", key });
+}
+
+function dropShown(key: string): void {
   bump(key);
   holdDeleted(key);
   queued.delete(key);
   useStore.getState().removeItem(key);
-  enqueue({ key, op: "delete", version: item.version });
 }
+
+// Another window's changes, and what its pushes made of them.
+type Heard = { op: "show"; item: ZItem } | { op: "delete"; key: string } | { op: "pushed"; results: Pushed[] };
+hear<Heard>("annotation", (m) => {
+  if (m.op === "show") show(m.item, false);
+  else if (m.op === "delete") dropShown(m.key);
+  else for (const r of m.results) adopt(r);
+});
 
 function adopt(r: Pushed): void {
   const st = useStore.getState();
@@ -275,7 +296,9 @@ export async function pushAnnotations(): Promise<void> {
     const results = await invoke<Pushed[]>("annotations_push");
     // A result for an annotation edited again meanwhile is stale; that
     // edit is in the outbox and the next push sends it.
-    for (const r of results) if (revs.get(r.key) === before.get(r.key)) adopt(r);
+    const fresh = results.filter((r) => revs.get(r.key) === before.get(r.key));
+    for (const r of fresh) adopt(r);
+    if (fresh.length) announce("annotation", { op: "pushed", results: fresh });
   } catch (e) {
     appLog("debug", `Annotation push failed: ${e}`);
   } finally {

@@ -27,7 +27,7 @@ import { useStore } from "../store";
 import { invoke } from "../tauri";
 import type { Chat, ContextPart } from "../types";
 import { nameChat, persistChats, removeChat } from "./chat";
-import { heading as headingOf } from "./context";
+import { heading as headingOf, TEXT_CAPS } from "./context";
 import { taskModel } from "./modelChoice";
 import { fillPrompt, promptTemplate } from "./prompts";
 
@@ -142,8 +142,8 @@ export function headExplanation(chatId: string): void {
 }
 
 /** Pages in a whole PDF's context, at most: a longer one sends this
- *  many pages around the passage. */
-const FULL_PAGES = 80;
+ *  many pages around the passage (still held to the characters' cap). */
+const FULL_PAGES = TEXT_CAPS.pages;
 
 const pagesLabel = (from: number, to: number) => (from === to ? `p. ${from}` : `pp. ${from}–${to}`);
 
@@ -184,6 +184,10 @@ export function contextParts(
   };
 }
 
+/** A part as it went: its label, and what the caps left of it —
+ *  "the full text (only pp. 1–37 of 52)". */
+export const partSent = (p: ContextPart) => (p.sent ? `${p.label} (${p.sent})` : p.label);
+
 /** What an explainer asked with its context is grounded in: the work's
  *  metadata — its title and authors, year, publication — and the text
  *  of `part` of its PDF, page markers and all, saying which part when
@@ -192,22 +196,26 @@ export function contextParts(
  *  context for every passage, and the provider's cache serves it to the
  *  next (contextCache.ts). Read from the PDF on this device (or Zotero),
  *  never sent as a file. */
-export async function explainContext(chat: Chat, part: ContextPart): Promise<string> {
+export async function explainContext(chat: Chat, part: ContextPart): Promise<{ context: string; sent?: string }> {
   const items = useStore.getState().library.items;
   const item = items.find((i) => i.key === chat.source.itemKeys[0]);
   if (!item) throw new Error("the entry is no longer in the library");
   const head = `# The work the passage was read in\n\n${headingOf(item, 1)}`;
   // The parser loads on demand, as Ask Full Papers' does.
-  const [{ extractFullText, extractPageSpan }, bytes] = await Promise.all([
+  const [{ extractFullText, extractPageSpan, sentPages }, bytes] = await Promise.all([
     import("../pdfText"),
     invoke<ArrayBuffer>("download_attachment_file", { attKey: part.attKey }),
   ]);
   const whole = part.kind === "full" && part.from === 1 && part.to <= FULL_PAGES;
-  const { text, truncated } = whole ? await extractFullText(bytes) : await extractPageSpan(bytes, part.from, part.to);
+  const read = whole ? await extractFullText(bytes, TEXT_CAPS) : await extractPageSpan(bytes, part.from, part.to, TEXT_CAPS.chars);
+  // Cut by the caps, it says which pages it has — to the model, and to
+  // the window's foot (the part's `sent`).
+  const sent = read.truncated ? `only ${sentPages(read)}` : undefined;
   const notes = [
     whole ? "" : `\n- Only part of this work is included: ${part.label}`,
-    truncated ? "\n- Note: long text, cut short below" : "",
+    sent ? `\n- Note: the text below is cut short; ${sent} are included` : "",
   ].join("");
+  const { text } = read;
   const body = text.trim() ? `## The PDF's text\n\n${text}` : "_The PDF yielded no text (it is probably a scan)._";
-  return `${head}${notes}\n\n${body}\n`;
+  return { context: `${head}${notes}\n\n${body}\n`, sent };
 }

@@ -1,0 +1,64 @@
+/* The header's New Window menu (WindowMenu.tsx): Duplicate and Fresh,
+   then a search of the library's PDFs, one picked opening in a window
+   of its own. The field is the Highlights tab's (tabs.css, .hl-search). */
+.window-search {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 4px 0 2px;
+}
+.window-search .window-search-field {
+  margin: 0;
+}
+.window-search-results {
+  display: flex;
+  flex-direction: column;
+  max-height: min(50vh, 380px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.window-search-hit {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  width: 100%;
+  padding: 7px 8px;
+  border-radius: 5px;
+  text-align: left;
+  color: var(--text-dim);
+}
+.window-search-hit.current {
+  background: var(--panel-alt);
+  color: var(--text);
+}
+.window-search-hit svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+.window-search-text {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+.window-search-title {
+  color: var(--text);
+  font-size: calc(12.5px * var(--font-scale));
+  line-height: 1.35;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.window-search-by {
+  font-size: calc(11px * var(--font-scale));
+  color: var(--text-dim);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.window-search-none {
+  padding: 8px;
+  font-size: calc(12px * var(--font-scale));
+  color: var(--text-dim);
+}

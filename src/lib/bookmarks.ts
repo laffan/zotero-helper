@@ -13,6 +13,7 @@ import type { Annotation } from "./highlights";
 import { appLog } from "./store";
 import { invoke, isTauri } from "./tauri";
 import type { ZItem } from "./types";
+import { shareDisk } from "./windows/channel";
 
 export interface Bookmark {
   id: string;
@@ -36,14 +37,17 @@ export const BOOKMARK_FILTER = "bookmark";
 export const useBookmarks = create<{ list: Bookmark[] }>(() => ({ list: [] }));
 
 let saveTimer = 0;
+// The other windows read them again once written (lib/windows/).
+const written = shareDisk("bookmarks", () => loadBookmarks(), () => saveTimer !== 0);
 
 function save(): void {
   window.clearTimeout(saveTimer);
   saveTimer = window.setTimeout(() => {
+    saveTimer = 0;
     if (!isTauri) return;
-    invoke("save_bookmarks", { bookmarks: useBookmarks.getState().list }).catch((e) =>
-      appLog("error", `Saving bookmarks failed: ${e}`),
-    );
+    invoke("save_bookmarks", { bookmarks: useBookmarks.getState().list })
+      .then(written)
+      .catch((e) => appLog("error", `Saving bookmarks failed: ${e}`));
   }, 300);
 }
 

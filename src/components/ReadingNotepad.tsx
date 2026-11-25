@@ -29,6 +29,7 @@
 // (`spareFromSentence`). One pad per
 // PDF (src/notepad/model.ts), the same one the notes pane can show.
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { beginPaneResize } from "../lib/dragGesture";
 import { useStore } from "../lib/store";
 import { spareFromSentence } from "../pdfviewer/sentenceMark";
 import { CloseIcon } from "./Icons";
@@ -390,10 +391,12 @@ export function ReadingNotepad({ attKey }: { attKey: string }) {
             title="Drag to size the notepad"
             onPointerDown={(e) => {
               const w0 = dock.width;
+              // The pages beside it are laid out once it is let go.
+              const resized = beginPaneResize();
               follow(
                 e,
                 (dx) => setDock({ side, width: clampWidth(side === "left" ? w0 + dx : w0 - dx) }),
-                () => {},
+                () => resized(),
               );
             }}
           />

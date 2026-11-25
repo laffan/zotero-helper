@@ -63,13 +63,20 @@ interface Flow {
 
 export function createMapWrap(host: HTMLElement, layer: HTMLElement) {
   const watched = new Set<HTMLElement>();
-  const resize = new ResizeObserver(() => relayout());
+  /** The canvas's height at the last layout. */
+  let laidH = 0;
+  // An item's size, or the canvas's height: only its width changing (a
+  // pane's edge dragged) leaves the stacks as they are.
+  const resize = new ResizeObserver((entries) => {
+    if (entries.some((en) => en.target !== host) || host.clientHeight !== laidH) relayout();
+  });
   resize.observe(host);
 
   function relayout(): void {
     const H = host.clientHeight;
     // Folded away: nothing to fit, and the last layout stands.
     if (!H) return;
+    laidH = H;
     for (const el of watched) {
       if (!el.isConnected) {
         resize.unobserve(el);

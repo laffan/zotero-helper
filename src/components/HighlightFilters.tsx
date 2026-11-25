@@ -7,12 +7,15 @@
 // colour (or, on the only one picked, all again); ⌘-click (Ctrl
 // elsewhere) adds or removes one, as in a file list. The PDFs' bookmarks
 // have an entry of their own after the colours. The list hides what the
-// filter leaves out; the map dims it.
-import { useMemo } from "react";
+// filter leaves out; the map dims it, and its search goes through the
+// dimmed cards too. The search field (HighlightSearch) is both's, drawn
+// as the PDF's own find is (PdfSearchBox.tsx): a magnifier at its left,
+// an ✕ in its place while there is something to clear.
+import { useMemo, useRef } from "react";
 import { BOOKMARK_FILTER, isBookmark } from "../lib/bookmarks";
 import { colorLetter, colorsOf, type Annotation } from "../lib/highlights";
 import { usePdfUi } from "../lib/readerUi";
-import { BookmarkIcon } from "./Icons";
+import { BookmarkIcon, CloseIcon, SearchIcon } from "./Icons";
 
 const NO_COLORS: string[] = [];
 
@@ -97,4 +100,56 @@ export function Marked({ text, q }: { text: string; q: string }) {
   }
   parts.push(text.slice(last));
   return <>{parts}</>;
+}
+
+/** The search field of the list and the map: the magnifier at its left,
+ *  or, with a query, the ✕ that clears it (as does Escape). `onKeyDown`
+ *  is the map's Enter, to go from match to match. */
+export function HighlightSearch({
+  value,
+  onChange,
+  placeholder,
+  onKeyDown,
+}: {
+  value: string;
+  onChange: (q: string) => void;
+  placeholder: string;
+  onKeyDown?: (e: React.KeyboardEvent<HTMLInputElement>) => void;
+}) {
+  const input = useRef<HTMLInputElement>(null);
+  const clear = () => {
+    onChange("");
+    input.current?.focus();
+  };
+  return (
+    <div className="hl-search">
+      {value ? (
+        <button className="icon-btn hl-search-clear" onClick={clear} title="Clear the search" aria-label="Clear the search">
+          <CloseIcon size={13} />
+        </button>
+      ) : (
+        <span className="hl-search-glyph" aria-hidden="true">
+          <SearchIcon />
+        </span>
+      )}
+      <input
+        ref={input}
+        type="text"
+        placeholder={placeholder}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        onKeyDown={(e) => {
+          // Spent here while there is a query to clear; after that,
+          // Escape leaves the field (the shortcuts' dispatch).
+          if (e.key === "Escape" && value) {
+            e.preventDefault();
+            clear();
+            return;
+          }
+          onKeyDown?.(e);
+        }}
+        aria-label={placeholder.replace(/…$/, "")}
+      />
+    </div>
+  );
 }

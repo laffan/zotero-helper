@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { useShallow } from "zustand/react/shallow";
 import { bootstrap } from "./lib/actions";
 import { aiConnected } from "./lib/ai/models";
 import { trackPointerDrag } from "./lib/dragGesture";
@@ -34,7 +35,16 @@ const RESIZER_PX = 5;
 const TABLET_PX = 900;
 
 function PaneResizer({ side }: { side: "left" | "right" }) {
-  const { leftWidth, rightWidth, notesWidth, setPaneSizes, setNotesWidth, setNotesWidthNarrow } = useStore();
+  const { leftWidth, rightWidth, notesWidth, setPaneSizes, setNotesWidth, setNotesWidthNarrow } = useStore(
+    useShallow((s) => ({
+      leftWidth: s.leftWidth,
+      rightWidth: s.rightWidth,
+      notesWidth: s.notesWidth,
+      setPaneSizes: s.setPaneSizes,
+      setNotesWidth: s.setNotesWidth,
+      setNotesWidthNarrow: s.setNotesWidthNarrow,
+    })),
+  );
   const reading = useStore((s) => s.reading);
 
   const start = (e: React.PointerEvent) => {
@@ -57,7 +67,7 @@ function PaneResizer({ side }: { side: "left" | "right" }) {
       } else {
         setPaneSizes({ rightWidth: Math.min(520, Math.max(200, startW - delta)) });
       }
-    });
+    }, undefined, { resizesPanes: true });
   };
 
   // The notes' edge stays on a tablet-sized window (600–900px — the
@@ -72,7 +82,14 @@ export default function App() {
   const setModal = useStore((s) => s.setModal);
   const selectedCollection = useStore((s) => s.selectedCollection);
   const reading = useStore((s) => s.reading);
-  const { leftWidth, rightWidth, notesWidth, notesWidthNarrow } = useStore();
+  const { leftWidth, rightWidth, notesWidth, notesWidthNarrow } = useStore(
+    useShallow((s) => ({
+      leftWidth: s.leftWidth,
+      rightWidth: s.rightWidth,
+      notesWidth: s.notesWidth,
+      notesWidthNarrow: s.notesWidthNarrow,
+    })),
+  );
   const sidebarHidden = useStore((s) => s.sidebarHidden);
   const metaHidden = useStore((s) => s.metaHidden);
   // Reading mode: the open PDF fills the window (readingmode.css).

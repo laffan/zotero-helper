@@ -453,6 +453,17 @@
 .ask-gaps .tool-btn {
   border-color: var(--border);
 }
+/* The works the text caps cut, and the pages of each that go. */
+.ask-cut-list {
+  margin: 0;
+  padding-left: 18px;
+  font-size: calc(12px * var(--font-scale));
+  line-height: 1.5;
+}
+.ask-gaps .hint,
+.ask-gaps .ask-cost-warn {
+  margin: 0;
+}
 .ask-cost-actions {
   display: flex;
   justify-content: flex-end;

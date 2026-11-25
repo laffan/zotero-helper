@@ -25,8 +25,15 @@
       events on natively rather than as touch-compatibility events.
     - UIApplicationSceneManifest, naming Tao's scene delegate: without
       it Tao starts on the legacy application-delegate path, and the
-      window is not created in its scene's orientation. One window
-      only. (TaoSceneDelegate is tao's own class, 0.37 and later.)
+      window is not created in its scene's orientation. (TaoSceneDelegate
+      is tao's own class, 0.37 and later.)
+
+    The manifest also lets the app have several windows (scenes): the
+    header's New Window menu, and iPadOS's own ways to make one (the app
+    icon's menu, App Exposé). tauri-plugin-scenes builds a window for
+    each scene the system asks for, sends links to a window already
+    open, and declines a connected monitor's session.
+    See "Multiple windows" in README_TECHNICAL.md.
 
     Both are read from the built app's Info.plist: a hot reload does not
     pick them up, the app has to be rebuilt and reinstalled.
@@ -52,7 +59,7 @@
   <key>UIApplicationSceneManifest</key>
   <dict>
     <key>UIApplicationSupportsMultipleScenes</key>
-    <false/>
+    <true/>
     <key>UISceneConfigurations</key>
     <dict>
       <key>UIWindowSceneSessionRoleApplication</key>

@@ -4,6 +4,7 @@ import App from "./App";
 import { initAppearance } from "./lib/appearance";
 import { initNightVision } from "./lib/nightVision";
 import { askStatusBar } from "./lib/statusBar";
+import { applyWindowBoot } from "./lib/windows";
 import "./styles/index.css";
 
 // iPadOS reports a desktop-class ("Macintosh") user agent — multitouch
@@ -25,6 +26,10 @@ askStatusBar();
 // viewport's user-scalable=no covers the rest.
 document.addEventListener("gesturestart", (e) => e.preventDefault());
 
+// Another window's first moments: what it was opened on (lib/windows/),
+// set before the first render.
+const boot = applyWindowBoot();
+
 initAppearance();
 initNightVision();
 
@@ -33,3 +38,4 @@ ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
     <App />
   </React.StrictMode>,
 );
+boot.afterBoot?.();

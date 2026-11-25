@@ -17,7 +17,8 @@
 // screen lasts while the notes are open.
 import { useEffect, useRef, useState } from "react";
 import { isStandaloneAttachment, pdfAttachmentOf } from "../lib/collections";
-import { noteAttachmentOf, openNote } from "../lib/notes";
+import { localNote, noteAttachmentOf, openNote } from "../lib/notes";
+import { hear } from "../lib/windows/channel";
 import { useStore } from "../lib/store";
 import type { NoteMeta, ZItem } from "../lib/types";
 import { FullHeightIcon, FullScreenIcon, Spinner } from "./Icons";
@@ -143,14 +144,29 @@ export function NotesPanel({ item }: { item: ZItem }) {
   const pdfAtt = pdfAttachmentOf(items, item.key);
   const standalone = isStandaloneAttachment(item);
 
+  // Read again when another window saved these notes (lib/windows/) —
+  // unless they are being written here, which will be saved in turn.
+  const [reread, setReread] = useState({ key: item.key, n: 0 });
+  const rev = reread.key === item.key ? reread.n : 0;
+  useEffect(
+    () =>
+      hear<{ itemKey: string }>("note", (m) => {
+        const typing = panelRef.current?.querySelector(".notes-split-top")?.contains(document.activeElement);
+        if (m.itemKey !== item.key || typing) return;
+        setReread((r) => ({ key: item.key, n: (r.key === item.key ? r.n : 0) + 1 }));
+      }),
+    [item.key],
+  );
+
   // Load once per entry. Not on library changes: our own pushes update
-  // the attachment, and re-reading mid-edit would be pointless.
+  // the attachment, and re-reading mid-edit would be pointless. Read
+  // again (from this device only) when another window saved them.
   useEffect(() => {
     if (standalone) return;
     let stale = false;
-    setNote(null);
+    if (!rev) setNote(null);
     setError(null);
-    openNote(item.key, remoteKey.current)
+    (rev ? localNote(item.key) : openNote(item.key, remoteKey.current))
       .then((n) => !stale && setNote(n ?? { text: "", meta: null }))
       .catch((e) => {
         if (stale) return;
@@ -161,7 +177,7 @@ export function NotesPanel({ item }: { item: ZItem }) {
     return () => {
       stale = true;
     };
-  }, [item.key, standalone]);
+  }, [item.key, standalone, rev]);
 
   if (standalone) {
     return (
@@ -191,7 +207,7 @@ export function NotesPanel({ item }: { item: ZItem }) {
         style={shared ? { flex: `0 0 ${split.ratio * 100}%` } : undefined}
       >
         <NotesEditor
-          key={item.key}
+          key={`${item.key}:${rev}`}
           itemKey={item.key}
           initialText={note.text}
           initialMeta={note.meta}

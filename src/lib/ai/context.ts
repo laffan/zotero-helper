@@ -33,9 +33,19 @@ import type {
 } from "../types";
 import { label } from "./index";
 
+/** The caps on a work's text, a guard against a book-length PDF quietly
+ *  turning one question into a very expensive one: 120,000 characters
+ *  of parsed text is roughly 30K tokens. A work they cut says so, and
+ *  which pages went (`ChatSource.cut`); the cost popup can lift them,
+ *  and the explainer keeps them. A part of a PDF (Ask PDF's section or
+ *  pages, an explainer's) is held to the characters alone. */
+export const TEXT_CAPS = { pages: 80, chars: 120_000 };
+
 interface Gathered {
   context: string;
   missing: string[];
+  /** Works the caps cut, and the pages of each that went. */
+  cut: { title: string; sent: string }[];
 }
 
 /** Metadata header every work gets, whichever depth was asked for (and
@@ -71,18 +81,25 @@ function gatherAbstracts(items: ZItem[]): Gathered {
   return {
     context: `# Works (abstracts)\n\n${sections.join("\n\n---\n\n")}\n`,
     missing,
+    cut: [],
   };
 }
 
 /** What a chat's full text covers, for the lines under its title and
- *  the cost popup: "full text", or the part of the PDF asked about. */
-export function depthLabel(source: Pick<ChatSource, "depth" | "pages">): string {
+ *  the cost popup: "full text", or the part of the PDF asked about —
+ *  and, where the caps cut it, how much went: "full text, pp. 1–37 of
+ *  212 sent", or for several works how many were cut. */
+export function depthLabel(source: Pick<ChatSource, "depth" | "pages" | "cut" | "itemKeys">): string {
   if (source.depth !== "full") return "abstracts";
-  return source.pages ? source.pages.label : "full text";
+  const base = source.pages ? source.pages.label : "full text";
+  const cut = source.cut ?? [];
+  if (!cut.length) return base;
+  return source.itemKeys.length === 1 ? `${base}, ${cut[0].sent} sent` : `${base}, ${cut.length} cut short`;
 }
 
-/** `pages`: only that part of the PDF (Ask PDF, one work). */
-async function gatherFullText(items: ZItem[], pages?: PageSpan): Promise<Gathered> {
+/** `pages`: only that part of the PDF (Ask PDF, one work). `uncapped`:
+ *  every page, past the caps (lib/pdfText.ts). */
+async function gatherFullText(items: ZItem[], pages?: PageSpan, uncapped = false): Promise<Gathered> {
   const store = useStore.getState();
   store.startUiTasks(
     "Read papers",
@@ -96,6 +113,7 @@ async function gatherFullText(items: ZItem[], pages?: PageSpan): Promise<Gathere
 
   const missing: string[] = [];
   const sections: string[] = [];
+  const cut: Gathered["cut"] = [];
   try {
     for (const [i, item] of items.entries()) {
       const head = heading(item, i + 1);
@@ -114,13 +132,14 @@ async function gatherFullText(items: ZItem[], pages?: PageSpan): Promise<Gathere
       }
       try {
         appLog("info", `Ask: reading the PDF of “${label(item)}”…`);
-        const [{ extractFullText, extractPageSpan }, bytes] = await Promise.all([
+        const [{ extractFullText, extractPageSpan, sentPages }, bytes] = await Promise.all([
           import("../pdfText"),
           invoke<ArrayBuffer>("download_attachment_file", { attKey: att.key }),
         ]);
-        const { text, truncated } = pages
-          ? await extractPageSpan(bytes, pages.from, pages.to)
-          : await extractFullText(bytes);
+        const read = pages
+          ? await extractPageSpan(bytes, pages.from, pages.to, uncapped ? null : TEXT_CAPS.chars)
+          : await extractFullText(bytes, uncapped ? null : TEXT_CAPS);
+        const { text, truncated } = read;
         if (!text.trim()) {
           missing.push(itemTitle(item));
           sections.push(
@@ -130,12 +149,16 @@ async function gatherFullText(items: ZItem[], pages?: PageSpan): Promise<Gathere
           continue;
         }
         // A part of the work says which part, so the model doesn't take
-        // it for the whole.
+        // it for the whole — and so does a work the caps cut, saying
+        // exactly which pages it has.
         const part = pages ? `\n- Only part of this work is included: ${pages.label}` : "";
-        sections.push(
-          `${head}${part}${truncated ? "\n- Note: long work, text below is cut short" : ""}\n\n${text}`,
-        );
-        task(item.key, "done", `${Math.round(text.length / 1000)}K chars`);
+        const sent = sentPages(read);
+        if (truncated) cut.push({ title: itemTitle(item), sent });
+        const note = truncated
+          ? `\n- Note: the text below is cut short; only ${sent} are included`
+          : "";
+        sections.push(`${head}${part}${note}\n\n${text}`);
+        task(item.key, "done", truncated ? `${sent}, cut short` : `${Math.round(text.length / 1000)}K chars`);
       } catch (e) {
         appLog("warn", `Ask: could not read “${label(item)}” (${e})`);
         missing.push(itemTitle(item));
@@ -149,6 +172,7 @@ async function gatherFullText(items: ZItem[], pages?: PageSpan): Promise<Gathere
   return {
     context: `# Works (full text)\n\n${sections.join("\n\n---\n\n")}\n`,
     missing,
+    cut,
   };
 }
 
@@ -241,6 +265,7 @@ export async function prepareAsk(
   items: ZItem[],
   depth: AskDepth,
   pages?: PageSpan,
+  uncapped = false,
 ): Promise<PendingAsk> {
   // A part of a PDF is one work's; anywhere else it means nothing.
   if (depth !== "full" || items.length !== 1) pages = undefined;
@@ -251,8 +276,8 @@ export async function prepareAsk(
     "info",
     `Ask ${pages ? `PDF (${pages.label})` : depth === "full" ? "Full Papers" : "Abstracts"}: gathering ${items.length} work(s)…`,
   );
-  const { context, missing } =
-    depth === "full" ? await gatherFullText(items, pages) : gatherAbstracts(items);
+  const { context, missing, cut } =
+    depth === "full" ? await gatherFullText(items, pages, uncapped) : gatherAbstracts(items);
 
   const count = await invoke<{
     tokens: number;
@@ -276,6 +301,8 @@ export async function prepareAsk(
       depth,
       ...(pages ? { pages } : {}),
       missing,
+      ...(cut.length ? { cut } : {}),
+      ...(uncapped && depth === "full" ? { uncapped } : {}),
     },
     context,
     tokens: count.tokens,

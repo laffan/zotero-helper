@@ -1,11 +1,12 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Capabilities for the main window and PDF capture windows",
-  "windows": ["main", "capture-*"],
+  "description": "Capabilities for the app's windows (main, those opened from New Window or by the system: window-*) and PDF capture windows",
+  "windows": ["main", "window-*", "capture-*"],
   "permissions": [
     "core:default",
     "core:window:allow-close",
+    "core:webview:allow-create-webview-window",
     "dialog:default",
     "opener:default",
     "clipboard-manager:allow-write-text",

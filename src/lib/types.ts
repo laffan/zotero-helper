@@ -243,6 +243,11 @@ export interface ChatSource {
   pages?: PageSpan;
   /** Works that contributed nothing (no PDF, no abstract). */
   missing: string[];
+  /** Works whose text was cut by the caps (lib/pdfText.ts), and which
+   *  of their pages went: "pp. 1–37 of 212". */
+  cut?: { title: string; sent: string }[];
+  /** The caps were lifted: every page went (the cost popup's "Send all"). */
+  uncapped?: boolean;
 }
 
 export interface ChatUsage {
@@ -320,6 +325,9 @@ export interface ContextPart {
   /** "the full text", "section “Methods”, pp. 4–9", "the visible pages,
    *  pp. 12–13". */
   label: string;
+  /** Set once read, when the caps cut it: the pages that went, "only
+   *  pp. 1–37 of 212". Not part of what the part is (partKey). */
+  sent?: string;
 }
 
 /** A clarification: a passage selected in an answer and asked about,

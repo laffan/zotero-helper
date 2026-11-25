@@ -3,7 +3,8 @@
 A companion app for Zotero, aimed at things the iPadOS Zotero app can't do.
 It imports DOIs, ISBNs, arXiv IDs and URLs together with their PDFs, shows
 your library with editable metadata, and provides a PDF reader with
-Zotero-compatible highlights, Apple Pencil annotations and post-its. Optional AI helpers
+Zotero-compatible highlights, Apple Pencil annotations and post-its, in as
+many windows as you like. Optional AI helpers
 (Anthropic or OpenAI, with your own key) can tidy metadata and answer questions
 about papers. Designed for iPadOS (26 or later); also runs on macOS, Windows and Linux.
 

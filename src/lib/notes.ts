@@ -11,6 +11,7 @@ import { scheduleTrayClear } from "../components/TaskTray";
 import { itemsForCollection, itemTitle, pdfAttachmentOf, REAL_KEY } from "./collections";
 import { appLog, useStore, type MetaTab } from "./store";
 import { invoke, isTauri } from "./tauri";
+import { announce } from "./windows/channel";
 import type {
   CachedPdf,
   LocalNote,
@@ -67,8 +68,17 @@ export async function openNote(
   return local;
 }
 
+/** Save the entry's notes on this device — and tell the other windows,
+ *  which show them again where they aren't being written (NotesPanel). */
 export async function saveNote(itemKey: string, text: string): Promise<NoteMeta> {
-  return invoke<NoteMeta>("notes_save", { itemKey, text });
+  const meta = await invoke<NoteMeta>("notes_save", { itemKey, text });
+  announce("note", { itemKey });
+  return meta;
+}
+
+/** The notes as this device has them, without asking Zotero. */
+export function localNote(itemKey: string): Promise<LocalNote | null> {
+  return invoke<LocalNote | null>("notes_load", { itemKey });
 }
 
 /** Push one note now. Resolves to its new bookkeeping. */

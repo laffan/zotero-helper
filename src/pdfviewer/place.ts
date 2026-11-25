@@ -43,7 +43,13 @@
 // again after a short debounce, never while the app is hidden — the
 // relayout waits for it to come back — and the paged view's set is put
 // back, centred, since the browser may settle on the neighbouring set
-// and WebKit may not snap again at all.
+// and WebKit may not snap again at all. Nor while a pane's edge is being
+// dragged (lib/dragGesture.ts): the pages keep their size, those coming
+// into view are drawn, and they are laid out once, when it is let go.
+// Laid out at each pause in a quick drag, every page in view was drawn
+// again at every size on the way, which an iPad's web view didn't
+// survive.
+import { onPaneResized, paneResizing } from "../lib/dragGesture";
 import { restoreAnchor, viewAnchor, type ViewAnchor } from "./anchor";
 import type { PageRecord } from "./types";
 import type { FoldAnchor, SavedView } from "./viewState";
@@ -71,6 +77,9 @@ export interface PlaceEnv {
   log?: (msg: string) => void;
   /** The view's size changed: cached page geometry is stale. */
   geometryChanged: () => void;
+  /** The view's size changed but the pages haven't (a pane's edge being
+   *  dragged): draw what has come into view. */
+  viewChanged: () => void;
   /** The pages are fitted to the view, so a resize lays them out again. */
   fitsView: () => boolean;
   /** Lay the pages out again; false when the view had no room for them
@@ -147,7 +156,8 @@ export function createPlaceKeeper(env: PlaceEnv) {
   /** The reader is holding the pages: what they do is the place. */
   const holding = () => !hidden() && (touches > 0 || pressed.size > 0);
 
-  const disturbed = () => !holding() && (hidden() || blurred || waiting || performance.now() < calmAt);
+  const disturbed = () =>
+    !holding() && (hidden() || blurred || waiting || paneResizing() || performance.now() < calmAt);
   const intend = (ms = INTENT_MS) => {
     intentUntil = Math.max(intentUntil, performance.now() + ms);
   };
@@ -216,7 +226,8 @@ export function createPlaceKeeper(env: PlaceEnv) {
   /** The disturbance is over: put the view back on the place. */
   function settle(): void {
     settleTimer = 0;
-    if (hidden() || blurred) return; // coming back disturbs again
+    // Coming back disturbs again, and so does a pane's edge let go.
+    if (hidden() || blurred || paneResizing()) return;
     if (disturbed()) return disturb(0);
     if (!place || !hasPages()) return;
     putBack("a disturbance");
@@ -307,11 +318,32 @@ export function createPlaceKeeper(env: PlaceEnv) {
     if (env.horizontal() && area.scrollTop) area.scrollTop = 0;
     if (env.isPaged() && set) env.goToPage(set);
   };
+  /** A resize put off until the pane's edge being dragged is let go. */
+  let held = false;
   const observer = new ResizeObserver(() => {
     if (!hasPages()) return;
     if (hidden()) env.log?.(`resized while hidden: ${area.clientWidth}×${area.clientHeight}`);
     disturb(RESIZE_SETTLE_MS);
     lead ??= env.shownSet();
+    if (paneResizing()) {
+      held = true;
+      if (timer) clearTimeout(timer);
+      timer = null;
+      env.viewChanged();
+      return;
+    }
+    resized();
+  });
+  observer.observe(area);
+  const offPaneResized = onPaneResized(() => {
+    if (!held) return;
+    held = false;
+    if (!hasPages()) return;
+    disturb(RESIZE_SETTLE_MS);
+    resized();
+  });
+
+  function resized(): void {
     // A container resize can re-wrap rows, so cached geometry is stale
     // either way; fit-mode geometry follows behind a short debounce.
     env.geometryChanged();
@@ -325,8 +357,7 @@ export function createPlaceKeeper(env: PlaceEnv) {
       if (hidden()) waiting = true;
       else run();
     }, 80);
-  });
-  observer.observe(area);
+  }
 
   // --- the background ----------------------------------------------------------
   const onVisibility = () => {
@@ -368,6 +399,7 @@ export function createPlaceKeeper(env: PlaceEnv) {
     heldAt: (): ViewAnchor | null => (disturbed() && place && "at" in place ? place.at : null),
     destroy: () => {
       observer.disconnect();
+      offPaneResized();
       document.removeEventListener("visibilitychange", onVisibility);
       for (const t of inputs) window.removeEventListener(t, onInput, { capture: true });
       for (const t of touchEnds) window.removeEventListener(t, onTouch, { capture: true });

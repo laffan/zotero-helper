@@ -41,7 +41,7 @@ export function Terminal() {
     trackPointerDrag(e, (ev) => {
       const h = Math.min(500, Math.max(80, startH + (startY - ev.clientY)));
       setPaneSizes({ termHeight: h });
-    });
+    }, undefined, { resizesPanes: true });
   };
 
   return (

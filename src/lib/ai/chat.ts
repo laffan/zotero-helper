@@ -23,6 +23,7 @@ import { getAbstracts } from "./index";
 import { itemsForAsk, prepareAsk } from "./context";
 import { noteSent } from "./contextCache";
 import { usageCost } from "./models";
+import { shareDisk } from "../windows/channel";
 
 interface ChatReply {
   text: string;
@@ -110,7 +111,7 @@ export async function refillAsk(ask: PendingAsk): Promise<void> {
       await getAbstracts(fixable);
     }
     const items = itemsForAsk(ask.target);
-    const next = await prepareAsk(ask.target, items, ask.source.depth, ask.source.pages);
+    const next = await prepareAsk(ask.target, items, ask.source.depth, ask.source.pages, ask.source.uncapped);
     // The user may have closed the popup while this ran; don't reopen
     // something they dismissed.
     if (useStore.getState().modal?.kind === "askCost") {
@@ -118,6 +119,22 @@ export async function refillAsk(ask: PendingAsk): Promise<void> {
     }
   } catch (e) {
     appLog("error", `Retrieval failed: ${e}`);
+  } finally {
+    useStore.getState().setAskPreparing(false);
+  }
+}
+
+/** The cost popup's "Send all": read the works again past the caps
+ *  (lib/pdfText.ts), every page of each, and re-price. */
+export async function uncapAsk(ask: PendingAsk): Promise<void> {
+  const store = useStore.getState();
+  if (store.askPreparing) return;
+  store.setAskPreparing(true);
+  try {
+    const next = await prepareAsk(ask.target, itemsForAsk(ask.target), ask.source.depth, ask.source.pages, true);
+    if (useStore.getState().modal?.kind === "askCost") useStore.getState().setPendingAsk(next);
+  } catch (e) {
+    appLog("error", `Reading the whole text failed: ${e}`);
   } finally {
     useStore.getState().setAskPreparing(false);
   }
@@ -319,6 +336,9 @@ export async function loadChats(): Promise<void> {
 // left hanging, or a caller's `finally` would never run.
 let saveTimer: ReturnType<typeof setTimeout> | null = null;
 let awaitingSave: (() => void)[] = [];
+// The other windows read them again once written (lib/windows/) — the
+// list from the disk, since a full-paper chat is too big to send.
+const written = shareDisk("chats", () => loadChats(), () => saveTimer !== null);
 
 export function persistChats(): Promise<void> {
   return new Promise((resolve) => {
@@ -329,6 +349,7 @@ export function persistChats(): Promise<void> {
       const settle = awaitingSave;
       awaitingSave = [];
       invoke("save_chats", { chats: useStore.getState().chats })
+        .then(written)
         .catch((e) => appLog("warn", `Could not save questions: ${e}`))
         .finally(() => settle.forEach((r) => r()));
     }, 400);

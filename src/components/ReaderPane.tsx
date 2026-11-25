@@ -117,6 +117,13 @@ export function openReaderAt(
   else void readItem(itemKey, tab);
 }
 
+/** Write the open PDF's place and view out now (they are kept after a
+ *  pause) — for Duplicate Window, which copies them (lib/windows/). */
+export function flushReaderView(): void {
+  active?.viewer.flushView();
+  flushSavedPage();
+}
+
 /** A place in the open PDF — an outline entry's: a 0-based page and a
  *  height on it in PDF units (null for its top). */
 export function goToReaderPosition(pageIndex: number, top: number | null): void {

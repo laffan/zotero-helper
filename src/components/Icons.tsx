@@ -106,6 +106,17 @@ export const NightVisionIcon = (p: IconProps = {}) =>
     p,
   );
 
+// New window (WindowMenu.tsx): a window over another, a + in the front.
+export const NewWindowIcon = (p: IconProps = {}) =>
+  svg(
+    <>
+      <rect x="1.5" y="4.5" width="10" height="9" rx="1.5" />
+      <path d="M4.5 4.5V3A1.5 1.5 0 0 1 6 1.5h7A1.5 1.5 0 0 1 14.5 3v6a1.5 1.5 0 0 1-1.5 1.5h-1.5" />
+      <path d="M6.5 7v4M4.5 9h4" />
+    </>,
+    p,
+  );
+
 export const TerminalIcon = (p: IconProps = {}) =>
   svg(
     <>

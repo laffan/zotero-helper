@@ -25,6 +25,7 @@ import { create } from "zustand";
 import type { Section } from "./outline";
 import { appLog } from "./store";
 import { invoke, isTauri } from "./tauri";
+import { shareDisk } from "./windows/channel";
 
 export interface Divider {
   id: string;
@@ -46,14 +47,17 @@ export interface Divider {
 export const useDividers = create<{ list: Divider[] }>(() => ({ list: [] }));
 
 let saveTimer = 0;
+// The other windows read them again once written (lib/windows/).
+const written = shareDisk("sections", () => loadDividers(), () => saveTimer !== 0);
 
 function save(): void {
   window.clearTimeout(saveTimer);
   saveTimer = window.setTimeout(() => {
+    saveTimer = 0;
     if (!isTauri) return;
-    invoke("save_dividers", { dividers: useDividers.getState().list }).catch((e) =>
-      appLog("error", `Saving sections failed: ${e}`),
-    );
+    invoke("save_dividers", { dividers: useDividers.getState().list })
+      .then(written)
+      .catch((e) => appLog("error", `Saving sections failed: ${e}`));
   }, 300);
 }
 

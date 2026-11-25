@@ -591,6 +591,7 @@ export function createPdfViewer(container: HTMLElement, opts: PdfViewerOptions =
     folds: foldLayer,
     log: opts.log,
     geometryChanged: () => (renderer.invalidateGeometry(), renderer.scheduleUpdate()),
+    viewChanged: () => renderer.scheduleUpdate(),
     fitsView: () => layoutMode !== "fixed",
     relayout: relayoutPages,
     shownSet: () => shownLead,

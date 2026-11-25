@@ -7,8 +7,8 @@
 // entries have no abstract makes for a poor conversation, and the app
 // already knows how to go and get them — so it offers, and re-prices
 // once it has, since retrieval changes the token count.
-import { confirmAsk, refillAsk } from "../lib/ai/chat";
-import { depthLabel } from "../lib/ai/context";
+import { confirmAsk, refillAsk, uncapAsk } from "../lib/ai/chat";
+import { depthLabel, TEXT_CAPS } from "../lib/ai/context";
 import {
   cachedFollowUpCost,
   estimateCost,
@@ -58,6 +58,46 @@ function Gaps({ ask, busy }: { ask: PendingAsk; busy: boolean }) {
               : `Get the ${fixable.length} missing abstract${fixable.length === 1 ? "" : "s"}`}
         </button>
       )}
+    </div>
+  );
+}
+
+/** Which works the caps cut, and the pages of each that go — said
+ *  plainly, with the way to send every page instead. */
+function Coverage({ ask, busy }: { ask: PendingAsk; busy: boolean }) {
+  if (ask.source.depth !== "full") return null;
+  const cut = ask.source.cut ?? [];
+  if (!cut.length) {
+    return ask.source.uncapped ? <p className="hint">Every page of each work is included.</p> : null;
+  }
+  const one = ask.source.itemKeys.length === 1;
+  const caps = ask.source.pages
+    ? `${TEXT_CAPS.chars.toLocaleString()} characters`
+    : `${TEXT_CAPS.pages} pages and ${TEXT_CAPS.chars.toLocaleString()} characters`;
+  return (
+    <div className="ask-gaps">
+      <p className="ask-cost-warn">
+        {one ? "Only part of this work goes to the model" : `Only part of ${cut.length} of these works goes to the model`}
+        {one ? `: ${cut[0].sent}.` : ":"}
+      </p>
+      {!one && (
+        <ul className="ask-cut-list">
+          {cut.slice(0, 5).map((c, i) => (
+            <li key={i}>
+              {c.title}: {c.sent}
+            </li>
+          ))}
+          {cut.length > 5 && <li>+{cut.length - 5} more</li>}
+        </ul>
+      )}
+      <p className="hint">
+        A work's text is capped at {caps} (about {Math.round(TEXT_CAPS.chars / 4000)}K tokens), so that a book isn't
+        sent whole by accident. The model is told where its text stops.
+      </p>
+      <button className="tool-btn" onClick={() => void uncapAsk(ask)} disabled={busy}>
+        {busy ? <Spinner size={13} /> : null}
+        {busy ? "Reading every page…" : "Send every page instead"}
+      </button>
     </div>
   );
 }
@@ -117,6 +157,8 @@ export function AskCostModal({ onClose }: { onClose: () => void }) {
             ? "Counted by the provider; the reply's length is assumed, so the totals are estimates."
             : "Token count is an approximation — this provider offers no counting endpoint."}
         </p>
+
+        <Coverage ask={ask} busy={busy} />
 
         <Gaps ask={ask} busy={busy} />
 

@@ -13,6 +13,8 @@ import { listenForPencil } from "./pencil";
 import { followReaderUi } from "./readerUi";
 import { appLog, useStore } from "./store";
 import { invoke, isTauri, on } from "./tauri";
+import { shareDisk } from "./windows/channel";
+import { startSharing } from "./windows/shared";
 import type {
   LibraryCache,
   LogLine,
@@ -37,6 +39,9 @@ export async function bootstrap(): Promise<void> {
     store.setView("settings");
     return;
   }
+
+  // This window's stores kept in step with the other windows'.
+  startSharing();
 
   // Backend → frontend event streams.
   await on<LogLine>("app-log", (line) => useStore.getState().pushLog(line));
@@ -247,8 +252,14 @@ export async function addItemsToCollection(
   return filed;
 }
 
+// The other windows read them again once saved (lib/windows/).
+const settingsSaved = shareDisk("settings", async () => {
+  useStore.getState().setSettings(await invoke<Settings>("get_settings"));
+});
+
 export async function saveSettings(settings: Settings): Promise<void> {
   await invoke("save_settings", { settings });
+  settingsSaved();
   useStore.getState().setSettings(settings);
 }
 

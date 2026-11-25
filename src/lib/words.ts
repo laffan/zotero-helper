@@ -8,6 +8,7 @@
 import { create } from "zustand";
 import { appLog } from "./store";
 import { invoke, isTauri } from "./tauri";
+import { shareDisk } from "./windows/channel";
 
 export interface WordEntry {
   id: string;
@@ -34,11 +35,16 @@ export const WORDS = "words";
 export const useWords = create<{ list: WordEntry[] }>(() => ({ list: [] }));
 
 let saveTimer = 0;
+// The other windows read them again once written (lib/windows/).
+const written = shareDisk("words", () => loadWords(), () => saveTimer !== 0);
 function save(): void {
   window.clearTimeout(saveTimer);
   saveTimer = window.setTimeout(() => {
+    saveTimer = 0;
     if (!isTauri) return;
-    invoke("save_words", { words: useWords.getState().list }).catch((e) => appLog("error", `Saving words failed: ${e}`));
+    invoke("save_words", { words: useWords.getState().list })
+      .then(written)
+      .catch((e) => appLog("error", `Saving words failed: ${e}`));
   }, 300);
 }
 

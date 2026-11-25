@@ -21,7 +21,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { removeChat } from "../lib/ai/chat";
-import { firstWords, headExplanation, isLongPassage } from "../lib/ai/explain";
+import { firstWords, headExplanation, isLongPassage, partSent } from "../lib/ai/explain";
 import { formatTokens, formatUsd, modelLabel } from "../lib/ai/models";
 import { pdfAttachmentOf } from "../lib/collections";
 import { useStore } from "../lib/store";
@@ -76,7 +76,7 @@ function Details({ chat, onClose }: { chat: Chat; onClose: () => void }) {
     [
       "Context",
       chat.context
-        ? `${chat.contextPart ? `its title and authors, and ${chat.contextPart.label}` : "the work and its PDF"} (${formatTokens(chat.contextTokens)})`
+        ? `${chat.contextPart ? `its title and authors, and ${partSent(chat.contextPart)}` : "the work and its PDF"} (${formatTokens(chat.contextTokens)})`
         : "none",
     ],
     ["From", chat.source.label],

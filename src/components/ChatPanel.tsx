@@ -129,6 +129,11 @@ export function ChatPanel({ chat }: { chat: Chat }) {
           {started(chat.createdMs)} · {turns} question{turns === 1 ? "" : "s"} · {formatTokens(chat.contextTokens)} tokens ·{" "}
           {formatUsd(chat.costUsd)} · {modelLabel(chat.model)}
         </div>
+        {(chat.source.cut?.length ?? 0) > 0 && n > 1 && (
+          <div className="chat-head-warn" title={chat.source.cut!.map((c) => `${c.title}: ${c.sent}`).join("\n")}>
+            {chat.source.cut!.length} work{chat.source.cut!.length === 1 ? " was" : "s were"} cut short
+          </div>
+        )}
         {chat.source.missing.length > 0 && (
           <div
             className="chat-head-warn"

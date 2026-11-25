@@ -33,7 +33,7 @@ import { usePdfUi, usePdfUiScroll } from "../lib/readerUi";
 import { useStore } from "../lib/store";
 import type { ZItem } from "../lib/types";
 import { DividerHeading } from "./DividerHeading";
-import { ColorSwatches, useHighlightFilter } from "./HighlightFilters";
+import { ColorSwatches, HighlightSearch, useHighlightFilter } from "./HighlightFilters";
 import { HighlightMap } from "./HighlightMap";
 import { HighlightRow, useRowHover } from "./HighlightRow";
 import { Refresh, Spinner } from "./Icons";
@@ -175,15 +175,7 @@ export function HighlightsPanel({ items, map = false }: { items: ZItem[]; map?: 
           {sync}
         </div>
       }
-      search={
-        <input
-          className="hl-search"
-          type="search"
-          placeholder="Search highlights…"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-        />
-      }
+      search={<HighlightSearch value={query} onChange={setQuery} placeholder="Search highlights…" />}
       swatches={<ColorSwatches filter={filter} />}
     >
       {visible.map((g) => (

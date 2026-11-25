@@ -2,6 +2,7 @@ mod ai;
 mod annotations;
 mod bookmarks;
 mod capture;
+mod capture_commands;
 mod chats;
 mod dividers;
 mod error;
@@ -492,103 +493,6 @@ fn open_url(app: &AppHandle, url: String) -> Result<()> {
 }
 
 // ---------------------------------------------------------------------------
-// PDF rescue browser: desktop, a child webview (capture.rs); mobile, tauri-plugin-capture-view.
-// ---------------------------------------------------------------------------
-
-#[cfg(not(desktop))]
-fn capture_plugin(app: &AppHandle) -> State<'_, tauri_plugin_capture_view::CaptureView<tauri::Wry>> {
-    app.state::<tauri_plugin_capture_view::CaptureView<tauri::Wry>>()
-}
-
-#[tauri::command]
-#[allow(clippy::too_many_arguments)]
-async fn open_capture_window(
-    app: AppHandle,
-    state: State<'_, AppState>,
-    url: String,
-    job_id: String,
-    x: f64,
-    y: f64,
-    w: f64,
-    h: f64,
-) -> Result<()> {
-    #[cfg(desktop)]
-    {
-        let tmp = state.tmp_dir();
-        capture::open_capture(&app, url, job_id, tmp, x, y, w, h)
-    }
-    #[cfg(not(desktop))]
-    {
-        let _ = state;
-        capture_plugin(&app)
-            .open(tauri_plugin_capture_view::OpenArgs { url, job_id, x, y, w, h })
-            .map_err(Error::msg)
-    }
-}
-
-#[tauri::command]
-async fn capture_set_bounds(
-    app: AppHandle,
-    job_id: String,
-    x: f64,
-    y: f64,
-    w: f64,
-    h: f64,
-) -> Result<()> {
-    #[cfg(desktop)]
-    {
-        capture::set_capture_bounds(&app, &job_id, x, y, w, h);
-        Ok(())
-    }
-    #[cfg(not(desktop))]
-    {
-        let _ = job_id;
-        capture_plugin(&app)
-            .set_bounds(tauri_plugin_capture_view::BoundsArgs { x, y, w, h })
-            .map_err(Error::msg)
-    }
-}
-
-#[tauri::command]
-async fn capture_back(app: AppHandle, job_id: String) -> Result<()> {
-    #[cfg(desktop)]
-    {
-        capture::capture_back(&app, &job_id);
-        Ok(())
-    }
-    #[cfg(not(desktop))]
-    {
-        let _ = job_id;
-        capture_plugin(&app).back().map_err(Error::msg)
-    }
-}
-
-#[tauri::command]
-async fn capture_grab(app: AppHandle, job_id: String) -> Result<()> {
-    #[cfg(desktop)]
-    return capture::capture_grab(&app, &job_id);
-    #[cfg(not(desktop))]
-    {
-        let _ = job_id;
-        capture_plugin(&app).grab().map_err(Error::msg)
-    }
-}
-
-#[tauri::command]
-async fn close_capture_window(app: AppHandle, job_id: String) -> Result<()> {
-    #[cfg(desktop)]
-    {
-        capture::close_capture(&app, &job_id);
-        Ok(())
-    }
-    #[cfg(not(desktop))]
-    {
-        let _ = job_id;
-        capture_plugin(&app).close().map_err(Error::msg)
-    }
-}
-
-// ---------------------------------------------------------------------------
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -602,6 +506,7 @@ pub fn run() {
         .plugin(tauri_plugin_pencil::init())
         .plugin(tauri_plugin_status_bar::init())
         .plugin(tauri_plugin_widget::init())
+        .plugin(tauri_plugin_scenes::init())
         .setup(|app| {
             let data_dir = app
                 .path()
@@ -670,11 +575,11 @@ pub fn run() {
             share_files,
             export_files,
             export_file,
-            open_capture_window,
-            capture_set_bounds,
-            capture_back,
-            capture_grab,
-            close_capture_window,
+            capture_commands::open_capture_window,
+            capture_commands::capture_set_bounds,
+            capture_commands::capture_back,
+            capture_commands::capture_grab,
+            capture_commands::close_capture_window,
             pdfcache::cache_pdf,
             pdfcache::read_cached_pdf,
             pdfcache::list_cached_pdfs,

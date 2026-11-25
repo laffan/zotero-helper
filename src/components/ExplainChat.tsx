@@ -29,7 +29,7 @@
 import { useEffect, useRef, useState } from "react";
 import { persistChats, sendChatMessage } from "../lib/ai/chat";
 import { partKey } from "../lib/ai/contextCache";
-import { explainContext, headExplanation } from "../lib/ai/explain";
+import { explainContext, headExplanation, partSent } from "../lib/ai/explain";
 import { formatUsd } from "../lib/ai/models";
 import { useStore } from "../lib/store";
 import type { Chat, ContextPart } from "../lib/types";
@@ -132,10 +132,11 @@ function ExplainWindow() {
     setMenu(false);
     setError(null);
     let context = "";
+    let sent: string | undefined;
     if (part) {
       setPreparing(true);
       try {
-        context = await explainContext(chat, part);
+        ({ context, sent } = await explainContext(chat, part));
       } catch (e) {
         setError(`Couldn't read the PDF: ${e}`);
         return;
@@ -158,7 +159,8 @@ function ExplainWindow() {
     s.upsertChat({
       ...cur,
       context,
-      contextPart: part ?? undefined,
+      // What of the part went, when the caps cut it ("only pp. 1–37 of 212").
+      contextPart: part ? { ...part, sent } : undefined,
       contextTokens: Math.ceil(context.length / 4),
       messages: [],
       threads: [],
@@ -297,7 +299,7 @@ function ExplainWindow() {
         )}
         <span>
           {withContext &&
-            `${chat.contextPart ? `${chat.contextPart.label} · ` : ""}${Math.round(chat.contextTokens / 1000)}K tokens · `}
+            `${chat.contextPart ? `${partSent(chat.contextPart)} · ` : ""}${Math.round(chat.contextTokens / 1000)}K tokens · `}
           {formatUsd(chat.costUsd)} spent
         </span>
       </div>

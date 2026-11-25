@@ -5,7 +5,10 @@
 // Stored on this device (src-tauri/src/notepads.rs,
 // `notepads/<attKey>.json`), loaded once and shared by every view of it
 // (reading mode's floating pad, the notes pane's half), and written a
-// moment after each change; never sent to Zotero.
+// moment after each change; never sent to Zotero. Another window with
+// the same pad open reads it again once it is written (lib/windows/),
+// unless it has changes of its own waiting.
+//
 //
 // Coordinates are the pad's own canvas, in CSS pixels; the pad pans over
 // it, so a note keeps its place on the canvas wherever the view is.
@@ -13,6 +16,7 @@ import type { PagePlace, PlaceTarget } from "../pdfviewer/places";
 import { penRestedMs, WRITING_PAUSE_MS } from "../lib/penActivity";
 import { appLog } from "../lib/store";
 import { invoke, isTauri } from "../lib/tauri";
+import { announce, hear } from "../lib/windows/channel";
 
 export interface NoteStroke {
   id: string;
@@ -136,8 +140,25 @@ export function flushNotepad(): void {
   const p = pending;
   pending = null;
   if (!p || !isTauri) return;
-  invoke("save_notepad", { attKey: p.attKey, notepad: p.pad }).catch((e) => appLog("error", `Saving the notepad failed: ${e}`));
+  invoke("save_notepad", { attKey: p.attKey, notepad: p.pad })
+    .then(() => announce("notepad", { attKey: p.attKey }))
+    .catch((e) => appLog("error", `Saving the notepad failed: ${e}`));
 }
+
+/** The views' `from` for a change another window made. */
+const elsewhere = {};
+
+/** Another window wrote `attKey`'s pad: read it into this window's —
+ *  the same object, which every view holds — and have them draw it. */
+async function reloadNotepad(attKey: string): Promise<void> {
+  const e = open.get(attKey);
+  if (!e || pending?.attKey === attKey) return;
+  const [pad, fresh] = await Promise.all([e.pad, loadNotepad(attKey)]);
+  if (pending?.attKey === attKey) return;
+  Object.assign(pad, fresh);
+  for (const fn of e.views) fn(elsewhere);
+}
+hear<{ attKey: string }>("notepad", (m) => void reloadNotepad(m.attKey));
 
 /** A link's label: the page, or the highlight's text, all of it. */
 export function linkLabel(t: PlaceTarget): string {

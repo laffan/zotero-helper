@@ -5,14 +5,18 @@
 //   event — "zh-pencil", detail `{ kind, action }`, the action being what
 //   Settings → Apple Pencil asks for — which turns the eraser shared by
 //   ink mode and the notepad on or off (lib/penTool.ts).
-// - The system's text-selection menu (Copy, Look Up, …), dismissed over
-//   a selection in the PDF, where it covers the viewer's own bar. Nothing
-//   on the page can keep it from appearing, so it is dismissed as the
-//   selection settles, once more a moment later in case it came up
-//   after, and then every quarter second while the selection lasts (a
-//   handle let go, or a tap on the selection, brings it up again without
-//   the page hearing of it). Selections elsewhere (the notes) keep
-//   their menu.
+// - The system's text-selection menu (Copy, Look Up, …), kept off a
+//   selection in the PDF, where it covers the viewer's own bar — and
+//   where, once it is up, a tap on the bar only closes it (UIKit spends
+//   the tap on the menu; the page never hears it). Nothing on the page
+//   can keep it from appearing, so the native side holds it off while a
+//   selection in the PDF lasts (`hold`: told as soon as one begins, well
+//   before the menu would show, and again when it ends); and, should it
+//   show all the same, it is dismissed as the selection settles, once
+//   more a moment later, and then every quarter second while the
+//   selection lasts (a handle let go, or a tap on the selection, brings
+//   it up again without the page hearing of it). Selections elsewhere
+//   (the notes) keep their menu.
 //
 // iPad only: elsewhere there is nothing to hear and no such menu.
 import { appLog } from "./store";
@@ -35,16 +39,25 @@ function selectionInPdf(): boolean {
 function watchPdfSelections(): void {
   let timers: number[] = [];
   let watch = 0;
+  let held = false;
+  /** The menu held off (a selection in the PDF), or let be again. */
+  const hold = (on: boolean) => {
+    if (on === held) return;
+    held = on;
+    void invoke("plugin:pencil|hide_edit_menu", { hold: on }).catch(() => {});
+  };
   const dismiss = () => {
     if (selectionInPdf()) void invoke("plugin:pencil|hide_edit_menu").catch(() => {});
     else stopWatch();
   };
   const stopWatch = () => {
+    hold(false);
     window.clearInterval(watch);
     watch = 0;
   };
   const hideSoon = () => {
     if (!selectionInPdf()) return stopWatch();
+    hold(true);
     timers.forEach(clearTimeout);
     timers = MENU_HIDE_MS.map((ms) => window.setTimeout(dismiss, ms));
     watch ||= window.setInterval(dismiss, MENU_WATCH_MS);

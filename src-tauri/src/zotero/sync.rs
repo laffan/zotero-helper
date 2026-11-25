@@ -398,10 +398,20 @@ async fn incremental_pass(
     Ok(())
 }
 
+/// One sync at a time, across the app's windows: each reads the cache,
+/// merges into it and writes it back, and two at once (a window opening
+/// as another syncs) would each write over the other's merge. The one
+/// that waits starts from the cache the first left.
+fn sync_lock() -> &'static tokio::sync::Mutex<()> {
+    static LOCK: std::sync::OnceLock<tokio::sync::Mutex<()>> = std::sync::OnceLock::new();
+    LOCK.get_or_init(|| tokio::sync::Mutex::new(()))
+}
+
 /// Full or incremental sync. Incremental sync merges changed objects and
 /// removes remotely-deleted ones without touching anything else, so
 /// local items that have not reached the server yet are preserved.
 pub async fn sync_library(app: &AppHandle, state: &AppState, full: bool) -> Result<LibraryCache> {
+    let _guard = sync_lock().lock().await;
     let mut cache = load_cache(&state.data_dir);
     let full = full || cache.version == 0;
     refresh_tag_colors(app, state, &mut cache).await;
@@ -459,6 +469,7 @@ pub async fn sync_collection(
     state: &AppState,
     collection_key: &str,
 ) -> Result<LibraryCache> {
+    let _guard = sync_lock().lock().await;
     let mut cache = load_cache(&state.data_dir);
     if cache.version == 0 {
         return Err(Error::msg("Run a full sync first — there is no local library yet"));

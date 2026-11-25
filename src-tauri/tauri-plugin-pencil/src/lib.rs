@@ -7,7 +7,10 @@
 //!   `PointerEvent.pointerType`.
 //! - `hide_edit_menu`: dismiss the system's text-selection menu (Copy,
 //!   Look Up, …), which would cover the viewer's own bar over a
-//!   selection in the PDF — and which the page has no way to suppress.
+//!   selection in the PDF — and which the page has no way to suppress —
+//!   and, with `hold`, keep it from showing while the selection lasts
+//!   (true) or let it show again (false): while it is up, a tap on the
+//!   bar only closes it.
 //!
 //! See ios/Sources/PencilPlugin.swift. Everywhere but iOS this is a
 //! no-op.
@@ -29,17 +32,23 @@ struct Pencil<R: Runtime>(PluginHandle<R>);
 #[derive(serde::Deserialize)]
 struct Empty {}
 
+#[cfg(target_os = "ios")]
+#[derive(serde::Serialize)]
+struct HideArgs {
+    hold: Option<bool>,
+}
+
 #[tauri::command]
-async fn hide_edit_menu<R: Runtime>(app: AppHandle<R>) -> Result<(), String> {
+async fn hide_edit_menu<R: Runtime>(app: AppHandle<R>, hold: Option<bool>) -> Result<(), String> {
     #[cfg(target_os = "ios")]
     {
         let handle = &app.state::<Pencil<R>>().0;
         handle
-            .run_mobile_plugin::<Empty>("hideEditMenu", ())
+            .run_mobile_plugin::<Empty>("hideEditMenu", HideArgs { hold })
             .map_err(|e| e.to_string())?;
     }
     #[cfg(not(target_os = "ios"))]
-    let _ = app;
+    let _ = (app, hold);
     Ok(())
 }
 

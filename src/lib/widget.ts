@@ -191,8 +191,12 @@ function libraryLoaded(): Promise<void> {
   });
 }
 
-/** The link the app was opened with, if any: its PDF, at its page. */
+/** The link the app was opened with, if any: its PDF, at its page. With
+ *  several windows (lib/windows/), each hears of a link and the first on
+ *  screen takes it — one out of sight leaves it for one in view, or
+ *  takes it itself as it comes into view. */
 async function openLink(): Promise<void> {
+  if (document.visibilityState === "hidden") return;
   const url = await invoke<string | null>("plugin:widget|take_open_url").catch(() => null);
   if (!url) return;
   await libraryLoaded();
@@ -230,7 +234,7 @@ export function startWidget(): void {
     if (s.library !== prev.library && s.reading?.attKey) pictureSoon();
   });
   document.addEventListener("visibilitychange", () => {
-    if (document.visibilityState !== "hidden") return;
+    if (document.visibilityState !== "hidden") return void openLink();
     window.clearTimeout(settleTimer);
     void picture().then(() => send());
   });

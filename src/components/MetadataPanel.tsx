@@ -15,6 +15,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useBookmarks } from "../lib/bookmarks";
 import { aiConnected } from "../lib/ai/models";
 import { isStandaloneAttachment } from "../lib/collections";
+import { onPaneResized, paneResizing } from "../lib/dragGesture";
 import { EXPLANATIONS, QUESTIONS, useStore, type MetaTab } from "../lib/store";
 import { WORDS } from "../lib/words";
 import { AttachmentPanel } from "./AttachmentPanel";
@@ -32,15 +33,24 @@ import { SummaryView } from "./SummaryView";
  *  a list. */
 const MAP_WIDTH = 600;
 
-/** Is the element wider than MAP_WIDTH? Follows it as it resizes. */
+/** Is the element wider than MAP_WIDTH? Follows it as it resizes — once
+ *  a pane's edge being dragged is let go, so a drag back and forth over
+ *  the width doesn't build the map and take it down again each time. */
 function useWide(ref: React.RefObject<HTMLElement>): boolean {
   const [wide, setWide] = useState(false);
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
-    const ro = new ResizeObserver(() => setWide(el.clientWidth > MAP_WIDTH));
+    const check = () => {
+      if (!paneResizing()) setWide(el.clientWidth > MAP_WIDTH);
+    };
+    const ro = new ResizeObserver(check);
     ro.observe(el);
-    return () => ro.disconnect();
+    const off = onPaneResized(check);
+    return () => {
+      ro.disconnect();
+      off();
+    };
   }, [ref]);
   return wide;
 }

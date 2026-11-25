@@ -30,6 +30,7 @@ import { SearchBox } from "./SearchBox";
 import { ReadingTitle } from "./RecentPdfs";
 import { ToolbarMenu, useDropdown } from "./ToolbarMenu";
 import { ShareMenuButton, SyncMenuButton } from "./ToolbarShareSync";
+import { WindowMenu } from "./WindowMenu";
 
 /** Folder controls are icon-only, so their glyphs carry the whole
  *  meaning and are drawn a touch larger than the labelled buttons'. */
@@ -294,6 +295,8 @@ export function Toolbar() {
         >
           <NightVisionIcon />
         </button>
+        {/* More windows (lib/windows/): duplicate, fresh, or on a PDF. */}
+        <WindowMenu />
         <button
           className="icon-btn"
           onClick={() => setView("settings")}

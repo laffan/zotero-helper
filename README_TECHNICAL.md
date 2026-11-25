@@ -98,7 +98,9 @@ src/            React + TypeScript UI (Vite, zustand, MiniSearch)
                 web's, either one a copy
   lib/dragGesture.ts
                 pointer drags (pane edges, columns, items) that keep
-                text selection off while they last
+                text selection off while they last, a move a frame;
+                a pane's edge being dragged, which what lays itself
+                out by the panes waits for
   lib/shortcuts/
                 the keyboard shortcuts: bindings (the actions, their
                 default keys, the reader's rebinding, combo parsing and
@@ -131,7 +133,12 @@ src/            React + TypeScript UI (Vite, zustand, MiniSearch)
                 status bar is hidden (the `status-bar-hidden` class)
   lib/widget.ts the iOS home-screen widget's PDFs and page pictures,
                 sent to tauri-plugin-widget; the links it opens with
-  components/   toolbar, sidebar, virtualized item list, metadata panel
+  lib/windows/  more than one window: index (opening one — a
+                duplicate, a fresh one, one on a PDF — and what a new
+                window starts from), channel (the messages between
+                windows), shared (the stores kept in step)
+  components/   toolbar (WindowMenu, its New Window menu), sidebar,
+                virtualized item list, metadata panel
                 and its tabs (Highlights — HighlightRow, one highlight,
                 HighlightFilters, the colours and the search's marks,
                 both shared with HighlightMap, the wide panel's map,
@@ -245,7 +252,8 @@ src/            React + TypeScript UI (Vite, zustand, MiniSearch)
                 (the reading questions and the "?" menu)
   styles/       one stylesheet per UI region (tokens, base, toolbar, …;
                 keyboard = the pane outline and sidebar cursor;
-                highlightmap = the Highlight Map;
+                highlightmap = the Highlight Map; windows = the
+                New Window menu;
                 pdfviewer-dark = dark pages; pdfviewer-sections =
                 the reader's sections on the pages; postits = post-its,
                 on the pages and in their tab; explanations = the
@@ -284,15 +292,21 @@ src-tauri/      Rust core (all networking + state)
   src/bookmarks.rs the reader's bookmarks on disk (bookmarks.json)
   src/dividers.rs  the reader's sections on disk (sections.json)
   src/capture.rs   desktop capture-browser window (download interception)
+  src/capture_commands.rs
+                   the capture browser's commands, desktop and iOS
   tauri-plugin-capture-view/, tauri-plugin-share-sheet/,
   tauri-plugin-keyboard-focus/, tauri-plugin-pencil/,
-  tauri-plugin-status-bar/, tauri-plugin-widget/
+  tauri-plugin-status-bar/, tauri-plugin-widget/,
+  tauri-plugin-scenes/
                    the app's own iOS plugins: the capture browser's
                    WKWebView, the share sheet, handing the web view
                    the hardware keyboard (first responder), the
-                   Apple Pencil's double-tap / squeeze, the app
-                   full screen (the status bar hidden), and the
-                   home-screen widget's data and links
+                   Apple Pencil's double-tap / squeeze (and the
+                   system's selection menu held off the PDF), the app
+                   full screen (the status bar hidden), the
+                   home-screen widget's data and links, and the iPad's
+                   windows (a window for each scene the system asks
+                   for; links to one open; monitors declined)
   ios-widget/      the Continue Reading widgets (WidgetKit, SwiftUI):
                    ContinueReading (the data, the timeline), its Views
                    and its Pins (a PDF kept in its place; the pin's
@@ -317,6 +331,14 @@ beside Recent (`src/lib/recent.ts`). None of it is written to Zotero.
 Settings that the Rust core needs (keys, the model, the rate limit) are
 the `Settings` struct, saved through `save_settings` — adding a field
 there means adding it on the Rust side too.
+
+With more than one window open (see [Multiple windows](#multiple-windows)),
+each window holds its own copy of all of this in memory. Anything one
+of them writes that the others hold too has to be announced to them
+(`src/lib/windows/channel.ts`) — a new store, a new file on disk, a
+new field of the device's UI prefs belongs in that list
+(`src/lib/windows/shared.ts`, or a `shareDisk` beside its write), or
+two windows will write over each other's copy.
 
 ### pdf.js assets
 
@@ -429,6 +451,123 @@ it changes and once more when the page asks at boot
 (`lib/statusBar.ts`); `base.css`, `readingmode.css`, `notepad.css` and
 `notepad-notes.css` keep the band only under `.ipados:not(.status-bar-hidden)`. Off the iPad
 nothing changes.
+
+### Multiple windows
+
+The app can have several windows — on the iPad, scenes (iPadOS 26
+windowing, Split View, Stage Manager); on the desktop, ordinary windows.
+The header's **New Window** button, between night vision and Settings
+(`components/WindowMenu.tsx`), opens a menu of three:
+
+- **Duplicate window** — another window showing what this one does: the
+  folder, the selection, the search and its mode, the conversation
+  open, the panels and their widths, the tab, the log — and the PDF
+  open, at the same place, in the same view and reading mode, with its
+  reading UI (the Highlights tab's search and colours, the map's view,
+  the outline). What is copied is `COPIED` in `lib/windows/index.ts`,
+  and the PDF's record from Recent, written out first (the viewer keeps
+  its place after a pause — `flushReaderView`).
+- **Fresh window** — the app as it opens: the library, with the prefs
+  it would open with.
+- **Search** — a field (focused at once where there is a keyboard and
+  pointer, not on a touch screen, where it would bring up the
+  on-screen keyboard for Duplicate too) that searches the library as
+  the list's search does (`useSearchResults`) and lists the first eight
+  entries with a PDF; one picked — a click, or ↑ ↓ and Enter — opens in
+  a window of its own, the PDF downloaded first if it isn't on this
+  device (`readItem`).
+
+iPadOS's own ways to make a window (the app icon's menu, App Exposé's
+"+") open a fresh one.
+
+*How a window is opened.* As a `WebviewWindow` from the page
+(`openWindow`): on iOS Tauri (2.11 and later) asks the system for a
+scene for it; elsewhere it takes this window's size, 30px down and to
+the right. Its label is `window-…`, which the capability
+(`capabilities/default.json`, with `core:webview:allow-create-webview-window`)
+names, or it could call nothing. What it opens on goes in its URL —
+`index.html#window=…`, JSON: a duplicate's snapshot, or the entry to
+open — read once as the page starts (`applyWindowBoot`, from
+`main.tsx`): a duplicate's state is set before the first render, so it
+is drawn as its original was from the start; an entry waits for the
+library. A web view that reloads (iPadOS reclaiming its memory) opens
+as it was first opened. The main window (`main`) has no boot.
+
+*Scenes the system asks for* come to Rust as `RunEvent::SceneRequested`,
+with no window in them: `tauri-plugin-scenes` builds one (`window-scene-N`,
+the app as it opens) for each application scene — not for a connected
+monitor's session (declined and torn down, so iPadOS mirrors instead:
+a window there boots a second copy of the app onto a screen nothing
+can reach or close), nor a role it doesn't know, nor past eight in a
+run (a stop on a loop of scenes asking for scenes). Its Swift side
+marks every scene as willing to take any link
+(`activationConditions`), so a widget's `zoterohelper://` link goes to a
+window already open rather than to a new, empty one; and it declines
+the monitor's session from the other notification too, with a hidden
+placeholder window so that a window opened meanwhile isn't put there.
+Both ported from Hush (`ios_scene.rs`, tauri-plugin-scene-reuse). The
+plist opts in (`UIApplicationSupportsMultipleScenes`, with tao's scene
+delegate still named for the application role). A link heard by every
+window is taken by the first one on screen (`openLink`, `lib/widget.ts`);
+one out of sight leaves it, or takes it as it comes into view.
+
+*What the windows share* — loosely: each window is its own (its folder,
+selection, search, the PDF it has open, its panels), and keeps the rest
+the same as the others as it changes. The messages are one Tauri event
+(`zh-windows`) sent to every window, marked with its sender, which
+passes over its own (`lib/windows/channel.ts`). What goes:
+
+- *The UI prefs that are the device's* (`SHARED_PREFS` in
+  `lib/windows/shared.ts`): the theme, the font size, night vision, tag
+  colours, the summary fields, the lists' sort, search mode and
+  columns, the folders' open state, flags, pins and views — set in
+  every window as they change. The rest of the prefs are each window's;
+  every window writes them all to `localStorage`, so the app opens next
+  time with the last written.
+- *The library.* A sync that brought a new library version: the others
+  read the cache again from the disk (`load_library`); items and
+  folders changed here (an edit, an item filed, a folder made or
+  renamed): the items themselves. Syncs run one at a time across the
+  windows (a lock in `zotero/sync.rs`) — each window syncs as it opens,
+  and two at once wrote over each other's merge.
+- *Annotations*, which aren't among those items: each change as it
+  shows, and what each push made of it (`annotationEdits.ts`), taken in
+  as the window that made it does — so a highlight made in one window's
+  pages is on another's Highlight Map at once, and stays through its
+  syncs until Zotero has it. Any window may push (the outbox is Rust's,
+  one push at a time).
+- *What is written to disk whole*: conversations, bookmarks, sections,
+  words and settings. Once a write lands, the others read it again from
+  the disk (`shareDisk`) — unless a write of their own is waiting,
+  which they announce in turn. So the last write stands everywhere; two
+  in the same moment, one is lost.
+- *Notepads*: written, the pad is read again by a window with it open
+  (into the same object its views hold, which then draw it), unless it
+  has changes of its own waiting. *Notes* (NOTES.md): read again from
+  this device by a window showing the entry's, unless they are being
+  written there.
+- *Recent and the pages PDFs were left on*: the list as the window that
+  changed it has it, and the records it changed, each kept where newer.
+  *The AI prompts and the shortcuts*: as they are.
+- *The PDFs on this device*: listed again.
+
+Not shared: the activity log and the task tray (each window's), the
+import queue, an open explainer or the cost popup, and device prefs
+kept outside the store (the pen's colour, dark pages, the view last
+chosen — read as they are needed, so a window takes the latest when it
+next reads them).
+
+*Not checked on an iPad.* None of the native side could be built here
+(no Xcode): the scenes plugin and the plist change were written from
+Hush's working versions, and the page's side was checked in a browser
+with the backend stubbed — the menu, the three ways of opening, a
+duplicate drawn as its original, and messages relayed between two
+pages (night vision followed; a highlight made in one listed in the
+other). The app's own iOS plugins were written for one window and find
+their web view as it loads, which is the first window's: the capture
+browser (PDF rescue) opens over the first window, and the Pencil's
+double-tap is heard there; the status bar is set per scene. Which of
+these hold up in a second window wants checking on the device.
 
 ### Continue Reading: the home-screen widget (iOS)
 
@@ -998,8 +1137,23 @@ it is over, and whenever a scroll nobody asked for leaves the pages
 somewhere else, the view is put back on the place; after a trip away
 the offset is also written again (a pixel off, then back, over two
 frames), so WebKit hands the native scroll view the position even when
-the page's own offset never moved. Nothing is laid out while the app
-is hidden — the relayout waits for it to come back — and a view with
+the page's own offset never moved. Nothing is laid out while a pane's
+edge is being dragged — the notes' or the outline's, the sidebar's, the
+log's height, reading mode's docked notepad (`paneResizing` in
+`lib/dragGesture.ts`): the pages keep their size and those coming into
+view are drawn, and they are laid out once, a frame after the edge is
+let go, then drawn sharp once. A quick drag used to lay them out at
+each pause of more than 80ms, and in a fitted layout draw every page in
+view again at each size on the way — in a test, 51 rasters for one drag
+back and forth across the notes' edge, against 4 now — which an iPad's
+web view, held to a budget for canvases, didn't survive. The right
+panel waits the same way before turning between the Highlights list
+and the map, which a drag back and forth over 600px built and took
+down each time, and the map's stacks are laid out again only when the
+canvas's height changes. A drag also hears one move a frame, and the
+panes' widths are read from the store by what draws them alone (the
+app's frame redrew for every change of the store). Nothing is laid out
+while the app is hidden — the relayout waits for it to come back — and a view with
 no room for a page at least 48px each way keeps the pages as they were
 (`roomToFit` in `layout.ts`). Finding the first page in view halves
 its way there, so a long book measures a dozen pages per scroll, not
@@ -1442,17 +1596,34 @@ for 1.5s (`STALE_MS`) stops holding touches and renders without being
 ended, since a Pencil resting mid-stroke may say nothing for a while.
 
 **The system's selection menu.** On the iPad, selecting text in the PDF
-also brings up the system's menu (Copy, Look Up, Translate…), over the
-viewer's own bar, and nothing on the page can stop it — CSS
-(`-webkit-touch-callout`) no longer reaches it. So as a selection in the
-PDF's text layer settles, `src/lib/pencil.ts` asks `tauri-plugin-pencil`
-to dismiss it (`hide_edit_menu`: WebKit's `UIEditMenuInteraction`, found
-among the web view's interactions, `dismissMenu()`; on iOS 15,
-`UIMenuController`), again 400ms later in case it came up after, and
-then every 250ms for as long as the selection lasts: letting go of a
-selection handle, or tapping the selection, brings the menu up again
-without the page hearing of either. It may show for a moment before it
-goes. Selections elsewhere — the notes — keep their menu.
+also brings up the system's menu (Copy, Look Up, Translate, Writing
+Tools…), over the viewer's own bar, and nothing on the page can stop it
+— CSS (`-webkit-touch-callout`) no longer reaches it. And while it is
+up, a tap on the bar only closes it: UIKit spends the tap on the menu,
+and the page hears nothing of it (the bar acts on a press's release,
+from any pointer, and still nothing came), so a colour picked after
+the menu came up did nothing, and had to be picked again.
+So `src/lib/pencil.ts` *holds the menu off* while a selection in the
+PDF's text layer lasts: as soon as one begins (its first
+`selectionchange`, long before the menu would show) it tells
+`tauri-plugin-pencil` (`hide_edit_menu` with `hold: true`; false when
+the selection ends or leaves the PDF), and the web views then answer
+`canPerformAction:withSender:` with no — the hook WebKit's content view
+asks its web view, which WKWebView subclasses use to trim the menu —
+so the menu has nothing to show. A key command is still answered (⌘C
+copies); the bar has its own Copy. It is added once, to wry's WKWebView
+subclass, leaving WebKit's class alone. Should a menu begin to show all
+the same, it is dismissed as it does (`webView:willPresentEditMenuWithAnimator:`,
+added to wry's UI delegate, which is set again on each web view, since
+WebKit notes its delegate's methods as it is set). And as before, as
+the selection settles it is dismissed (WebKit's `UIEditMenuInteraction`,
+found among the web views' interactions — in every window —
+`dismissMenu()`), again 400ms later, and then every 250ms for as long
+as the selection lasts. Selections elsewhere — the notes — keep their
+menu. The native half wasn't built here (no Xcode): whether WebKit asks
+`canPerformAction` of the web view for every item of the menu on iPadOS
+26, and so shows none, is the thing to check on the device; the
+dismissal on presentation is the fallback if it doesn't.
 
 The system's selection handles stay, and they take the touches around
 their knobs (above the first line's start, below the last line's end).
@@ -1654,7 +1825,9 @@ rest of the library; nothing extra is fetched. When the selection has
 any, the right panel gains a **Highlights** tab, a searchable browser
 modelled on [Hush](https://github.com/laffan/hush)'s highlight pane: a
 filter box that searches highlighted text, comments, page labels and
-tags; a column of colour swatches (a click shows one colour, ⌘-click —
+tags (drawn as the PDF's own find is — a magnifier at its left, an ✕
+in its place that clears it while there is a query, Escape too:
+`HighlightSearch` in `HighlightFilters.tsx`, the map's as well); a column of colour swatches (a click shows one colour, ⌘-click —
 Ctrl elsewhere — adds or removes one, as in a file list); and the
 highlights in reading
 order, each with its page and three small buttons — shown on the row
@@ -1755,15 +1928,18 @@ list's own (`HighlightFilters.tsx`, kept per PDF), so the panel crosses
 between list and map with the same ones. On the map they work
 differently: neither narrows anything — the map keeps its shape, so it
 keeps still while they change — and both fade what they leave out to a
-fifth: the colours, the cards not in them; the search, the cards that
-don't match (or that the colours leave out). The search also goes round
+fifth: the colours, the cards not in them; the search, while there is
+one, the cards that don't match — whatever their colour: a card the
+colours fade is still on the map to be found, so the search goes
+through those too, and a match among them shows. The search also goes round
 its matches in reading order — to the first a moment (250ms) after the typing
 stops, then Enter or › to the next and ⇧Enter or ‹ to the one before,
 with "2 of 7" beside the field. Each is glided to (350ms, easing out) and
 put in the middle of the view at the zoom in force, unless that is too
 small to read (under 45%, when it goes to 100%) or the card wouldn't fit.
 Matches are ringed, the one in force in the accent, and their words
-marked; the search steps over the cards the colours leave out. A tap on
+marked. (It used to step over the cards the colours faded, so with a
+colour picked, a passage in another colour couldn't be found.) A tap on
 the bare canvas lets go of the card picked.
 
 *View Notepad* (`MapNotepad.tsx`; an icon with no words — reading mode's
@@ -1862,8 +2038,12 @@ or **Visible pages** (the pages in view, as Ask About and Share count
 them). Each says what it covers, and the work's metadata — its title,
 authors, year and publication — goes with every one; the text of the
 part is read with the same local parser as Ask Full Papers, page
-markers and all, capped at 120,000 characters (`explainContext`), and
-a part says it is one. The answer is about what the passage means in
+markers and all, held to the same 120,000 characters (`explainContext`;
+see the caps under Questions, below), and a part says it is one. A
+part the cap cuts says which of its pages went — to the model ("the
+text below is cut short; only pp. 1–37 of 52 are included") and in the
+window's foot and the explanation's info ("the full text (only pp.
+1–37 of 52)": the part's `sent`, set once it is read). The answer is about what the passage means in
 this work, in under 120 words ("explain-context"). The passage's page
 goes with the question ("The passage is on page 12 of the PDF", added
 as it is sent, `askModel`), not in the context, so that every passage
@@ -2076,6 +2256,25 @@ downloads each PDF and extracts its text with the same local parser Get
 Abstract uses — the model is sent words, never a PDF, and never anything
 else about Zotero. Before any of it is sent you get a popup with the
 token count and what the first question and each one after it will cost.
+
+**What of a work is sent.** A work's text is capped — 80 pages and
+120,000 characters, about 30K tokens (`TEXT_CAPS` in
+`lib/ai/context.ts`) — so that a book isn't sent whole by accident; a
+part of a PDF (Ask About's section or pages) is held to the characters
+alone. The text is cut at a page's end, never inside one, and the
+PDF's page count is read (pdf.js, from its page tree; `countPages` in
+`lib/pdfText.ts`), so what was cut can be said exactly: "pp. 1–37 of
+212". It is said to the model, in the work's heading ("the text below
+is cut short; only pp. 1–37 of 212 are included"), and to the reader:
+the cost popup says which works only part of goes to, and how much of
+each, the caps, and offers **Send every page instead**, which reads the
+works again without the caps and prices them again (`uncapAsk`; the
+popup's check against the model's context still applies). The chat
+keeps it (`ChatSource.cut`, and `uncapped` when lifted): the line under
+a conversation's title says "full text, pp. 1–37 of 212 sent", or, for
+several works, how many were cut, with the pages of each under the
+pointer. Before, the cut was a character count wherever it fell — often
+inside a page — and all anyone was told was "cut short".
 
 Inside a conversation, the works sit at the head of every request and
 never change a byte, so after the first call the provider serves them
@@ -3029,8 +3228,10 @@ the app's WebKit targets have it, but a test browser may need a polyfill.
   quarter round — a vertical swipe arrived as a horizontal one — so the
   continuous view, which only scrolls vertically, didn't move, while a
   finger scrolled it fine. `UIApplicationSupportsIndirectInputEvents`
-  makes UIKit deliver the pointer natively, and a single-window
-  `UIApplicationSceneManifest` naming `TaoSceneDelegate` puts Tao (0.37
+  makes UIKit deliver the pointer natively, and a
+  `UIApplicationSceneManifest` naming `TaoSceneDelegate` (now with
+  `UIApplicationSupportsMultipleScenes` on — see Multiple windows; the
+  delegate is named for every application scene) puts Tao (0.37
   or later) on the scene lifecycle, so the window is created in its
   scene's orientation; without the manifest Tao starts on the legacy
   application-delegate path. Both are read from the built app, so a
@@ -3040,6 +3241,11 @@ the app's WebKit targets have it, but a test browser may need a polyfill.
   two fingers on the trackpad scroll the continuous view vertically and
   turn sets in the paged view; a finger still scrolls; the status bar
   still hides full screen and returns in a windowed layout.
+- Multiple windows: after `tauri ios init` (which writes the plist anew
+  from `Info.ios.plist`), check on a device that New Window from the
+  app icon's menu opens a fresh window, that a widget tap opens its PDF
+  in a window already open (not a new, empty one), and that a monitor
+  plugged in mirrors rather than showing a second copy of the app.
 - The capture browser works in-app on iPad via a custom plugin
   (`src-tauri/tauri-plugin-capture-view/`): a native WKWebView overlays the
   modal body, PDFs are recognized by response MIME type and downloaded

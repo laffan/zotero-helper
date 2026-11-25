@@ -51,7 +51,8 @@ Windows/Linux desktops too).
   its quote button links to the map's cards.
 - **AI helpers (optional)** — tidy metadata, extract abstracts, ask
   questions of abstracts, full papers or a part of one with page-cited
-  answers, have a selected passage explained in a few lines, with or
+  answers (a long work's text is capped at about 30K tokens; the cost
+  popup says which pages of it go, and can send every page instead), have a selected passage explained in a few lines, with or
   without the work as context (kept in Explanations and underlined in
   the pages), or a word defined (kept in Words and underlined in the
   pages), with prompts you can edit, using Anthropic or OpenAI models.
@@ -71,6 +72,13 @@ Windows/Linux desktops too).
   with it, kept in the margin where it can be.
 - **Full screen on iPad** — the status bar is hidden while the app fills
   the screen.
+- **More than one window** — the New Window button in the header (or
+  iPadOS's own New Window) opens a duplicate of the window (the same
+  folder, selection or PDF, at the same place), a fresh one, or one on a
+  PDF found from its search — say the reader in one window and the same
+  PDF's Highlight Map in another. Each window is its own; the library,
+  annotations, conversations, notes and the app's look are kept the same
+  across them as they change.
 - **Continue Reading widgets (iOS)** — home-screen widgets with the
   PDFs read last and the page each was left on, as text or as the page
   itself (highlights and ink included); a tap opens the PDF there, and

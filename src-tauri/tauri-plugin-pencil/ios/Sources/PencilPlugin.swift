@@ -15,14 +15,27 @@ import WebKit
 // equivalent of), so the Pencil does here what it does everywhere else.
 //
 // Also `hideEditMenu`: the system's text-selection menu (Copy, Look Up,
-// Translate…) comes up over a selection in the PDF and covers the
-// viewer's own bar there, and nothing on the page can stop it — CSS
-// (-webkit-touch-callout) doesn't reach it since iOS 16. So the page
-// asks for it to be dismissed as a selection in the PDF settles
-// (src/lib/pencil.ts): the menu is WebKit's UIEditMenuInteraction on its
-// content view, found among the web view's interactions and dismissed
-// (public API); on iOS 15, UIMenuController's. Selections in the notes
-// keep their menu — the page only asks for the PDF's.
+// Translate, Writing Tools…) comes up over a selection in the PDF and
+// covers the viewer's own bar there, and nothing on the page can stop it
+// — CSS (-webkit-touch-callout) doesn't reach it since iOS 16. Worse,
+// while it is up, a tap on the bar only closes it: UIKit spends the tap
+// on the menu, and the page never hears it. So:
+// - while a selection in the PDF lasts, the page holds the menu off
+//   (`hold`, src/lib/pencil.ts): the web views answer that no edit
+//   action can be performed (`canPerformAction`, which WebKit's content
+//   view asks its web view — the hook WebKit gives WKWebView subclasses
+//   to trim the menu), so the menu has nothing in it and isn't shown.
+//   Keyboard shortcuts (⌘C) are still answered. The bar has its own
+//   Copy.
+// - should a menu begin to show all the same, it is dismissed as it
+//   does (WKUIDelegate's willPresentEditMenu, added to wry's delegate),
+//   rather than when the page next looks;
+// - and the page asks for it to be dismissed as a selection settles and
+//   while it lasts: the menu is WebKit's UIEditMenuInteraction on its
+//   content view, found among each web view's interactions and dismissed
+//   (public API).
+// Selections in the notes keep their menu — the page only holds the
+// PDF's.
 //
 // Ported from Hush (tauri-plugin-pencil's PencilPlugin.swift), less its
 // status-bar and keyboard-focus duties — this app's keyboard focus is
@@ -43,19 +56,88 @@ class PencilPlugin: Plugin {
     self.interaction = interaction
   }
 
+  struct HideArgs: Decodable {
+    /// True: hold the menu off until false comes (a selection in the PDF
+    /// began, or ended). Absent: only dismiss it now.
+    let hold: Bool?
+  }
+
+  /// A selection in the PDF lasts: no edit action can be performed.
+  private static var holding = false
+  private static var guarded = false
+
   @objc public func hideEditMenu(_ invoke: Invoke) {
-    DispatchQueue.main.async { [weak self] in self?.dismissEditMenu() }
+    let hold = (try? invoke.parseArgs(HideArgs.self))?.hold
+    DispatchQueue.main.async { [weak self] in
+      if let hold = hold {
+        PencilPlugin.holding = hold
+        if hold { self?.guardEditMenu() }
+      }
+      if hold != false { PencilPlugin.dismissEditMenu() }
+    }
     invoke.resolve()
   }
 
-  private func dismissEditMenu() {
+  /// Every web view on screen, in every window (scene) of the app.
+  private static func webViews() -> [WKWebView] {
+    func find(_ view: UIView) -> [WKWebView] {
+      if let web = view as? WKWebView { return [web] }
+      return view.subviews.flatMap(find)
+    }
+    return UIApplication.shared.connectedScenes
+      .compactMap { $0 as? UIWindowScene }
+      .flatMap { $0.windows }
+      .flatMap { find($0) }
+  }
+
+  private static func dismissEditMenu() {
     if #available(iOS 16.0, *) {
-      guard let web = webView else { return }
-      for case let menu as UIEditMenuInteraction in PencilPlugin.interactions(in: web) {
-        menu.dismissMenu()
+      for web in webViews() {
+        for case let menu as UIEditMenuInteraction in interactions(in: web) {
+          menu.dismissMenu()
+        }
       }
     } else {
       UIMenuController.shared.hideMenu()
+    }
+  }
+
+  /// Once: the web views' class answers `canPerformAction` with no while
+  /// the menu is held (a key command apart), and their UI delegate hears
+  /// of a menu about to show, to dismiss it. Both are added to the
+  /// classes wry made (a WKWebView subclass, its delegate), leaving
+  /// WebKit's own alone.
+  private func guardEditMenu() {
+    guard !PencilPlugin.guarded, let web = webView ?? PencilPlugin.webViews().first,
+          let cls = object_getClass(web) else { return }
+    PencilPlugin.guarded = true
+
+    let can = #selector(UIResponder.canPerformAction(_:withSender:))
+    if let method = class_getInstanceMethod(cls, can) {
+      typealias Can = @convention(c) (AnyObject, Selector, Selector, AnyObject?) -> Bool
+      let original = unsafeBitCast(method_getImplementation(method), to: Can.self)
+      let held: @convention(block) (AnyObject, Selector, AnyObject?) -> Bool = { this, action, sender in
+        if PencilPlugin.holding && !(sender is UIKeyCommand) { return false }
+        return original(this, can, action, sender)
+      }
+      let imp = imp_implementationWithBlock(held)
+      if !class_addMethod(cls, can, imp, method_getTypeEncoding(method)) {
+        method_setImplementation(method, imp)
+      }
+    }
+
+    if #available(iOS 16.4, *), let delegate = web.uiDelegate, let dcls = object_getClass(delegate) {
+      let present = #selector(WKUIDelegate.webView(_:willPresentEditMenuWithAnimator:))
+      if class_getInstanceMethod(dcls, present) == nil {
+        let showing: @convention(block) (AnyObject, AnyObject, AnyObject) -> Void = { _, _, _ in
+          if PencilPlugin.holding { DispatchQueue.main.async { PencilPlugin.dismissEditMenu() } }
+        }
+        class_addMethod(dcls, present, imp_implementationWithBlock(showing), "v@:@@")
+        // WebKit notes which methods its delegate has as it is set.
+        for view in PencilPlugin.webViews() where view.uiDelegate === delegate {
+          view.uiDelegate = delegate
+        }
+      }
     }
   }
 
